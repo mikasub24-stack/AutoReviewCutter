@@ -35,8 +35,8 @@ echo "::endgroup::"
 echo "::group::audio.cpp (host) biên dịch"
 cmake --build "$WORK/build-audio-host" -j "$JOBS" --target audiocpp
 echo "::endgroup::"
-AUDIO_SO="$(find "$WORK/build-audio-host" -name 'libaudiocpp.so' -type f | head -n1)"
-[ -n "$AUDIO_SO" ] || { echo "Không thấy libaudiocpp.so"; exit 11; }
+AUDIO_SO="$(find "$WORK/build-audio-host" -name 'libaudiocpp.so' \( -type f -o -type l \) | head -n1)"
+[ -n "$AUDIO_SO" ] || { echo "Không thấy libaudiocpp.so"; find "$WORK/build-audio-host" -name 'libaudiocpp*' | head -20; exit 11; }
 cp -L "$AUDIO_SO" "$OUT/lib/libaudiocpp.so"
 # smoke sẽ cần đúng SONAME của thư viện (thường là libaudiocpp.so.0): chép thêm một bản mang tên đó
 SONAME="$(readelf -d "$OUT/lib/libaudiocpp.so" | sed -n 's/.*Library soname: \[\(.*\)\].*/\1/p')"

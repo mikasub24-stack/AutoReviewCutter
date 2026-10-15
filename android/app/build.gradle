@@ -61,6 +61,12 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.0'
 }
 
+// kotlin-stdlib 1.8+ đã gộp sẵn jdk7/jdk8; bản cũ 1.6.x kéo theo gây trùng lớp khi dựng.
+configurations.configureEach {
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }

@@ -73,7 +73,7 @@ fi
 echo "::endgroup::"
 
 # gom thư viện
-find "$AB" -name '*.so' -type f \( -name 'libaudiocpp*.so' -o -name 'libggml*.so' \) -print0 | while IFS= read -r -d '' f; do
+find "$AB" -name '*.so' \( -type f -o -type l \) \( -name 'libaudiocpp*.so' -o -name 'libggml*.so' \) -print0 | while IFS= read -r -d '' f; do
     cp -L "$f" "$STAGE/$(basename "$f")"
 done
 [ -f "$STAGE/libaudiocpp.so" ] || { echo "Không thấy libaudiocpp.so sau khi dựng"; find "$AB" -name '*.so*' | head -50; exit 11; }
