@@ -1,0 +1,101 @@
+# apk-final  run=38757457253 #19  status=success  2026-10-15T15:10:53Z
+## các dòng lỗi (tối đa 120)
+
+## 400 dòng cuối
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.10.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:mergeReleaseJniLibFolders
+> Task :app:mergeReleaseNativeLibs
+> Task :app:checkReleaseDuplicateClasses
+> Task :app:javaPreCompileRelease
+
+> Task :app:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libaudiocpp.so, libc++_shared.so, libggml-base.so, libggml-cpu-android_armv8.0_1.so, libggml-cpu-android_armv8.2_1.so, libggml-cpu-android_armv8.2_2.so, libggml-cpu-android_armv8.6_1.so, libggml-cpu-android_armv9.0_1.so, libggml-cpu-android_armv9.2_1.so, libggml-cpu-android_armv9.2_2.so, libggml.so, libninhdon.so, libsea_g2p_rs.s
+
+> Task :app:generateReleaseResValues
+> Task :app:extractReleaseNativeSymbolTables
+> Task :app:checkReleaseAarMetadata
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:generateReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:mergeReleaseResources
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease
+> Task :app:parseReleaseLocalResources
+> Task :app:processReleaseMainManifest
+> Task :app:processReleaseManifest
+> Task :app:desugarReleaseFileDependencies
+> Task :app:mergeReleaseStartupProfile
+> Task :app:processReleaseManifestForPackage
+> Task :app:processReleaseResources
+> Task :app:mergeExtDexRelease
+> Task :app:compileReleaseJavaWithJavac
+> Task :app:dexBuilderRelease
+> Task :app:mergeReleaseArtProfile
+> Task :app:mergeReleaseGlobalSynthetics
+> Task :app:mergeReleaseShaders
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:processReleaseJavaRes NO-SOURCE
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:optimizeReleaseResources
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:mergeReleaseJavaResource
+> Task :app:mergeDexRelease
+> Task :app:compileReleaseArtProfile
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1792077010725.json
+
+BUILD SUCCESSFUL in 44s
+41 actionable tasks: 41 executed
+     2376  1981-01-01 01:01   assets/dexopt/baseline.prof
+      225  1981-01-01 01:01   assets/dexopt/baseline.profm
+ 38453840  1981-01-01 01:01   lib/arm64-v8a/libaudiocpp.so
+  9485032  1981-01-01 01:01   lib/arm64-v8a/libc++_shared.so
+  5093664  1981-01-01 01:01   lib/arm64-v8a/libggml-base.so
+  4241672  1981-01-01 01:01   lib/arm64-v8a/libggml-cpu-android_armv8.0_1.so
+  4432200  1981-01-01 01:01   lib/arm64-v8a/libggml-cpu-android_armv8.2_1.so
+  4432608  1981-01-01 01:01   lib/arm64-v8a/libggml-cpu-android_armv8.2_2.so
+  4552544  1981-01-01 01:01   lib/arm64-v8a/libggml-cpu-android_armv8.6_1.so
+  4583456  1981-01-01 01:01   lib/arm64-v8a/libggml-cpu-android_armv9.0_1.so
+  4583456  1981-01-01 01:01   lib/arm64-v8a/libggml-cpu-android_armv9.2_1.so
+  4583456  1981-01-01 01:01   lib/arm64-v8a/libggml-cpu-android_armv9.2_2.so
+   442520  1981-01-01 01:01   lib/arm64-v8a/libggml.so
+   258944  1981-01-01 01:01   lib/arm64-v8a/libninhdon.so
+  6516128  1981-01-01 01:01   lib/arm64-v8a/libsea_g2p_rs.so
+      440  1981-01-01 01:01   assets/files.txt
+     6263  1981-01-01 01:01   assets/voices/adam/ref_codes.txt
+     1834  1981-01-01 01:01   assets/voices/adam/speaker.emb.txt
+     6244  1981-01-01 01:01   assets/voices/ninh_don/ref_codes.txt
+     1829  1981-01-01 01:01   assets/voices/ninh_don/speaker.emb.txt
+     6264  1981-01-01 01:01   assets/voices/tung_dang/ref_codes.txt
+     1828  1981-01-01 01:01   assets/voices/tung_dang/speaker.emb.txt
+       17  1981-01-01 01:01   assets/voices/version.txt
+       54  1981-01-01 01:01   assets/voices/voices.txt
+V2 Signer: certificate DN: CN=Ninh Don TTS, O=Ca nhan, C=VN
+V2 Signer: certificate SHA-256 digest: 787e8e9286599673c99caf74b1a0ea71752dcef784d9145f58feb84b24d552c9
+V2 Signer: certificate SHA-1 digest: 1cafb3831e053f4aa49c719b9743bd203d037391
+V2 Signer: certificate MD5 digest: b159d8d1b4bca73dd93fc0476691ac33
+package: name='vn.ninhdon.tts' versionCode='19' versionName='1.0.19' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+minSdkVersion:'29'
+targetSdkVersion:'34'
+uses-permission: name='android.permission.INTERNET'
+uses-permission: name='android.permission.WAKE_LOCK'
+uses-permission: name='vn.ninhdon.tts.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+application-label:'Ninh Đôn TTS'
+application-label-af:'Ninh Đôn TTS'
+application-label-am:'Ninh Đôn TTS'
+application-label-ar:'Ninh Đôn TTS'
+application-label-as:'Ninh Đôn TTS'
+application-label-az:'Ninh Đôn TTS'

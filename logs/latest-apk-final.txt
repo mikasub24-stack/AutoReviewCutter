@@ -1,4 +1,4 @@
-# apk-final  run=38745654642 #18  status=success  2026-10-15T13:53:03Z
+# apk-final  run=38757457253 #19  status=success  2026-10-15T15:10:53Z
 ## các dòng lỗi (tối đa 120)
 
 ## 400 dòng cuối
@@ -10,16 +10,16 @@ Daemon will be stopped at the end of the build
 > Task :app:mergeReleaseNativeLibs
 > Task :app:checkReleaseDuplicateClasses
 > Task :app:javaPreCompileRelease
-> Task :app:generateReleaseResValues
-> Task :app:checkReleaseAarMetadata
 
 > Task :app:stripReleaseDebugSymbols
 Unable to strip the following libraries, packaging them as they are: libaudiocpp.so, libc++_shared.so, libggml-base.so, libggml-cpu-android_armv8.0_1.so, libggml-cpu-android_armv8.2_1.so, libggml-cpu-android_armv8.2_2.so, libggml-cpu-android_armv8.6_1.so, libggml-cpu-android_armv9.0_1.so, libggml-cpu-android_armv9.2_1.so, libggml-cpu-android_armv9.2_2.so, libggml.so, libninhdon.so, libsea_g2p_rs.s
 
-> Task :app:mapReleaseSourceSetPaths
-> Task :app:generateReleaseResources
+> Task :app:generateReleaseResValues
 > Task :app:extractReleaseNativeSymbolTables
+> Task :app:checkReleaseAarMetadata
+> Task :app:mapReleaseSourceSetPaths
 > Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:generateReleaseResources
 > Task :app:packageReleaseResources
 > Task :app:mergeReleaseResources
 > Task :app:createReleaseCompatibleScreenManifests
@@ -45,9 +45,9 @@ Unable to strip the following libraries, packaging them as they are: libaudiocpp
 > Task :app:processReleaseJavaRes NO-SOURCE
 > Task :app:collectReleaseDependencies
 > Task :app:sdkReleaseDependencyData
+> Task :app:optimizeReleaseResources
 > Task :app:validateSigningRelease
 > Task :app:writeReleaseAppMetadata
-> Task :app:optimizeReleaseResources
 > Task :app:writeReleaseSigningConfigVersions
 > Task :app:mergeReleaseJavaResource
 > Task :app:mergeDexRelease
@@ -55,11 +55,11 @@ Unable to strip the following libraries, packaging them as they are: libaudiocpp
 > Task :app:packageRelease
 > Task :app:createReleaseApkListingFileRedirect
 > Task :app:assembleRelease
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1792072344376.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1792077010725.json
 
-BUILD SUCCESSFUL in 38s
+BUILD SUCCESSFUL in 44s
 41 actionable tasks: 41 executed
-     2103  1981-01-01 01:01   assets/dexopt/baseline.prof
+     2376  1981-01-01 01:01   assets/dexopt/baseline.prof
       225  1981-01-01 01:01   assets/dexopt/baseline.profm
  38453840  1981-01-01 01:01   lib/arm64-v8a/libaudiocpp.so
   9485032  1981-01-01 01:01   lib/arm64-v8a/libc++_shared.so
@@ -87,7 +87,7 @@ V2 Signer: certificate DN: CN=Ninh Don TTS, O=Ca nhan, C=VN
 V2 Signer: certificate SHA-256 digest: 787e8e9286599673c99caf74b1a0ea71752dcef784d9145f58feb84b24d552c9
 V2 Signer: certificate SHA-1 digest: 1cafb3831e053f4aa49c719b9743bd203d037391
 V2 Signer: certificate MD5 digest: b159d8d1b4bca73dd93fc0476691ac33
-package: name='vn.ninhdon.tts' versionCode='18' versionName='1.0.18' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+package: name='vn.ninhdon.tts' versionCode='19' versionName='1.0.19' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
 minSdkVersion:'29'
 targetSdkVersion:'34'
 uses-permission: name='android.permission.INTERNET'
