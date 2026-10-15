@@ -1,6 +1,16 @@
 plugins { id 'com.android.application' }
-android { namespace 'com.autoreview.cutter'; compileSdk 35
- defaultConfig { applicationId 'com.autoreview.cutter'; minSdk 26; targetSdk 28; versionCode 1; versionName '0.1' }
+android {
+ // namespace giữ nguyên để mã nguồn dùng chung; applicationId khác để cài song song với app cũ.
+ namespace 'com.autoreview.cutter'
+ compileSdk 35
+ defaultConfig { applicationId 'com.autoreview.cutter.scene'; minSdk 26; targetSdk 28; versionCode 1; versionName '1.0-scene' }
+ // Khoá ký cố định (nằm trong repo): bản mới cài đè được bản cũ, không phải gỡ app.
+ signingConfigs { fixed { storeFile file('../keystore/arcplus.jks'); storePassword 'arcplus2026'; keyAlias 'arcplus'; keyPassword 'arcplus2026' } }
+ buildTypes {
+  debug { signingConfig signingConfigs.fixed }
+  release { signingConfig signingConfigs.fixed; minifyEnabled false }
+ }
+ lint { checkReleaseBuilds false; abortOnError false }
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 dependencies { implementation 'dev.ffmpegkit-maintained:ffmpeg-kit-full-gpl:8.1.9' }
