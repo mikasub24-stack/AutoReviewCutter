@@ -1,0 +1,98 @@
+# apk  run=38752020832 #2  status=success  2026-10-15T14:31:13Z
+## các dòng lỗi (tối đa 120)
+
+## 400 dòng cuối
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.10.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:mergeReleaseJniLibFolders
+> Task :app:checkReleaseDuplicateClasses
+> Task :app:javaPreCompileRelease
+> Task :app:generateReleaseResValues
+> Task :app:checkReleaseAarMetadata
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:generateReleaseResources
+> Task :app:mergeReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:mergeReleaseNativeLibs
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease
+> Task :app:parseReleaseLocalResources
+> Task :app:processReleaseMainManifest
+
+> Task :app:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libavcodec.so, libavdevice.so, libavfilter.so, libavformat.so, libavutil.so, libc++_shared.so, libffmpegkit.so, libffmpegkit_abidetect.so, libswresample.so, libswscale.so.
+
+> Task :app:processReleaseManifest
+> Task :app:desugarReleaseFileDependencies
+> Task :app:mergeReleaseStartupProfile
+> Task :app:extractReleaseNativeSymbolTables
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:processReleaseManifestForPackage
+> Task :app:mergeReleaseArtProfile
+> Task :app:mergeReleaseShaders
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:mergeExtDexRelease
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:processReleaseJavaRes NO-SOURCE
+> Task :app:processReleaseResources
+> Task :app:mergeReleaseJavaResource
+> Task :app:collectReleaseDependencies
+> Task :app:compileReleaseJavaWithJavac
+> Task :app:dexBuilderRelease
+> Task :app:mergeReleaseGlobalSynthetics
+> Task :app:mergeDexRelease
+> Task :app:sdkReleaseDependencyData
+> Task :app:compileReleaseArtProfile
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:optimizeReleaseResources
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1792074653491.json
+
+BUILD SUCCESSFUL in 18s
+41 actionable tasks: 41 executed
+V2 Signer: certificate DN: CN=Auto Review Cutter Plus, O=Personal, C=VN
+V2 Signer: certificate SHA-256 digest: 7f669668a55818db774565eef03dc74812f7b4c25042deee94967e4a5b3154c5
+V2 Signer: certificate SHA-1 digest: 7bce064688e1cb2211a8864d7430f5dca601cc9c
+V2 Signer: certificate MD5 digest: 80a0da7bed201209f6954d64c430cae9
+package: name='com.autoreview.cutter.scene' versionCode='1' versionName='1.0-scene' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+minSdkVersion:'26'
+targetSdkVersion:'28'
+application-label:'Auto Review Cutter+'
+application: label='Auto Review Cutter+' icon=''
+launchable-activity: name='com.autoreview.cutter.MainActivity'  label='' icon=''
+feature-group: label=''
+  uses-feature: name='android.hardware.faketouch'
+  uses-implied-feature: name='android.hardware.faketouch' reason='default feature for all apps'
+main
+supports-screens: 'small' 'normal' 'large' 'xlarge'
+supports-any-density: 'true'
+   112500  1981-01-01 01:01   classes.dex
+ 22054608  1981-01-01 01:01   lib/arm64-v8a/libavcodec.so
+    56640  1981-01-01 01:01   lib/arm64-v8a/libavdevice.so
+  7061672  1981-01-01 01:01   lib/arm64-v8a/libavfilter.so
+  3561800  1981-01-01 01:01   lib/arm64-v8a/libavformat.so
+   559592  1981-01-01 01:01   lib/arm64-v8a/libavutil.so
+  1794776  1981-01-01 01:01   lib/arm64-v8a/libc++_shared.so
+   467872  1981-01-01 01:01   lib/arm64-v8a/libffmpegkit.so
+    30704  1981-01-01 01:01   lib/arm64-v8a/libffmpegkit_abidetect.so
+   205504  1981-01-01 01:01   lib/arm64-v8a/libswresample.so
+   545920  1981-01-01 01:01   lib/arm64-v8a/libswscale.so
+ 28559848  1981-01-01 01:01   lib/x86_64/libavcodec.so
+    57408  1981-01-01 01:01   lib/x86_64/libavdevice.so
+  7908160  1981-01-01 01:01   lib/x86_64/libavfilter.so
+  3725400  1981-01-01 01:01   lib/x86_64/libavformat.so
+   692832  1981-01-01 01:01   lib/x86_64/libavutil.so
+  1617608  1981-01-01 01:01   lib/x86_64/libc++_shared.so
+   480432  1981-01-01 01:01   lib/x86_64/libffmpegkit.so
+    43560  1981-01-01 01:01   lib/x86_64/libffmpegkit_abidetect.so
+   344072  1981-01-01 01:01   lib/x86_64/libswresample.so
+   854024  1981-01-01 01:01   lib/x86_64/libswscale.so
