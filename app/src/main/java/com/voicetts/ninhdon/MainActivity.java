@@ -147,9 +147,16 @@ public class MainActivity extends Activity {
       }
       File list=new File(dir,"concat.txt");
       try(FileOutputStream fos=new FileOutputStream(list)){
-        for(File wav:wavs){
-          String line="file "+quote(wav)+"\n";
-          fos.write(line.getBytes(StandardCharsets.UTF_8));
+        for(int k=0;k<wavs.size();k++){
+          File wav=wavs.get(k);
+          fos.write(("file "+quote(wav)+"\n").getBytes(StandardCharsets.UTF_8));
+          if(k<wavs.size()-1 && pauseMs>0){
+            File silence=new File(dir,"silence_"+k+".wav");
+            String scmd="-y -f lavfi -i anullsrc=r=24000:cl=mono -t "+String.format(Locale.US,"%.3f",pauseMs/1000.0)+" -c:a pcm_s16le "+quote(silence);
+            com.arthenica.ffmpegkit.FFmpegSession sr=FFmpegKit.execute(scmd);
+            if(!ReturnCode.isSuccess(sr.getReturnCode()))throw new IOException("Không tạo được khoảng nghỉ");
+            fos.write(("file "+quote(silence)+"\n").getBytes(StandardCharsets.UTF_8));
+          }
         }
       }
       show("Đang ghép và mã hóa MP3...");
