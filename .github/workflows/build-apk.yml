@@ -1,7 +1,7 @@
-name: Build APK
+name: Build Voice TTS APK
 on:
   push:
-    branches: [main]
+    branches: [voice-tts-android]
   workflow_dispatch:
 jobs:
   build:
@@ -18,5 +18,5 @@ jobs:
       - run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: AutoReviewCutter-APK
+          name: Voice-TTS-Android-APK
           path: app/build/outputs/apk/debug/*.apk
