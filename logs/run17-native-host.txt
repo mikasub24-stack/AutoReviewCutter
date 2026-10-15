@@ -1,0 +1,405 @@
+# native-host  run=38744739702 #17  status=failure  2026-10-15T13:44:51Z
+## các dòng lỗi (tối đa 120)
+252:[63/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/error.cc.o
+
+## 400 dòng cuối
+[51/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/stringpiece.cc.o
+[52/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/stringprintf.cc.o
+[53/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/structurally_valid.cc.o
+[54/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/repeated_field.cc.o
+In file included from /usr/include/string.h:548,
+                 from /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/port.h:39,
+                 from /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/macros.h:34,
+                 from /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/stubs/logging.h:34,
+                 from /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:60,
+                 from /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/third_party/protobuf-lite/repeated_field.cc:35:
+In function ‘void* memcpy(void*, const void*, size_t)’,
+    inlined from ‘void google::protobuf::internal::ElementCopier<Element, true>::operator()(Element*, const Element*, int) [with Element = bool]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1639:11,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::CopyArray(Element*, const Element*, int) [with Element = bool]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1624:37,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::MoveArray(Element*, Element*, int) [with Element = bool]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1618:12,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::Reserve(int) [with Element = bool]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1599:14,
+    inlined from ‘google::protobuf::RepeatedField<Element>::RepeatedField(const google::protobuf::RepeatedField<Element>&) [with Element = bool]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1194:12:
+/usr/include/x86_64-linux-gnu/bits/string_fortified.h:29:33: warning: ‘void* __builtin_memcpy(void*, const void*, long unsigned int)’ offset 0 is out of the bounds [0, 0] [-Warray-bounds=]
+   29 |   return __builtin___memcpy_chk (__dest, __src, __len,
+      |          ~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+   30 |                                  __glibc_objsize0 (__dest));
+      |                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~
+In function ‘void* memcpy(void*, const void*, size_t)’,
+    inlined from ‘void google::protobuf::internal::ElementCopier<Element, true>::operator()(Element*, const Element*, int) [with Element = int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1639:11,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::CopyArray(Element*, const Element*, int) [with Element = int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1624:37,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::MoveArray(Element*, Element*, int) [with Element = int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1618:12,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::Reserve(int) [with Element = int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1599:14,
+    inlined from ‘google::protobuf::RepeatedField<Element>::RepeatedField(const google::protobuf::RepeatedField<Element>&) [with Element = int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1194:12:
+/usr/include/x86_64-linux-gnu/bits/string_fortified.h:29:33: warning: ‘void* __builtin_memcpy(void*, const void*, long unsigned int)’ offset [0, 3] is out of the bounds [0, 0] [-Warray-bounds=]
+   29 |   return __builtin___memcpy_chk (__dest, __src, __len,
+      |          ~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+   30 |                                  __glibc_objsize0 (__dest));
+      |                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~
+In function ‘void* memcpy(void*, const void*, size_t)’,
+    inlined from ‘void google::protobuf::internal::ElementCopier<Element, true>::operator()(Element*, const Element*, int) [with Element = unsigned int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1639:11,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::CopyArray(Element*, const Element*, int) [with Element = unsigned int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1624:37,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::MoveArray(Element*, Element*, int) [with Element = unsigned int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1618:12,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::Reserve(int) [with Element = unsigned int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1599:14,
+    inlined from ‘google::protobuf::RepeatedField<Element>::RepeatedField(const google::protobuf::RepeatedField<Element>&) [with Element = unsigned int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1194:12:
+/usr/include/x86_64-linux-gnu/bits/string_fortified.h:29:33: warning: ‘void* __builtin_memcpy(void*, const void*, long unsigned int)’ offset [0, 3] is out of the bounds [0, 0] [-Warray-bounds=]
+   29 |   return __builtin___memcpy_chk (__dest, __src, __len,
+      |          ~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+   30 |                                  __glibc_objsize0 (__dest));
+      |                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~
+In function ‘void* memcpy(void*, const void*, size_t)’,
+    inlined from ‘void google::protobuf::internal::ElementCopier<Element, true>::operator()(Element*, const Element*, int) [with Element = long int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1639:11,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::CopyArray(Element*, const Element*, int) [with Element = long int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1624:37,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::MoveArray(Element*, Element*, int) [with Element = long int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1618:12,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::Reserve(int) [with Element = long int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1599:14,
+    inlined from ‘google::protobuf::RepeatedField<Element>::RepeatedField(const google::protobuf::RepeatedField<Element>&) [with Element = long int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1194:12:
+/usr/include/x86_64-linux-gnu/bits/string_fortified.h:29:33: warning: ‘void* __builtin_memcpy(void*, const void*, long unsigned int)’ offset [0, 7] is out of the bounds [0, 0] [-Warray-bounds=]
+   29 |   return __builtin___memcpy_chk (__dest, __src, __len,
+      |          ~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+   30 |                                  __glibc_objsize0 (__dest));
+      |                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~
+In function ‘void* memcpy(void*, const void*, size_t)’,
+    inlined from ‘void google::protobuf::internal::ElementCopier<Element, true>::operator()(Element*, const Element*, int) [with Element = long unsigned int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1639:11,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::CopyArray(Element*, const Element*, int) [with Element = long unsigned int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1624:37,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::MoveArray(Element*, Element*, int) [with Element = long unsigned int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1618:12,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::Reserve(int) [with Element = long unsigned int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1599:14,
+    inlined from ‘google::protobuf::RepeatedField<Element>::RepeatedField(const google::protobuf::RepeatedField<Element>&) [with Element = long unsigned int]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1194:12:
+/usr/include/x86_64-linux-gnu/bits/string_fortified.h:29:33: warning: ‘void* __builtin_memcpy(void*, const void*, long unsigned int)’ offset [0, 7] is out of the bounds [0, 0] [-Warray-bounds=]
+   29 |   return __builtin___memcpy_chk (__dest, __src, __len,
+      |          ~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+   30 |                                  __glibc_objsize0 (__dest));
+      |                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~
+In function ‘void* memcpy(void*, const void*, size_t)’,
+    inlined from ‘void google::protobuf::internal::ElementCopier<Element, true>::operator()(Element*, const Element*, int) [with Element = float]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1639:11,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::CopyArray(Element*, const Element*, int) [with Element = float]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1624:37,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::MoveArray(Element*, Element*, int) [with Element = float]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1618:12,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::Reserve(int) [with Element = float]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1599:14,
+    inlined from ‘google::protobuf::RepeatedField<Element>::RepeatedField(const google::protobuf::RepeatedField<Element>&) [with Element = float]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1194:12:
+/usr/include/x86_64-linux-gnu/bits/string_fortified.h:29:33: warning: ‘void* __builtin_memcpy(void*, const void*, long unsigned int)’ offset [0, 3] is out of the bounds [0, 0] [-Warray-bounds=]
+   29 |   return __builtin___memcpy_chk (__dest, __src, __len,
+      |          ~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+   30 |                                  __glibc_objsize0 (__dest));
+      |                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~
+In function ‘void* memcpy(void*, const void*, size_t)’,
+    inlined from ‘void google::protobuf::internal::ElementCopier<Element, true>::operator()(Element*, const Element*, int) [with Element = double]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1639:11,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::CopyArray(Element*, const Element*, int) [with Element = double]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1624:37,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::MoveArray(Element*, Element*, int) [with Element = double]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1618:12,
+    inlined from ‘void google::protobuf::RepeatedField<Element>::Reserve(int) [with Element = double]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1599:14,
+    inlined from ‘google::protobuf::RepeatedField<Element>::RepeatedField(const google::protobuf::RepeatedField<Element>&) [with Element = double]’ at /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/sentencepiece/src/../third_party/protobuf-lite/google/protobuf/repeated_field.h:1194:12:
+/usr/include/x86_64-linux-gnu/bits/string_fortified.h:29:33: warning: ‘void* __builtin_memcpy(void*, const void*, long unsigned int)’ offset [0, 7] is out of the bounds [0, 0] [-Warray-bounds=]
+   29 |   return __builtin___memcpy_chk (__dest, __src, __len,
+      |          ~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+   30 |                                  __glibc_objsize0 (__dest));
+      |                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~
+[55/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/time.cc.o
+[56/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/zero_copy_stream.cc.o
+[57/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/strutil.cc.o
+[58/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/wire_format_lite.cc.o
+[59/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/zero_copy_stream_impl.cc.o
+[60/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/zero_copy_stream_impl_lite.cc.o
+[61/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/builtin_pb/sentencepiece.pb.cc.o
+[62/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/char_model.cc.o
+[63/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/error.cc.o
+[64/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/bpe_model.cc.o
+[65/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/builtin_pb/sentencepiece_model.pb.cc.o
+[66/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/filesystem.cc.o
+[67/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/model_factory.cc.o
+[68/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/model_interface.cc.o
+[69/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/normalizer.cc.o
+[70/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/util.cc.o
+[71/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/word_model.cc.o
+[72/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/absl/flags/flag.cc.o
+[73/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/sentencepiece_processor.cc.o
+[74/277] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/unigram_model.cc.o
+[75/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/assets/resource_bundle.cpp.o
+[76/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/model_spec/options.cpp.o
+[77/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/model_spec/package.cpp.o
+[78/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/model_spec/schema.cpp.o
+[79/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/assets/weight_norm_folding.cpp.o
+[80/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/assets/lora_tensor_source.cpp.o
+[81/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/core/module.cpp.o
+[82/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/core/attention_fallback.cpp.o
+[83/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/core/deferred_tensor_writer.cpp.o
+[84/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/core/execution_context.cpp.o
+[85/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/core/host_memory.cpp.o
+[86/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/core/backend.cpp.o
+[87/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/assets/torch_bin.cpp.o
+[88/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/core/load_progress.cpp.o
+[89/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/model.cpp.o
+[90/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/assets/tensor_source.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/assets/tensor_source.cpp:355: warning: ignoring ‘#pragma omp parallel’ [-Wunknown-pragmas]
+  355 |         #pragma omp parallel for schedule(static)
+      | 
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/assets/tensor_source.cpp:372: warning: ignoring ‘#pragma omp parallel’ [-Wunknown-pragmas]
+  372 |     #pragma omp parallel for schedule(static)
+      | 
+[91/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/partial_text.cpp.o
+[92/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/task_vocabulary.cpp.o
+[93/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/artifacts.cpp.o
+[94/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/cache.cpp.o
+[95/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/session.cpp.o
+[96/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/graph_executor.cpp.o
+[97/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/graph_optimizer.cpp.o
+[98/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/model_spec/metadata.cpp.o
+[99/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/bounded_static_kv_decode.cpp.o
+[100/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/host_ops.cpp.o
+[101/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/kv_cache.cpp.o
+[102/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/workspace.cpp.o
+[103/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/options.cpp.o
+[104/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/session_base.cpp.o
+[105/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/io/filesystem.cpp.o
+[106/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/greedy_causal_decoder.cpp.o
+[107/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/espeak_phonemizer.cpp.o
+[108/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/midi/midi_file.cpp.o
+[109/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/io/text.cpp.o
+[110/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/io/json.cpp.o
+[111/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/io/config.cpp.o
+[112/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/espeak_data.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/text/espeak_data.cpp: In function ‘std::filesystem::__cxx11::path engine::audio::materialize_espeak_data(const std::filesystem::__cxx11::path&)’:
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/text/espeak_data.cpp:165:44: warning: ignoring attributes on template argument ‘int (*)(FILE*)’ [-Wignored-attributes]
+  165 |     std::unique_ptr<FILE, decltype(&fclose)> input(fopen(package.c_str(), "rb"), fclose);
+      |                                            ^
+[113/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/chunking.cpp.o
+[114/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/subtitle.cpp.o
+[115/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/moss_tts_normalization.cpp.o
+[116/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/unicode_normalization.cpp.o
+[117/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/chinese_normalization.cpp.o
+[118/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/io/yaml.cpp.o
+[119/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/io/binary.cpp.o
+[120/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/text_normalization.cpp.o
+[121/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/debug/trace.cpp.o
+[122/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/debug/profiler.cpp.o
+[123/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/rknn/engine.cpp.o
+[124/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/io/safetensors.cpp.o
+[125/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/chinese_variant.cpp.o
+[126/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/moss_tts_delay/config.cpp.o
+[127/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/moss_tts_delay/delay_decoder.cpp.o
+[128/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/tdt_decoder_runner.cpp.o
+[129/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/moss_tts_delay/prompt.cpp.o
+[130/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/moss_tts_delay/heads.cpp.o
+[131/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/tdt_decoder_greedy_customized.cpp.o
+[132/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/moss_tts_delay/backbone.cpp.o
+[133/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/tdt_decoder_greedy_separate_heads.cpp.o
+[134/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/tdt_decoder_greedy_duration_loop.cpp.o
+[135/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/linear_module.cpp.o
+[136/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/convnext_modules.cpp.o
+[137/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/primitive_modules.cpp.o
+[138/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/activation_modules.cpp.o
+[139/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/packed_linear_weights.cpp.o
+[140/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/norm_modules.cpp.o
+[141/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/lookup_modules.cpp.o
+[142/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/asr_helpers.cpp.o
+[143/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/structural_modules.cpp.o
+[144/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/multi_codebook_embedding.cpp.o
+[145/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/vocoders/vocos_vocoder.cpp.o
+[146/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/whisper_embedding.cpp.o
+[147/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/conv_modules.cpp.o
+[148/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/zipformer_modules.cpp.o
+[149/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/whisper_frontend.cpp.o
+[150/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/s3_tokenizer.cpp.o
+[151/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/nemo_nano_codec_runtime.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/codecs/nemo_nano_codec_runtime.cpp: In function ‘engine::modules::Snake1dWeights engine::modules::{anonymous}::load_half_snake_alpha(engine::core::BackendWeightStore&, const engine::assets::TensorSource&, const std::string&, int64_t)’:
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/codecs/nemo_nano_codec_runtime.cpp:183:83: warning: missing initializer for member ‘engine::modules::Snake1dWeights::inverse_alpha’ [-Wmissing-field-initializers]
+  183 |     return {store.make_f32(core::TensorShape::from_dims({snake_channels}), values)};
+      |                                                                                   ^
+[152/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/wan_video_vae_runtime.cpp.o
+[153/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speaker_encoders/campplus_encoder.cpp.o
+[154/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/pitch_extractors/rmvpe_pitch_extractor.cpp.o
+[155/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/vocoders/hifigan_vocoder.cpp.o
+[156/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/vocoders/bigvgan_vocoder.cpp.o
+[157/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/vocoders/hift_vocoder.cpp.o
+[158/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/sanm.cpp.o
+[159/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/optimizations/fast_conv_modules.cpp.o
+[160/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/optimizations/fast_projection_modules.cpp.o
+[161/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/recurrent_modules.cpp.o
+[162/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/wav2vec2_bert_encoder.cpp.o
+[163/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/wav2vec2_encoder.cpp.o
+[164/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/streaming_conv_modules.cpp.o
+[165/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/positional_encoding.cpp.o
+[166/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/feed_forward_modules.cpp.o
+[167/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/self_attention.cpp.o
+[168/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/wavlm_encoder.cpp.o
+[169/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/longformer_attention_gpu.cpp.o
+[170/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/longformer_attention.cpp.o
+[171/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/relative_attention.cpp.o
+[172/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/common_relative_attention.cpp.o
+[173/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/grouped_query_attention.cpp.o
+[174/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/streaming_frame_attention_cache.cpp.o
+[175/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/scaled_dot_product_attention.cpp.o
+[176/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/projected_grouped_self_attention.cpp.o
+[177/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/transformers/decoder.cpp.o
+[178/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/transformers/causal_decoder.cpp.o
+[179/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/transformers/causal_decoder_runtime.cpp.o
+[180/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/cross_attention.cpp.o
+[181/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/transformers/qwen35_decoder_runtime.cpp.o
+[182/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/qwen3_audio_encoder_runtime.cpp.o
+[183/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/transformers/transformer_blocks.cpp.o
+[184/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/text_encoders/qwen3_vl_encoder_runtime.cpp.o
+[185/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/conditioning_modules.cpp.o
+[186/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/conformer_modules.cpp.o
+[187/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/ebranchformer_modules.cpp.o
+[188/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/predictor_modules.cpp.o
+[189/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/positional_modules.cpp.o
+[190/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/text_encoders/t5_base_encoder.cpp.o
+[191/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/text_encoders/t5_gemma_encoder.cpp.o
+[192/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/optimizations/fast_kv_modules.cpp.o
+[193/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/sampling/flow_sampler_runtime.cpp.o
+[194/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/tokenizers/hf_tokenizer_json.cpp.o
+[195/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/transformers/gemma_decoder.cpp.o
+[196/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/tokenizers/llama_bpe.cpp.o
+[197/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/tokenizers/qwen_bpe_bundle.cpp.o
+[198/277] Building CXX object CMakeFiles/engine_core.dir/external/llama_tokenizer/bpe-core.cpp.o
+[199/277] Building CXX object CMakeFiles/engine_core.dir/external/llama_tokenizer/unicode-data.cpp.o
+[200/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/tokenizers/sentencepiece.cpp.o
+[201/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/activity.cpp.o
+[202/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/probability_segmenter.cpp.o
+[203/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/activity_graph.cpp.o
+[204/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/kaldi_fbank.cpp.o
+[205/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/conversion.cpp.o
+[206/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/chunking.cpp.o
+[207/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/utilities/deepfilternet2.cpp.o
+[208/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/dsp.cpp.o
+[209/277] Building CXX object CMakeFiles/engine_core.dir/external/llama_tokenizer/unicode.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/llama_tokenizer/unicode.cpp:22:20: warning: ‘std::string unicode_cpts_to_utf8(const std::vector<unsigned int>&)’ defined but not used [-Wunused-function]
+   22 | static std::string unicode_cpts_to_utf8(const std::vector<uint32_t> & cps) {
+      |                    ^~~~~~~~~~~~~~~~~~~~
+[210/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/mel_spectrogram_frontend.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp: In instantiation of ‘void engine::audio::{anonymous}::project_mel_filterbank(const engine::audio::MelSpectrogramFrontendConfig&, const engine::audio::AudioTensor&, const engine::audio::AudioTensor&, const engine::audio::SparseMelFilterbank&, int64_t, int64_t, int64_t, int64_t, en
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:252:53:   required from ‘engine::audio::MelSpectrogramFrontend::extract_planar(const std::vector<float>&, int64_t, size_t) const::<lambda(auto:2)> [with auto:2 = std::integral_constant<engine::audio::MelFilterbankProjection, engine::audio::MelFilterbankProjection::DenseF32>]’
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:263:27:   required from here
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:32:19: warning: unused variable ‘projection_work_items’ [-Wunused-variable]
+   32 |     const int64_t projection_work_items = channels * config.n_mels * frames;
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp: In instantiation of ‘void engine::audio::{anonymous}::project_mel_filterbank(const engine::audio::MelSpectrogramFrontendConfig&, const engine::audio::AudioTensor&, const engine::audio::AudioTensor&, const engine::audio::SparseMelFilterbank&, int64_t, int64_t, int64_t, int64_t, en
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:256:54:   required from ‘engine::audio::MelSpectrogramFrontend::extract_planar(const std::vector<float>&, int64_t, size_t) const::<lambda(auto:2)> [with auto:2 = std::integral_constant<engine::audio::MelFilterbankProjection, engine::audio::MelFilterbankProjection::DenseF32>]’
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:263:27:   required from here
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:32:19: warning: unused variable ‘projection_work_items’ [-Wunused-variable]
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp: In instantiation of ‘void engine::audio::{anonymous}::project_mel_filterbank(const engine::audio::MelSpectrogramFrontendConfig&, const engine::audio::AudioTensor&, const engine::audio::AudioTensor&, const engine::audio::SparseMelFilterbank&, int64_t, int64_t, int64_t, int64_t, en
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:252:53:   required from ‘engine::audio::MelSpectrogramFrontend::extract_planar(const std::vector<float>&, int64_t, size_t) const::<lambda(auto:2)> [with auto:2 = std::integral_constant<engine::audio::MelFilterbankProjection, engine::audio::MelFilterbankProjection::SparseF32>]’
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:266:27:   required from here
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:32:19: warning: unused variable ‘projection_work_items’ [-Wunused-variable]
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp: In instantiation of ‘void engine::audio::{anonymous}::project_mel_filterbank(const engine::audio::MelSpectrogramFrontendConfig&, const engine::audio::AudioTensor&, const engine::audio::AudioTensor&, const engine::audio::SparseMelFilterbank&, int64_t, int64_t, int64_t, int64_t, en
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:256:54:   required from ‘engine::audio::MelSpectrogramFrontend::extract_planar(const std::vector<float>&, int64_t, size_t) const::<lambda(auto:2)> [with auto:2 = std::integral_constant<engine::audio::MelFilterbankProjection, engine::audio::MelFilterbankProjection::SparseF32>]’
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:266:27:   required from here
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:32:19: warning: unused variable ‘projection_work_items’ [-Wunused-variable]
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp: In instantiation of ‘void engine::audio::{anonymous}::project_mel_filterbank(const engine::audio::MelSpectrogramFrontendConfig&, const engine::audio::AudioTensor&, const engine::audio::AudioTensor&, const engine::audio::SparseMelFilterbank&, int64_t, int64_t, int64_t, int64_t, en
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:252:53:   required from ‘engine::audio::MelSpectrogramFrontend::extract_planar(const std::vector<float>&, int64_t, size_t) const::<lambda(auto:2)> [with auto:2 = std::integral_constant<engine::audio::MelFilterbankProjection, engine::audio::MelFilterbankProjection::DenseF64>]’
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:269:27:   required from here
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:32:19: warning: unused variable ‘projection_work_items’ [-Wunused-variable]
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp: In instantiation of ‘void engine::audio::{anonymous}::project_mel_filterbank(const engine::audio::MelSpectrogramFrontendConfig&, const engine::audio::AudioTensor&, const engine::audio::AudioTensor&, const engine::audio::SparseMelFilterbank&, int64_t, int64_t, int64_t, int64_t, en
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:256:54:   required from ‘engine::audio::MelSpectrogramFrontend::extract_planar(const std::vector<float>&, int64_t, size_t) const::<lambda(auto:2)> [with auto:2 = std::integral_constant<engine::audio::MelFilterbankProjection, engine::audio::MelFilterbankProjection::DenseF64>]’
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:269:27:   required from here
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:32:19: warning: unused variable ‘projection_work_items’ [-Wunused-variable]
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp: In instantiation of ‘void engine::audio::{anonymous}::project_mel_filterbank(const engine::audio::MelSpectrogramFrontendConfig&, const engine::audio::AudioTensor&, const engine::audio::AudioTensor&, const engine::audio::SparseMelFilterbank&, int64_t, int64_t, int64_t, int64_t, en
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:252:53:   required from ‘engine::audio::MelSpectrogramFrontend::extract_planar(const std::vector<float>&, int64_t, size_t) const::<lambda(auto:2)> [with auto:2 = std::integral_constant<engine::audio::MelFilterbankProjection, engine::audio::MelFilterbankProjection::DenseLongDouble>
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:272:27:   required from here
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:32:19: warning: unused variable ‘projection_work_items’ [-Wunused-variable]
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp: In instantiation of ‘void engine::audio::{anonymous}::project_mel_filterbank(const engine::audio::MelSpectrogramFrontendConfig&, const engine::audio::AudioTensor&, const engine::audio::AudioTensor&, const engine::audio::SparseMelFilterbank&, int64_t, int64_t, int64_t, int64_t, en
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:256:54:   required from ‘engine::audio::MelSpectrogramFrontend::extract_planar(const std::vector<float>&, int64_t, size_t) const::<lambda(auto:2)> [with auto:2 = std::integral_constant<engine::audio::MelFilterbankProjection, engine::audio::MelFilterbankProjection::DenseLongDouble>
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:272:27:   required from here
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:32:19: warning: unused variable ‘projection_work_items’ [-Wunused-variable]
+[211/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/nemo_mel_frontend.cpp.o
+[212/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/reference_audio_frontend.cpp.o
+[213/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/fft.cpp.o
+[214/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/istft_graph.cpp.o
+[215/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/resampling.cpp.o
+[216/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/mixing.cpp.o
+[217/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/utilities/flashsr.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/utilities/flashsr.cpp:401: warning: ignoring ‘#pragma omp parallel’ [-Wunknown-pragmas]
+  401 |     #pragma omp parallel for schedule(static)
+      | 
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/utilities/flashsr.cpp:440: warning: ignoring ‘#pragma omp parallel’ [-Wunknown-pragmas]
+  440 |     #pragma omp parallel for schedule(static)
+      | 
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/utilities/flashsr.cpp:478: warning: ignoring ‘#pragma omp parallel’ [-Wunknown-pragmas]
+  478 |     #pragma omp parallel for schedule(static)
+      | 
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/utilities/flashsr.cpp:580: warning: ignoring ‘#pragma omp parallel’ [-Wunknown-pragmas]
+  580 |         #pragma omp parallel for schedule(static)
+      | 
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/utilities/flashsr.cpp:609: warning: ignoring ‘#pragma omp parallel’ [-Wunknown-pragmas]
+  609 |         #pragma omp parallel for schedule(static)
+      | 
+[218/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/output.cpp.o
+[219/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/utilities/gtcrn.cpp.o
+[220/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/waveform_ops.cpp.o
+[221/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/wav_reader.cpp.o
+[222/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/utilities/utility_api.cpp.o
+[223/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/wav_writer.cpp.o
+[224/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/flow_kv_cache.cpp.o
+[225/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/utilities/rnnoise.cpp.o
+[226/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/utilities/zipenhancer.cpp.o
+[227/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speaker_encoders/titanet_runtime.cpp.o
+[228/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speaker_encoders/ecapa_tdnn_runtime.cpp.o
+[229/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/fsq_audio_codec_runtime.cpp.o
+[230/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/mel_latent_vae44k_runtime.cpp.o
+[231/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/neural_audio.cpp.o
+[232/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/fish_dac_codec_runtime.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/codecs/fish_dac_codec_runtime.cpp: In function ‘engine::modules::Snake1dWeights engine::codecs::{anonymous}::load_snake(engine::core::BackendWeightStore&, const engine::assets::TensorSource&, const std::string&, int64_t)’:
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/codecs/fish_dac_codec_runtime.cpp:742:63: warning: missing initializer for member ‘engine::modules::Snake1dWeights::inverse_alpha’ [-Wmissing-field-initializers]
+  742 |         source.require_f32(name + ".alpha", {1, channels, 1}))};
+      |                                                               ^
+[233/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/moss_audio_tokenizer_codec_runtime.cpp.o
+[234/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/mimi_codec_runtime.cpp.o
+[235/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/oobleck_audio_vae_runtime.cpp.o
+[236/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/redae_codec_runtime.cpp.o
+[237/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/snac_decoder_runtime.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/codecs/snac_decoder_runtime.cpp: In function ‘engine::modules::Snake1dWeights engine::codecs::{anonymous}::load_snake(engine::core::BackendWeightStore&, const engine::assets::TensorSource&, const std::string&, int64_t)’:
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/codecs/snac_decoder_runtime.cpp:88:74: warning: missing initializer for member ‘engine::modules::Snake1dWeights::inverse_alpha’ [-Wmissing-field-initializers]
+   88 |                               source.require_f32(name, {1, channels, 1}))};
+      |                                                                          ^
+[238/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/conditioners/cav_mae_st_conditioner_runtime.cpp.o
+[239/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/conditioners/clap_audio_conditioner_runtime.cpp.o
+[240/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/conditioners/musicgen_style_conditioner_runtime.cpp.o
+[241/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/s3gen_runtime.cpp.o
+[242/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/sampling/greedy_decode.cpp.o
+[243/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/conditioners/open_clip_conditioner_runtime.cpp.o
+[244/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/sampling/diffusion_math.cpp.o
+[245/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/conditioners/synchformer_conditioner_runtime.cpp.o
+[246/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/sampling/noise.cpp.o
+[247/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/sampling/torch_random.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/sampling/torch_random.cpp:224: warning: ignoring ‘#pragma omp parallel’ [-Wunknown-pragmas]
+  224 | #pragma omp parallel for if (parallel_count >= 65536)
+      | 
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/sampling/torch_random.cpp: In function ‘void engine::sampling::torch_cuda_sample_topk_exponential_pairs(const void*, int64_t, int64_t, float, int64_t, const uint64_t*, const uint64_t*, uint64_t, const TorchCudaSamplingPolicy&, int32_t*)’:
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/sampling/torch_random.cpp:457:14: warning: unused parameter ‘offset_step_blocks’ [-Wunused-parameter]
+  457 |     uint64_t offset_step_blocks,
+      |     ~~~~~~~~~^~~~~~~~~~~~~~~~~~
+[248/277] Building CXX object CMakeFiles/engine_core.dir/src/framework/sampling/hf_sampler.cpp.o
+[249/277] Building CXX object CMakeFiles/engine_core.dir/src/models/controlfoley/flow_denoiser.cpp.o
+[250/277] Building CXX object CMakeFiles/engine_model_silero_vad.dir/src/models/silero_vad/assets.cpp.o
+[251/277] Building CXX object CMakeFiles/engine_model_silero_vad.dir/src/models/silero_vad/session.cpp.o
+[252/277] Building CXX object CMakeFiles/engine_model_silero_vad.dir/src/models/silero_vad/runtime.cpp.o
+[253/277] Building CXX object CMakeFiles/engine_model_marblenet_vad.dir/src/models/marblenet_vad/runtime.cpp.o
+[254/277] Building CXX object CMakeFiles/engine_model_marblenet_vad.dir/src/models/marblenet_vad/assets.cpp.o
+[255/277] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/assets.cpp.o
+[256/277] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/tokenizer_text.cpp.o
+[257/277] Building CXX object CMakeFiles/engine_model_marblenet_vad.dir/src/models/marblenet_vad/session.cpp.o
+[258/277] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/tokenizer_speech_encoder.cpp.o
+[259/277] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/speaker_encoder.cpp.o
+[260/277] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/prompt_tts_voice_clone.cpp.o
+[261/277] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/tokenizer_speech_decoder.cpp.o
+[262/277] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/frame_cap.cpp.o
+[263/277] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/orchestration.cpp.o
+[264/277] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/text_frontend.cpp.o
+[265/277] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/session.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/community_models/vieneu_v3_turbo/session.cpp: In constructor ‘engine::models::vieneu_v3_turbo::VieNeuTTSSession::VieNeuTTSSession(engine::runtime::TaskSpec, engine::runtime::SessionOptions, std::shared_ptr<const engine::models::vieneu_v3_turbo::VieNeuTTSAssets>)’:
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/community_models/vieneu_v3_turbo/session.cpp:502:9: warning: missing initializer for member ‘engine::codecs::MossAudioTokenizerCodecRuntimeOptions::encoder_transformer_weight_storage_type’ [-Wmissing-field-initializers]
+  502 |         },
+      |         ^
+[266/277] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/loader.cpp.o
+[267/277] Linking C static library libcjson_vendor.a
+[268/277] Linking C static library libyaml_vendor.a
+[269/277] Linking CXX static library ggml/src/libggml.a
+[270/277] Linking CXX static library external/sentencepiece/src/libsentencepiece.a
+[271/277] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/talker.cpp.o
+[272/277] Building CXX object CMakeFiles/engine_runtime.dir/src/framework/runtime/registry.cpp.o
+[273/277] Building CXX object CMakeFiles/audiocpp.dir/src/capi/audiocpp.cpp.o
+In file included from /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/capi/audiocpp.cpp:15:
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/include/audiocpp.h:130:34: warning: "/*" within comment [-Wcomment]
+  130 |  * install -- reading model_specs/*.json to build a picker, say -- has had
+      |                                   
+[274/277] Linking CXX static library libengine_runtime.a
+[275/277] Linking CXX shared library bin/libaudiocpp.so.0.1.0
+[276/277] Creating library symlink bin/libaudiocpp.so.0 bin/libaudiocpp.so
+::endgroup::
+Không thấy libaudiocpp.so
