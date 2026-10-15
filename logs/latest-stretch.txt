@@ -1,0 +1,94 @@
+# stretch  run=38757457253 #19  status=success  2026-10-15T15:07:25Z
+## các dòng lỗi (tối đa 120)
+
+## 400 dòng cuối
+
+== Tiếng giống nói 20 giây, 24000 Hz
+  gốc: f0=129.0 Hz, rms=3981, bước nhảy lớn nhất=4949
+  [ok]   0.50×: độ dài đúng (tỉ lệ 1.0000), 162 ms xử lý
+  [ok]   0.50×: cao độ giữ nguyên (129.0 → 128.3 Hz)
+  [ok]   0.50×: âm lượng giữ nguyên (rms 3981 → 3977)
+  [ok]   0.50×: không có tiếng lụp bụp (bước nhảy lớn nhất 4949, gốc 4949)
+  [ok]   0.70×: độ dài đúng (tỉ lệ 1.0000), 100 ms xử lý
+  [ok]   0.70×: cao độ giữ nguyên (129.0 → 129.0 Hz)
+  [ok]   0.70×: âm lượng giữ nguyên (rms 3981 → 3978)
+  [ok]   0.70×: không có tiếng lụp bụp (bước nhảy lớn nhất 4949, gốc 4949)
+  [ok]   0.85×: độ dài đúng (tỉ lệ 1.0000), 66 ms xử lý
+  [ok]   0.85×: cao độ giữ nguyên (129.0 → 129.0 Hz)
+  [ok]   0.85×: âm lượng giữ nguyên (rms 3981 → 3977)
+  [ok]   0.85×: không có tiếng lụp bụp (bước nhảy lớn nhất 4949, gốc 4949)
+  [ok]   1.15×: độ dài đúng (tỉ lệ 1.0000), 35 ms xử lý
+  [ok]   1.15×: cao độ giữ nguyên (129.0 → 130.4 Hz)
+  [ok]   1.15×: âm lượng giữ nguyên (rms 3981 → 3980)
+  [ok]   1.15×: không có tiếng lụp bụp (bước nhảy lớn nhất 4949, gốc 4949)
+  [ok]   1.30×: độ dài đúng (tỉ lệ 1.0000), 36 ms xử lý
+  [ok]   1.30×: cao độ giữ nguyên (129.0 → 129.0 Hz)
+  [ok]   1.30×: âm lượng giữ nguyên (rms 3981 → 3979)
+  [ok]   1.30×: không có tiếng lụp bụp (bước nhảy lớn nhất 4945, gốc 4949)
+  [ok]   1.50×: độ dài đúng (tỉ lệ 1.0000), 34 ms xử lý
+  [ok]   1.50×: cao độ giữ nguyên (129.0 → 129.0 Hz)
+  [ok]   1.50×: âm lượng giữ nguyên (rms 3981 → 3976)
+  [ok]   1.50×: không có tiếng lụp bụp (bước nhảy lớn nhất 4888, gốc 4949)
+  [ok]   2.00×: độ dài đúng (tỉ lệ 1.0000), 30 ms xử lý
+  [ok]   2.00×: cao độ giữ nguyên (129.0 → 129.7 Hz)
+  [ok]   2.00×: âm lượng giữ nguyên (rms 3981 → 3971)
+  [ok]   2.00×: không có tiếng lụp bụp (bước nhảy lớn nhất 4933, gốc 4949)
+  [ok]   đẩy từng mảnh lẻ cho kết quả y hệt đẩy một lần
+  [ok]   như trên với tốc độ 0.8
+
+== Tiếng giống nói 20 giây, 48000 Hz
+  gốc: f0=128.7 Hz, rms=3981, bước nhảy lớn nhất=2616
+  [ok]   0.50×: độ dài đúng (tỉ lệ 1.0000), 166 ms xử lý
+  [ok]   0.50×: cao độ giữ nguyên (128.7 → 129.0 Hz)
+  [ok]   0.50×: âm lượng giữ nguyên (rms 3981 → 3978)
+  [ok]   0.50×: không có tiếng lụp bụp (bước nhảy lớn nhất 2616, gốc 2616)
+  [ok]   0.70×: độ dài đúng (tỉ lệ 1.0000), 115 ms xử lý
+  [ok]   0.70×: cao độ giữ nguyên (128.7 → 129.0 Hz)
+  [ok]   0.70×: âm lượng giữ nguyên (rms 3981 → 3980)
+  [ok]   0.70×: không có tiếng lụp bụp (bước nhảy lớn nhất 2616, gốc 2616)
+  [ok]   0.85×: độ dài đúng (tỉ lệ 1.0000), 92 ms xử lý
+  [ok]   0.85×: cao độ giữ nguyên (128.7 → 128.7 Hz)
+  [ok]   0.85×: âm lượng giữ nguyên (rms 3981 → 3980)
+  [ok]   0.85×: không có tiếng lụp bụp (bước nhảy lớn nhất 2616, gốc 2616)
+  [ok]   1.15×: độ dài đúng (tỉ lệ 1.0000), 55 ms xử lý
+  [ok]   1.15×: cao độ giữ nguyên (128.7 → 130.8 Hz)
+  [ok]   1.15×: âm lượng giữ nguyên (rms 3981 → 3982)
+  [ok]   1.15×: không có tiếng lụp bụp (bước nhảy lớn nhất 2616, gốc 2616)
+  [ok]   1.30×: độ dài đúng (tỉ lệ 1.0000), 54 ms xử lý
+  [ok]   1.30×: cao độ giữ nguyên (128.7 → 130.1 Hz)
+  [ok]   1.30×: âm lượng giữ nguyên (rms 3981 → 3979)
+  [ok]   1.30×: không có tiếng lụp bụp (bước nhảy lớn nhất 2616, gốc 2616)
+  [ok]   1.50×: độ dài đúng (tỉ lệ 1.0000), 50 ms xử lý
+  [ok]   1.50×: cao độ giữ nguyên (128.7 → 130.8 Hz)
+  [ok]   1.50×: âm lượng giữ nguyên (rms 3981 → 3976)
+  [ok]   1.50×: không có tiếng lụp bụp (bước nhảy lớn nhất 2616, gốc 2616)
+  [ok]   2.00×: độ dài đúng (tỉ lệ 1.0000), 40 ms xử lý
+  [ok]   2.00×: cao độ giữ nguyên (128.7 → 129.4 Hz)
+  [ok]   2.00×: âm lượng giữ nguyên (rms 3981 → 3968)
+  [ok]   2.00×: không có tiếng lụp bụp (bước nhảy lớn nhất 2559, gốc 2616)
+  [ok]   đẩy từng mảnh lẻ cho kết quả y hệt đẩy một lần
+  [ok]   như trên với tốc độ 0.8
+
+== Trường hợp biên
+  [ok]   đầu vào 0 mẫu → 0 mẫu (mong 0)
+  [ok]   đầu vào 1 mẫu → 1 mẫu (mong 1)
+  [ok]   đầu vào 100 mẫu → 67 mẫu (mong 67)
+  [ok]   đầu vào 700 mẫu → 467 mẫu (mong 467)
+  [ok]   đầu vào 1500 mẫu → 1000 mẫu (mong 1000)
+  [ok]   đầu vào 5000 mẫu → 3333 mẫu (mong 3333)
+  [ok]   im lặng vẫn im lặng
+  [ok]   biên độ tối đa không tràn số
+  [ok]   tốc độ 1.0 trả nguyên bản
+  [ok]   tốc độ quá lớn bị kẹp ở 2.0×
+
+== Tệp WAV (qua WavWriter / WavSpeed)
+  [ok]   WAV 30 giây → 24.000 giây (124 ms), tần số mẫu giữ 48000
+  [ok]   báo tiến độ tới 100%
+  [ok]   huỷ giữa chừng: ném lỗi và xoá tệp dở
+  [ok]   tệp không phải WAV: báo lỗi, không để lại tệp
+
+== Bài dài: 60 phút ở 48 kHz đi qua bộ đổi tốc độ theo dòng
+  [ok]   đủ độ dài (123428571 mẫu), mất 8.1 giây (445× thời gian thực)
+  [ok]   bộ nhớ tăng 4.3 MB (không giữ cả bài)
+
+76/76 kiểm tra đạt
