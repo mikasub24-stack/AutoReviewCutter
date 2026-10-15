@@ -26,8 +26,8 @@ public class MainActivity extends Activity {
   Button make;
   SeekBar speedControl, pauseControl;
   TextView speedLabel, pauseLabel;
-  float speed=1.0f;
-  int pauseMs=350;
+  float speed=0.92f;
+  int pauseMs=450;
   TextToSpeech tts;
   boolean ready=false;
   volatile boolean busy=false;
@@ -58,18 +58,19 @@ public class MainActivity extends Activity {
     editor.setGravity(48);
     editor.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffffa2c5));
     root.addView(editor,new LinearLayout.LayoutParams(-1,0,1));
-    speedLabel=new TextView(this); speedLabel.setTextColor(Color.WHITE); speedLabel.setText("Tốc độ đọc: 1.00x"); root.addView(speedLabel);
-    speedControl=new SeekBar(this); speedControl.setMax(120); speedControl.setProgress(60);
+    speedLabel=new TextView(this); speedLabel.setTextColor(Color.WHITE); speedLabel.setText("Tốc độ đọc: 0.92x"); root.addView(speedLabel);
+    speedControl=new SeekBar(this); speedControl.setMax(120); speedControl.setProgress(52);
     speedControl.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
       public void onProgressChanged(SeekBar b,int p,boolean fromUser){speed=0.4f+p/100f;speedLabel.setText(String.format(Locale.US,"Tốc độ đọc: %.2fx",speed));}
       public void onStartTrackingTouch(SeekBar b){} public void onStopTrackingTouch(SeekBar b){}
     });root.addView(speedControl);
-    pauseLabel=new TextView(this);pauseLabel.setTextColor(Color.WHITE);pauseLabel.setText("Nghỉ giữa các đoạn: 350 ms");root.addView(pauseLabel);
-    pauseControl=new SeekBar(this);pauseControl.setMax(2000);pauseControl.setProgress(350);
+    pauseLabel=new TextView(this);pauseLabel.setTextColor(Color.WHITE);pauseLabel.setText("Nghỉ giữa các đoạn: 450 ms");root.addView(pauseLabel);
+    pauseControl=new SeekBar(this);pauseControl.setMax(2000);pauseControl.setProgress(450);
     pauseControl.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
       public void onProgressChanged(SeekBar b,int p,boolean fromUser){pauseMs=p;pauseLabel.setText("Nghỉ giữa các đoạn: "+p+" ms");}
       public void onStartTrackingTouch(SeekBar b){} public void onStopTrackingTouch(SeekBar b){}
     });root.addView(pauseControl);
+    Button natural=new Button(this);natural.setText("CHẾ ĐỘ KỂ CHUYỆN TỰ NHIÊN");natural.setOnClickListener(v->{speedControl.setProgress(52);pauseControl.setProgress(450);});root.addView(natural);
     make=new Button(this);
     make.setText("TẠO GIỌNG ĐỌC MP3");
     make.setOnClickListener(v->start());
