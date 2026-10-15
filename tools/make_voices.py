@@ -36,6 +36,36 @@ def log(msg: str) -> None:
     print(msg, flush=True)
 
 
+def materialize_hf_symlinks() -> int:
+    """ONNX Runtime bản mới từ chối tệp dữ liệu ngoài (*.data) nếu đường dẫn đi qua liên kết tắt
+    ra khỏi thư mục mô hình - đúng kiểu bộ nhớ đệm Hugging Face (snapshots/ -> blobs/).
+    Thay mỗi liên kết tắt trong snapshots/ bằng bản sao thật."""
+    import shutil
+    roots = []
+    for env in ("HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE"):
+        if os.environ.get(env):
+            roots.append(Path(os.environ[env]))
+    hf_home = Path(os.environ.get("HF_HOME") or (Path.home() / ".cache" / "huggingface"))
+    roots.append(hf_home / "hub")
+    n = 0
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for dirpath, _dirs, files in os.walk(root):
+            if "snapshots" not in Path(dirpath).parts:
+                continue
+            for name in files:
+                p = Path(dirpath) / name
+                if p.is_symlink():
+                    target = p.resolve()
+                    if target.is_file():
+                        p.unlink()
+                        shutil.copy2(target, p)
+                        n += 1
+    log("Đã thay %d liên kết tắt bằng bản sao thật" % n)
+    return n
+
+
 def load_engine(base: str):
     from vieneu import Vieneu
     errors = []
@@ -44,14 +74,20 @@ def load_engine(base: str):
         dict(mode="v3turbo", backend="onnx", backbone_repo=base),
         dict(mode="v3turbo"),
     ]
-    for kw in attempts:
-        try:
-            log("Vieneu(%s)" % ", ".join("%s=%r" % kv for kv in kw.items()))
-            return Vieneu(**kw)
-        except Exception as e:   # noqa: BLE001 - thử cấu hình kế tiếp, in hết lỗi nếu đều hỏng
-            errors.append("%s -> %s: %s" % (kw, type(e).__name__, e))
-            log("  lỗi: %s: %s" % (type(e).__name__, e))
-    raise RuntimeError("Không khởi tạo được Vieneu:\n" + "\n".join(errors))
+    materialized = False
+    for rnd in range(2):
+        for kw in attempts:
+            try:
+                log("Vieneu(%s)" % ", ".join("%s=%r" % kv for kv in kw.items()))
+                return Vieneu(**kw)
+            except Exception as e:   # noqa: BLE001 - thử cấu hình kế tiếp, in hết lỗi nếu đều hỏng
+                errors.append("%s -> %s: %s" % (kw, type(e).__name__, e))
+                log("  lỗi: %s: %s" % (type(e).__name__, str(e)[:300]))
+        if materialized or "External data path" not in errors[-1]:
+            break
+        materialize_hf_symlinks()
+        materialized = True
+    raise RuntimeError("Không khởi tạo được Vieneu:\n" + "\n".join(e[:400] for e in errors))
 
 
 def strip_pad(codes):

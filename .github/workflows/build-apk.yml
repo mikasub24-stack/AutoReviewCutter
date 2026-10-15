@@ -85,23 +85,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/publish_log.sh voices _logs/voices.log "${{ job.status }}"
 
-  # ------------------------------------------------------------------ 3. chạy thử engine trên máy chủ (x86_64)
-  smoke:
-    needs: [data, voices]
+  # ------------------------------------------------------------------ 3. dựng engine cho máy chủ (x86_64) - chạy song song ngay từ đầu
+  native-host:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
       CCACHE_DIR: ${{ github.workspace }}/_ccache
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: data
-          path: _data
-      - uses: actions/download-artifact@v4
-        with:
-          name: voices
-          path: _voices
       - uses: actions/cache@v4
         with:
           path: _ccache
@@ -112,15 +103,41 @@ jobs:
       - name: Dựng audio.cpp + sea-g2p + smoke
         run: |
           mkdir -p _logs
-          bash scripts/build_host.sh 2>&1 | tee _logs/smoke-build.log
-      - name: Đẩy nhật ký dựng
+          bash scripts/build_host.sh 2>&1 | tee _logs/native-host.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: host-bin
+          path: _work/host
+          retention-days: 2
+      - name: Đẩy nhật ký
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash scripts/publish_log.sh smoke-build _logs/smoke-build.log "${{ job.status }}"
+        run: bash scripts/publish_log.sh native-host _logs/native-host.log "${{ job.status }}"
+
+  # ------------------------------------------------------------------ 4. chạy thử đọc bằng 3 giọng
+  smoke:
+    needs: [data, voices, native-host]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: data
+          path: _data
+      - uses: actions/download-artifact@v4
+        with:
+          name: voices
+          path: _voices
+      - uses: actions/download-artifact@v4
+        with:
+          name: host-bin
+          path: _work/host
       - name: Đọc thử bằng 3 giọng
         run: |
-          mkdir -p _out
+          mkdir -p _logs _out
+          chmod +x _work/host/bin/smoke
           export LD_LIBRARY_PATH="$PWD/_work/host/lib:${LD_LIBRARY_PATH:-}"
           {
             for v in ninh_don adam tung_dang; do
@@ -143,13 +160,47 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/publish_log.sh smoke _logs/smoke.log "${{ job.status }}"
 
-  # ------------------------------------------------------------------ 4. dựng APK
-  apk:
-    needs: [data, voices]
+  # ------------------------------------------------------------------ 5. dựng thư viện native cho Android - chạy song song ngay từ đầu
+  native-android:
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     env:
       CCACHE_DIR: ${{ github.workspace }}/_ccache
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: _ccache
+          key: ccache-android-${{ hashFiles('scripts/pins.env') }}-${{ github.run_number }}
+          restore-keys: ccache-android-${{ hashFiles('scripts/pins.env') }}-
+      - name: Cài công cụ
+        run: |
+          mkdir -p _logs
+          sudo apt-get update -qq && sudo apt-get install -y -qq ninja-build ccache
+          # Dùng Android SDK/NDK có sẵn trên máy chủ (không gọi sdkmanager).
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_NDK_LATEST_HOME=${ANDROID_NDK_LATEST_HOME:-}"
+          ls "$ANDROID_HOME/ndk" || true
+      - name: Dựng thư viện native (Android arm64)
+        run: |
+          export ANDROID_NDK_HOME="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          bash scripts/build_android.sh 2>&1 | tee _logs/native-android.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-libs
+          path: android/app/src/main/jniLibs
+          retention-days: 2
+      - name: Đẩy nhật ký
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/publish_log.sh native-android _logs/native-android.log "${{ job.status }}"
+
+  # ------------------------------------------------------------------ 6. đóng gói APK
+  apk:
+    needs: [data, voices, native-android]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -160,39 +211,23 @@ jobs:
         with:
           name: voices
           path: _voices
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-libs
+          path: android/app/src/main/jniLibs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-      - uses: actions/cache@v4
-        with:
-          path: _ccache
-          key: ccache-android-${{ hashFiles('scripts/pins.env') }}-${{ github.run_number }}
-          restore-keys: ccache-android-${{ hashFiles('scripts/pins.env') }}-
-      - name: Cài công cụ + Android SDK
-        run: |
-          mkdir -p _logs
-          sudo apt-get update -qq && sudo apt-get install -y -qq ninja-build ccache
-          # Dùng Android SDK/NDK có sẵn trên máy chủ (không gọi sdkmanager).
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_NDK_LATEST_HOME=${ANDROID_NDK_LATEST_HOME:-}"
-          ls "$ANDROID_HOME/ndk" "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools" || true
-      - name: Dựng thư viện native (Android arm64)
-        run: |
-          export ANDROID_NDK_HOME="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
-          bash scripts/build_android.sh 2>&1 | tee _logs/apk-native.log
-      - name: Đẩy nhật ký dựng native
-        if: always()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash scripts/publish_log.sh apk-native _logs/apk-native.log "${{ job.status }}"
       - name: Chép giọng + danh sách tải vào assets
         run: |
+          mkdir -p _logs
+          find android/app/src/main/jniLibs -type f | sort
           A=android/app/src/main/assets
           mkdir -p "$A/voices"
           cp -r _voices/* "$A/voices/"
           cp _manifest/files.txt "$A/files.txt"
-          cat "$A/files.txt" | cut -c1-200
+          cut -c1-200 "$A/files.txt"
           cat "$A/voices/voices.txt"
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -226,7 +261,7 @@ jobs:
           cat _logs/apk-gradle.log _logs/apk-check.log > _logs/apk-final.log 2>/dev/null || true
           bash scripts/publish_log.sh apk-final _logs/apk-final.log "${{ job.status }}"
 
-  # ------------------------------------------------------------------ 5. đăng APK lên Releases
+  # ------------------------------------------------------------------ 7. đăng APK lên Releases
   release:
     needs: [apk, smoke]
     if: always() && needs.apk.result == 'success'
