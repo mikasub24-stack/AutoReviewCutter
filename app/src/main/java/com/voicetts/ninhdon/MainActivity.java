@@ -24,6 +24,10 @@ public class MainActivity extends Activity {
   TextView status;
   ProgressBar progress;
   Button make;
+  SeekBar speedControl, pauseControl;
+  TextView speedLabel, pauseLabel;
+  float speed=1.0f;
+  int pauseMs=350;
   TextToSpeech tts;
   boolean ready=false;
   volatile boolean busy=false;
@@ -54,6 +58,18 @@ public class MainActivity extends Activity {
     editor.setGravity(48);
     editor.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffffa2c5));
     root.addView(editor,new LinearLayout.LayoutParams(-1,0,1));
+    speedLabel=new TextView(this); speedLabel.setTextColor(Color.WHITE); speedLabel.setText("Tốc độ đọc: 1.00x"); root.addView(speedLabel);
+    speedControl=new SeekBar(this); speedControl.setMax(120); speedControl.setProgress(60);
+    speedControl.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+      public void onProgressChanged(SeekBar b,int p,boolean fromUser){speed=0.4f+p/100f;speedLabel.setText(String.format(Locale.US,"Tốc độ đọc: %.2fx",speed));}
+      public void onStartTrackingTouch(SeekBar b){} public void onStopTrackingTouch(SeekBar b){}
+    });root.addView(speedControl);
+    pauseLabel=new TextView(this);pauseLabel.setTextColor(Color.WHITE);pauseLabel.setText("Nghỉ giữa các đoạn: 350 ms");root.addView(pauseLabel);
+    pauseControl=new SeekBar(this);pauseControl.setMax(2000);pauseControl.setProgress(350);
+    pauseControl.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+      public void onProgressChanged(SeekBar b,int p,boolean fromUser){pauseMs=p;pauseLabel.setText("Nghỉ giữa các đoạn: "+p+" ms");}
+      public void onStartTrackingTouch(SeekBar b){} public void onStopTrackingTouch(SeekBar b){}
+    });root.addView(pauseControl);
     make=new Button(this);
     make.setText("TẠO GIỌNG ĐỌC MP3");
     make.setOnClickListener(v->start());
@@ -81,7 +97,7 @@ public class MainActivity extends Activity {
     if(!ready){show("Chưa có bộ đọc tiếng Việt. Cài Speech Services by Google hoặc bộ TTS tiếng Việt.");return;}
     String text=editor.getText().toString().trim();
     if(text.isEmpty()){show("Hãy nhập văn bản trước.");return;}
-    busy=true;make.setEnabled(false);progress.setProgress(0);
+    busy=true;tts.setSpeechRate(speed);make.setEnabled(false);progress.setProgress(0);
     new Thread(()->process(text)).start();
   }
   ArrayList<String> chunks(String s){
