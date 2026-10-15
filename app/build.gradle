@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
-android { namespace 'com.autoreview.cutter'; compileSdk 35
- defaultConfig { applicationId 'com.autoreview.cutter'; minSdk 26; targetSdk 28; versionCode 1; versionName '0.1' }
+android { namespace 'com.voicetts.ninhdon'; compileSdk 35
+ defaultConfig { applicationId 'com.voicetts.ninhdon'; minSdk 26; targetSdk 28; versionCode 1; versionName '1.0' }
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 dependencies { implementation 'dev.ffmpegkit-maintained:ffmpeg-kit-full-gpl:8.1.9' }
