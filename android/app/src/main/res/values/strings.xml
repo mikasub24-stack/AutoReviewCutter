@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ninh Đôn TTS</string>
+    <string name="subtitle">Đọc văn bản tiếng Việt bằng giọng nhân bản — chạy ngay trên điện thoại, không cần mạng sau khi tải dữ liệu</string>
+    <string name="btn_download">Tải dữ liệu giọng nói</string>
+    <string name="label_voice">Giọng đọc</string>
+    <string name="label_text">Văn bản</string>
+    <string name="hint_text">Dán hoặc gõ văn bản cần đọc. Xuống dòng để nghỉ lâu hơn; viết [nghỉ 2s] để chèn khoảng lặng; [cười], [thở dài], [hắng giọng] để thêm âm thanh.</string>
+    <string name="btn_paste">Dán</string>
+    <string name="btn_open">Mở .txt</string>
+    <string name="btn_clear">Xóa</string>
+    <string name="label_sent_pause">Nghỉ giữa câu (giây)</string>
+    <string name="label_para_pause">Nghỉ khi xuống dòng (giây)</string>
+    <string name="tip_pause">Mẹo: giữ màn hình sáng khi đang tạo giọng. Văn bản dài sẽ lâu hơn vì điện thoại chạy hoàn toàn ngoại tuyến.</string>
+    <string name="btn_go">Tạo giọng đọc</string>
+    <string name="btn_stop">Dừng (giữ phần đã đọc)</string>
+    <string name="btn_play">Nghe</string>
+    <string name="btn_save">Lưu vào Tải xuống</string>
+    <string name="btn_share">Chia sẻ</string>
+    <string name="btn_log">Gửi nhật ký lỗi cho người hỗ trợ</string>
+</resources>

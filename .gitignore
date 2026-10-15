@@ -1,0 +1,17 @@
+_work/
+_logs/
+_data/
+_voices/
+_manifest/
+_ccache/
+_out/
+_apk/
+build/
+.gradle/
+*.class
+__pycache__/
+android/app/build/
+android/app/src/main/jniLibs/
+android/app/src/main/assets/files.txt
+android/app/src/main/assets/voices/
+local.properties

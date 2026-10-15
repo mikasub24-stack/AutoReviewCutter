@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- micro đơn giản + sóng âm -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,30 a8,8 0 0 1 8,8 v14 a8,8 0 0 1 -16,0 v-14 a8,8 0 0 1 8,-8 z" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M42,50 a12,12 0 0 0 24,0 M54,62 v10 M46,72 h16"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="3" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M72,42 q4,8 0,16 M78,38 q7,12 0,24"
+        android:strokeColor="#7FB0FF"
+        android:strokeLineCap="round"
+        android:strokeWidth="3" />
+</vector>

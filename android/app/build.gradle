@@ -1,0 +1,66 @@
+plugins {
+    id 'com.android.application'
+}
+
+def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+
+android {
+    namespace 'vn.ninhdon.tts'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'vn.ninhdon.tts'
+        minSdk 29
+        targetSdk 34
+        versionCode runNumber
+        versionName "1.0.${runNumber}"
+        // Chỉ điện thoại 64-bit (hầu hết máy từ 2017 trở lại đây).
+        ndk { abiFilters 'arm64-v8a' }
+    }
+
+    signingConfigs {
+        // Khoá ký cố định, để bản sau cài đè được lên bản trước mà không mất dữ liệu.
+        release {
+            storeFile rootProject.file('keystore/ninhdon.jks')
+            storePassword 'ninhdon123'
+            keyAlias 'ninhdon'
+            keyPassword 'ninhdon123'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+        debug {
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packaging {
+        // Bắt buộc: audio.cpp tìm các thư viện CPU (libggml-cpu-*.so) nằm cạnh libaudiocpp.so
+        // trong thư mục thư viện của app, nên phải giải nén chúng ra đĩa khi cài.
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

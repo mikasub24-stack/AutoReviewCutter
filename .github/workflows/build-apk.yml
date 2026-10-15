@@ -1,0 +1,247 @@
+name: Dựng APK Ninh Đôn TTS
+
+on:
+  push:
+    # Chạy trên mọi nhánh, trừ nhánh chính của app khác và nhánh nhật ký.
+    branches-ignore: [main, master, ci-logs]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # ------------------------------------------------------------------ 1. mô hình + từ điển
+  data:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Tải mô hình + từ điển, tạo files.txt
+        run: |
+          mkdir -p _logs
+          python scripts/make_manifest.py --data _data --manifest _manifest/files.txt 2>&1 | tee _logs/data.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manifest
+          path: _manifest
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: data
+          path: _data
+          compression-level: 0
+          retention-days: 2
+      - name: Đẩy nhật ký
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/publish_log.sh data _logs/data.log "${{ job.status }}"
+
+  # ------------------------------------------------------------------ 2. tạo giọng (Python, chạy 1 lần)
+  voices:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-voices-${{ hashFiles('tools/make_voices.py') }}
+          restore-keys: hf-voices-
+      - name: Cài vieneu và tạo giọng
+        run: |
+          mkdir -p _logs
+          {
+            python -m pip install --upgrade pip
+            pip install vieneu soundfile
+            python tools/make_voices.py --wav-dir voices --out _voices
+            echo "---- kết quả"
+            find _voices -type f | sort | xargs ls -la
+            head -c 200 _voices/ninh_don/ref_codes.txt; echo
+            head -c 200 _voices/ninh_don/speaker.emb.txt; echo
+          } 2>&1 | tee _logs/voices.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voices
+          path: _voices
+          retention-days: 7
+      - name: Đẩy nhật ký
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/publish_log.sh voices _logs/voices.log "${{ job.status }}"
+
+  # ------------------------------------------------------------------ 3. chạy thử engine trên máy chủ (x86_64)
+  smoke:
+    needs: [data, voices]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/_ccache
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: data
+          path: _data
+      - uses: actions/download-artifact@v4
+        with:
+          name: voices
+          path: _voices
+      - uses: actions/cache@v4
+        with:
+          path: _ccache
+          key: ccache-host-${{ hashFiles('scripts/pins.env') }}-${{ github.run_number }}
+          restore-keys: ccache-host-${{ hashFiles('scripts/pins.env') }}-
+      - name: Cài công cụ
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ninja-build ccache
+      - name: Dựng audio.cpp + sea-g2p + smoke
+        run: |
+          mkdir -p _logs
+          bash scripts/build_host.sh 2>&1 | tee _logs/smoke-build.log
+      - name: Đẩy nhật ký dựng
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/publish_log.sh smoke-build _logs/smoke-build.log "${{ job.status }}"
+      - name: Đọc thử bằng 3 giọng
+        run: |
+          mkdir -p _out
+          export LD_LIBRARY_PATH="$PWD/_work/host/lib:${LD_LIBRARY_PATH:-}"
+          {
+            for v in ninh_don adam tung_dang; do
+              echo "=================== giọng $v"
+              _work/host/bin/smoke \
+                _data/vieneu-v3-turbo-q8_0.gguf _data/sea_g2p.bin _work/host/lib/libsea_g2p_rs.so \
+                "_voices/$v/ref_codes.txt" "_voices/$v/speaker.emb.txt" "_out/$v.wav" \
+                "Xin chào các bạn. Hôm nay trời đẹp quá, chúng ta cùng đi dạo nhé." "$(nproc)"
+            done
+          } 2>&1 | tee _logs/smoke.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-wavs
+          path: _out
+          retention-days: 7
+      - name: Đẩy nhật ký chạy thử
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/publish_log.sh smoke _logs/smoke.log "${{ job.status }}"
+
+  # ------------------------------------------------------------------ 4. dựng APK
+  apk:
+    needs: [data, voices]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/_ccache
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: manifest
+          path: _manifest
+      - uses: actions/download-artifact@v4
+        with:
+          name: voices
+          path: _voices
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/cache@v4
+        with:
+          path: _ccache
+          key: ccache-android-${{ hashFiles('scripts/pins.env') }}-${{ github.run_number }}
+          restore-keys: ccache-android-${{ hashFiles('scripts/pins.env') }}-
+      - name: Cài công cụ + Android SDK
+        run: |
+          mkdir -p _logs
+          sudo apt-get update -qq && sudo apt-get install -y -qq ninja-build ccache
+          # Dùng Android SDK/NDK có sẵn trên máy chủ (không gọi sdkmanager).
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_NDK_LATEST_HOME=${ANDROID_NDK_LATEST_HOME:-}"
+          ls "$ANDROID_HOME/ndk" "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools" || true
+      - name: Dựng thư viện native (Android arm64)
+        run: |
+          export ANDROID_NDK_HOME="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          bash scripts/build_android.sh 2>&1 | tee _logs/apk-native.log
+      - name: Đẩy nhật ký dựng native
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/publish_log.sh apk-native _logs/apk-native.log "${{ job.status }}"
+      - name: Chép giọng + danh sách tải vào assets
+        run: |
+          A=android/app/src/main/assets
+          mkdir -p "$A/voices"
+          cp -r _voices/* "$A/voices/"
+          cp _manifest/files.txt "$A/files.txt"
+          cat "$A/files.txt" | cut -c1-200
+          cat "$A/voices/voices.txt"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+      - name: Dựng APK
+        working-directory: android
+        run: |
+          gradle --no-daemon assembleRelease --stacktrace 2>&1 | tee ../_logs/apk-gradle.log
+      - name: Kiểm tra APK
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          ls -la "$APK"
+          mkdir -p _apk
+          cp "$APK" _apk/NinhDonTTS.apk
+          {
+            unzip -l _apk/NinhDonTTS.apk | grep -E "lib/|assets/" || true
+            BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)"
+            "$BT/apksigner" verify --print-certs _apk/NinhDonTTS.apk || true
+            "$BT/aapt2" dump badging _apk/NinhDonTTS.apk | head -n 12 || true
+          } 2>&1 | tee _logs/apk-check.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NinhDonTTS-apk
+          path: _apk/NinhDonTTS.apk
+          retention-days: 30
+      - name: Đẩy nhật ký APK
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cat _logs/apk-gradle.log _logs/apk-check.log > _logs/apk-final.log 2>/dev/null || true
+          bash scripts/publish_log.sh apk-final _logs/apk-final.log "${{ job.status }}"
+
+  # ------------------------------------------------------------------ 5. đăng APK lên Releases
+  release:
+    needs: [apk, smoke]
+    if: always() && needs.apk.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: NinhDonTTS-apk
+          path: _apk
+      - name: Tạo bản phát hành
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="ninhdon-apk-${{ github.run_number }}"
+          gh release create "$TAG" _apk/NinhDonTTS.apk \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Ninh Đôn TTS #${{ github.run_number }}" \
+            --notes "APK cài trên Android 10 trở lên (64-bit). Lần mở đầu app tải khoảng 250 MB dữ liệu. Chạy thử engine trên máy chủ: ${{ needs.smoke.result }}."
