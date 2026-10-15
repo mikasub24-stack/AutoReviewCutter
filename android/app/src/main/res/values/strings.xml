@@ -12,6 +12,9 @@
     <string name="label_sent_pause">Nghỉ giữa câu (giây)</string>
     <string name="label_para_pause">Nghỉ khi xuống dòng (giây)</string>
     <string name="tip_pause">Mẹo: giữ màn hình sáng khi đang tạo giọng. Văn bản dài sẽ lâu hơn vì điện thoại chạy hoàn toàn ngoại tuyến.</string>
+    <string name="label_speed">Tốc độ đọc</string>
+    <string name="btn_speed_reset">Về 1.0×</string>
+    <string name="tip_speed">Kéo sang phải để đọc nhanh hơn, sang trái để chậm hơn (0.50×–2.00×); giọng không bị cao hay trầm đi. Đổi được cả sau khi đã tạo xong — không cần đọc lại.</string>
     <string name="btn_go">Tạo giọng đọc</string>
     <string name="btn_stop">Dừng (giữ phần đã đọc)</string>
     <string name="btn_play">Nghe</string>

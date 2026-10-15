@@ -6,6 +6,7 @@ import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.media.MediaPlayer;
 import android.net.Uri;
@@ -19,6 +20,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ProgressBar;
+import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -55,6 +57,16 @@ public class MainActivity extends AppCompatActivity {
     private final AtomicBoolean cancelJob = new AtomicBoolean(false);
     private volatile boolean downloading = false;
     private volatile boolean working = false;
+    private volatile boolean converting = false;
+
+    private static final int SPEED_STEPS = 30;      // 0.50× .. 2.00×, mỗi nấc 0.05
+    private static final int SPEED_DEFAULT = 10;    // 1.00×
+    private SharedPreferences prefs;
+    private SeekBar sbSpeed;
+    private TextView tvSpeed;
+    private boolean touchingSpeed = false;
+    private File origFile;          // bản đọc ở tốc độ gốc (chưa đổi)
+    private String resultNote = "";
 
     private File lastFile;
     private Uri savedUri;
@@ -98,6 +110,9 @@ public class MainActivity extends AppCompatActivity {
         etText = findViewById(R.id.etText);
         etSentPause = findViewById(R.id.etSentPause);
         etParaPause = findViewById(R.id.etParaPause);
+        sbSpeed = findViewById(R.id.sbSpeed);
+        tvSpeed = findViewById(R.id.tvSpeed);
+        prefs = getSharedPreferences("settings", MODE_PRIVATE);
 
         btnDownload.setOnClickListener(v -> startDownload());
         btnGo.setOnClickListener(v -> startJob());
@@ -113,6 +128,27 @@ public class MainActivity extends AppCompatActivity {
         btnSave.setOnClickListener(v -> saveToDownloads(false));
         btnShare.setOnClickListener(v -> saveToDownloads(true));
         findViewById(R.id.btnLog).setOnClickListener(v -> sendLog());
+
+        sbSpeed.setMax(SPEED_STEPS);
+        sbSpeed.setProgress(Math.max(0, Math.min(SPEED_STEPS, prefs.getInt("speed", SPEED_DEFAULT))));
+        showSpeedLabel();
+        sbSpeed.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar sb, int p, boolean fromUser) {
+                showSpeedLabel();
+                if (fromUser && !touchingSpeed) commitSpeed();     // chỉnh bằng bàn phím / trợ năng
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar sb) { touchingSpeed = true; }
+
+            @Override public void onStopTrackingTouch(SeekBar sb) {
+                touchingSpeed = false;
+                commitSpeed();
+            }
+        });
+        findViewById(R.id.btnSpeedReset).setOnClickListener(v -> {
+            sbSpeed.setProgress(SPEED_DEFAULT);
+            commitSpeed();
+        });
 
         String ver = "?";
         try {
@@ -233,7 +269,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startJob() {
-        if (working) return;
+        if (working || converting) return;
         final String text = etText.getText().toString();
         if (Plan.strip(text).isEmpty()) {
             Toast.makeText(this, "Hãy nhập văn bản cần đọc.", Toast.LENGTH_SHORT).show();
@@ -304,12 +340,13 @@ public class MainActivity extends AppCompatActivity {
 
     private void showResult(Synthesizer.Result r) {
         setBusy(false);
+        boolean haveResult = false;
         if (r.file != null && r.seconds > 0) {
-            lastFile = r.file;
+            origFile = r.file;
+            resultNote = r.cancelled ? " (đã dừng, giữ phần đã đọc)" : "";
             panelResult.setVisibility(View.VISIBLE);
-            tvResult.setText(String.format(Locale.ROOT, "%s — %s%s", r.file.getName(), fmtTime(r.seconds),
-                    r.cancelled ? " (đã dừng, giữ phần đã đọc)" : ""));
-            btnPlay.setText("Nghe");
+            useResultFile(r.file, 1.0);
+            haveResult = true;
         }
         if (r.error != null) {
             tvProgress.setText(r.error + "\n(Phần đã đọc được giữ lại. Có thể gửi nhật ký lỗi bên dưới.)");
@@ -318,6 +355,122 @@ public class MainActivity extends AppCompatActivity {
         } else {
             tvProgress.setText("Xong.");
         }
+        if (haveResult && r.error == null) applySpeed();      // áp tốc độ đang chọn lên bản vừa đọc xong
+    }
+
+    // ------------------------------------------------------------------ tốc độ đọc
+
+    private double currentSpeed() {
+        return Math.round((0.5 + sbSpeed.getProgress() * 0.05) * 100) / 100.0;
+    }
+
+    private void showSpeedLabel() {
+        double sp = currentSpeed();
+        String how = sp < 0.95 ? " (chậm hơn)" : (sp > 1.05 ? " (nhanh hơn)" : " (bình thường)");
+        tvSpeed.setText(String.format(Locale.ROOT, "Tốc độ đọc: %.2f×%s", sp, how));
+    }
+
+    private void commitSpeed() {
+        prefs.edit().putInt("speed", sbSpeed.getProgress()).apply();
+        showSpeedLabel();
+        applySpeed();
+    }
+
+    private static File speedFile(File orig, double sp) {
+        String n = orig.getName();
+        if (n.endsWith(".wav")) n = n.substring(0, n.length() - 4);
+        return new File(orig.getParentFile(), n + " (x" + String.format(Locale.ROOT, "%.2f", sp) + ").wav");
+    }
+
+    /** Làm cho tệp dùng để nghe/lưu/chia sẻ khớp với tốc độ đang chọn (đổi từ bản gốc, không đọc lại). */
+    private void applySpeed() {
+        if (origFile == null || !origFile.isFile() || working || converting) return;
+        final double sp = currentSpeed();
+        if (Math.abs(sp - 1.0) < 0.005) {
+            if (lastFile != origFile) useResultFile(origFile, 1.0);
+            return;
+        }
+        final File dst = speedFile(origFile, sp);
+        if (dst.isFile() && dst.length() > 44) {
+            if (!dst.equals(lastFile)) useResultFile(dst, sp);
+            return;
+        }
+        startConversion(origFile, dst, sp);
+    }
+
+    private void setActionsEnabled(boolean on) {
+        btnPlay.setEnabled(on);
+        btnSave.setEnabled(on);
+        btnShare.setEnabled(on);
+        btnGo.setEnabled(on);
+    }
+
+    private void startConversion(final File src, final File dst, final double sp) {
+        converting = true;
+        setActionsEnabled(false);
+        progress.setVisibility(View.VISIBLE);
+        progress.setProgress(0);
+        tvProgress.setText(String.format(Locale.ROOT, "Đang đổi tốc độ sang %.2f×…", sp));
+        Logger.log(String.format(Locale.ROOT, "Đổi tốc độ %s sang %.2f×", src.getName(), sp));
+        new Thread(() -> {
+            File tmp = new File(dst.getParentFile(), dst.getName() + ".part");
+            String err = null;
+            try {
+                WavSpeed.convert(src, tmp, sp, fr -> ui(() -> progress.setProgress((int) (fr * 1000))), null);
+                if (!tmp.renameTo(dst)) throw new IOException("Không đổi tên được tệp tạm");
+                deleteOtherSpeedFiles(src, dst);
+            } catch (Throwable t) {
+                Logger.log("Lỗi đổi tốc độ", t);
+                err = t.getMessage() == null ? t.toString() : t.getMessage();
+                //noinspection ResultOfMethodCallIgnored
+                tmp.delete();
+            }
+            final String e = err;
+            ui(() -> {
+                converting = false;
+                progress.setVisibility(View.GONE);
+                setActionsEnabled(true);
+                if (e != null) {
+                    tvProgress.setText("Không đổi được tốc độ: " + e + "\nĐang dùng bản tốc độ gốc.");
+                    useResultFile(origFile, 1.0);
+                } else {
+                    tvProgress.setText("Xong.");
+                    useResultFile(dst, sp);
+                    if (Math.abs(currentSpeed() - sp) > 0.005) applySpeed();    // trong lúc đổi, người dùng kéo sang tốc độ khác
+                }
+            });
+        }, "speed").start();
+    }
+
+    /** Xoá các bản tốc độ cũ của cùng một bài (giữ bản gốc và bản mới). */
+    private static void deleteOtherSpeedFiles(File orig, File keep) {
+        String n = orig.getName();
+        if (n.endsWith(".wav")) n = n.substring(0, n.length() - 4);
+        final String prefix = n + " (x";
+        File[] all = orig.getParentFile().listFiles();
+        if (all == null) return;
+        for (File f : all) {
+            if (f.getName().startsWith(prefix) && f.getName().endsWith(".wav") && !f.equals(keep)) {
+                //noinspection ResultOfMethodCallIgnored
+                f.delete();
+            }
+        }
+    }
+
+    /** Chọn tệp để nghe / lưu / chia sẻ và cập nhật dòng mô tả. */
+    private void useResultFile(File f, double sp) {
+        releasePlayer();
+        lastFile = f;
+        savedUri = null;
+        btnPlay.setText("Nghe");
+        String dur = "";
+        try {
+            dur = " — " + fmtTime(WavSpeed.info(f).seconds());
+        } catch (IOException ex) {
+            Logger.log("Không đọc được thông tin WAV", ex);
+        }
+        String spd = Math.abs(sp - 1.0) < 0.005 ? "" : String.format(Locale.ROOT, " · tốc độ %.2f×", sp);
+        tvResult.setText(f.getName() + dur + spd + resultNote);
     }
 
     private static String fmtTime(double sec) {

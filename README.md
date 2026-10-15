@@ -7,6 +7,7 @@ Dựng APK hoàn toàn trên GitHub Actions, không cần máy tính.
 - Bộ chuyển chữ → âm: [sea‑g2p](https://github.com/pnnbao97/sea-g2p) (Rust)
 - Giọng: tạo sẵn một lần trên CI từ 3 tệp trong `voices/` (bằng Python `vieneu`)
 - App: Java thuần, giao diện giống tab Ninh Đôn của Auto Studio (nghỉ giữa câu / giữa đoạn, thẻ `[nghỉ 2s]`, nghe / lưu / chia sẻ)
+- **Tốc độ đọc** 0.50×–2.00× (thanh kéo): đổi nhanh/chậm mà không đổi cao độ (WSOLA, `Stretcher.java`). Áp lên bản đã đọc xong nên đổi lại không cần đọc lại; bản gốc luôn được giữ.
 
 ## Cài APK
 1. Mở trang **Releases** của repo trên điện thoại, tải `NinhDonTTS.apk` của bản mới nhất.
@@ -45,3 +46,7 @@ voices/             3 tệp WAV mẫu
 - Chưa có dịch vụ nền: nếu chuyển sang app khác lâu, Android có thể làm đơ việc đọc. Hãy để app mở.
 - Tốc độ phụ thuộc chip; máy yếu có thể chậm hơn thời gian thực khá nhiều.
 - Bộ nhớ ngữ cảnh được giảm (512/256/256 MB) để chạy trong RAM điện thoại.
+
+## Thử bộ đổi tốc độ trên máy tính
+`tools/host-test/run_stretch.sh` (cần Java 17+): kiểm tra độ dài, cao độ, âm lượng, tiếng lụp bụp, chia nhỏ đầu vào, bài dài 1 giờ.
+`tools/host-test/compare_real.py` (cần ffmpeg + numpy) so với `atempo` của ffmpeg trên 3 giọng mẫu.

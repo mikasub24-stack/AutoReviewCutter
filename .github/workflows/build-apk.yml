@@ -18,6 +18,26 @@ defaults:
     shell: bash
 
 jobs:
+  # ------------------------------------------------------------------ 0. thử bộ đổi tốc độ (Java thuần, rất nhanh)
+  stretch-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Thử bộ đổi tốc độ
+        run: |
+          mkdir -p _logs
+          tools/host-test/run_stretch.sh 2>&1 | tee _logs/stretch.log
+      - name: Đẩy nhật ký
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/publish_log.sh stretch _logs/stretch.log "${{ job.status }}"
+
   # ------------------------------------------------------------------ 1. mô hình + từ điển
   data:
     runs-on: ubuntu-24.04
