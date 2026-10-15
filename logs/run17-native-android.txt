@@ -1,0 +1,407 @@
+# native-android  run=38744739702 #17  status=success  2026-10-15T13:45:27Z
+## các dòng lỗi (tối đa 120)
+133:-- Looking for pthread_create in pthreads - not found
+135:-- Looking for pthread_create in pthread - not found
+356:[160/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/error.cc.o
+
+## 400 dòng cuối
+      |             ^~~~~~~~~~
+1 warning generated.
+[94/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_1.dir/ggml-cpu/binary-ops.cpp.o
+[95/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_1.dir/ggml-cpu/vec.cpp.o
+[96/372] Building C object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_1.dir/ggml-cpu/arch/arm/quants.c.o
+[97/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_1.dir/ggml-cpu/unary-ops.cpp.o
+[98/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_1-feats.dir/ggml-cpu/arch/arm/cpu-feats.cpp.o
+[99/372] Building C object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_2.dir/ggml-cpu/ggml-cpu.c.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/ggml/src/ggml-cpu/ggml-cpu.c:1812:13: warning: 9 enumeration values not handled in switch: 'GGML_OP_COL2IM_1D', 'GGML_OP_SAGE_ATTN2', 'GGML_OP_SAGE_ATTN2_I8'... [-Wswitch]
+ 1812 |     switch (tensor->op) {
+      |             ^~~~~~~~~~
+1 warning generated.
+[100/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_2.dir/ggml-cpu/ggml-cpu.cpp.o
+[101/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_2.dir/ggml-cpu/hbm.cpp.o
+[102/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_1.dir/ggml-cpu/arch/arm/repack.cpp.o
+[103/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_2.dir/ggml-cpu/traits.cpp.o
+[104/372] Building C object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_2.dir/ggml-cpu/quants.c.o
+[105/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_2.dir/ggml-cpu/amx/amx.cpp.o
+[106/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_2.dir/ggml-cpu/amx/mmq.cpp.o
+[107/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_1.dir/ggml-cpu/ops.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/ggml/src/ggml-cpu/ops.cpp:5698:13: warning: enumeration values 'GGML_TYPE_I8_S' and 'GGML_TYPE_I2_S' not handled in switch [-Wswitch]
+ 5698 |     switch (src0->type) {
+      |             ^~~~~~~~~~
+1 warning generated.
+[108/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_2.dir/ggml-cpu/repack.cpp.o
+[109/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_2.dir/ggml-cpu/binary-ops.cpp.o
+[110/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_2.dir/ggml-cpu/vec.cpp.o
+[111/372] Building C object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_2.dir/ggml-cpu/arch/arm/quants.c.o
+[112/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_2-feats.dir/ggml-cpu/arch/arm/cpu-feats.cpp.o
+[113/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_2.dir/ggml-cpu/unary-ops.cpp.o
+[114/372] Building C object CMakeFiles/cjson_vendor.dir/external/cJSON/cJSON.c.o
+[115/372] Building C object CMakeFiles/yaml_vendor.dir/external/libyaml/src/api.c.o
+[116/372] Building C object CMakeFiles/yaml_vendor.dir/external/libyaml/src/reader.c.o
+[117/372] Building C object CMakeFiles/yaml_vendor.dir/external/libyaml/src/parser.c.o
+[118/372] Building C object CMakeFiles/yaml_vendor.dir/external/libyaml/src/loader.c.o
+[119/372] Building C object CMakeFiles/yaml_vendor.dir/external/libyaml/src/scanner.c.o
+[120/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_2.dir/ggml-cpu/arch/arm/repack.cpp.o
+[121/372] Linking CXX shared module bin/libggml-cpu-android_armv8.0_1.so
+[122/372] Linking CXX shared module bin/libggml-cpu-android_armv8.2_1.so
+[123/372] Linking CXX shared module bin/libggml-cpu-android_armv8.2_2.so
+[124/372] Linking CXX shared module bin/libggml-cpu-android_armv8.6_1.so
+[125/372] Linking CXX shared module bin/libggml-cpu-android_armv9.0_1.so
+[126/372] Linking CXX shared module bin/libggml-cpu-android_armv9.2_1.so
+[127/372] Building CXX object ggml/src/CMakeFiles/ggml.dir/ggml-backend-dl.cpp.o
+[128/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/arena.cc.o
+[129/372] Building CXX object ggml/src/CMakeFiles/ggml.dir/ggml-backend-reg.cpp.o
+[130/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/arenastring.cc.o
+[131/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/bytestream.cc.o
+[132/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/common.cc.o
+[133/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/coded_stream.cc.o
+[134/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/generated_enum_util.cc.o
+[135/372] Building CXX object ggml/src/CMakeFiles/ggml-cpu-android_armv9.2_2.dir/ggml-cpu/ops.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/ggml/src/ggml-cpu/ops.cpp:5698:13: warning: enumeration values 'GGML_TYPE_I8_S' and 'GGML_TYPE_I2_S' not handled in switch [-Wswitch]
+ 5698 |     switch (src0->type) {
+      |             ^~~~~~~~~~
+1 warning generated.
+[136/372] Linking CXX shared module bin/libggml-cpu-android_armv9.2_2.so
+[137/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/implicit_weak_message.cc.o
+[138/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/generated_message_table_driven_lite.cc.o
+[139/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/extension_set.cc.o
+[140/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/io_win32.cc.o
+[141/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/generated_message_util.cc.o
+[142/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/int128.cc.o
+[143/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/parse_context.cc.o
+[144/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/message_lite.cc.o
+[145/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/status.cc.o
+[146/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/statusor.cc.o
+[147/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/stringpiece.cc.o
+[148/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/repeated_field.cc.o
+[149/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/stringprintf.cc.o
+[150/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/structurally_valid.cc.o
+[151/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/strutil.cc.o
+[152/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/time.cc.o
+[153/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/zero_copy_stream.cc.o
+[154/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/wire_format_lite.cc.o
+[155/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/zero_copy_stream_impl_lite.cc.o
+[156/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/protobuf-lite/zero_copy_stream_impl.cc.o
+[157/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/builtin_pb/sentencepiece.pb.cc.o
+[158/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/builtin_pb/sentencepiece_model.pb.cc.o
+[159/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/char_model.cc.o
+[160/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/error.cc.o
+[161/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/bpe_model.cc.o
+[162/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/filesystem.cc.o
+[163/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/model_factory.cc.o
+[164/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/model_interface.cc.o
+[165/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/normalizer.cc.o
+[166/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/util.cc.o
+[167/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/word_model.cc.o
+[168/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/sentencepiece_processor.cc.o
+[169/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/__/third_party/absl/flags/flag.cc.o
+[170/372] Building CXX object external/sentencepiece/src/CMakeFiles/sentencepiece-static.dir/unigram_model.cc.o
+[171/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/assets/resource_bundle.cpp.o
+[172/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/model_spec/options.cpp.o
+[173/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/model_spec/package.cpp.o
+[174/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/model_spec/schema.cpp.o
+[175/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/assets/weight_norm_folding.cpp.o
+[176/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/assets/lora_tensor_source.cpp.o
+[177/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/core/module.cpp.o
+[178/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/core/attention_fallback.cpp.o
+[179/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/assets/torch_bin.cpp.o
+[180/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/core/backend.cpp.o
+[181/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/core/host_memory.cpp.o
+[182/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/core/deferred_tensor_writer.cpp.o
+[183/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/core/execution_context.cpp.o
+[184/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/core/load_progress.cpp.o
+[185/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/model.cpp.o
+[186/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/model_spec/metadata.cpp.o
+[187/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/assets/tensor_source.cpp.o
+[188/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/task_vocabulary.cpp.o
+[189/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/session.cpp.o
+[190/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/partial_text.cpp.o
+[191/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/cache.cpp.o
+[192/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/artifacts.cpp.o
+[193/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/graph_executor.cpp.o
+[194/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/graph_optimizer.cpp.o
+[195/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/bounded_static_kv_decode.cpp.o
+[196/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/host_ops.cpp.o
+[197/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/kv_cache.cpp.o
+[198/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/options.cpp.o
+[199/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/workspace.cpp.o
+[200/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/session_base.cpp.o
+[201/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/greedy_causal_decoder.cpp.o
+[202/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/io/filesystem.cpp.o
+[203/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/espeak_phonemizer.cpp.o
+[204/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/midi/midi_file.cpp.o
+[205/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/io/config.cpp.o
+[206/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/io/text.cpp.o
+[207/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/io/json.cpp.o
+[208/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/espeak_data.cpp.o
+[209/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/chinese_variant.cpp.o
+[210/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/subtitle.cpp.o
+[211/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/chunking.cpp.o
+[212/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/unicode_normalization.cpp.o
+[213/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/moss_tts_normalization.cpp.o
+[214/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/chinese_normalization.cpp.o
+[215/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/io/binary.cpp.o
+[216/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/io/yaml.cpp.o
+[217/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/debug/profiler.cpp.o
+[218/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/debug/trace.cpp.o
+[219/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/text/text_normalization.cpp.o
+[220/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/rknn/engine.cpp.o
+[221/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/io/safetensors.cpp.o
+[222/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/moss_tts_delay/config.cpp.o
+[223/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/moss_tts_delay/delay_decoder.cpp.o
+[224/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/moss_tts_delay/heads.cpp.o
+[225/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/moss_tts_delay/backbone.cpp.o
+[226/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/moss_tts_delay/prompt.cpp.o
+[227/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/tdt_decoder_runner.cpp.o
+[228/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/tdt_decoder_greedy_customized.cpp.o
+[229/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/tdt_decoder_greedy_duration_loop.cpp.o
+[230/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/decoders/tdt_decoder_greedy_separate_heads.cpp.o
+[231/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/linear_module.cpp.o
+[232/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/convnext_modules.cpp.o
+[233/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/primitive_modules.cpp.o
+[234/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/packed_linear_weights.cpp.o
+[235/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/activation_modules.cpp.o
+[236/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/norm_modules.cpp.o
+[237/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/lookup_modules.cpp.o
+[238/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/vocoders/vocos_vocoder.cpp.o
+[239/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/structural_modules.cpp.o
+[240/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/multi_codebook_embedding.cpp.o
+[241/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/asr_helpers.cpp.o
+[242/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/conv_modules.cpp.o
+[243/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/whisper_embedding.cpp.o
+[244/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/zipformer_modules.cpp.o
+[245/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/whisper_frontend.cpp.o
+[246/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/s3_tokenizer.cpp.o
+[247/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/nemo_nano_codec_runtime.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/codecs/nemo_nano_codec_runtime.cpp:183:83: warning: missing field 'inverse_alpha' initializer [-Wmissing-field-initializers]
+  183 |     return {store.make_f32(core::TensorShape::from_dims({snake_channels}), values)};
+      |                                                                                   ^
+1 warning generated.
+[248/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/wan_video_vae_runtime.cpp.o
+[249/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speaker_encoders/campplus_encoder.cpp.o
+[250/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/pitch_extractors/rmvpe_pitch_extractor.cpp.o
+[251/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/vocoders/hifigan_vocoder.cpp.o
+[252/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/vocoders/bigvgan_vocoder.cpp.o
+[253/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/vocoders/hift_vocoder.cpp.o
+[254/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/sanm.cpp.o
+[255/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/optimizations/fast_conv_modules.cpp.o
+[256/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/wav2vec2_bert_encoder.cpp.o
+[257/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/wav2vec2_encoder.cpp.o
+[258/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/optimizations/fast_projection_modules.cpp.o
+[259/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/streaming_conv_modules.cpp.o
+[260/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/recurrent_modules.cpp.o
+[261/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/positional_encoding.cpp.o
+[262/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/wavlm_encoder.cpp.o
+[263/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/feed_forward_modules.cpp.o
+[264/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/self_attention.cpp.o
+[265/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/longformer_attention_gpu.cpp.o
+[266/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/longformer_attention.cpp.o
+[267/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/common_relative_attention.cpp.o
+[268/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/relative_attention.cpp.o
+[269/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/scaled_dot_product_attention.cpp.o
+[270/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/grouped_query_attention.cpp.o
+[271/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/projected_grouped_self_attention.cpp.o
+[272/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/streaming_frame_attention_cache.cpp.o
+[273/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/transformers/decoder.cpp.o
+[274/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/transformers/causal_decoder.cpp.o
+[275/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/transformers/causal_decoder_runtime.cpp.o
+[276/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/attention/cross_attention.cpp.o
+[277/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/text_encoders/qwen3_vl_encoder_runtime.cpp.o
+[278/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/transformers/qwen35_decoder_runtime.cpp.o
+[279/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speech_encoders/qwen3_audio_encoder_runtime.cpp.o
+[280/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/ebranchformer_modules.cpp.o
+[281/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/transformers/transformer_blocks.cpp.o
+[282/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/conditioning_modules.cpp.o
+[283/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/conformer_modules.cpp.o
+[284/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/positional_modules.cpp.o
+[285/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/predictor_modules.cpp.o
+[286/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/text_encoders/t5_base_encoder.cpp.o
+[287/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/text_encoders/t5_gemma_encoder.cpp.o
+[288/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/optimizations/fast_kv_modules.cpp.o
+[289/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/sampling/flow_sampler_runtime.cpp.o
+[290/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/transformers/gemma_decoder.cpp.o
+[291/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/tokenizers/hf_tokenizer_json.cpp.o
+[292/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/tokenizers/qwen_bpe_bundle.cpp.o
+[293/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/tokenizers/llama_bpe.cpp.o
+[294/372] Building CXX object CMakeFiles/engine_core.dir/external/llama_tokenizer/unicode-data.cpp.o
+[295/372] Building CXX object CMakeFiles/engine_core.dir/external/llama_tokenizer/bpe-core.cpp.o
+[296/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/tokenizers/sentencepiece.cpp.o
+[297/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/activity.cpp.o
+[298/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/probability_segmenter.cpp.o
+[299/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/kaldi_fbank.cpp.o
+[300/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/activity_graph.cpp.o
+[301/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/conversion.cpp.o
+[302/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/chunking.cpp.o
+[303/372] Building CXX object CMakeFiles/engine_core.dir/external/llama_tokenizer/unicode.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/external/llama_tokenizer/unicode.cpp:22:20: warning: unused function 'unicode_cpts_to_utf8' [-Wunused-function]
+   22 | static std::string unicode_cpts_to_utf8(const std::vector<uint32_t> & cps) {
+      |                    ^~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+[304/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/utilities/deepfilternet2.cpp.o
+[305/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/dsp.cpp.o
+[306/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/nemo_mel_frontend.cpp.o
+[307/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/fft.cpp.o
+[308/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/reference_audio_frontend.cpp.o
+[309/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/mel_spectrogram_frontend.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/mel_spectrogram_frontend.cpp:32:19: warning: unused variable 'projection_work_items' [-Wunused-variable]
+   32 |     const int64_t projection_work_items = channels * config.n_mels * frames;
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+[310/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/istft_graph.cpp.o
+[311/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/utilities/flashsr.cpp.o
+[312/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/utilities/gtcrn.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/audio/utilities/gtcrn.cpp:40:19: warning: unused variable 'kErbBins' [-Wunused-const-variable]
+   40 | constexpr int64_t kErbBins = 129;
+      |                   ^~~~~~~~
+1 warning generated.
+[313/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/mixing.cpp.o
+[314/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/output.cpp.o
+[315/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/resampling.cpp.o
+[316/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/waveform_ops.cpp.o
+[317/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/utilities/utility_api.cpp.o
+[318/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/wav_reader.cpp.o
+[319/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/utilities/rnnoise.cpp.o
+[320/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/wav_writer.cpp.o
+[321/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/runtime/flow_kv_cache.cpp.o
+[322/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/audio/utilities/zipenhancer.cpp.o
+[323/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speaker_encoders/titanet_runtime.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/modules/speaker_encoders/titanet_runtime.cpp:97:17: warning: unused variable 'kPreemph' [-Wunused-const-variable]
+   97 | constexpr float kPreemph = 0.97f;
+      |                 ^~~~~~~~
+1 warning generated.
+[324/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/modules/speaker_encoders/ecapa_tdnn_runtime.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/modules/speaker_encoders/ecapa_tdnn_runtime.cpp:99:19: warning: unused variable 'kEmbeddingDim' [-Wunused-const-variable]
+   99 | constexpr int64_t kEmbeddingDim = 192;
+      |                   ^~~~~~~~~~~~~
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/modules/speaker_encoders/ecapa_tdnn_runtime.cpp:101:17: warning: unused variable 'kStatsEps' [-Wunused-const-variable]
+  101 | constexpr float kStatsEps = 1.0e-12f;
+      |                 ^~~~~~~~~
+2 warnings generated.
+[325/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/fsq_audio_codec_runtime.cpp.o
+[326/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/mel_latent_vae44k_runtime.cpp.o
+[327/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/neural_audio.cpp.o
+[328/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/moss_audio_tokenizer_codec_runtime.cpp.o
+[329/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/fish_dac_codec_runtime.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/codecs/fish_dac_codec_runtime.cpp:742:63: warning: missing field 'inverse_alpha' initializer [-Wmissing-field-initializers]
+  742 |         source.require_f32(name + ".alpha", {1, channels, 1}))};
+      |                                                               ^
+1 warning generated.
+[330/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/mimi_codec_runtime.cpp.o
+[331/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/oobleck_audio_vae_runtime.cpp.o
+[332/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/redae_codec_runtime.cpp.o
+[333/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/snac_decoder_runtime.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/codecs/snac_decoder_runtime.cpp:88:74: warning: missing field 'inverse_alpha' initializer [-Wmissing-field-initializers]
+   88 |                               source.require_f32(name, {1, channels, 1}))};
+      |                                                                          ^
+1 warning generated.
+[334/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/conditioners/cav_mae_st_conditioner_runtime.cpp.o
+[335/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/conditioners/clap_audio_conditioner_runtime.cpp.o
+[336/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/conditioners/musicgen_style_conditioner_runtime.cpp.o
+[337/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/codecs/s3gen_runtime.cpp.o
+[338/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/conditioners/open_clip_conditioner_runtime.cpp.o
+[339/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/sampling/greedy_decode.cpp.o
+[340/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/conditioners/synchformer_conditioner_runtime.cpp.o
+[341/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/sampling/diffusion_math.cpp.o
+[342/372] Building CXX object CMakeFiles/engine_core.dir/src/models/controlfoley/flow_denoiser.cpp.o
+[343/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/sampling/noise.cpp.o
+[344/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/sampling/hf_sampler.cpp.o
+[345/372] Building CXX object CMakeFiles/engine_core.dir/src/framework/sampling/torch_random.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/framework/sampling/torch_random.cpp:457:14: warning: unused parameter 'offset_step_blocks' [-Wunused-parameter]
+  457 |     uint64_t offset_step_blocks,
+      |              ^
+1 warning generated.
+[346/372] Building CXX object CMakeFiles/engine_model_silero_vad.dir/src/models/silero_vad/assets.cpp.o
+[347/372] Building CXX object CMakeFiles/engine_model_silero_vad.dir/src/models/silero_vad/runtime.cpp.o
+[348/372] Building CXX object CMakeFiles/engine_model_silero_vad.dir/src/models/silero_vad/session.cpp.o
+[349/372] Building CXX object CMakeFiles/engine_model_marblenet_vad.dir/src/models/marblenet_vad/assets.cpp.o
+[350/372] Building CXX object CMakeFiles/engine_model_marblenet_vad.dir/src/models/marblenet_vad/runtime.cpp.o
+[351/372] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/assets.cpp.o
+[352/372] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/tokenizer_text.cpp.o
+[353/372] Building CXX object CMakeFiles/engine_model_marblenet_vad.dir/src/models/marblenet_vad/session.cpp.o
+[354/372] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/tokenizer_speech_encoder.cpp.o
+[355/372] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/speaker_encoder.cpp.o
+[356/372] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/prompt_tts_voice_clone.cpp.o
+[357/372] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/tokenizer_speech_decoder.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/community_models/vieneu_v3_turbo/tokenizer_speech_decoder.cpp:1149:13: warning: variable 'chunks' set but not used [-Wunused-but-set-variable]
+ 1149 |     int64_t chunks = 0;
+      |             ^
+1 warning generated.
+[358/372] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/frame_cap.cpp.o
+[359/372] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/orchestration.cpp.o
+[360/372] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/session.cpp.o
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/community_models/vieneu_v3_turbo/session.cpp:502:9: warning: missing field 'encoder_transformer_weight_storage_type' initializer [-Wmissing-field-initializers]
+  502 |         },
+      |         ^
+1 warning generated.
+[361/372] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/loader.cpp.o
+[362/372] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/talker.cpp.o
+[363/372] Building CXX object CMakeFiles/engine_model_vieneu_v3_turbo.dir/src/community_models/vieneu_v3_turbo/text_frontend.cpp.o
+[364/372] Linking CXX shared library bin/libggml.so
+[365/372] Linking C static library libcjson_vendor.a
+[366/372] Linking C static library libyaml_vendor.a
+[367/372] Linking CXX static library external/sentencepiece/src/libsentencepiece.a
+[368/372] Building CXX object CMakeFiles/engine_runtime.dir/src/framework/runtime/registry.cpp.o
+[369/372] Linking CXX static library libengine_runtime.a
+[370/372] Building CXX object CMakeFiles/audiocpp.dir/src/capi/audiocpp.cpp.o
+In file included from /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/src/capi/audiocpp.cpp:15:
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/include/audiocpp.h:130:34: warning: '/*' within block comment [-Wcomment]
+  130 |  * install -- reading model_specs/*.json to build a picker, say -- has had
+      |                                  ^
+1 warning generated.
+[371/372] Linking CXX shared library bin/libaudiocpp.so
+::endgroup::
+::group::libninhdon (JNI)
+-- The CXX compiler identification is Clang 21.0.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/local/lib/android/sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/build-nd-android
+[1/4] Building CXX object CMakeFiles/ninhdon.dir/ninhdon_jni.cpp.o
+[2/4] Building CXX object CMakeFiles/ninhdon_core.dir/ninhdon_core.cpp.o
+In file included from /home/runner/work/AutoReviewCutter/AutoReviewCutter/native/ninhdon_core.cpp:3:
+/home/runner/work/AutoReviewCutter/AutoReviewCutter/_work/audio.cpp/include/audiocpp.h:130:34: warning: '/*' within block comment [-Wcomment]
+  130 |  * install -- reading model_specs/*.json to build a picker, say -- has had
+      |                                  ^
+1 warning generated.
+[3/4] Linking CXX static library libninhdon_core.a
+[4/4] Linking CXX shared library libninhdon.so
+::endgroup::
+::group::kiểm tra thư viện
+libaudiocpp.so                           soname=libaudiocpp.so needed=['libggml.so', 'libggml-base.so', 'libdl.so', 'libm.so', 'libc++_shared.so', 'libc.so']
+libc++_shared.so                         soname=libc++_shared.so needed=['libc.so', 'libm.so', 'libdl.so']
+libggml-base.so                          soname=libggml-base.so needed=['libm.so', 'libdl.so', 'libc++_shared.so', 'libc.so']
+libggml-cpu-android_armv8.0_1.so         soname=None needed=['libggml-base.so', 'libm.so', 'libc++_shared.so', 'libdl.so', 'libc.so']
+libggml-cpu-android_armv8.2_1.so         soname=None needed=['libggml-base.so', 'libm.so', 'libc++_shared.so', 'libdl.so', 'libc.so']
+libggml-cpu-android_armv8.2_2.so         soname=None needed=['libggml-base.so', 'libm.so', 'libc++_shared.so', 'libdl.so', 'libc.so']
+libggml-cpu-android_armv8.6_1.so         soname=None needed=['libggml-base.so', 'libm.so', 'libc++_shared.so', 'libdl.so', 'libc.so']
+libggml-cpu-android_armv9.0_1.so         soname=None needed=['libggml-base.so', 'libm.so', 'libc++_shared.so', 'libdl.so', 'libc.so']
+libggml-cpu-android_armv9.2_1.so         soname=None needed=['libggml-base.so', 'libm.so', 'libc++_shared.so', 'libdl.so', 'libc.so']
+libggml-cpu-android_armv9.2_2.so         soname=None needed=['libggml-base.so', 'libm.so', 'libc++_shared.so', 'libdl.so', 'libc.so']
+libggml.so                               soname=libggml.so needed=['libggml-base.so', 'libm.so', 'libc++_shared.so', 'libdl.so', 'libc.so']
+libninhdon.so                            soname=libninhdon.so needed=['libaudiocpp.so', 'libm.so', 'libc++_shared.so', 'libdl.so', 'libc.so']
+libsea_g2p_rs.so                         soname=None needed=['libdl.so', 'libc.so']
+Biến thể CPU: libggml-cpu-android_armv8.0_1.so, libggml-cpu-android_armv8.2_1.so, libggml-cpu-android_armv8.2_2.so, libggml-cpu-android_armv8.6_1.so, libggml-cpu-android_armv9.0_1.so, libggml-cpu-android_armv9.2_1.so, libggml-cpu-android_armv9.2_2.so
+OK
+::endgroup::
+[build_android] đã chép vào /home/runner/work/AutoReviewCutter/AutoReviewCutter/android/app/src/main/jniLibs/arm64-v8a:
+total 89556
+drwxr-xr-x 2 runner runner     4096 Oct 15 13:45 .
+drwxr-xr-x 3 runner runner     4096 Oct 15 13:41 ..
+-rwxr-xr-x 1 runner runner 38453840 Oct 15 13:45 libaudiocpp.so
+-rwxr-xr-x 1 runner runner  9485032 Oct 15 13:45 libc++_shared.so
+-rwxr-xr-x 1 runner runner  5093664 Oct 15 13:45 libggml-base.so
+-rwxr-xr-x 1 runner runner  4241672 Oct 15 13:45 libggml-cpu-android_armv8.0_1.so
+-rwxr-xr-x 1 runner runner  4432200 Oct 15 13:45 libggml-cpu-android_armv8.2_1.so
+-rwxr-xr-x 1 runner runner  4432608 Oct 15 13:45 libggml-cpu-android_armv8.2_2.so
+-rwxr-xr-x 1 runner runner  4552544 Oct 15 13:45 libggml-cpu-android_armv8.6_1.so
+-rwxr-xr-x 1 runner runner  4583456 Oct 15 13:45 libggml-cpu-android_armv9.0_1.so
+-rwxr-xr-x 1 runner runner  4583456 Oct 15 13:45 libggml-cpu-android_armv9.2_1.so
+-rwxr-xr-x 1 runner runner  4583456 Oct 15 13:45 libggml-cpu-android_armv9.2_2.so
+-rwxr-xr-x 1 runner runner   442520 Oct 15 13:45 libggml.so
+-rwxr-xr-x 1 runner runner   258944 Oct 15 13:45 libninhdon.so
+-rwxr-xr-x 1 runner runner  6516128 Oct 15 13:45 libsea_g2p_rs.so
+88M	/home/runner/work/AutoReviewCutter/AutoReviewCutter/android/app/src/main/jniLibs/arm64-v8a
