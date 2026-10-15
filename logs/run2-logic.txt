@@ -1,0 +1,67 @@
+# logic  run=38752020832 #2  status=success  2026-10-15T14:31:25Z
+## các dòng lỗi (tối đa 120)
+
+## 400 dòng cuối
+Thư mục tạm: /tmp/arcplus5636860410730564739
+
+== Video A (ngang, 30 fps)
+  cuts=[6.0, 13.0, 15.0, 19.0, 22.0] bad=[[13.0, 15.0], [13.0, 15.0], [15.0, 19.0], [19.0, 22.0]]
+  [ok]   tìm thấy chỗ cắt ~6.0
+  [ok]   tìm thấy chỗ cắt ~13.0
+  [ok]   tìm thấy chỗ cắt ~15.0
+  [ok]   tìm thấy chỗ cắt ~19.0
+  [ok]   tìm thấy chỗ cắt ~22.0
+  [ok]   đúng 5 chỗ cắt, không báo thừa (có 5)
+  [ok]   đoạn đen/đứng hình phủ 13.3 → 21.7
+  usable(cảnh+bỏ xấu) = [0.00..5.70] [6.05..12.70] [22.05..26.95]
+  [ok]   có đoạn dùng được
+  [ok]   không đoạn nào chạm vùng đen/đứng hình 13-22
+  [ok]   không đoạn nào vắt qua chỗ cắt 6
+  [ok]   không đoạn nào vắt qua chỗ cắt 22
+  usable(chỉ cảnh)     = [0.00..5.70] [6.05..12.70] [13.05..14.70] [15.05..18.70] [19.05..21.70] [22.05..26.95]
+  [ok]   (chỉ cảnh) không vắt qua 6.0
+  [ok]   (chỉ cảnh) không vắt qua 13.0
+  [ok]   (chỉ cảnh) không vắt qua 15.0
+  [ok]   (chỉ cảnh) không vắt qua 19.0
+  [ok]   (chỉ cảnh) không vắt qua 22.0
+  [ok]   (chỉ cảnh) giữ lại nhiều hơn khi không bỏ đoạn xấu
+  usable(chỉ bỏ xấu)   = [0.00..12.70] [22.05..26.95]
+  [ok]   (chỉ bỏ xấu) không chạm vùng 13-22
+  [ok]   (chỉ bỏ xấu) được phép vắt qua chỗ cắt 6
+
+== Video B (dọc, 25 fps, đen tới hết video)
+  cuts=[5.0, 9.0] bad=[[9.0, 11.75], [9.0, 12.0]]
+  [ok]   tìm thấy chỗ cắt ~5 và ~9
+  [ok]   đen cuối video được ghi nhận (9.3 → 11.9)
+  usable = [0.00..4.70] [5.05..8.70]
+  [ok]   không đoạn nào chạm đoạn đen cuối
+  [ok]   không vắt qua chỗ cắt 5
+
+== Video C (1 cảnh liền 20 giây)
+  cuts=[] bad=[]
+  [ok]   không báo cắt/đoạn xấu giả
+  usable+split = [0.00..3.99] [3.99..7.98] [7.98..11.97] [11.97..15.96] [15.96..19.95]
+  [ok]   chia 20 giây thành 5 đoạn (có 5)
+
+== Xếp lịch
+  12 đoạn: [v0@0.00+2.83, v1@0.00+4.70, v2@0.00+3.97, v0@2.85+2.83, v1@5.05+3.63, v2@3.99+3.97, v0@6.05+3.30, v2@7.98+3.97, v0@9.38+3.30, v2@11.97+3.97, v0@22.05+4.90, v2@15.96+3.63]
+  [ok]   tổng độ dài 45.000 ≈ 45.0
+  [ok]   đoạn cuối không quá ngắn (3.6333333333333333)
+  [ok]   ba đoạn đầu lần lượt từ 3 video
+  [ok]   mọi đoạn cắt nằm trong đoạn dùng được của video tương ứng
+  [ok]   lời đọc 0,4 giây → 1 đoạn ngắn
+  [ok]   quay vòng khi hết đoạn (4 đoạn, tổng 35.0)
+  [ok]   không có đoạn nào → danh sách rỗng
+  [ok]   quét 400+ độ dài lời đọc: tổng đúng, đoạn cuối không quá ngắn
+
+== Dựng thật bằng ffmpeg
+  kết quả: 45.0 giây, 1920
+1080
+30/1
+0/0
+  [ok]   video xuất dài 45.000 ≈ lời đọc 45.000
+  [ok]   độ phân giải 1920x1080
+  [ok]   có cả hình và tiếng
+  [ok]   soi lại 12 đoạn đã cắt: không đoạn nào còn đổi cảnh / đen / đứng hình (hỏng 0)
+
+37/37 kiểm tra đạt
