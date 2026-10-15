@@ -1,0 +1,22 @@
+# smoke  run=38757457253 #19  status=success  2026-10-15T15:09:27Z
+## các dòng lỗi (tối đa 120)
+
+## 400 dòng cuối
+=================== giọng ninh_don
+audio.cpp dev
+init: 0.2 s
+synth: 1.7 s wall, audio 3.84 s @ 48000 Hz, RTF 0.44, rms 3656, peak 17478
+synth #2: ok, 1.5 s wall
+SMOKE OK
+=================== giọng adam
+audio.cpp dev
+init: 0.2 s
+synth: 1.3 s wall, audio 3.36 s @ 48000 Hz, RTF 0.39, rms 3113, peak 19894
+synth #2: ok, 1.2 s wall
+SMOKE OK
+=================== giọng tung_dang
+audio.cpp dev
+init: 0.2 s
+synth: 1.4 s wall, audio 3.68 s @ 48000 Hz, RTF 0.38, rms 3881, peak 24053
+synth #2: ok, 1.4 s wall
+SMOKE OK
