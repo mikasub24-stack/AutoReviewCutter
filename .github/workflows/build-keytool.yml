@@ -1,0 +1,101 @@
+name: Dựng APK Cấp Key
+
+on:
+  push:
+    branches: [keytool]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-keytool-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # ------------------------------------------------------------------ 1. chạy thử phần tính toán (Ed25519 + định dạng key)
+  logic-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Chạy thử
+        run: |
+          mkdir -p _logs
+          JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8" tools/host-test/run.sh 2>&1 | tee _logs/logic.log
+      - name: Đẩy nhật ký
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/publish_log.sh capkey-logic _logs/logic.log "${{ job.status }}"
+
+  # ------------------------------------------------------------------ 2. dựng APK
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+      - name: Dựng APK
+        run: |
+          mkdir -p _logs
+          gradle --no-daemon assembleRelease --stacktrace 2>&1 | tee _logs/apk-gradle.log
+          test "${PIPESTATUS[0]}" -eq 0
+      - name: Kiểm tra APK
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          ls -la "$APK"
+          mkdir -p _apk
+          cp "$APK" _apk/CapKey.apk
+          {
+            BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)"
+            "$BT/apksigner" verify --print-certs _apk/CapKey.apk || true
+            "$BT/aapt2" dump badging _apk/CapKey.apk | head -n 12 || true
+            "$BT/aapt2" dump permissions _apk/CapKey.apk || true
+          } 2>&1 | tee _logs/apk-check.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CapKey-apk
+          path: _apk/CapKey.apk
+          retention-days: 30
+      - name: Đẩy nhật ký APK
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cat _logs/apk-gradle.log _logs/apk-check.log > _logs/apk-final.log 2>/dev/null || true
+          bash scripts/publish_log.sh capkey-apk _logs/apk-final.log "${{ job.status }}"
+
+  # ------------------------------------------------------------------ 3. đăng lên Releases
+  release:
+    needs: [build, logic-test]
+    if: needs.build.result == 'success' && needs.logic-test.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: CapKey-apk
+          path: _apk
+      - name: Tạo bản phát hành
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="capkey-${{ github.run_number }}"
+          gh release create "$TAG" _apk/CapKey.apk \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Cấp Key #${{ github.run_number }}" \
+            --notes "Ứng dụng cấp key bản quyền Auto Studio / AnimStudio trên Android. Không kèm khóa riêng (nhập một lần trong app), không có quyền Internet. Key tạo ra đã đối chiếu từng ký tự với tao_key.py. Chưa thử trên điện thoại thật."

@@ -1,0 +1,14 @@
+plugins { id 'com.android.application' }
+android {
+ namespace 'vn.mika.capkey'
+ compileSdk 35
+ defaultConfig { applicationId 'vn.mika.capkey'; minSdk 26; targetSdk 33; versionCode 1; versionName '1.0' }
+ // Khoá ký cố định (nằm trong repo): bản mới cài đè được bản cũ mà không mất khóa riêng đã nhập.
+ signingConfigs { fixed { storeFile file('../keystore/capkey.jks'); storePassword 'capkey2026'; keyAlias 'capkey'; keyPassword 'capkey2026' } }
+ buildTypes {
+  debug { signingConfig signingConfigs.fixed }
+  release { signingConfig signingConfigs.fixed; minifyEnabled false }
+ }
+ lint { checkReleaseBuilds false; abortOnError false }
+ compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
