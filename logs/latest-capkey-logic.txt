@@ -1,0 +1,7 @@
+# capkey-logic  run=40077966390 #1  status=success  2026-10-24T08:25:25Z
+## các dòng lỗi (tối đa 120)
+
+## 400 dòng cuối
+Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+HOST TEST OK (30 kiểm tra)
