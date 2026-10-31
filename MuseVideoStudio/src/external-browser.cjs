@@ -65,7 +65,14 @@ function toPlaywright(cookie) {
 async function launchExternalBrowser({ executablePath, profileDir, sessionFile, safeStorage, onWarning = () => {}, chromium, onClosed = () => {}, headless = false, deferMuseNavigation = false }) {
   if (typeof executablePath !== 'string' || !path.isAbsolute(executablePath)) throw Error('Chọn đường dẫn Chrome hoặc Edge đầy đủ.');
   await fs.access(executablePath);
+  try {if((await fs.lstat(profileDir)).isSymbolicLink())throw Error('Không dùng liên kết tới hồ sơ cá nhân.');}catch(e){if(e.code!=='ENOENT')throw e;}
   await ownProfile(profileDir);
+  // Windows may spell the temp/AppData parent with an 8.3 alias. Pin the real
+  // owned child path once so later safety checks compare the same directory.
+  profileDir=await fs.realpath(profileDir);
+  if(typeof sessionFile!=='string'||!path.isAbsolute(sessionFile))throw Error('Đường dẫn lưu phiên không hợp lệ.');
+  await fs.mkdir(path.dirname(sessionFile),{recursive:true});
+  sessionFile=path.join(await fs.realpath(path.dirname(sessionFile)),path.basename(sessionFile));
   const engine = chromium || require('playwright-core').chromium;
   let context, store, pollTimer, debounceTimer, pendingFlush, closePromise, clearPromise, resetReceipt, closing = false, closed = false, current;
   const attached = new Set();
