@@ -7,7 +7,7 @@ const{chatDiagnostics}=require('../src/chat-diagnostics.cjs');
  try{
   const page=await browser.newPage();
   await page.setContent(`<aside><button>Send invite</button></aside><div role="log"><button>Send</button></div><form><textarea>PRIVATE_PROMPT_SECRET</textarea><button type="button" id="plus">+</button><button type="button" id="send"><svg><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button></form>`);
-  await page.evaluate(()=>{globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]=new Map([['one',{}]]);globalThis.sent=0;document.getElementById('send').onclick=()=>{globalThis.sent++;document.querySelector('textarea').value='';};});
+  await page.evaluate(()=>{globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]=new Map([['one',{prompt:'PRIVATE_PROMPT_SECRET'}]]);globalThis.sent=0;document.getElementById('send').onclick=()=>{globalThis.sent++;document.querySelector('textarea').value='';};});
   assert.equal((await page.evaluate(submitPrompt,{id:'one',composerSelector:'textarea'})).clicked,true);assert.equal(await page.evaluate(()=>globalThis.sent),1);assert.equal(await page.locator('textarea').inputValue(),'');
   await page.locator('textarea').fill('PRIVATE_PROMPT_SECRET');await page.locator('#send').evaluate(e=>e.disabled=true);
   await assert.rejects(page.evaluate(submitPrompt,{id:'one',composerSelector:'textarea'}),/chưa sẵn sàng/);assert.equal(await page.locator('textarea').inputValue(),'PRIVATE_PROMPT_SECRET');

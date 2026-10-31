@@ -1,9 +1,23 @@
 // Serialized into the account's document; no Node dependencies.
-function submitPrompt({id,selector='',composerSelector}) {
+function submitPrompt({id,selector='',composerSelector,attachmentTokens=[]}) {
   const state=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]?.get(id);
   if(!state)throw Error('Tác vụ đã dừng; không gửi prompt.');
   const visible=e=>e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden';
   const enabled=e=>!e.disabled&&e.getAttribute('aria-disabled')!=='true';
+  const draft=[...document.querySelectorAll(composerSelector)].filter(visible);
+  const norm=s=>String(s||'').replace(/\s+/g,' ').trim();
+  if(draft.length!==1||norm(draft[0].value||draft[0].innerText)!==state.prompt)throw Error('Prompt trong ô chat đã thay đổi. Tool chưa gửi để tránh nhầm cảnh.');
+  const keys=globalThis.__museStudioImageKeys;
+  const current=[...document.querySelectorAll('img')].filter(visible);
+  if(attachmentTokens.length){
+    let matching=false;
+    for(let root=draft[0].parentElement,depth=0;root&&root!==document.body&&depth<7;root=root.parentElement,depth++){
+      if(root.querySelector('video,[role="log"],[role="feed"],nav,aside'))break;
+      const tokens=current.filter(e=>root.contains(e)&&e.complete&&e.naturalWidth>0).map(e=>(keys?.get(e)||'')+'|'+(e.currentSrc||e.src));
+      if(attachmentTokens.every(token=>tokens.includes(token))){matching=true;break;}
+    }
+    if(!matching)throw Error('Ảnh tham chiếu trong ô chat đã thay đổi. Tool chưa gửi.');
+  }
   let targets=[];
   if(selector)targets=[...document.querySelectorAll(selector)].filter(visible);
   else {
@@ -27,6 +41,9 @@ function submitPrompt({id,selector='',composerSelector}) {
   }
   if(targets.length!==1)throw Error('Chưa nhận diện được nút Gửi duy nhất của Muse. Prompt vẫn ở ô soạn thảo; tool chưa gửi tiếp. Chọn nút Gửi trong cài đặt hoặc xuất thông tin lỗi.');
   if(!enabled(targets[0]))throw Error('Nút Gửi của Muse chưa sẵn sàng. Chờ ảnh tải xong rồi thử lại.');
+  let scope=draft[0].parentElement;
+  for(let depth=0;scope&&scope!==document.body&&!scope.contains(targets[0])&&depth<7;depth++)scope=scope.parentElement;
+  if(scope&&scope!==document.body&&[...scope.querySelectorAll('img')].filter(visible).length!==attachmentTokens.length)throw Error('Số ảnh trong ô chat không khớp cảnh đã khóa. Tool chưa gửi.');
   targets[0].click();return {clicked:true,method:'button'};
 }
 module.exports={submitPrompt};

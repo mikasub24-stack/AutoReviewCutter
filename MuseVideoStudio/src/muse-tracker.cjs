@@ -1,7 +1,7 @@
 // These functions execute inside the Muse document through either browser
 // adapter. Keep every browser helper inside beginTracking's closure so the
 // exported function can be serialized without Node imports or outer variables.
-function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = '', recover = false }) {
+function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = '', recover = false, echoMarker='',echoKey='' }) {
   const key = Symbol.for('MuseVideoStudio.promptTrackers.v1');
   const map = globalThis[key] || (globalThis[key] = new Map());
   if (!id || typeof prompt !== 'string' || !prompt.trim()) throw Error('Tác vụ cần mã và prompt đầy đủ.');
@@ -37,16 +37,18 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     }
   });
   s.observer.observe(document.body,{subtree:true,childList:true,characterData:true});
-  function echoCandidates() {
-    const matches=[...document.body.querySelectorAll('*')].filter(e=>visible(e)&&!composer(e)&&norm(e.innerText ?? e.textContent)===wanted&&(recover||!s.baseline.has(e))&&author(e).kind!=='assistant');
-    const leaves=matches.filter(e=>!matches.some(other=>other!==e&&e.contains(other)));
+  function echoCandidates(all=false) {
+    const matches=[...document.body.querySelectorAll('*')].filter(e=>visible(e)&&!composer(e)&&norm(e.innerText ?? e.textContent)===wanted&&(all||recover||!s.baseline.has(e))&&author(e).kind!=='assistant');
+    const preferred=!all&&recover&&(echoKey||echoMarker)?matches.filter(e=>{const root=author(e).root||e.closest('[data-muse-studio-attempt]')||e;return echoKey?(root.id===echoKey||root.getAttribute('data-message-id')===echoKey||root.getAttribute('data-id')===echoKey):root.getAttribute('data-muse-studio-attempt')===echoMarker;}):matches;
+    const restricted=all?matches:preferred.length||echoKey?preferred:matches;
+    const leaves=restricted.filter(e=>!matches.some(other=>other!==e&&e.contains(other)));
     const roots=new Map();
     for(const leaf of leaves) {
       const known=author(leaf);
       let root=(messageSelector?leaf.closest(messageSelector):null)||(known.kind==='user'?known.root:leaf);
       if(!root)continue;
       if(!(messageSelector&&root.matches(messageSelector)) && known.kind==='unknown')while(root.parentElement && root.parentElement!==document.body && norm(root.parentElement.innerText ?? root.parentElement.textContent)===wanted && !root.parentElement.querySelector('video,textarea,[contenteditable="true"]'))root=root.parentElement;
-      if(!recover && s.baseline.has(root))continue;
+      if(!all&&!recover && s.baseline.has(root))continue;
       roots.set(root,{leaf,root});
     }
     return [...roots.values()];
@@ -90,16 +92,23 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     return new Set(values).size===1?values[0]:null;
   }
   const playable=v=>videoLink(v)||v.readyState>=1&&v.videoWidth>0&&Number.isFinite(v.duration)&&v.duration>0&&Boolean(source(v));
-  function result(phase,stage,root=s.responseRoot) {return {id,phase,stage,ready:phase==='ready',progress:progress(root),...(phase==='ready'?{url:source(s.video),fingerprint:s.fingerprint}:{})};}
+  function result(phase,stage,root=s.responseRoot) {return {id,phase,stage,echoMatched:Boolean(s.echo),echoKey:s.echoRoot?.id||s.echoRoot?.getAttribute('data-message-id')||s.echoRoot?.getAttribute('data-id')||'',echoMarker:s.echoRoot?.getAttribute('data-muse-studio-attempt')||'',ready:phase==='ready',progress:progress(root),...(phase==='ready'?{url:source(s.video),fingerprint:s.fingerprint}:{})};}
   s.poll=()=>{
     const echoes=echoCandidates();
-    if(echoes.length>1)throw Error('Có nhiều tin nhắn trùng chính xác prompt. Không xác định được video của tác vụ; hãy dùng chat riêng hoặc xử lý thủ công.');
+    if(!s.echo&&echoes.length>1)throw Error('Có nhiều tin nhắn trùng chính xác prompt. Không xác định được video của tác vụ; hãy dùng chat riêng hoặc xử lý thủ công.');
     if(!s.echo) {
       if(!echoes.length)return result('waiting-prompt','Chờ Muse hiển thị đúng prompt đã gửi');
-      s.echo=echoes[0].leaf;s.echoRoot=echoes[0].root;s.echoEpoch=Math.max(s.added.get(s.echo)||0,s.added.get(s.echoRoot)||0,s.textChanged.get(s.echo)||0);
+      s.echo=echoes[0].leaf;s.echoRoot=echoes[0].root;s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.echoNativeKey=s.echoRoot.id||s.echoRoot.getAttribute('data-message-id')||s.echoRoot.getAttribute('data-id')||'';s.echoEpoch=Math.max(s.added.get(s.echo)||0,s.added.get(s.echoRoot)||0,s.textChanged.get(s.echo)||0);
     }
-    if(!s.echo.isConnected||!s.echoRoot.isConnected)throw Error('Tin nhắn prompt đã rời khỏi trang. Dừng theo dõi để tránh gán nhầm video.');
+    if(!s.echo.isConnected||!s.echoRoot.isConnected){
+      const all=echoCandidates(true);
+      let anchored=all.filter(e=>e.root===s.echoRoot||e.root.getAttribute('data-muse-studio-attempt')===id||(s.echoNativeKey&&[e.root.id,e.root.getAttribute('data-message-id'),e.root.getAttribute('data-id')].includes(s.echoNativeKey)));
+      if(!anchored.length&&!s.hadPriorSame&&!s.echoNativeKey&&all.length===1)anchored=all;
+      if(anchored.length!==1)return result('waiting-response','Muse đang dựng lại tin nhắn · chờ khôi phục đúng cảnh gốc',null);
+      s.echo=anchored[0].leaf;s.echoRoot=anchored[0].root;s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.ready=false;s.responseRoot=null;s.video=null;
+    }
     const thread=threadRoot(s.echoRoot);if(!thread)return result('waiting-response','Chưa xác định được vùng phản hồi cho prompt này');
+    if(s.ready&&(!s.video?.isConnected||!s.responseRoot?.isConnected)){s.ready=false;s.video=null;s.responseRoot=null;}
     if(s.ready) {
       const videos=mediaNodes(s.responseRoot);
       if(!s.video.isConnected||videos.length!==1||videos[0]!==s.video||source(s.video)!==s.fingerprint)throw Error('Kết quả đã thay đổi hoặc không còn duy nhất. Dừng tải để tránh lấy nhầm video.');
@@ -166,6 +175,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     if(more.length===1){s.menuBaseline=new Set(controls());s.menuPending=true;more[0].click();return {action:'waiting-menu',clicked:false,needsMenu:true};}
     return {action:'source',clicked:false,needsMenu:false,url:source(s.video)};
   };
+  const prior=echoCandidates(true).length;s.hadPriorSame=recover?prior>1:prior>0;
   map.set(id,s);
   return {id,phase:'waiting-prompt',stage:'Đã chụp trạng thái trước khi gửi prompt',ready:false,progress:null};
 }
@@ -181,6 +191,6 @@ function downloadAction({id,phase='auto'}) {
 }
 function endTracking({id}) {
   const map=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')],state=map?.get(id);
-  state?.observer?.disconnect();state?.downloadController?.abort();return map?.delete(id)||false;
+  state?.observer?.disconnect();state?.downloadController?.abort();const stops=globalThis[Symbol.for('MuseVideoStudio.stopRequests.v1')];if(stops)for(const key of stops)if(key.startsWith(id+':'))stops.delete(key);return map?.delete(id)||false;
 }
 module.exports={beginTracking,pollTracking,downloadAction,endTracking};

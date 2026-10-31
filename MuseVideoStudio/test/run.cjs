@@ -11,3 +11,5 @@ require('./license.test.cjs');
 require('./example-script.test.cjs');
 
 require('./download-capture.test.cjs');
+
+require('./locked-input.test.cjs');

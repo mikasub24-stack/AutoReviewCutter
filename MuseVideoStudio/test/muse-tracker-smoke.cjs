@@ -12,7 +12,8 @@ const assert = require('node:assert/strict');
   let browser;
   try {
     const media=path.join(dir,'clip.webm');
-    await promisify(execFile)('ffmpeg',['-v','error','-f','lavfi','-i','color=c=blue:s=160x90:r=15:d=0.6','-c:v','libvpx','-threads','1','-an',media]);
+    if(process.env.MUSE_TRACKER_VIDEO_FIXTURE)await fs.copyFile(process.env.MUSE_TRACKER_VIDEO_FIXTURE,media);
+    else await promisify(execFile)('ffmpeg',['-v','error','-f','lavfi','-i','color=c=blue:s=160x90:r=15:d=0.6','-c:v','libvpx','-threads','1','-an',media]);
     const bytes=await fs.readFile(media);
     browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
     const context=await browser.newContext();
@@ -74,7 +75,8 @@ const assert = require('node:assert/strict');
     // repeated historical prompts.
     await reset();await append({id:'u-recover',role:'user',text:'Recover exact prompt'});await append({id:'recover-result',src:'/recover.webm',ref:'u-recover'});await ready('recover-result');
     await page.evaluate(beginTracking,{id:'recover',prompt:'Recover exact prompt',recover:true,messageSelector:'article'});assert.equal((await page.evaluate(pollTracking,{id:'recover'})).ready,true);
-    await append({id:'u-recover-dupe',role:'user',text:'Recover exact prompt'});await assert.rejects(page.evaluate(pollTracking,{id:'recover'}),/nhiều tin nhắn/);
+    await append({id:'u-recover-dupe',role:'user',text:'Recover exact prompt'});assert.equal((await page.evaluate(pollTracking,{id:'recover'})).url,'https://muse.ai/recover.webm');
+    await page.evaluate(beginTracking,{id:'recover',prompt:'Recover exact prompt',recover:true,messageSelector:'article'});await assert.rejects(page.evaluate(pollTracking,{id:'recover'}),/nhiều tin nhắn/);
     // A single fragment may add the user echo and assistant response in one
     // mutation record; DOM order still binds the unique response correctly.
     await reset();await page.evaluate(beginTracking,{id:'fragment',prompt:'One fragment target'});
@@ -106,6 +108,19 @@ const assert = require('node:assert/strict');
     await reset();await page.evaluate(beginTracking,{id:'attachment',prompt:'Attachment target'});await append({id:'u-attachment',role:'user',text:'Attachment target'});
     await page.evaluate(()=>{const r=document.createElement('article');r.dataset.messageRole='assistant';r.innerHTML='<a href="/clip.mp4?signature=secret" download="clip.mp4"><img alt="Preview"></a>';document.getElementById('thread').append(r);});
     const attachment=await page.evaluate(pollTracking,{id:'attachment'});assert.equal(attachment.ready,true);assert.match(attachment.url,/clip\.mp4/);
+    // Repeated text in history must not hijack a resumed attempt.
+    await reset();await append({id:'u-old-repeat',role:'user',text:'Repeated resume target'});await append({id:'r-old-repeat',src:'/old-repeat.webm',ref:'u-old-repeat'});await ready('r-old-repeat');
+    await page.evaluate(beginTracking,{id:'new-attempt',prompt:'Repeated resume target'});await append({id:'u-new-repeat',role:'user',text:'Repeated resume target'});await append({id:'r-new-repeat',src:'/new-repeat.webm',ref:'u-new-repeat'});await ready('r-new-repeat');
+    const anchor=await page.evaluate(pollTracking,{id:'new-attempt'});assert.equal(anchor.echoKey,'u-new-repeat');
+    await page.evaluate(beginTracking,{id:'new-attempt',prompt:'Repeated resume target',recover:true,echoKey:anchor.echoKey,echoMarker:anchor.echoMarker});
+    assert.equal((await page.evaluate(pollTracking,{id:'new-attempt'})).url,'https://muse.ai/new-repeat.webm');
+    // A React remount of the same message must rebind its stable ID, not fail
+    // before the delayed video arrives.
+    await reset();await page.evaluate(beginTracking,{id:'remount',prompt:'Remounted original scene'});await append({id:'u-remount',role:'user',text:'Remounted original scene'});
+    assert.equal((await page.evaluate(pollTracking,{id:'remount'})).ready,false);
+    await page.evaluate(()=>{const old=document.getElementById('u-remount'),fresh=old.cloneNode(true);fresh.removeAttribute('data-muse-studio-attempt');old.replaceWith(fresh);});
+    assert.equal((await page.evaluate(pollTracking,{id:'remount'})).ready,false);
+    await append({id:'r-remount',src:'/remounted.webm',ref:'u-remount'});await ready('r-remount');assert.equal((await page.evaluate(pollTracking,{id:'remount'})).ready,true);
     console.log('PASS: real Chromium decoded-video tracker fixture — exact prompt binding, delayed result/progress, old/unrelated/wrong/out-of-order media rejection, ambiguity fail-closed, scoped menu download and unique recovery. No live Muse requests.');
   } finally {if(browser)await browser.close();await fs.rm(dir,{recursive:true,force:true});}
-})().catch(error=>{console.error(error.message);process.exitCode=1;});
+})().catch(error=>{console.error(error);process.exitCode=1;});

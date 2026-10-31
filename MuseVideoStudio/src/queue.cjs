@@ -1,5 +1,5 @@
 const { randomUUID } = require('node:crypto');
-function stoppedError(){return Object.assign(Error('Đã dừng trong tool. Prompt đã gửi có thể vẫn tiếp tục trên Muse; kiểm tra trước khi chạy lại.'),{name:'AbortError'});}
+function stoppedError(){return Object.assign(Error('Đã dừng trong tool. Đang kiểm tra trạng thái dừng trên Muse; bấm Tiếp tục để xử lý cảnh đang dở.'),{name:'AbortError'});}
 function abortable(promise,signal){
   if(signal.aborted){Promise.resolve(promise).catch(()=>{});return Promise.reject(stoppedError());}
   return new Promise((resolve,reject)=>{
@@ -25,13 +25,13 @@ class Queue {
     this.jobs.push(...items.map(j=>({id:randomUUID(),prompt:j.prompt.trim(),source:typeof j.source==='string'?j.source:'',title:typeof j.title==='string'?j.title:'',number:Number.isInteger(j.number)?j.number:null,voiceover:typeof j.voiceover==='string'?j.voiceover:'',durationSeconds:Number.isFinite(j.durationSeconds)&&j.durationSeconds>0?j.durationSeconds:null,image:j.image||j.references?.[0]||'',references:Array.isArray(j.references)?[...j.references]:j.image?[j.image]:[],status:'pending',stage:'pending',stageMessage:'',progress:null,downloadProgress:null,submittedAt:null,mayHaveSubmitted:false,submissionProfileKey:null,submissionSessionId:null,resultReadyAt:null,downloadStartedAt:null,downloadCompletedAt:null,startedAt:null,finishedAt:null,error:'',output:'',createdAt:Date.now()})));
     await this.publish();
   }
-  async retry(id){const j=this.jobs.find(x=>x.id===id);if(!j||!['failed','interrupted'].includes(j.status))throw Error('Chỉ chạy lại tác vụ lỗi hoặc bị gián đoạn.');resetRunFields(j);j.status='pending';await this.publish();}
+  async retry(id){const j=this.jobs.find(x=>x.id===id);if(!j||!['failed','interrupted'].includes(j.status))throw Error('Chỉ chạy lại tác vụ lỗi hoặc bị gián đoạn.');delete j.resumeMode;resetRunFields(j);j.status='pending';await this.publish();}
   async remove(id){if(this.jobs.find(j=>j.id===id)?.status==='running')throw Error('Dừng tác vụ trước khi xóa.');this.jobs=this.jobs.filter(j=>j.id!==id);await this.publish();}
-  async clearPending(){this.jobs=this.jobs.filter(j=>j.status!=='pending');await this.publish();}
+  async clearPending(){this.jobs=this.jobs.filter(j=>j.status!=='pending'||j.mayHaveSubmitted);await this.publish();}
   async clearAll(){await this.stop();this.jobs=[];await this.publish();}
   async applyReferences(files){
     if(!Array.isArray(files)||files.some(x=>typeof x!=='string'||!x))throw Error('Ảnh tham chiếu không hợp lệ.');
-    for(const j of this.jobs)if(j.status==='pending'){j.references=[...files];j.image=files[0]||'';}
+    for(const j of this.jobs)if(j.status==='pending'&&!j.lockedInput){j.references=[...files];j.image=files[0]||'';}
     await this.publish();
   }
   pause(){this.paused=true;}
@@ -54,6 +54,13 @@ class Queue {
     } finally {job.finishedAt=new Date().toISOString();this.controllers.delete(job.id);}
     await this.publish();
   }
+  prepareResume(){
+    if(this.active)throw Error('Hàng đợi vẫn đang chạy.');
+    for(const j of this.jobs)if(['failed','interrupted'].includes(j.status)){
+      j.resumeMode=j.mayHaveSubmitted&&!['confirmed','ui-stopped'].includes(j.remoteStop?.state)?'recover':'resubmit';
+      j.status='pending';j.error='';
+    }
+  }
   start(){
     if(this.active)return Promise.resolve();
     if(!Number.isInteger(this.concurrency)||this.concurrency<1)throw Error('Số tác vụ chạy đồng thời phải là số nguyên dương.');
@@ -61,8 +68,9 @@ class Queue {
     this.runningPromise=(async()=>{
       const worker=async slot=>{
         while(!this.paused){
-          const job=this.jobs.find(x=>x.status==='pending');if(!job)break;
-          await this.executeJob(job,(item,signal)=>this.run(item,slot,signal),true);
+          const job=this.jobs.find(x=>x.status==='pending'&&(!x.resumeMode||this.concurrency===1||x.account===slot+1||!x.account));if(!job)break;
+          const resume=job.resumeMode;await this.executeJob(job,(item,signal)=>this.run(item,slot,signal),!resume);
+          if(job.status==='completed')delete job.resumeMode;
         }
       };
       try{const results=await Promise.allSettled(Array.from({length:this.concurrency},(_,i)=>worker(i)));const rejected=results.find(r=>r.status==='rejected');if(rejected)throw rejected.reason;}

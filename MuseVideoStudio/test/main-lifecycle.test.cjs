@@ -115,9 +115,9 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
   return { handlers, sessions, windows, lifecycle, notices, errors,updates,
     invoke: (name, data, sender = windows[0]?.webContents) => handlers.get(`studio:${name}`)({ sender }, data),
     async stop() {
-      let prevented = false;
+      let prevented = false;const priorQuits=lifecycle.filter(x=>x==='quit').length;
       app.emit('before-quit', { preventDefault() { prevented = true; } });
-      await quitPromise;
+      if(prevented)await until(()=>lifecycle.filter(x=>x==='quit').length>priorQuits);else await quitPromise;
       assert.equal(prevented, ownsLock);
       return lifecycle;
     }
@@ -342,13 +342,13 @@ test('recovery refuses a different browser profile before searching or downloadi
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
 
-test('unresponsive Muse DOM fails visibly and leaves next prompt pending rather than hanging',{timeout:5000},async()=>{
+test('unresponsive Muse DOM stays waiting and Stop leaves next prompt pending',{timeout:5000},async()=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-dom-timeout-'));let app,submitted=0;
  try{
   await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1}}));
   app=await boot(dir,{domTimeoutMs:25,browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},openMuse:async()=>{},close:async()=>{},evaluate:async()=>new Promise(()=>{}),pressEnter:async()=>submitted++})});
-  await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'First scene'},{prompt:'Second scene'}]);await app.invoke('start');await until(()=>!app.invoke('state').active);
-  const state=app.invoke('state');assert.equal(state.jobs[0].status,'failed');assert.match(state.jobs[0].error,/không phản hồi/);assert.equal(state.jobs[1].status,'pending');assert.equal(submitted,0);await app.stop();
+  await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'First scene'},{prompt:'Second scene'}]);await app.invoke('start');await until(()=>app.invoke('state').jobs[0].stageMessage?.includes('lag'));
+  const state=app.invoke('state');assert.equal(state.jobs[0].status,'running');assert.equal(state.jobs[1].status,'pending');assert.equal(submitted,0);const stopped=await app.invoke('stop');assert.equal(stopped.jobs[0].status,'interrupted');assert.equal(stopped.active,false);await app.stop();
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
 
@@ -380,4 +380,53 @@ test('two account browsers submit together and the faster account takes the next
   assert.deepEqual(sent,[['Scene one'],['Scene two','Scene three']]);assert.equal(app.invoke('state').jobs[0].status,'running');assert.equal(app.invoke('state').active,true);assert.deepEqual(Array.from(app.invoke('state').jobs,j=>j.account),[1,2,2]);
   release();await until(()=>!app.invoke('state').active);assert.ok(app.invoke('state').jobs.every(j=>j.status==='completed'));assert.deepEqual(busy,[0,0]);await app.stop();
  }finally{release();if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
+test('Stop clicks Muse cancellation and Continue resubmits the same locked scene before the next scene',{timeout:10000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-remote-stop-'));let app,draft='',stopClicks=0;const sent=[],attempts=[];
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',openMuse:async()=>{},show:async()=>{},close:async()=>{},evaluate:async(fn,arg)=>{
+   if(fn.name==='beginTracking'){attempts.push(arg);return{};}
+   if(fn.name==='submitPrompt'){sent.push(draft);return{clicked:true};}
+   if(fn.name==='browserStop'){if(arg.request){stopClicks++;return{state:'requested',clicked:true};}return{state:'confirmed',clicked:false};}
+   if(fn.name==='pollTracking')return sent.length===1?new Promise(()=>{}):{phase:'ready',ready:true,echoMatched:true,echoKey:'new-reply',progress:null};
+   if(fn.name==='downloadAction')return{action:'clicked',clicked:true};if(arg?.prompt&&!arg?.id)draft=arg.prompt;return null;
+  },captureDownload:async(target,{trigger})=>{await trigger();await fs.writeFile(target,fixtureMp4());}})});
+  await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Locked original scene'},{prompt:'Next scene'}]);await app.invoke('start');await until(()=>sent.length===1);
+  const stopped=await app.invoke('stop');assert.equal(stopClicks,1);assert.equal(stopped.stopping,false);assert.equal(stopped.jobs[0].remoteStop.state,'confirmed');assert.equal(stopped.jobs[0].status,'interrupted');assert.equal(stopped.jobs[1].status,'pending');
+  await app.invoke('start');await until(()=>!app.invoke('state').active);assert.deepEqual(sent,['Locked original scene','Locked original scene','Next scene']);assert.notEqual(attempts[0].id,attempts[1].id);assert.equal(attempts[1].recover,false);assert.ok(app.invoke('state').jobs.every(j=>j.status==='completed'));await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+test('a temporary DOM timeout while Muse creates does not fail, resend or dispatch another prompt',{timeout:10000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-slow-generation-'));let app,sent=0,polls=0;
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',openMuse:async()=>{},show:async()=>{},close:async()=>{},evaluate:async(fn)=>{
+   if(fn.name==='submitPrompt'){sent++;return{clicked:true};}
+   if(fn.name==='pollTracking'){polls++;if(polls===1)throw Object.assign(Error('temporary lag'),{code:'MUSE_DOM_TIMEOUT'});return{phase:'ready',ready:true,progress:null};}
+   if(fn.name==='downloadAction')return{action:'clicked',clicked:true};return null;
+  },captureDownload:async(target,{trigger})=>{await trigger();await fs.writeFile(target,fixtureMp4());}})});
+  await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Slow scene'},{prompt:'Later scene'}]);await app.invoke('start');await until(()=>polls===1);
+  assert.equal(app.invoke('state').jobs[0].status,'running');assert.equal(app.invoke('state').jobs[1].status,'pending');assert.equal(sent,1);
+  await until(()=>!app.invoke('state').active);assert.ok(app.invoke('state').jobs.every(j=>j.status==='completed'));assert.equal(sent,2);assert.equal(app.updates.some(rows=>rows.some(j=>j.status==='failed')),false);await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
+test('uncertain remote stop resumes the original attempt and retries downloading without resending',{timeout:30000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-retry-transfer-'));let app,recovering=false,sent=0,downloads=0;const attempts=[];
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',openMuse:async()=>{},show:async()=>{},close:async()=>{},evaluate:async(fn,arg)=>{
+   if(fn.name==='beginTracking'){attempts.push(arg);if(arg.recover)recovering=true;return{};}
+   if(fn.name==='submitPrompt'){sent++;return{clicked:true};}
+   if(fn.name==='browserStop')return{state:'unavailable',clicked:false};
+   if(fn.name==='pollTracking')return recovering?{phase:'ready',ready:true,progress:null}:new Promise(()=>{});
+   if(fn.name==='downloadAction')return{action:'clicked',clicked:true};return null;
+  },captureDownload:async(target,{trigger})=>{await trigger();downloads++;if(downloads===1)throw Error('Server transfer is not ready yet');await fs.writeFile(target,fixtureMp4());}})});
+  await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Original pending result'},{prompt:'Later scene'}]);await app.invoke('start');await until(()=>sent===1);
+  await app.invoke('stop');assert.equal(app.invoke('state').jobs[0].remoteStop.state,'unavailable');await app.invoke('start');await until(()=>downloads===1);
+  assert.equal(sent,1);assert.equal(app.invoke('state').jobs[0].status,'running');assert.equal(app.invoke('state').jobs[1].status,'pending');assert.equal(attempts[1].recover,true);assert.equal(attempts[1].id,attempts[0].id);
+  await until(()=>!app.invoke('state').active,10000);assert.equal(sent,2);assert.equal(downloads,3);assert.ok(app.invoke('state').jobs.every(j=>j.status==='completed'));await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });

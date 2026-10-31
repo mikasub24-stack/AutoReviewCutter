@@ -30,7 +30,7 @@ async function create(startNow,fromInput=false){
   }
   if(!drafts.length||drafts.some(d=>!d.prompt.trim()))return toast('Nhập prompt cho từng dòng hoặc xóa dòng trống.');
   if(startNow){
-    if(state.active||state.starting||state.merging||state.packaging)return toast('Dừng hàng đợi hiện tại trước khi tạo lượt mới.');
+    if(state.active||state.starting||state.stopping||state.merging||state.packaging)return toast('Dừng hàng đợi hiện tại trước khi tạo lượt mới.');
     if(!state.settings.output)return toast('Chọn thư mục lưu video trước.');
     if(!confirm(`Thêm ${drafts.length} prompt và chạy toàn bộ tác vụ đang chờ? Tạo video có thể dùng credit Muse. Tool gửi nguyên prompt đã xem, cùng ảnh tham chiếu của từng cảnh.`))return;
   }
@@ -102,7 +102,7 @@ function makeCard(id){
   body.append(badge,title,prompt,meta,stage,source,error,actions);card.append(preview,body);return row;
 }
 function updateMedia(row,job){
-  const output=localFileUrl(job.output),image=localFileUrl(job.image||job.references?.[0]);
+  const output=localFileUrl(job.output),image=localFileUrl(job.lockedInput?.references?.[0]?.path||job.image||job.references?.[0]);
   const key=output?'video:'+output:image?'image:'+image:'empty';
   text(row.mediaLabel,output?'Video đã tải':image?'Ảnh tham chiếu':'Chưa có video');
   if(row.mediaKey===key)return;
@@ -119,8 +119,8 @@ function updateMedia(row,job){
 function updateCard(row,job,index){
   row.job=job;updateMedia(row,job);
   text(row.number,'#'+(index+1));text(row.title,job.title||`Prompt ${index+1}`);row.card.setAttribute('aria-label',`${job.title||'Prompt '+(index+1)} · ${labels[job.status]||job.status}`);
-  row.badge.className='badge '+job.status;text(row.badge,labels[job.status]||job.status);text(row.prompt,job.prompt);
-  text(row.meta,`${job.references?.length||0} ảnh tham chiếu${job.account?' · TK '+job.account:''}${job.durationSeconds?' · '+job.durationSeconds+'s':''}`);
+  row.badge.className='badge '+job.status;text(row.badge,labels[job.status]||job.status);text(row.prompt,job.lockedInput?.prompt||job.prompt);
+  text(row.meta,`${job.lockedInput?'🔒 Đã khóa · ':''}${job.references?.length||0} ảnh tham chiếu${job.account?' · TK '+job.account:''}${job.durationSeconds?' · '+job.durationSeconds+'s':''}`);
   const active=job.status==='running';
   const stageName=job.status==='completed'?'Đã lưu video':stageLabels[job.stage]||labels[job.status]||'Đang chờ';
   text(row.stageName,stageName);row.stage.classList.toggle('active',active);
@@ -137,8 +137,8 @@ function updateCard(row,job,index){
   text(row.error,job.error||'');row.error.hidden=!job.error;
   row.reveal.hidden=!job.output;
   const recoverable=['failed','interrupted'].includes(job.status)&&Boolean(job.mayHaveSubmitted||job.submittedAt||job.resultReadyAt);
-  row.recover.hidden=!recoverable;row.recover.disabled=Boolean(state.active||state.starting||state.merging||state.packaging);
-  row.retry.hidden=!['failed','interrupted'].includes(job.status);row.remove.hidden=job.status==='running';row.edit.hidden=job.status!=='pending';
+  row.recover.hidden=!recoverable;row.recover.disabled=Boolean(state.active||state.starting||state.stopping||state.merging||state.packaging);
+  row.retry.hidden=!['failed','interrupted'].includes(job.status);row.remove.hidden=job.status==='running';row.edit.hidden=job.status!=='pending'||Boolean(job.lockedInput);row.retry.disabled=Boolean(state.active||state.starting||state.stopping);
   row.card.hidden=!(filter==='all'||(filter==='failed'?['failed','interrupted'].includes(job.status):job.status===filter));
 }
 function renderJobs(jobs){
@@ -162,16 +162,16 @@ function render(next){
   $('accountPicker').value=Math.min(indexBefore,state.settings.accountCount-1);const index=Number($('accountPicker').value);
   const browserName=({builtin:'Trình duyệt tích hợp',chrome:'Google Chrome',edge:'Microsoft Edge',custom:'Chromium tùy chọn'})[state.settings.browserChoice||'builtin'];$('browserInfo').textContent=browserName;
   const account=state.accounts?.find(a=>a.index===index);$('sessionStatus').textContent=account?.warning||(account?.rememberSession?'Cookie phiên lưu mã hóa riêng trên máy.':'Mỗi tài khoản giữ một phiên đăng nhập riêng.');
-  $('logoutAccount').textContent=`Đăng xuất TK ${index+1} · ${browserName}`;$('logoutAccount').disabled=state.active||state.starting||state.merging||state.packaging||state.resettingAccounts?.length>0;
+  $('logoutAccount').textContent=`Đăng xuất TK ${index+1} · ${browserName}`;$('logoutAccount').disabled=state.active||state.starting||state.stopping||state.merging||state.packaging||state.resettingAccounts?.length>0;
   const license=state.license;
   if(license){const expires=license.expiresAt?new Date(license.expiresAt).toLocaleString('vi-VN'):'';$('licenseSummary').textContent=license.status==='trial'?'Dùng thử đến '+expires:license.message;$('licenseStatus').textContent=license.message+(expires?' Hạn: '+expires:'');$('deviceCode').value=license.device;}
   if(state.payment){$('paymentQR').src=state.payment.qr;$('paymentContent').textContent='Nội dung chuyển khoản: '+state.payment.content;}
   $('parallelInfo').textContent=state.settings.dispatchMode==='parallel'?`Song song ${state.settings.accountCount} tài khoản · mỗi tài khoản 1 prompt`:'Lần lượt · tải xong từng video mới gửi tiếp';
   $('total').textContent=$('navCount').textContent=$('allCount').textContent=jobs.length;$('folderPath').textContent=state.settings.output||'Chưa chọn thư mục';
-  $('queueState').textContent=state.starting?'Đang kiểm tra trước khi chạy':state.active?state.paused?'Đang dừng…':'Đang chạy':'Đã dừng';
-  $('start').disabled=state.active||state.starting||state.merging||state.packaging||!jobs.some(j=>j.status==='pending');$('pause').disabled=!state.active&&!state.starting;
-  $('clearPending').disabled=!jobs.some(j=>j.status==='pending');$('clearList').disabled=!jobs.length;
-  const complete=jobs.length&&jobs.every(j=>j.status==='completed'),busy=state.active||state.starting||state.merging||state.packaging;
+  $('queueState').textContent=state.stopping?'Đang bấm dừng trong Muse…':state.starting?'Đang kiểm tra trước khi chạy':state.active?state.paused?'Đang dừng…':'Đang chạy':'Đã dừng';
+  $('start').disabled=state.active||state.starting||state.stopping||state.merging||state.packaging||!jobs.some(j=>['pending','interrupted','failed'].includes(j.status));$('start').textContent=jobs.some(j=>['interrupted','failed'].includes(j.status))?'▶ Tiếp tục hàng đợi':'▶ Chạy hàng đợi';$('pause').disabled=state.stopping||(!state.active&&!state.starting&&!jobs.some(j=>j.mayHaveSubmitted&&['interrupted','failed'].includes(j.status)));
+  $('clearPending').disabled=!jobs.some(j=>j.status==='pending');$('clearList').disabled=state.stopping||!jobs.length;
+  const complete=jobs.length&&jobs.every(j=>j.status==='completed'),busy=state.active||state.starting||state.stopping||state.merging||state.packaging;
   $('mergeNow').disabled=$('packageClips').disabled=busy||!complete;
   $('mergeStatus').textContent=state.mergeError||state.mergeProgress||state.mergedOutput||(state.settings.autoMerge?'Tự nối khi đủ video.':'Chỉ nối khi bạn chọn; giữ clip nguồn.');$('revealMerged').hidden=!state.mergedOutput;
   $('packageStatus').textContent=state.packageError||state.packageProgress||state.editPackageDir||'Xuất clip rời đúng thứ tự để nhập vào CapCut.';$('openPackage').hidden=!state.editPackageDir;
@@ -189,7 +189,7 @@ $('referenceMode').onchange=remapDrafts;
 $('images').onclick=async()=>{const files=await call('images',{multiple:refMode()==='numbered'});if(files?.length){referenceFiles=files;remapDrafts();}};
 $('imageFolder').onclick=async()=>{const files=await call('imageFolder');if(files){referenceFiles=files;remapDrafts();}};
 $('clearRefs').onclick=()=>{referenceFiles=[];remapDrafts();};
-$('applyRefs').onclick=async()=>{remapDrafts();const result=mapped(state.jobs.filter(j=>j.status==='pending'));mappingInfo(result);render(await call('applyReferences',{assignments:result.items.map(j=>({id:j.id,references:j.references}))}));};
+$('applyRefs').onclick=async()=>{remapDrafts();const result=mapped(state.jobs.filter(j=>j.status==='pending'&&!j.lockedInput));mappingInfo(result);render(await call('applyReferences',{assignments:result.items.map(j=>({id:j.id,references:j.references}))}));};
 $('referencePaste').onpaste=e=>pasteImages(e);$('referencePaste').ondragover=e=>e.preventDefault();$('referencePaste').ondrop=e=>pasteImages(e);
 $('browser').onclick=()=>call('browser',Number($('accountPicker').value));$('accountPicker').onchange=()=>render(state);
 $('logoutAccount').onclick=async()=>render(await call('logoutAccount',Number($('accountPicker').value)));
@@ -197,7 +197,7 @@ $('start').onclick=async()=>render(await call('start'));$('pause').onclick=async
 $('clearPending').onclick=async()=>{if(confirm('Xóa tất cả tác vụ đang chờ? Các clip đã tải vẫn giữ nguyên.'))render(await call('clearPending'));};
 $('clearList').onclick=async()=>{if(confirm('Dừng và xóa toàn bộ danh sách tác vụ? File video đã tải không bị xóa. Tác vụ đã gửi có thể còn chạy trên Muse.'))render(await call('clearList'));};
 $('folder').onclick=async()=>render(await call('folder'));$('export').onclick=()=>call('export');
-$('configure').onclick=()=>{for(const name of ['composer','fileInput','submit','video','attachmentReadySelector','messageSelector','timeoutMinutes','accountCount','ffmpeg','browserChoice','browserPath','dispatchMode','cooldownSeconds'])$('settingsForm').elements.namedItem(name).value=state.settings[name]??(name==='dispatchMode'?'parallel':name==='cooldownSeconds'?3:'');$('settingsForm').elements.namedItem('finishAction').value=state.settings.autoMerge?'merge':state.settings.autoPackage?'package':'keep';$('settingsDialog').showModal();};
+$('configure').onclick=()=>{for(const name of ['composer','fileInput','submit','stopSelector','video','attachmentReadySelector','messageSelector','timeoutMinutes','accountCount','ffmpeg','browserChoice','browserPath','dispatchMode','cooldownSeconds'])$('settingsForm').elements.namedItem(name).value=state.settings[name]??(name==='dispatchMode'?'parallel':name==='cooldownSeconds'?3:'');$('settingsForm').elements.namedItem('finishAction').value=state.settings.autoMerge?'merge':state.settings.autoPackage?'package':'keep';$('settingsDialog').showModal();};
 $('closeSettings').onclick=()=>$('settingsDialog').close();$('settingsForm').onsubmit=async e=>{e.preventDefault();const result=await call('settings',Object.fromEntries(new FormData(e.target)));if(result){render(result);$('settingsDialog').close();toast('Đã lưu cấu hình.');}};
 for(const[id,method,name]of[['chooseBrowser','chooseBrowser','browserPath']])$(id).onclick=async()=>{const file=await call(method);if(file){$('settingsForm').elements.namedItem(name).value=file;if(id==='chooseBrowser')$('settingsForm').elements.namedItem('browserChoice').value='custom';}};
 $('chooseFfmpeg').onclick=async()=>{const result=await call('chooseFfmpeg');if(result){render(result);$('settingsForm').elements.namedItem('ffmpeg').value=result.settings.ffmpeg;}};

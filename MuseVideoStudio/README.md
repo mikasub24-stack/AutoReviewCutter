@@ -1,6 +1,18 @@
-# Muse Video Studio 0.6.4 · Windows
+# Muse Video Studio 0.7.0 · Windows
 
 Icon Muse Studio riêng (M vàng + Play trắng) được nhúng vào EXE, cửa sổ ứng dụng và logo trong giao diện.
+
+## Khóa cảnh, chờ clip và Dừng / Tiếp tục (0.7.0)
+
+Khi nhận cảnh, tool lưu nguyên prompt và bản sao ảnh theo SHA-256. Ảnh gốc sửa/xóa sau đó không đổi nội dung đã khóa; bản cache bị thay đổi sẽ bị từ chối. Đổi ảnh hàng loạt và đưa về sửa không áp dụng cho cảnh đã khóa. Trước khi bấm Gửi, tool so lại prompt trong ô chat, ảnh preview đã giải mã và đúng DOM token của các ảnh vừa đính kèm. Ảnh thừa/cũ trong vùng soạn thảo ngăn gửi.
+
+Mỗi lần gửi có mã attempt riêng; khi nhận tin nhắn echo, lưu ID/marker của tin nhắn đó. Tiếp tục chờ clip đã gửi dùng lại attempt/anchor cũ, kể cả lịch sử có prompt trùng. Gửi lại sau khi dừng dùng attempt mới và bỏ kết quả từ các lượt cũ theo vùng phản hồi/ID. Đây là ràng buộc theo phản hồi chat; không tự đánh giá nội dung hình ảnh có đáp ứng ý nghĩa prompt hay không.
+
+Mốc45 giây xác nhận đã bỏ. Thời gian cấu hình là ngưỡng cảnh báo Muse chậm, không tự hủy tác vụ đang tạo. Timeout tạm thời khi đọc trang được chờ và thử lại. Lỗi tải file giữ nguyên cảnh/kết quả, thử tải lại sau5 giây; không gửi lại prompt và không cấp cảnh kế tiếp cho tài khoản đó trước khi lưu video thành công. Cảnh không xác định được duy nhất vẫn dừng để kiểm tra, không đoán kết quả.
+
+**Dừng** ngắt phần chờ/tải trong tool và tìm nút Stop/Dừng ở vùng soạn thảo của từng tài khoản. Chỉ bấm nút nhận diện được duy nhất; có CSS selector nút dừng riêng. Tool ghi trạng thái: đã quan sát hủy, giao diện đã dừng, clip đã có, đã yêu cầu nhưng chưa xác nhận, hoặc không tìm được nút. Việc nút biến mất chỉ xác nhận giao diện dừng, không hứa máy chủ hủy tuyệt đối.
+
+**Tiếp tục hàng đợi** tự xử lý các cảnh bị gián đoạn trên đúng tài khoản. Nếu đã quan sát hủy/giao diện dừng, gửi lại prompt/ảnh đã khóa. Nếu clip đã có hoặc chưa xác nhận dừng, chờ/lấy kết quả attempt cũ thay vì gửi trùng. Những tài khoản khác vẫn chạy song song. Nếu Muse không có markup/nút được nhận diện, xuất thông tin lỗi chat để hiệu chỉnh; chưa xác minh bằng tài khoản Muse thực.
 
 ## Sửa luồng chờ và gửi của 0.6.2
 
@@ -33,7 +45,7 @@ Chỉ dùng chế độ **Kịch bản thô → prompt theo mẫu** khi muốn t
 
 ## Dừng, xóa và đóng app
 
-- **Dừng ngay** hủy chờ/polling trong tool và chặn prompt tiếp theo. Tác vụ đang chạy chuyển thành bị gián đoạn. Tác vụ đã gửi lên máy chủ Muse có thể tiếp tục; không hứa hủy từ xa khi chưa có nút/API hủy được xác minh.
+- **Dừng ngay** ngắt chờ/tải và thử bấm Stop/Dừng trong vùng chat của mỗi tài khoản; trạng thái xác nhận nằm trên thẻ. Cảnh đang chạy chuyển sang gián đoạn; Tiếp tục quyết định gửi lại hay chờ kết quả theo trạng thái dừng đã quan sát.
 - **Xóa tất cả đang chờ** chỉ xóa tác vụ chưa gửi. **Xóa toàn bộ danh sách** dừng rồi xóa metadata; giữ file video đã tải.
 - Đóng cửa sổ app sẽ dừng hàng đợi, lưu phiên và đóng các trình duyệt do app mở. Chỉ một instance được chạy; mở lần nữa đưa cửa sổ đang chạy lên trước.
 
