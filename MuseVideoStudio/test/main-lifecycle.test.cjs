@@ -159,7 +159,7 @@ test('main retains independent encrypted sessions on graceful quit and restores 
       'persist:muse-account-2': [cookie(values[1])]
     } });
     await first.invoke('browser', 0); await first.invoke('browser', 1);
-    assert.equal(first.sessions.size, 2); assert.equal(first.windows.length, 3);
+    assert.equal(first.sessions.size, 2); assert.equal(first.windows.length, 3);assert.equal(first.windows[1].options.webPreferences.backgroundThrottling,false);assert.equal(first.windows[2].options.webPreferences.backgroundThrottling,false);
     assert.notEqual(first.windows[1].webContents.session, first.windows[2].webContents.session);
     assert.equal(first.invoke('state').accounts.every(account => account.rememberSession), true);
     const publicState = JSON.stringify(first.invoke('state'));
@@ -304,7 +304,7 @@ test('main binds each prompt transaction and waits for validated saved video bef
     releaseSave();await until(()=>!app.invoke('state').active);
     const result=app.invoke('state');assert.deepEqual(sent,['Exact scene one. Camera pans left.','Exact scene two. Camera pans right.']);assert.ok(result.jobs.every(j=>j.status==='completed'));
     assert.equal(trackers.length,2);assert.equal(trackers[0].prompt,sent[0]);assert.equal(trackers[1].prompt,sent[1]);assert.equal(trackers[0].recover,false);
-    assert.notEqual(result.jobs[0].output,result.jobs[1].output);
+    assert.notEqual(result.jobs[0].output,result.jobs[1].output);assert.equal(path.basename(result.jobs[0].output),'001.mp4');assert.equal(path.basename(result.jobs[1].output),'002.mp4');
     for(const j of result.jobs){assert.deepEqual(await fs.readFile(j.output),fixtureMp4());assert.ok(j.resultReadyAt&&j.downloadCompletedAt);assert.equal(j.output.endsWith('.part'),false);}
     assert.equal((await fs.readdir(dir)).some(file=>file.endsWith('.part')),false);await app.stop();
   }finally{releaseSave();if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}

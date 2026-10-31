@@ -1,10 +1,11 @@
 // These functions execute inside the Muse document through either browser
 // adapter. Keep every browser helper inside beginTracking's closure so the
 // exported function can be serialized without Node imports or outer variables.
-function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = '', recover = false, echoMarker='',echoKey='' }) {
+function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = '', recover = false, echoMarker='',echoKey='',echoAliases=[] }) {
   const key = Symbol.for('MuseVideoStudio.promptTrackers.v1');
   const map = globalThis[key] || (globalThis[key] = new Map());
   if (!id || typeof prompt !== 'string' || !prompt.trim()) throw Error('Tác vụ cần mã và prompt đầy đủ.');
+  const savedAliases=[...new Set([...echoAliases,...(recover&&map.get(id)?.echoAliases?[...map.get(id).echoAliases]:[]),...(echoKey?[echoKey]:[])])];
   if (map.has(id)) { if (!recover) throw Error('Tác vụ này đã được theo dõi.'); map.get(id).observer?.disconnect(); map.delete(id); }
   const norm = value => String(value || '').replace(/\s+/g, ' ').trim();
   const wanted = norm(prompt);
@@ -22,13 +23,13 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     }
     return {kind:'unknown',root:null};
   }
-  const source = v => v.tagName==='A'?v.href:v.currentSrc || v.getAttribute('src') || '';
+  const source=v=>{if(v.tagName==='A')return v.href;const declared=v.getAttribute('src');if(declared)return new URL(declared,document.baseURI).href;return v.currentSrc||v.querySelector('source[src]')?.src||'';};
   const videoLink=a=>a.tagName==='A'&&(/^video\//i.test(a.type||'')||/\.(mp4|webm)(?:$|[?#])/i.test(a.href)||/\.(mp4|webm)$/i.test(a.getAttribute('download')||''))&&/^(https:|blob:)/i.test(a.href);
   function mediaNodes(root){return [...new Set([...(root.matches?.(videoSelector)?[root]:[]),...root.querySelectorAll(videoSelector),...(videoLink(root)?[root]:[]),...root.querySelectorAll('a[href]')])].filter(v=>v.tagName==='VIDEO'||videoLink(v));}
   // Validate selectors now rather than partially submitting then discovering a
   // malformed configuration. A selector must resolve to actual video elements.
   document.querySelectorAll(videoSelector); if(messageSelector)document.querySelectorAll(messageSelector);
-  const s={id,prompt:wanted,recover,videoSelector,messageSelector,baseline:new Set(document.querySelectorAll('*')),baselineSources:new Set(mediaNodes(document).map(source).filter(Boolean)),added:new WeakMap(),textChanged:new WeakMap(),sequence:0,echo:null,echoRoot:null,responseRoot:null,video:null,fingerprint:'',ready:false,menuPending:false,menuBaseline:null};
+  const s={echoAliases:new Set(savedAliases),id,prompt:wanted,recover,videoSelector,messageSelector,baseline:new Set(document.querySelectorAll('*')),baselineSources:new Set(mediaNodes(document).map(source).filter(Boolean)),added:new WeakMap(),textChanged:new WeakMap(),sequence:0,echo:null,echoRoot:null,responseRoot:null,video:null,fingerprint:'',ready:false,menuPending:false,menuBaseline:null};
   s.observer=new MutationObserver(records=>{
     for(const record of records) {
       const seq=++s.sequence;
@@ -91,21 +92,23 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     const values=[...root.querySelectorAll('*')].filter(e=>visible(e)&&e.children.length===0).map(e=>norm(e.textContent)).filter(t=>t.length<=80).map(t=>t.match(/(?:^|\s)(\d{1,3}(?:[.,]\d+)?)\s*%/)).filter(Boolean).map(m=>Number(m[1].replace(',','.'))).filter(v=>v>=0&&v<=100);
     return new Set(values).size===1?values[0]:null;
   }
-  const playable=v=>videoLink(v)||v.readyState>=1&&v.videoWidth>0&&Number.isFinite(v.duration)&&v.duration>0&&Boolean(source(v));
-  function result(phase,stage,root=s.responseRoot) {return {id,phase,stage,echoMatched:Boolean(s.echo),echoKey:s.echoRoot?.id||s.echoRoot?.getAttribute('data-message-id')||s.echoRoot?.getAttribute('data-id')||'',echoMarker:s.echoRoot?.getAttribute('data-muse-studio-attempt')||'',ready:phase==='ready',progress:progress(root),...(phase==='ready'?{url:source(s.video),fingerprint:s.fingerprint}:{})};}
+  const playable=v=>videoLink(v)||(v.tagName==='VIDEO'&&/^(https:|blob:)/i.test(source(v)));
+  function rememberContext(root){const parents=[];for(let p=root.parentElement,depth=0;p&&p!==document.body&&depth<8;p=p.parentElement,depth++)if(!p.querySelector('textarea,input,[contenteditable="true"],[role="textbox"],nav,aside'))parents.push(p);return parents;}
+  function result(phase,stage,root=s.responseRoot) {return {id,phase,stage,echoAliases:[...s.echoAliases],echoMatched:Boolean(s.echo),echoKey:s.echoRoot?.id||s.echoRoot?.getAttribute('data-message-id')||s.echoRoot?.getAttribute('data-id')||'',echoMarker:s.echoRoot?.getAttribute('data-muse-studio-attempt')||'',ready:phase==='ready',progress:progress(root),...(phase==='ready'?{url:source(s.video),fingerprint:s.fingerprint}:{})};}
   s.poll=()=>{
-    const echoes=echoCandidates();
+    let echoes=echoCandidates();
+    if(!s.echo&&!echoes.length&&recover&&(echoKey||echoMarker)){const exact=echoCandidates(true);if(exact.length===1)echoes=exact;else if(exact.length>1)throw Error('Có nhiều tin nhắn trùng prompt nhưng ID cũ đã thay đổi. Không chọn clip khi chưa xác định được cảnh.');}
     if(!s.echo&&echoes.length>1)throw Error('Có nhiều tin nhắn trùng chính xác prompt. Không xác định được video của tác vụ; hãy dùng chat riêng hoặc xử lý thủ công.');
     if(!s.echo) {
       if(!echoes.length)return result('waiting-prompt','Chờ Muse hiển thị đúng prompt đã gửi');
-      s.echo=echoes[0].leaf;s.echoRoot=echoes[0].root;s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.echoNativeKey=s.echoRoot.id||s.echoRoot.getAttribute('data-message-id')||s.echoRoot.getAttribute('data-id')||'';s.echoEpoch=Math.max(s.added.get(s.echo)||0,s.added.get(s.echoRoot)||0,s.textChanged.get(s.echo)||0);
+      s.echo=echoes[0].leaf;s.echoRoot=echoes[0].root;s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.echoNativeKey=s.echoRoot.id||s.echoRoot.getAttribute('data-message-id')||s.echoRoot.getAttribute('data-id')||'';if(s.echoNativeKey)s.echoAliases.add(s.echoNativeKey);s.echoContexts=rememberContext(s.echoRoot);s.echoEpoch=Math.max(s.added.get(s.echo)||0,s.added.get(s.echoRoot)||0,s.textChanged.get(s.echo)||0);
     }
     if(!s.echo.isConnected||!s.echoRoot.isConnected){
       const all=echoCandidates(true);
       let anchored=all.filter(e=>e.root===s.echoRoot||e.root.getAttribute('data-muse-studio-attempt')===id||(s.echoNativeKey&&[e.root.id,e.root.getAttribute('data-message-id'),e.root.getAttribute('data-id')].includes(s.echoNativeKey)));
-      if(!anchored.length&&!s.hadPriorSame&&!s.echoNativeKey&&all.length===1)anchored=all;
+      if(!anchored.length&&all.length===1&&s.echoContexts?.some(parent=>parent.isConnected&&parent.contains(all[0].root)))anchored=all;
       if(anchored.length!==1)return result('waiting-response','Muse đang dựng lại tin nhắn · chờ khôi phục đúng cảnh gốc',null);
-      s.echo=anchored[0].leaf;s.echoRoot=anchored[0].root;s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.ready=false;s.responseRoot=null;s.video=null;
+      s.echo=anchored[0].leaf;s.echoRoot=anchored[0].root;s.echoContexts=rememberContext(s.echoRoot);s.echoNativeKey=s.echoRoot.id||s.echoRoot.getAttribute('data-message-id')||s.echoRoot.getAttribute('data-id')||'';if(s.echoNativeKey)s.echoAliases.add(s.echoNativeKey);s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.ready=false;s.responseRoot=null;s.video=null;
     }
     const thread=threadRoot(s.echoRoot);if(!thread)return result('waiting-response','Chưa xác định được vùng phản hồi cho prompt này');
     if(s.ready&&(!s.video?.isConnected||!s.responseRoot?.isConnected)){s.ready=false;s.video=null;s.responseRoot=null;}
@@ -115,7 +118,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       return playable(s.video)?result('ready','Video của prompt đã sẵn sàng tải'):result('rendering','Đang chờ dữ liệu video có thể phát');
     }
     const userRoots=[...thread.querySelectorAll('*')].filter(e=>author(e).kind==='user'&&author(e).root===e&&e!==s.echoRoot&&following(s.echoRoot,e));
-    const echoIds=new Set([s.echoRoot.id,s.echoRoot.getAttribute('data-message-id'),s.echoRoot.getAttribute('data-id')].filter(Boolean));
+    const echoIds=new Set([...s.echoAliases,s.echoRoot.id,s.echoRoot.getAttribute('data-message-id'),s.echoRoot.getAttribute('data-id')].filter(Boolean));
     const candidates=[];
     for(const video of mediaNodes(thread)) {
       if(!following(s.echoRoot,video))continue;
@@ -149,7 +152,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     s.poll();if(!s.ready||!s.responseRoot?.isConnected)throw Error('Video gắn với prompt chưa sẵn sàng tải.');
     const text=e=>norm(e.getAttribute('aria-label')||e.getAttribute('title')||e.textContent);
     const exactDownload=e=>/^(?:download(?:\s+(?:video|file))?|tải\s*(?:xuống|video))$/i.test(text(e));
-    const isDownload=e=>e.matches('a[download]')||exactDownload(e);
+    const isDownload=e=>e.matches('a[download]')||exactDownload(e)||Boolean(e.querySelector('svg.lucide-download,.tabler-icon-download,[data-icon="download"],[data-lucide="download"]'));
     function controls(scope=document) {
       const raw=[...scope.querySelectorAll('[role="menuitem"],button,a,[role="button"],div,span')].filter(e=>visible(e)&&(e.matches('[role="menuitem"],button,a,[role="button"]')||exactDownload(e)));
       const normalized=[...new Set(raw.map(e=>{
@@ -169,7 +172,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     }
     const direct=controls(s.responseRoot).filter(isDownload);
     if(direct.length>1)throw Error('Phản hồi có nhiều nút tải. Không thể xác định nút đúng.');
-    if(direct.length===1){direct[0].click();return {action:'clicked',clicked:true,needsMenu:false};}
+    if(direct.length===1){if(videoLink(direct[0]))return{action:'source',clicked:false,needsMenu:false,url:direct[0].href};direct[0].click();return {action:'clicked',clicked:true,needsMenu:false};}
     const more=[...s.responseRoot.querySelectorAll('button,[role="button"]')].filter(e=>visible(e)&&(/^(?:\.{3}|…|⋯|more(?:\s.*)?|options|menu|thêm|tùy\s*chọn)$/i.test(text(e))||e.getAttribute('aria-haspopup')==='menu'));
     if(more.length>1)throw Error('Có nhiều menu trong phản hồi. Không thể xác định menu tải video.');
     if(more.length===1){s.menuBaseline=new Set(controls());s.menuPending=true;more[0].click();return {action:'waiting-menu',clicked:false,needsMenu:true};}

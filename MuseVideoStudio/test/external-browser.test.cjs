@@ -173,3 +173,14 @@ test('clearLogin waits for an in-flight cookie backup after the external browser
     release();await saving;assert.equal(await clearing,true);await assert.rejects(fs.access(t.config.sessionFile));await new Promise(resolve=>setTimeout(resolve,200));await assert.rejects(fs.access(t.config.sessionFile));
   } finally {if(release)release();await t.cleanup(adapter);}
 });
+
+test('an active job pins its Muse tab and never falls back to another tab after closure',async()=>{
+ const t=await setup();let adapter;
+ try{
+  adapter=await launchExternalBrowser(t.config);const original=t.context.page;const other=await t.context.newPage();other.address='https://muse.ai/';
+  adapter.pinPage('scene-one');assert.equal(await adapter.evaluate(()=>42),42);assert.throws(()=>adapter.pinPage('scene-two'),/chưa hoàn tất/);
+  await original.close();await assert.rejects(async()=>adapter.evaluate(()=>42),/tab khác/);assert.equal(other.events.some(e=>e[0]==='evaluate'),false);
+  adapter.releasePage('scene-two');await assert.rejects(async()=>adapter.evaluate(()=>42),/tab khác/);
+  adapter.releasePage('scene-one');assert.equal(await adapter.evaluate(()=>43),43);
+ }finally{await t.cleanup(adapter);}
+});

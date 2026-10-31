@@ -107,7 +107,7 @@ const assert = require('node:assert/strict');
     // Explicit video attachment link with image thumbnail, no HTML video tag.
     await reset();await page.evaluate(beginTracking,{id:'attachment',prompt:'Attachment target'});await append({id:'u-attachment',role:'user',text:'Attachment target'});
     await page.evaluate(()=>{const r=document.createElement('article');r.dataset.messageRole='assistant';r.innerHTML='<a href="/clip.mp4?signature=secret" download="clip.mp4"><img alt="Preview"></a>';document.getElementById('thread').append(r);});
-    const attachment=await page.evaluate(pollTracking,{id:'attachment'});assert.equal(attachment.ready,true);assert.match(attachment.url,/clip\.mp4/);
+    const attachment=await page.evaluate(pollTracking,{id:'attachment'});assert.equal(attachment.ready,true);assert.match(attachment.url,/clip\.mp4/);assert.equal((await page.evaluate(downloadAction,{id:'attachment'})).action,'source');
     // Repeated text in history must not hijack a resumed attempt.
     await reset();await append({id:'u-old-repeat',role:'user',text:'Repeated resume target'});await append({id:'r-old-repeat',src:'/old-repeat.webm',ref:'u-old-repeat'});await ready('r-old-repeat');
     await page.evaluate(beginTracking,{id:'new-attempt',prompt:'Repeated resume target'});await append({id:'u-new-repeat',role:'user',text:'Repeated resume target'});await append({id:'r-new-repeat',src:'/new-repeat.webm',ref:'u-new-repeat'});await ready('r-new-repeat');
@@ -121,6 +121,25 @@ const assert = require('node:assert/strict');
     await page.evaluate(()=>{const old=document.getElementById('u-remount'),fresh=old.cloneNode(true);fresh.removeAttribute('data-muse-studio-attempt');old.replaceWith(fresh);});
     assert.equal((await page.evaluate(pollTracking,{id:'remount'})).ready,false);
     await append({id:'r-remount',src:'/remounted.webm',ref:'u-remount'});await ready('r-remount');assert.equal((await page.evaluate(pollTracking,{id:'remount'})).ready,true);
+    // Muse can replace transient DOM IDs while retaining the same chat. A
+    // unique exact prompt in that same connected chat must regain its anchor.
+    await reset();await page.evaluate(beginTracking,{id:'dynamic-id',prompt:'Dynamic ID scene'});await append({id:'temporary-user-id',role:'user',text:'Dynamic ID scene'});await page.evaluate(pollTracking,{id:'dynamic-id'});
+    await page.evaluate(()=>{const old=document.getElementById('temporary-user-id'),fresh=old.cloneNode(true);fresh.id='new-temporary-user-id';fresh.removeAttribute('data-muse-studio-attempt');old.replaceWith(fresh);});
+    assert.equal((await page.evaluate(pollTracking,{id:'dynamic-id'})).echoKey,'new-temporary-user-id');
+    await append({id:'dynamic-result',src:'/dynamic-id.webm',ref:'temporary-user-id'});await ready('dynamic-result');assert.equal((await page.evaluate(pollTracking,{id:'dynamic-id'})).ready,true);
+    // A poster-only video (preload=none) is a downloadable result even before
+    // the player loads metadata. The saved bytes are validated by the host.
+    await reset();await page.evaluate(beginTracking,{id:'poster-only',prompt:'Poster-only result'});await append({id:'u-poster',role:'user',text:'Poster-only result'});
+    await page.evaluate(()=>{const a=document.createElement('article');a.dataset.messageRole='assistant';a.setAttribute('data-response-to','u-poster');a.innerHTML='<video preload="none" src="/poster-result.webm"></video>';document.getElementById('thread').append(a);});
+    const poster=await page.evaluate(pollTracking,{id:'poster-only'});assert.equal(poster.ready,true);assert.match(poster.url,/poster-result\.webm$/);
+    // A restarted app can have a stale DOM ID but one unique original prompt
+    // still visible in the selected account tab. Recover that exact response.
+    await reset();await append({id:'new-render-user',role:'user',text:'Unique restart scene'});await append({id:'restart-result',src:'/restarted.webm',ref:'old-render-user'});await ready('restart-result');
+    await page.evaluate(beginTracking,{id:'restarted-attempt',prompt:'Unique restart scene',recover:true,echoKey:'old-render-user',echoMarker:'missing-old-marker',echoAliases:['old-render-user']});
+    assert.equal((await page.evaluate(pollTracking,{id:'restarted-attempt'})).url,'https://muse.ai/restarted.webm');
+    await append({id:'second-identical-turn',role:'user',text:'Unique restart scene'});
+    await page.evaluate(beginTracking,{id:'ambiguous-restart',prompt:'Unique restart scene',recover:true,echoKey:'missing-key',echoMarker:'missing-marker'});
+    await assert.rejects(page.evaluate(pollTracking,{id:'ambiguous-restart'}),/nhiều tin nhắn/);
     console.log('PASS: real Chromium decoded-video tracker fixture — exact prompt binding, delayed result/progress, old/unrelated/wrong/out-of-order media rejection, ambiguity fail-closed, scoped menu download and unique recovery. No live Muse requests.');
   } finally {if(browser)await browser.close();await fs.rm(dir,{recursive:true,force:true});}
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -1,6 +1,12 @@
-# Muse Video Studio 0.7.0 · Windows
+# Muse Video Studio 0.7.1 · Windows
 
 Icon Muse Studio riêng (M vàng + Play trắng) được nhúng vào EXE, cửa sổ ứng dụng và logo trong giao diện.
+
+## Sửa nhận clip và đặt tên (0.7.1)
+
+Khi Muse thay DOM ID nhưng prompt nguyên vẹn vẫn là duy nhất trong cùng vùng chat còn kết nối, tool gắn lại đúng tin nhắn thay vì đứng ở trạng thái khôi phục cảnh. Giữ alias ID của cùng tin nhắn để nhận phản hồi vẫn trỏ tới ID trước khi render lại. Các cửa sổ Muse tích hợp không bị hạn chế timer/render khi ở nền để cả hai tài khoản cập nhật kết quả. Các tab Chrome/Edge được giữ cố định theo tác vụ; đóng/đổi trang của tab gửi không khiến tool lấy kết quả từ một tab khác.
+
+Thẻ video có nguồn HTTPS/blob có thể tải ngay trong đúng phản hồi mà không chờ player phát hoặc tải metadata; tệp lưu vẫn phải qua kiểm tra MP4/WebM. File tải về được đặt theo số prompt: `001.mp4`, `002.mp4`, …; không phụ thuộc tài khoản nào xong trước. Nếu không có số trong prompt, thứ tự hàng đợi được lưu cố định. Nếu đã có file cùng tên, giữ file cũ và lưu `001 (2).mp4`. WebM giữ đuôi `.webm` đúng định dạng nguồn.
 
 ## Khóa cảnh, chờ clip và Dừng / Tiếp tục (0.7.0)
 

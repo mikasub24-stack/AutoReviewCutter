@@ -118,7 +118,8 @@ function updateMedia(row,job){
 }
 function updateCard(row,job,index){
   row.job=job;updateMedia(row,job);
-  text(row.number,'#'+(index+1));text(row.title,job.title||`Prompt ${index+1}`);row.card.setAttribute('aria-label',`${job.title||'Prompt '+(index+1)} · ${labels[job.status]||job.status}`);
+  const displayNumber=Number.isInteger(job.number)&&job.number>0?job.number:job.order||index+1;
+  text(row.number,'#'+displayNumber);text(row.title,job.title||`Prompt ${displayNumber}`);row.card.setAttribute('aria-label',`${job.title||'Prompt '+displayNumber} · ${labels[job.status]||job.status}`);
   row.badge.className='badge '+job.status;text(row.badge,labels[job.status]||job.status);text(row.prompt,job.lockedInput?.prompt||job.prompt);
   text(row.meta,`${job.lockedInput?'🔒 Đã khóa · ':''}${job.references?.length||0} ảnh tham chiếu${job.account?' · TK '+job.account:''}${job.durationSeconds?' · '+job.durationSeconds+'s':''}`);
   const active=job.status==='running';

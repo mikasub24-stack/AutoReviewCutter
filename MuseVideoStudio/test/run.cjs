@@ -13,3 +13,4 @@ require('./example-script.test.cjs');
 require('./download-capture.test.cjs');
 
 require('./locked-input.test.cjs');
+require('./ordered-output.test.cjs');

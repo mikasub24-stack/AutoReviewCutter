@@ -74,12 +74,13 @@ async function launchExternalBrowser({ executablePath, profileDir, sessionFile, 
   await fs.mkdir(path.dirname(sessionFile),{recursive:true});
   sessionFile=path.join(await fs.realpath(path.dirname(sessionFile)),path.basename(sessionFile));
   const engine = chromium || require('playwright-core').chromium;
-  let context, store, pollTimer, debounceTimer, pendingFlush, closePromise, clearPromise, resetReceipt, closing = false, closed = false, current;
+  let context, store, pollTimer, debounceTimer, pendingFlush, closePromise, clearPromise, resetReceipt, closing = false, closed = false, current, pinnedPage, pageOwner;
   const attached = new Set();
   function warning(message) { try { onWarning(message); } catch {} }
   function stopTimers() { clearInterval(pollTimer); clearTimeout(debounceTimer); }
   function selectPage() {
     if (closed || !context) throw Error('Trình duyệt tài khoản đã đóng. Hãy mở lại tài khoản.');
+    if(pinnedPage){if(pinnedPage.isClosed()||!museURL(pinnedPage.url()))throw Error('Tab đã gửi prompt bị đóng hoặc đổi trang. Tool không lấy clip từ tab khác.');return pinnedPage;}
     const pages = context.pages().filter(p => !p.isClosed());
     if (current && !current.isClosed() && museURL(current.url())) return current;
     const match = pages.find(p => museURL(p.url()));
@@ -182,15 +183,17 @@ async function launchExternalBrowser({ executablePath, profileDir, sessionFile, 
     pollTimer.unref?.();
     return {
       external: true,
+      pinPage:owner=>{if(pageOwner&&pageOwner!==owner)throw Error('Tab này đang giữ một cảnh chưa hoàn tất.');const page=assertPage();pinnedPage=page;pageOwner=owner;},
+      releasePage:owner=>{if(pageOwner===owner){pinnedPage=undefined;pageOwner=undefined;}},
       isDestroyed: () => closed,
       isSessionEnabled: () => Boolean(store?.isEnabled()),
       openMuse,
       clearLogin,
-      url: () => { try { return selectPage().url(); } catch { return current && !current.isClosed() ? current.url() : ''; } },
+      url: () => { if(pinnedPage)return pinnedPage.url();try { return selectPage().url(); } catch { return current && !current.isClosed() ? current.url() : ''; } },
       show: async () => {
         if (closed) throw Error('Trình duyệt tài khoản đã đóng.');
-        const page = current && !current.isClosed() ? current : context.pages().find(p => !p.isClosed());
-        if (!page) throw Error('Trình duyệt tài khoản không có tab đang mở.');
+        const page = pinnedPage || (current && !current.isClosed() ? current : context.pages().find(p => !p.isClosed()));
+        if (!page||page.isClosed()) throw Error('Trình duyệt tài khoản không có tab đang mở.');
         await page.bringToFront();
       },
       evaluate: (fn, arg) => assertPage().evaluate(fn, arg),
