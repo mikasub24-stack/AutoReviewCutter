@@ -26,7 +26,7 @@ const browsers = new Map(), profiles = new Map(), opening = new Map(), externalL
 let quitAllowed = false, flushingQuit = false, starting = false, runEpoch=0, nextAccount=0;
 const nextDispatchAt=new Map();
 const resettingAccounts = new Set(), accountResets = new Map();
-const defaults = { accountSessionIds:{}, dispatchMode:'sequential', cooldownSeconds:3, messageSelector:'', attachmentReadySelector:'', browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', timeoutMinutes: 15 };
+const defaults = { accountSessionIds:{}, dispatchMode:'parallel', cooldownSeconds:3, messageSelector:'', attachmentReadySelector:'', browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', timeoutMinutes: 15 };
 async function atomic(file, data) { await fs.writeFile(file + '.tmp', JSON.stringify(data, null, 2)); await fs.rename(file + '.tmp', file); }
 function snapshot() {
   return {jobs:queue.jobs,settings,license:licenseManager?.status(),payment:paymentDetails,starting,resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,
@@ -38,7 +38,7 @@ function snapshot() {
 
 function notify() { if (main && !main.isDestroyed()) main.webContents.send('studio:update', snapshot()); }
 let stateWrites = Promise.resolve();
-async function save() { const data = JSON.parse(JSON.stringify({ jobs: queue.jobs, settings, mergedOutput, mergeError, editPackageDir, packageError, configVersion: 2 })); const write = stateWrites.then(() => atomic(stateFile, data)); stateWrites = write.catch(() => {}); await write; }
+async function save() { const data = JSON.parse(JSON.stringify({ jobs: queue.jobs, settings, mergedOutput, mergeError, editPackageDir, packageError, configVersion: 2, dispatchRevision: 1 })); const write = stateWrites.then(() => atomic(stateFile, data)); stateWrites = write.catch(() => {}); await write; }
 function assertMuse(muse) {
   if (!muse || muse.isDestroyed()) throw Error('Mở Muse và đăng nhập trước khi chạy.');
   const u = new URL(muse.external ? muse.url() : muse.webContents.getURL());
@@ -319,6 +319,8 @@ app.whenReady().then(async () => {
   let stored = {};
   try { stored = JSON.parse(await fs.readFile(stateFile, 'utf8')); } catch (e) { if (e.code !== 'ENOENT') throw e; }
   settings = { ...defaults, ...stored.settings };
+  // Upgrade the old sequential default once; later explicit choices persist.
+  if(stored.dispatchRevision!==1)settings.dispatchMode='parallel';
   // Discard obsolete IP/VPN preferences from v0.5 so they cannot gate login.
   for(const key of ['requireUSA','vpnProvider','vpnClientPath'])delete settings[key];
   await fs.mkdir(app.getPath('userData'),{recursive:true});
@@ -350,7 +352,7 @@ app.whenReady().then(async () => {
       const structure=await dom(muse,chatDiagnostics,{jobs:jobs.map(j=>({id:j.id,prompt:j.prompt,number:j.number})),composerSelector:settings.composer});
       const result=await dialog.showSaveDialog(main,{defaultPath:`Muse-chat-diagnostics-TK${index+1}.json`,filters:[{name:'Thông tin lỗi',extensions:['json']}]});
       if(result.canceled)return false;
-      await atomic(result.filePath,{version:app.getVersion?.()||'0.6.2',account:index+1,jobs:jobs.map(j=>({id:j.id,title:j.title,number:j.number,status:j.status,stage:j.stage,error:j.error,submittedAt:j.submittedAt})),structure});
+      await atomic(result.filePath,{version:app.getVersion?.()||'0.6.3',account:index+1,jobs:jobs.map(j=>({id:j.id,title:j.title,number:j.number,status:j.status,stage:j.stage,error:j.error,submittedAt:j.submittedAt})),structure});
       shell.showItemInFolder?.(result.filePath);return true;
     },
     logoutAccount: async index => {await logoutAccount(Number(index??0));return snapshot();},

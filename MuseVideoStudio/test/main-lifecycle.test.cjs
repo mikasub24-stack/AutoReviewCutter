@@ -351,3 +351,33 @@ test('unresponsive Muse DOM fails visibly and leaves next prompt pending rather 
   const state=app.invoke('state');assert.equal(state.jobs[0].status,'failed');assert.match(state.jobs[0].error,/không phản hồi/);assert.equal(state.jobs[1].status,'pending');assert.equal(submitted,0);await app.stop();
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
+
+test('upgrade enables parallel accounts once and preserves later explicit sequential choice',async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-parallel-upgrade-'));let app;
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{accountCount:2,dispatchMode:'sequential'},jobs:[{id:'kept-job',prompt:'Keep this scene',status:'pending'}]}));
+  app=await boot(dir);let state=app.invoke('state');assert.equal(state.settings.dispatchMode,'parallel');assert.equal(state.settings.accountCount,2);assert.equal(state.jobs[0].id,'kept-job');
+  await app.invoke('settings',{...state.settings,dispatchMode:'sequential',finishAction:'keep'});await app.stop();
+  assert.equal(JSON.parse(await fs.readFile(path.join(dir,'studio.json'),'utf8')).dispatchRevision,1);
+  app=await boot(dir);assert.equal(app.invoke('state').settings.dispatchMode,'sequential');await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+test('two account browsers submit together and the faster account takes the next scene independently',{timeout:12000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-parallel-browsers-'));let app,release;const slow=new Promise(r=>release=r),sent=[[],[]],busy=[0,0];let launched=0,slowDownloading=false;
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:2,cooldownSeconds:0}}));
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>{
+   const slot=launched++;let draft='';return{external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},openMuse:async()=>{},close:async()=>{},evaluate:async(fn,arg)=>{
+    if(fn.name==='submitPrompt'){assert.equal(busy[slot],0);busy[slot]++;sent[slot].push(draft);return{clicked:true};}
+    if(fn.name==='pollTracking')return{phase:'ready',ready:true,progress:null};
+    if(fn.name==='downloadAction')return{action:'clicked',clicked:true,needsMenu:false};
+    if(arg?.prompt&&!arg?.id)draft=arg.prompt;return null;
+   },captureDownload:async(target,{trigger})=>{await trigger();if(slot===0){slowDownloading=true;await slow;}await fs.writeFile(target,fixtureMp4());busy[slot]--;}};
+  }});
+  await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('browser',1);
+  await app.invoke('add',[{prompt:'Scene one'},{prompt:'Scene two'},{prompt:'Scene three'}]);await app.invoke('start');
+  await until(()=>slowDownloading&&app.invoke('state').jobs[2].status==='completed');
+  assert.deepEqual(sent,[['Scene one'],['Scene two','Scene three']]);assert.equal(app.invoke('state').jobs[0].status,'running');assert.equal(app.invoke('state').active,true);assert.deepEqual(Array.from(app.invoke('state').jobs,j=>j.account),[1,2,2]);
+  release();await until(()=>!app.invoke('state').active);assert.ok(app.invoke('state').jobs.every(j=>j.status==='completed'));assert.deepEqual(busy,[0,0]);await app.stop();
+ }finally{release();if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});

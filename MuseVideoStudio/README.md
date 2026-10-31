@@ -1,4 +1,4 @@
-# Muse Video Studio 0.6.2 · Windows
+# Muse Video Studio 0.6.3 · Windows
 
 ## Sửa luồng chờ và gửi của 0.6.2
 
@@ -10,7 +10,7 @@ Giao diện Muse thực chưa truy cập được từ môi trường này. Nế
 
 ## Tạo liên tục, đúng prompt và tải về
 
-Mặc định tool chạy lần lượt và tự chuyển đến hết danh sách: xác nhận đúng prompt trong chat → chờ video trả lời prompt đó → tải và kiểm tra tệp video → chuyển prompt tiếp theo. Khi có nhiều tài khoản, chế độ lần lượt xoay vòng tài khoản; muốn dùng cùng lúc, chọn **Song song theo tài khoản** trong Cài đặt. Mỗi tài khoản vẫn chỉ giữ một tác vụ đang xử lý, không gửi thêm trước khi tải xong. Khoảng nghỉ giữa hai lượt của cùng tài khoản mặc định3 giây, điều chỉnh0–120 giây.
+Mặc định tool chạy song song theo tài khoản và tự chuyển đến hết danh sách. Với2 tài khoản, TK1 gửi cảnh1 và TK2 gửi cảnh2 cùng lúc; tài khoản nào tải xong video trước sẽ nhận cảnh tiếp theo, không phải chờ tài khoản kia. Khi nâng cấp từ0.6.2 trở về trước, app tự chuyển cấu hình cũ sang song song một lần; sau đó giữ lựa chọn bạn lưu trong Cài đặt. Mỗi tài khoản thực hiện: xác nhận đúng prompt trong chat → chờ video trả lời prompt đó → tải và kiểm tra tệp video → chuyển prompt tiếp theo. Mở và đăng nhập đủ tài khoản đã chọn trước khi chạy. Chế độ **Lần lượt** vẫn có trong Cài đặt nếu bạn chủ động chọn. Mỗi tài khoản vẫn chỉ giữ một tác vụ đang xử lý, không gửi thêm trước khi tải xong. Khoảng nghỉ giữa hai lượt của cùng tài khoản mặc định3 giây, điều chỉnh0–120 giây.
 
 Mỗi thẻ hiển thị cảnh/prompt gốc, giai đoạn xử lý, thời gian chờ, tiến độ Muse khi trang thực sự cung cấp và tiến độ tải khi trình duyệt cung cấp số byte. Không tạo phần trăm giả khi Muse không có số liệu. Tệp đã tải phát trực tiếp trong đúng thẻ, giữ nguyên trình phát khi trạng thái cập nhật.
 
