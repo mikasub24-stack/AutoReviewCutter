@@ -1,6 +1,6 @@
-# Muse Video Studio 0.6.1 · Windows
+# Muse Video Studio 0.6.2 · Windows
 
-## Sửa luồng chờ và gửi của 0.6.1
+## Sửa luồng chờ và gửi của 0.6.2
 
 Tool bấm nút Gửi trong vùng soạn thảo thay vì giả định Enter gửi được. Selector nút gửi để trống sẽ tự nhận diện nhãn Send/Gửi, nút submit hoặc biểu tượng mũi tên được hỗ trợ; có nhiều nút hoặc không nhận diện được thì báo lỗi, giữ bản nháp. Việc gửi vẫn chờ đúng prompt xuất hiện trong chat, không bấm lại mù.
 
