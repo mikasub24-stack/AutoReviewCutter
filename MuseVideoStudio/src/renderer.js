@@ -177,6 +177,9 @@ function render(next){
   $('packageStatus').textContent=state.packageError||state.packageProgress||state.editPackageDir||'Xuất clip rời đúng thứ tự để nhập vào CapCut.';$('openPackage').hidden=!state.editPackageDir;
   $('finishMode').textContent='Sau khi tạo xong: '+(state.settings.autoMerge?'Nối MP4':state.settings.autoPackage?'Xuất clip CapCut':'Giữ clip riêng');
   $('summary').textContent=`${jobs.filter(j=>j.status==='completed').length} / ${jobs.length} video hoàn tất`;
+  const failed=jobs.filter(j=>['failed','interrupted'].includes(j.status)&&j.error);
+  $('queueFailure').hidden=Boolean(state.active||!failed.length);
+  $('queueFailureText').textContent=failed.length?`${failed[0].title||'Prompt '+(jobs.indexOf(failed[0])+1)} · ${failed[0].error}`:'';
   renderJobs(jobs);
 }
 $('prompts').oninput=()=>{dirty=true;committed=false;};$('importMode').onchange=()=>{dirty=true;$('rawOptions').hidden=$('importMode').value!=='script';};
@@ -203,3 +206,7 @@ document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{filter=b.da
 window.studio.onUpdate(render);call('state').then(render);renderDrafts();mappingInfo();
 
 $('licenseButton').onclick=()=>$('licenseDialog').showModal();$('closeLicense').onclick=()=>$('licenseDialog').close();$('copyDevice').onclick=async()=>{try{await navigator.clipboard.writeText($('deviceCode').value);toast('Đã sao chép mã máy.');}catch{$('deviceCode').select();toast('Nhấn Ctrl+C để sao chép mã máy.');}};$('activateKey').onclick=async()=>{const result=await call('activateKey',$('activationKey').value.trim());if(result){render(result);toast('Đã kích hoạt key.');}};
+
+$('showFailures').onclick=()=>{filter='failed';document.querySelectorAll('[data-filter]').forEach(b=>b.classList.toggle('active',b.dataset.filter==='failed'));render(state);$('jobs').scrollIntoView({block:'start',behavior:'smooth'});};
+
+$('diagnostics').onclick=async()=>{if(await call('diagnostics',Number($('accountPicker').value)))toast('Đã lưu thông tin cấu trúc chat. Tệp không chứa cookie hay nội dung prompt.');};

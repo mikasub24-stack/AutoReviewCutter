@@ -2,6 +2,8 @@ const { app, BrowserWindow, ipcMain, dialog, shell, session, safeStorage } = req
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { Queue,stoppedError,abortable } = require('./queue.cjs');
+const {chatDiagnostics}=require('./chat-diagnostics.cjs');
+const {submitPrompt}=require('./submit-prompt.cjs');
 const {imageSources,attachmentState}=require('./attachment-ready.cjs');
 const {beginTracking,pollTracking,downloadAction,endTracking}=require('./muse-tracker.cjs');
 const {captureElectronDownload,validateVideo}=require('./download-capture.cjs');
@@ -42,7 +44,12 @@ function assertMuse(muse) {
   const u = new URL(muse.external ? muse.url() : muse.webContents.getURL());
   if (u.protocol !== 'https:' || !(u.hostname === 'muse.ai' || u.hostname.endsWith('.muse.ai'))) throw Error('Hãy mở trang chat trên muse.ai.');
 }
-async function dom(muse, fn, arg) { assertMuse(muse); if(muse.external) return muse.evaluate(fn,arg); return muse.webContents.executeJavaScript(`(${fn.toString()})(${JSON.stringify(arg)})`, true); }
+async function dom(muse, fn, arg, timeoutMs=20000) {
+  assertMuse(muse);let timer;
+  const pending=muse.external?muse.evaluate(fn,arg):muse.webContents.executeJavaScript(`(${fn.toString()})(${JSON.stringify(arg)})`,true);
+  try{return await Promise.race([pending,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Trang Muse không phản hồi trong 20 giây. Tool đã ngừng bước này; kiểm tra chat trước khi gửi lại.')),timeoutMs);timer.unref?.();})]);}
+  finally{clearTimeout(timer);}
+}
 async function prepareNativeProfile(index) {
   let profile=profiles.get(index);
   if(!profile) {
@@ -257,15 +264,8 @@ async function runJob(job,worker,signal,{recover=false}={}) {
   check();await step(dom(muse,beginTracking,{id:job.id,prompt:job.prompt,videoSelector:settings.video,messageSelector:settings.messageSelector,recover}));
   if(!recover){
     stage('submitting','Đang gửi một prompt');job.submissionProfileKey=profileKey;job.submissionSessionId=currentSession;job.mayHaveSubmitted=true;job.submittedAt=new Date().toISOString();await step(save());check();
-    await step(dom(muse,({id,selector})=>{
-      const state=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]?.get(id);if(!state)throw Error('Tác vụ đã dừng; không gửi prompt.');
-      if(selector){const a=[...document.querySelectorAll(selector)].filter(e=>e.getClientRects().length);if(a.length!==1||a[0].disabled)throw Error('Nút gửi chưa sẵn sàng.');a[0].click();}
-    },{id:job.id,selector:settings.submit}));
+    await step(dom(muse,submitPrompt,{id:job.id,selector:settings.submit,composerSelector:settings.composer}));
     check();
-    if(!settings.submit){
-      if(muse.external)await step(muse.pressEnter({id:job.id,signal}));
-      else {muse.webContents.sendInputEvent({type:'keyDown',keyCode:'Return'});muse.webContents.sendInputEvent({type:'keyUp',keyCode:'Return'});}
-    }
   }
   stage('confirming',recover?'Đang tìm video đã tạo của đúng prompt':'Chờ Muse xác nhận đã nhận prompt');
   const deadline=Date.now()+settings.timeoutMinutes*60000,ackDeadline=Date.now()+45000;
@@ -286,7 +286,7 @@ async function runJob(job,worker,signal,{recover=false}={}) {
     throw Error('Hết thời gian chờ video của prompt này. Tool không gửi tiếp hoặc lấy video từ cảnh khác. Mở chat rồi dùng Lấy video đã tạo.');
   }finally{
     const cleanup=dom(muse,endTracking,{id:job.id}).catch(()=>{});
-    if(!signal.aborted)await cleanup;
+    void cleanup;
   }
 }
 
@@ -344,6 +344,15 @@ app.whenReady().then(async () => {
     retry: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); invalidateOutputs(); await queue.retry(id); return snapshot(); },
     remove: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); invalidateOutputs(); await queue.remove(id); return snapshot(); },
     browser: async index => { await openMuse(Number(index ?? 0)); return true; },
+    diagnostics: async index=>{
+      index=Number(index??0);validAccount(index);const muse=browsers.get(index);assertMuse(muse);
+      const jobs=queue.jobs.filter(j=>j.account===index+1).slice(-8);
+      const structure=await dom(muse,chatDiagnostics,{jobs:jobs.map(j=>({id:j.id,prompt:j.prompt,number:j.number})),composerSelector:settings.composer});
+      const result=await dialog.showSaveDialog(main,{defaultPath:`Muse-chat-diagnostics-TK${index+1}.json`,filters:[{name:'Thông tin lỗi',extensions:['json']}]});
+      if(result.canceled)return false;
+      await atomic(result.filePath,{version:app.getVersion?.()||'0.6.1',account:index+1,jobs:jobs.map(j=>({id:j.id,title:j.title,number:j.number,status:j.status,stage:j.stage,error:j.error,submittedAt:j.submittedAt})),structure});
+      shell.showItemInFolder?.(result.filePath);return true;
+    },
     logoutAccount: async index => {await logoutAccount(Number(index??0));return snapshot();},
     start: async () => {
       if(merging || packaging) throw Error('Đang xử lý đầu ra video.');

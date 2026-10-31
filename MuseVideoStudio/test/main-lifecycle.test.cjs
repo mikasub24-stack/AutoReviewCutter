@@ -28,7 +28,7 @@ const safeStorage = {
   }
 };
 
-async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, logoutResponse=1 } = {}) {
+async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, domTimeoutMs=20000, logoutResponse=1 } = {}) {
   const handlers = new Map(), sessions = new Map(), windows = [], errors = [], notices = [];
   const lifecycle = [],updates=[];
   let loaded, quit;
@@ -105,7 +105,7 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
       if(name === './browser-discovery.cjs' && browserResolver) return {resolveBrowser:browserResolver};
       return localRequire(name);
     },
-    __dirname: path.dirname(mainPath), Buffer, URL, console, setTimeout, clearTimeout, AbortController
+    __dirname: path.dirname(mainPath), Buffer, URL, console, setTimeout:(fn,ms,...args)=>setTimeout(fn,ms===20000?domTimeoutMs:ms,...args), clearTimeout, AbortController
   });
   vm.runInContext(await fs.readFile(mainPath, 'utf8'), context, { filename: mainPath });
   if (ownsLock) await loadedPromise;
@@ -287,6 +287,7 @@ test('main binds each prompt transaction and waits for validated saved video bef
     app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>{
       let closed=false,draft='';return{external:true,isDestroyed:()=>closed,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},openMuse:async()=>{},
       evaluate:async(fn,arg)=>{
+        if(fn.name==='submitPrompt'){sent.push(draft);return{clicked:true};}
         if(fn.name==='beginTracking'){trackers.push({...arg});return{phase:'waiting-prompt'};}
         if(fn.name==='pollTracking')return ready?{phase:'ready',ready:true,progress:null}:{phase:'rendering',ready:false,progress:37,stage:'Fixture is creating this scene'};
         if(fn.name==='downloadAction')return{action:'clicked',clicked:true,needsMenu:false};
@@ -338,5 +339,15 @@ test('recovery refuses a different browser profile before searching or downloadi
   await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1},jobs:[{id:'old-chrome',prompt:'Existing scene',account:1,status:'interrupted',mayHaveSubmitted:true,submissionProfileKey:'chrome/account-1'}]}));
   app=await boot(dir);await app.invoke('browser',0);await app.invoke('retryDownload','old-chrome');await until(()=>!app.invoke('state').active);
   assert.equal(app.invoke('state').jobs[0].status,'failed');assert.match(app.invoke('state').jobs[0].error,/đúng trình duyệt/);assert.equal(app.invoke('state').jobs[0].output,'');await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
+test('unresponsive Muse DOM fails visibly and leaves next prompt pending rather than hanging',{timeout:5000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-dom-timeout-'));let app,submitted=0;
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1}}));
+  app=await boot(dir,{domTimeoutMs:25,browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},openMuse:async()=>{},close:async()=>{},evaluate:async()=>new Promise(()=>{}),pressEnter:async()=>submitted++})});
+  await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'First scene'},{prompt:'Second scene'}]);await app.invoke('start');await until(()=>!app.invoke('state').active);
+  const state=app.invoke('state');assert.equal(state.jobs[0].status,'failed');assert.match(state.jobs[0].error,/không phản hồi/);assert.equal(state.jobs[1].status,'pending');assert.equal(submitted,0);await app.stop();
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });

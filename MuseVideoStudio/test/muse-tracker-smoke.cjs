@@ -95,6 +95,17 @@ const assert = require('node:assert/strict');
     await reset();await page.evaluate(()=>document.getElementById('thread').removeAttribute('data-chat-thread'));await page.evaluate(beginTracking,{id:'generic-progress',prompt:'Generic progress target'});
     await page.evaluate(()=>{const u=document.createElement('div');u.innerHTML='<div><p>Generic progress target</p></div><div><button>Copy</button></div>';const r=document.createElement('div');r.innerHTML='<div><div role="progressbar" aria-valuenow="42" aria-valuemax="100">Rendering</div></div><div><button>…</button></div>';document.getElementById('thread').append(u,r);});
     const genericProgress=await page.evaluate(pollTracking,{id:'generic-progress'});assert.equal(genericProgress.ready,false);assert.equal(genericProgress.progress,42);assert.equal(genericProgress.phase,'rendering');
+    // Rendered block breaks match original whitespace; metadata-only player
+    // need not decode a frame before its download can be taken.
+    await reset();await page.evaluate(beginTracking,{id:'blocks',prompt:'First paragraph. Second paragraph.'});
+    await page.evaluate(()=>{const u=document.createElement('article');u.dataset.messageRole='user';u.id='u-blocks';u.innerHTML='<p>First paragraph.</p><p>Second paragraph.</p>';document.getElementById('thread').append(u);});
+    await append({id:'metadata-only',src:'/metadata.webm',ref:'u-blocks'});await ready('metadata-only');
+    await page.evaluate(()=>Object.defineProperty(document.querySelector('#metadata-only video'),'readyState',{get:()=>1}));
+    assert.equal((await page.evaluate(pollTracking,{id:'blocks'})).ready,true);
+    // Explicit video attachment link with image thumbnail, no HTML video tag.
+    await reset();await page.evaluate(beginTracking,{id:'attachment',prompt:'Attachment target'});await append({id:'u-attachment',role:'user',text:'Attachment target'});
+    await page.evaluate(()=>{const r=document.createElement('article');r.dataset.messageRole='assistant';r.innerHTML='<a href="/clip.mp4?signature=secret" download="clip.mp4"><img alt="Preview"></a>';document.getElementById('thread').append(r);});
+    const attachment=await page.evaluate(pollTracking,{id:'attachment'});assert.equal(attachment.ready,true);assert.match(attachment.url,/clip\.mp4/);
     console.log('PASS: real Chromium decoded-video tracker fixture — exact prompt binding, delayed result/progress, old/unrelated/wrong/out-of-order media rejection, ambiguity fail-closed, scoped menu download and unique recovery. No live Muse requests.');
   } finally {if(browser)await browser.close();await fs.rm(dir,{recursive:true,force:true});}
 })().catch(error=>{console.error(error.message);process.exitCode=1;});

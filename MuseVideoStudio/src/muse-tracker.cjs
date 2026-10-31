@@ -22,11 +22,13 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     }
     return {kind:'unknown',root:null};
   }
-  const source = v => v.currentSrc || v.getAttribute('src') || '';
+  const source = v => v.tagName==='A'?v.href:v.currentSrc || v.getAttribute('src') || '';
+  const videoLink=a=>a.tagName==='A'&&(/^video\//i.test(a.type||'')||/\.(mp4|webm)(?:$|[?#])/i.test(a.href)||/\.(mp4|webm)$/i.test(a.getAttribute('download')||''))&&/^(https:|blob:)/i.test(a.href);
+  function mediaNodes(root){return [...new Set([...(root.matches?.(videoSelector)?[root]:[]),...root.querySelectorAll(videoSelector),...(videoLink(root)?[root]:[]),...root.querySelectorAll('a[href]')])].filter(v=>v.tagName==='VIDEO'||videoLink(v));}
   // Validate selectors now rather than partially submitting then discovering a
   // malformed configuration. A selector must resolve to actual video elements.
   document.querySelectorAll(videoSelector); if(messageSelector)document.querySelectorAll(messageSelector);
-  const s={id,prompt:wanted,recover,videoSelector,messageSelector,baseline:new Set(document.querySelectorAll('*')),baselineSources:new Set([...document.querySelectorAll(videoSelector)].map(source).filter(Boolean)),added:new WeakMap(),textChanged:new WeakMap(),sequence:0,echo:null,echoRoot:null,responseRoot:null,video:null,fingerprint:'',ready:false,menuPending:false,menuBaseline:null};
+  const s={id,prompt:wanted,recover,videoSelector,messageSelector,baseline:new Set(document.querySelectorAll('*')),baselineSources:new Set(mediaNodes(document).map(source).filter(Boolean)),added:new WeakMap(),textChanged:new WeakMap(),sequence:0,echo:null,echoRoot:null,responseRoot:null,video:null,fingerprint:'',ready:false,menuPending:false,menuBaseline:null};
   s.observer=new MutationObserver(records=>{
     for(const record of records) {
       const seq=++s.sequence;
@@ -36,14 +38,14 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   });
   s.observer.observe(document.body,{subtree:true,childList:true,characterData:true});
   function echoCandidates() {
-    const matches=[...document.body.querySelectorAll('*')].filter(e=>visible(e)&&!composer(e)&&norm(e.textContent)===wanted&&(recover||!s.baseline.has(e))&&author(e).kind!=='assistant');
+    const matches=[...document.body.querySelectorAll('*')].filter(e=>visible(e)&&!composer(e)&&norm(e.innerText ?? e.textContent)===wanted&&(recover||!s.baseline.has(e))&&author(e).kind!=='assistant');
     const leaves=matches.filter(e=>!matches.some(other=>other!==e&&e.contains(other)));
     const roots=new Map();
     for(const leaf of leaves) {
       const known=author(leaf);
       let root=(messageSelector?leaf.closest(messageSelector):null)||(known.kind==='user'?known.root:leaf);
       if(!root)continue;
-      if(!(messageSelector&&root.matches(messageSelector)) && known.kind==='unknown')while(root.parentElement && root.parentElement!==document.body && norm(root.parentElement.textContent)===wanted && !root.parentElement.querySelector('video,textarea,[contenteditable="true"]'))root=root.parentElement;
+      if(!(messageSelector&&root.matches(messageSelector)) && known.kind==='unknown')while(root.parentElement && root.parentElement!==document.body && norm(root.parentElement.innerText ?? root.parentElement.textContent)===wanted && !root.parentElement.querySelector('video,textarea,[contenteditable="true"]'))root=root.parentElement;
       if(!recover && s.baseline.has(root))continue;
       roots.set(root,{leaf,root});
     }
@@ -63,7 +65,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       let next=branch.nextElementSibling;
       while(next&&!norm(next.textContent)&&!next.querySelector('video,progress,[role="progressbar"],button,a'))next=next.nextElementSibling;
       if(!next||next.tagName!==branch.tagName)continue;
-      const freshMedia=[...next.querySelectorAll(videoSelector)].some(v=>v.tagName==='VIDEO'&&(recover||(!s.baseline.has(v)&&!s.baselineSources.has(source(v)))));
+      const freshMedia=mediaNodes(next).some(v=>(recover||(!s.baseline.has(v)&&!s.baselineSources.has(source(v)))));
       const actualProgress=next.querySelector('progress,[role="progressbar"],[aria-valuenow]');
       if(freshMedia||actualProgress){s.genericResponseRoot=next;return parent;}
     }
@@ -87,7 +89,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     const values=[...root.querySelectorAll('*')].filter(e=>visible(e)&&e.children.length===0).map(e=>norm(e.textContent)).filter(t=>t.length<=80).map(t=>t.match(/(?:^|\s)(\d{1,3}(?:[.,]\d+)?)\s*%/)).filter(Boolean).map(m=>Number(m[1].replace(',','.'))).filter(v=>v>=0&&v<=100);
     return new Set(values).size===1?values[0]:null;
   }
-  const playable=v=>v.readyState>=2&&v.videoWidth>0&&Number.isFinite(v.duration)&&v.duration>0&&Boolean(source(v));
+  const playable=v=>videoLink(v)||v.readyState>=1&&v.videoWidth>0&&Number.isFinite(v.duration)&&v.duration>0&&Boolean(source(v));
   function result(phase,stage,root=s.responseRoot) {return {id,phase,stage,ready:phase==='ready',progress:progress(root),...(phase==='ready'?{url:source(s.video),fingerprint:s.fingerprint}:{})};}
   s.poll=()=>{
     const echoes=echoCandidates();
@@ -99,15 +101,15 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     if(!s.echo.isConnected||!s.echoRoot.isConnected)throw Error('Tin nhắn prompt đã rời khỏi trang. Dừng theo dõi để tránh gán nhầm video.');
     const thread=threadRoot(s.echoRoot);if(!thread)return result('waiting-response','Chưa xác định được vùng phản hồi cho prompt này');
     if(s.ready) {
-      const videos=[...(s.responseRoot.tagName==='VIDEO'&&s.responseRoot.matches(videoSelector)?[s.responseRoot]:[]),...s.responseRoot.querySelectorAll(videoSelector)].filter(v=>v.tagName==='VIDEO');
+      const videos=mediaNodes(s.responseRoot);
       if(!s.video.isConnected||videos.length!==1||videos[0]!==s.video||source(s.video)!==s.fingerprint)throw Error('Kết quả đã thay đổi hoặc không còn duy nhất. Dừng tải để tránh lấy nhầm video.');
       return playable(s.video)?result('ready','Video của prompt đã sẵn sàng tải'):result('rendering','Đang chờ dữ liệu video có thể phát');
     }
     const userRoots=[...thread.querySelectorAll('*')].filter(e=>author(e).kind==='user'&&author(e).root===e&&e!==s.echoRoot&&following(s.echoRoot,e));
     const echoIds=new Set([s.echoRoot.id,s.echoRoot.getAttribute('data-message-id'),s.echoRoot.getAttribute('data-id')].filter(Boolean));
     const candidates=[];
-    for(const video of thread.querySelectorAll(videoSelector)) {
-      if(video.tagName!=='VIDEO'||!following(s.echoRoot,video))continue;
+    for(const video of mediaNodes(thread)) {
+      if(!following(s.echoRoot,video))continue;
       if(!recover&&(s.baseline.has(video)||s.baselineSources.has(source(video))))continue;
       const root=responseRoot(video,thread);
       if(!root||root.contains(s.echo)||!following(s.echoRoot,root))continue;

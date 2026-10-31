@@ -1,4 +1,12 @@
-# Muse Video Studio 0.6.0 · Windows
+# Muse Video Studio 0.6.1 · Windows
+
+## Sửa luồng chờ và gửi của 0.6.1
+
+Tool bấm nút Gửi trong vùng soạn thảo thay vì giả định Enter gửi được. Selector nút gửi để trống sẽ tự nhận diện nhãn Send/Gửi, nút submit hoặc biểu tượng mũi tên được hỗ trợ; có nhiều nút hoặc không nhận diện được thì báo lỗi, giữ bản nháp. Việc gửi vẫn chờ đúng prompt xuất hiện trong chat, không bấm lại mù.
+
+Nhận player đã tải metadata mà chưa tải khung hình và liên kết MP4/WebM có thumbnail, gắn với đúng phản hồi. Ghép nội dung prompt nhiều đoạn bằng văn bản hiển thị thay vì nối dính các đoạn HTML. Mỗi thao tác đọc/điều khiển trang có hạn chờ20 giây; lỗi hiện trên danh sách ngay cả khi đang lọc Đang chờ. Khi dừng/lỗi, không chờ vô hạn việc dọn tracker.
+
+Giao diện Muse thực chưa truy cập được từ môi trường này. Nếu vẫn không nhận thẻ clip, chọn đúng tài khoản rồi bấm **Xuất thông tin lỗi chat**, lưu JSON và gửi tệp để kiểm tra. Tệp chứa cấu trúc DOM, thuộc tính giao diện đã lọc, trạng thái player và bước lỗi; không chứa cookie, storage, giá trị ô nhập, nội dung prompt hoặc URL có token. Không công khai tệp hỗ trợ lên GitHub. Đây là chẩn đoán cần thiết để xác minh adapter với markup thực, không phải bằng chứng mọi dạng player đã được hỗ trợ.
 
 ## Tạo liên tục, đúng prompt và tải về
 
@@ -55,6 +63,6 @@ Nối MP4 tùy chọn cần FFmpeg/ffprobe trên máy (chưa đóng kèm): chọ
 
 ## Phát triển và kiểm thử
 
-Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. Các kiểm tra `node test/cards-smoke.cjs`, `node test/muse-tracker-smoke.cjs`, `node test/download-capture-smoke.cjs` xác minh thẻ video, gắn kết quả theo prompt và tải/cancel tệp video thật từ máy chủ cục bộ; smoke tải cần FFmpeg hoặc MUSE_VIDEO_FIXTURE. Test UI và browser smoke cần Chromium; đặt CHROMIUM_PATH nếu khác /usr/bin/chromium. `node test/attachment-ready-smoke.cjs` kiểm tra readiness ảnh trên DOM fixture thật. FFmpeg smoke riêng: `npm run test:merge`.
+Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. Các kiểm tra `node test/submit-diagnostics-smoke.cjs`, `node test/cards-smoke.cjs`, `node test/muse-tracker-smoke.cjs`, `node test/download-capture-smoke.cjs` xác minh thẻ video, gắn kết quả theo prompt và tải/cancel tệp video thật từ máy chủ cục bộ; smoke tải cần FFmpeg hoặc MUSE_VIDEO_FIXTURE. Test UI và browser smoke cần Chromium; đặt CHROMIUM_PATH nếu khác /usr/bin/chromium. `node test/attachment-ready-smoke.cjs` kiểm tra readiness ảnh trên DOM fixture thật. FFmpeg smoke riêng: `npm run test:merge`.
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
