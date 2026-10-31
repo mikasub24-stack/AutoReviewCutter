@@ -63,3 +63,79 @@ test('bulk delete pending keeps completed outputs; clearAll stops active job and
  await q.add([{prompt:'c'}]);const work=q.start();await new Promise(r=>setImmediate(r));await q.clearAll();await work;assert.equal(q.jobs.length,0);
 });
 test('bulk reference changes affect pending jobs only',async()=>{const q=new Queue({...base,jobs:[{id:'done',status:'completed',references:['old.png']}],run:async()=>''});await q.add([{prompt:'a'}]);await q.applyReferences(['common.png']);assert.deepEqual(q.jobs[0].references,['old.png']);assert.deepEqual(q.jobs[1].references,['common.png']);});
+
+test('sequential default never submits the next prompt until the current confirmed download finishes',async()=>{
+ const calls=[],saved=[];let confirmDownload;
+ const downloaded=new Promise(resolve=>confirmDownload=resolve);
+ const q=new Queue({...base,save:async jobs=>saved.push(JSON.parse(JSON.stringify(jobs))),run:async job=>{
+  calls.push(job.prompt);job.submittedAt=new Date().toISOString();job.mayHaveSubmitted=true;
+  job.stage='waiting_result';
+  if(job.prompt==='one'){
+   job.resultReadyAt=new Date().toISOString();job.stage='downloading';job.downloadStartedAt=new Date().toISOString();
+   await downloaded;job.downloadCompletedAt=new Date().toISOString();
+  }
+  return job.prompt+'.mp4';
+ }});
+ await q.add([{prompt:'one'},{prompt:'two'}]);const work=q.start();await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(calls,['one']);assert.equal(q.concurrency,1);
+ assert.deepEqual(q.jobs.map(j=>j.status),['running','pending']);assert.equal(q.jobs[0].stage,'downloading');
+ assert.equal(q.jobs[0].finishedAt,null);assert.equal(q.jobs[0].output,'');
+ assert.ok(Number.isFinite(Date.parse(q.jobs[0].startedAt)));
+ confirmDownload();await work;
+ assert.deepEqual(calls,['one','two']);assert.equal(q.jobs[0].stage,'completed');assert.equal(q.jobs[0].progress,100);
+ assert.ok(Date.parse(q.jobs[0].finishedAt)>=Date.parse(q.jobs[0].downloadCompletedAt));
+ const firstCompleted=saved.findIndex(jobs=>jobs[0].status==='completed');
+ const secondRunning=saved.findIndex(jobs=>jobs[1].status==='running');assert.ok(firstCompleted>=0&&secondRunning>firstCompleted);
+});
+
+test('retry and a fresh run clear stale transaction stages while preserving script and references',async()=>{
+ const job={id:'retry',status:'failed',prompt:'source prompt',source:'narration',title:'Cảnh 1',number:1,voiceover:'voice',durationSeconds:10,references:['one.png'],image:'one.png',account:2,
+  stage:'downloading',stageMessage:'old download',progress:75,downloadProgress:{receivedBytes:12,totalBytes:16},submittedAt:'2025-01-01T00:00:00Z',mayHaveSubmitted:true,resultReadyAt:'old-result',downloadStartedAt:'old-download',downloadCompletedAt:'old-completion',startedAt:'old-start',finishedAt:'old-finish',output:'partial.mp4',error:'old error'};
+ let inspected=false;
+ const q=new Queue({...base,jobs:[job],run:async current=>{
+  inspected=true;assert.equal(current.stage,'starting');assert.equal(current.stageMessage,'');assert.equal(current.progress,null);assert.equal(current.downloadProgress,null);
+  for(const field of ['submittedAt','resultReadyAt','downloadStartedAt','downloadCompletedAt','finishedAt'])assert.equal(current[field],null);
+  assert.equal(current.mayHaveSubmitted,false);assert.equal(current.account,undefined);assert.equal(current.output,'');assert.equal(current.error,'');
+  assert.ok(Number.isFinite(Date.parse(current.startedAt)));assert.equal(current.source,'narration');assert.deepEqual(current.references,['one.png']);
+  return 'new.mp4';
+ }});
+ await q.retry('retry');assert.equal(q.jobs[0].startedAt,null);assert.equal(q.jobs[0].stage,'pending');
+ await q.start();assert.equal(inspected,true);assert.equal(q.jobs[0].output,'new.mp4');assert.ok(Number.isFinite(Date.parse(q.jobs[0].finishedAt)));
+});
+
+test('failed download preserves submission evidence, pauses dispatch, and records finish time',async()=>{
+ const q=new Queue({...base,run:async job=>{job.mayHaveSubmitted=true;job.submittedAt='2026-01-01T00:00:00Z';job.stage='downloading';throw Error('MP4 not validated');}});
+ await q.add([{prompt:'one'},{prompt:'two'}]);await q.start();
+ assert.deepEqual(q.jobs.map(job=>job.status),['failed','pending']);assert.equal(q.jobs[0].mayHaveSubmitted,true);
+ assert.equal(q.jobs[0].stage,'failed');assert.equal(q.jobs[0].error,'MP4 not validated');assert.equal(q.jobs[0].output,'');
+ assert.ok(Number.isFinite(Date.parse(q.jobs[0].finishedAt)));assert.equal(q.paused,true);
+});
+
+test('recovery keeps transaction evidence, invokes only its runner, and never dispatches pending prompts',async()=>{
+ let originalRuns=0,release;
+ const q=new Queue({...base,jobs:[{id:'recover',prompt:'already sent',status:'interrupted',account:2,mayHaveSubmitted:true,submittedAt:'2026-01-01T00:00:00Z',resultReadyAt:'2026-01-01T00:00:05Z'},{id:'next',prompt:'not sent',status:'pending'}],run:async()=>{originalRuns++;return 'unexpected.mp4';}});
+ const work=q.recover('recover',async(job,signal)=>{
+  assert.equal(job.account,2);assert.equal(job.mayHaveSubmitted,true);assert.equal(job.submittedAt,'2026-01-01T00:00:00Z');assert.equal(job.resultReadyAt,'2026-01-01T00:00:05Z');
+  assert.equal(job.stage,'confirming');assert.equal(signal.aborted,false);await new Promise(resolve=>release=resolve);return 'recovered.mp4';
+ });
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(q.active,true);assert.equal(q.jobs[1].status,'pending');
+ assert.throws(()=>q.recover('recover',async()=>''),/Chờ hoặc dừng/);
+ release();await work;
+ assert.equal(q.jobs[0].status,'completed');assert.equal(q.jobs[0].output,'recovered.mp4');assert.equal(q.jobs[1].status,'pending');assert.equal(originalRuns,0);assert.equal(q.active,false);
+});
+
+test('stop interrupts recovery immediately and leaves the original submission available for a later recovery',async()=>{
+ const q=new Queue({...base,jobs:[{id:'recover',prompt:'already sent',status:'failed',mayHaveSubmitted:true,submittedAt:'2026-01-01T00:00:00Z'},{id:'next',status:'pending',prompt:'not sent'}],run:async()=>{throw Error('must not dispatch');}});
+ let observedSignal;
+ const work=q.recover('recover',async(_job,signal)=>{observedSignal=signal;await new Promise(()=>{});});
+ await new Promise(resolve=>setImmediate(resolve));await q.stop();await work;
+ assert.equal(observedSignal.aborted,true);assert.equal(q.jobs[0].status,'interrupted');assert.equal(q.jobs[0].stage,'interrupted');assert.equal(q.jobs[0].mayHaveSubmitted,true);
+ assert.ok(Number.isFinite(Date.parse(q.jobs[0].finishedAt)));assert.equal(q.jobs[1].status,'pending');assert.equal(q.active,false);
+});
+
+test('recovery rejects unsent pending or completed jobs, and empty outputs never complete a job',async()=>{
+ const q=new Queue({...base,jobs:[{id:'unsent',status:'failed',prompt:'unsent'},{id:'done',status:'completed',mayHaveSubmitted:true,output:'done.mp4'}],run:async()=>undefined});
+ assert.throws(()=>q.recover('unsent',async()=>''),/Chưa có thông tin/);
+ assert.throws(()=>q.recover('done',async()=>''),/tác vụ lỗi/);
+ await q.add([{prompt:'new'}]);await q.start();assert.equal(q.jobs[2].status,'failed');assert.match(q.jobs[2].error,/Chưa xác nhận/);
+});

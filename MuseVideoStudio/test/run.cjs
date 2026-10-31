@@ -9,3 +9,5 @@ require('./prompt-import.test.cjs');
 require('./reference-map.test.cjs');
 require('./license.test.cjs');
 require('./example-script.test.cjs');
+
+require('./download-capture.test.cjs');

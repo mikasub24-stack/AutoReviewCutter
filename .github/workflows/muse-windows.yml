@@ -60,7 +60,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "muse-studio-v$env:MUSE_VERSION" "dist/$env:MUSE_ZIP" --target $env:GITHUB_SHA --title "Muse Video Studio $env:MUSE_VERSION — Windows" --notes "Download the ZIP, extract and run the EXE. Muse opens directly without VPN or IP-country checks. See README for setup and remaining real-service validation."
+          gh release create "muse-studio-v$env:MUSE_VERSION" "dist/$env:MUSE_ZIP" --target $env:GITHUB_SHA --title "Muse Video Studio $env:MUSE_VERSION — Windows" --notes "Download the ZIP, extract and run the EXE. Continuous queue with exact prompt/result tracking, scoped automatic downloads, progress and inline video previews. Recover existing results without resending prompts. No VPN/IP checks. Browser fixtures verified; live Muse account validation remains needed. See MuseVideoStudio/README.md."
       - name: Retain public test diagnostics on failure
         if: failure()
         shell: pwsh

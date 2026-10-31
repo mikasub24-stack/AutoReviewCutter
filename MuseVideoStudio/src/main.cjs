@@ -3,6 +3,8 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { Queue,stoppedError,abortable } = require('./queue.cjs');
 const {imageSources,attachmentState}=require('./attachment-ready.cjs');
+const {beginTracking,pollTracking,downloadAction,endTracking}=require('./muse-tracker.cjs');
+const {captureElectronDownload,validateVideo}=require('./download-capture.cjs');
 const {createLicense,deviceCode}=require('./license.cjs');
 const {payment}=require('./payment.cjs');
 let licenseManager,paymentDetails;
@@ -19,9 +21,10 @@ let packaging = false, packageProgress = '', editPackageDir = '', packageError =
 let merging = false, mergeProgress = '', mergedOutput = '', mergeError = '';
 let main, queue, settings, stateFile;
 const browsers = new Map(), profiles = new Map(), opening = new Map(), externalLaunches = new Map(), browserWarnings = new Map();
-let quitAllowed = false, flushingQuit = false, starting = false, runEpoch=0;
+let quitAllowed = false, flushingQuit = false, starting = false, runEpoch=0, nextAccount=0;
+const nextDispatchAt=new Map();
 const resettingAccounts = new Set(), accountResets = new Map();
-const defaults = { attachmentReadySelector:'', browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', timeoutMinutes: 15 };
+const defaults = { accountSessionIds:{}, dispatchMode:'sequential', cooldownSeconds:3, messageSelector:'', attachmentReadySelector:'', browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', timeoutMinutes: 15 };
 async function atomic(file, data) { await fs.writeFile(file + '.tmp', JSON.stringify(data, null, 2)); await fs.rename(file + '.tmp', file); }
 function snapshot() {
   return {jobs:queue.jobs,settings,license:licenseManager?.status(),payment:paymentDetails,starting,resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,
@@ -57,6 +60,14 @@ async function prepareNativeProfile(index) {
 }
 function validAccount(index) {
   if(!Number.isInteger(index) || index<0 || index>=settings.accountCount) throw Error('Tài khoản không hợp lệ.');
+}
+function accountProfileKey(index) {
+  const type=settings.browserChoice==='custom'?'custom-'+createHash('sha256').update(resolveBrowser({choice:'custom',customPath:settings.browserPath})).digest('hex').slice(0,16):settings.browserChoice;
+  return `${type}/account-${index+1}`;
+}
+function sessionId(key) {
+  if(!settings.accountSessionIds||Array.isArray(settings.accountSessionIds)||typeof settings.accountSessionIds!=='object')settings.accountSessionIds={};
+  return settings.accountSessionIds[key] || (settings.accountSessionIds[key]=randomUUID());
 }
 async function ensureExternalBrowser(index) {
   const existing=browsers.get(index);
@@ -107,7 +118,7 @@ function accountOperationBusy() {
 }
 function logoutAccount(index) {
   validAccount(index);
-  if(flushingQuit || accountOperationBusy() || resettingAccounts.size) throw Error('Chờ hàng đợi, kiểm tra mạng và các thao tác trình duyệt hoàn tất trước khi đăng xuất.');
+  if(flushingQuit || accountOperationBusy() || resettingAccounts.size) throw Error('Chờ hàng đợi và các thao tác trình duyệt hoàn tất trước khi đăng xuất.');
   resettingAccounts.add(index);notify();
   const task=(async()=>{
     const browserName=({builtin:'Trình duyệt tích hợp',chrome:'Google Chrome',edge:'Microsoft Edge',custom:'Trình duyệt tùy chọn'})[settings.browserChoice];
@@ -137,6 +148,7 @@ function logoutAccount(index) {
       browsers.delete(index);profiles.delete(index);
       if([...clearResults,...deleteResults].some(result=>result.status==='rejected')) throw Error('Chưa xóa được đầy đủ dữ liệu đăng nhập của tài khoản đã chọn. Vui lòng thử lại.');
     }
+    const key=accountProfileKey(index);sessionId(key);settings.accountSessionIds[key]=randomUUID();await save();
     return snapshot();
   })();
   accountResets.set(index,task);
@@ -157,85 +169,129 @@ async function upload(muse, files) {
   } finally { debug.detach(); }
 }
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-async function download(muse, url, job, signal) {
-  const target = path.join(settings.output, `muse-${job.id}.mp4`);
-  await fs.mkdir(settings.output, { recursive: true });
-  if(muse.external) {await muse.download(url,target,{signal});await validateMp4(target);return target;}
-  const session = muse.webContents.session;
-  return new Promise((resolve, reject) => {
-    let timer, item;
-    function cleanup() { clearTimeout(timer); session.removeListener('will-download', onDownload); signal?.removeEventListener('abort',cancel); }
-    function cancel(){item?.cancel();cleanup();reject(stoppedError());}
-    signal?.addEventListener('abort',cancel,{once:true});
-    function onDownload(event, candidate, contents) {
-      if (contents !== muse.webContents || candidate.getURLChain()[0] !== url) return;
-      if(signal?.aborted){candidate.cancel();cleanup();return;}
-      item = candidate; item.setSavePath(target);
-      item.once('done', async (_, status) => {
-        cleanup();
-        if (status !== 'completed') { reject(Error('Tải video chưa hoàn tất: ' + status)); return; }
-        try {
-          await validateMp4(target);
-          resolve(target);
-        } catch (e) { reject(e); }
-      });
-    }
-    session.on('will-download', onDownload);
-    timer = setTimeout(() => { cleanup(); item?.cancel(); reject(Error('Hết thời gian tải video.')); }, 180000);
-    try { muse.webContents.downloadURL(url); } catch (e) { cleanup(); reject(e); }
-  });
+async function triggerTrackedDownload(muse,id,signal) {
+  const check=()=>{if(signal.aborted)throw stoppedError();};
+  check();let action=await abortable(dom(muse,downloadAction,{id,phase:'auto'}),signal);
+  if(action.clicked && !action.needsMenu)return;
+  if(action.action==='source' && action.url){
+    const url=new URL(action.url);
+    if(url.username||url.password||!['https:','blob:'].includes(url.protocol))throw Error('Địa chỉ video chưa hợp lệ.');
+    check();
+    if(!muse.external){muse.webContents.downloadURL(action.url);return;}
+    await abortable(dom(muse,async ({id,source})=>{
+      const state=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]?.get(id);if(!state)throw Error('Đã dừng tải.');
+      state.downloadController=new AbortController();
+      const response=await fetch(source,{credentials:'include',signal:state.downloadController.signal});if(!response.ok)throw Error('Chưa tải được nguồn video.');
+      const blob=await response.blob();if(state.downloadController.signal.aborted)throw Error('Đã dừng tải.');
+      const url=URL.createObjectURL(blob),a=document.createElement('a');
+      a.href=url;a.download='muse-video.mp4';a.style.display='none';document.body.appendChild(a);
+      try{a.click();}finally{a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}
+    },{id,source:action.url}),signal);return;
+  }
+  const deadline=Date.now()+6000;
+  while(action.needsMenu && Date.now()<deadline){
+    await abortable(delay(200),signal);check();
+    action=await abortable(dom(muse,downloadAction,{id,phase:'menu'}),signal);
+    if(action.clicked && !action.needsMenu)return;
+  }
+  throw Error('Chưa tìm thấy nút tải của đúng video. Mở phản hồi Muse, rồi bấm Lấy video đã tạo; không cần gửi lại prompt.');
 }
-async function validateMp4(target) {
-  const stat=await fs.stat(target),fd=await fs.open(target),bytes=Buffer.alloc(12);
-  try {await fd.read(bytes,0,12,0);} finally {await fd.close();}
-  if(!stat.size || bytes.toString('ascii',4,8)!=='ftyp') throw Error('Kết quả tải về không phải MP4 hợp lệ. Kiểm tra video trong Muse.');
+async function download(muse,job,signal) {
+  const number=String(job.number || queue.jobs.indexOf(job)+1).padStart(3,'0');
+  const basename=path.join(settings.output,`scene-${number}-${job.id.slice(0,8)}-${randomUUID().slice(0,8)}`);
+  const temporary=basename+'.part';
+  await fs.mkdir(settings.output,{recursive:true});
+  let lastNotify=0;
+  const options={signal,trigger:()=>triggerTrackedDownload(muse,job.id,signal),onProgress:progress=>{
+    if(signal.aborted)return;job.downloadProgress=progress;
+    if(Date.now()-lastNotify>300){lastNotify=Date.now();notify();}
+  }};
+  try{
+    if(muse.external)await muse.captureDownload(temporary,options);
+    else await captureElectronDownload(muse.webContents,temporary,options);
+    if(signal.aborted)throw stoppedError();
+    const format=await validateVideo(temporary);
+    const target=basename+format.extension;
+    if(signal.aborted)throw stoppedError();
+    await fs.rename(temporary,target);
+    job.downloadCompletedAt=new Date().toISOString();return target;
+  }catch(error){await fs.rm(temporary,{force:true}).catch(()=>{});throw error;}
 }
-async function runJob(job,slot,signal) {
+async function runJob(job,worker,signal,{recover=false}={}) {
+  const slot=recover ? Number(job.account)-1 : settings.dispatchMode==='parallel' ? worker : nextAccount++%settings.accountCount;
+  validAccount(slot);
   const muse=browsers.get(slot),check=()=>{if(signal.aborted)throw stoppedError();},step=promise=>abortable(promise,signal);
   check();job.account=slot+1;assertMuse(muse);
-  await step(licenseManager.ensureAllowed());check();
-  check();
-  if(!settings.output)throw Error('Chọn thư mục lưu video trước.');
-  const references=job.references?.length?job.references:job.image?[job.image]:[];
-  let previous=await step(dom(muse,selector=>[...document.querySelectorAll(selector)].map(v=>v.currentSrc||v.src).filter(Boolean),settings.video));
-  const before=references.length?await step(dom(muse,imageSources,null)):[];
-  check();job.stage='preparing';notify();
-  await step(dom(muse,({selector,prompt})=>{
-    const list=[...document.querySelectorAll(selector)].filter(e=>e.getClientRects().length);
-    if(list.length!==1)throw Error('Không xác định được ô nhập prompt duy nhất.');
-    const e=list[0];if((e.value||e.innerText||'').trim())throw Error('Ô Muse còn bản nháp. Kiểm tra và xóa bản nháp trước khi chạy lại.');
-    e.focus();
-    if(e instanceof HTMLTextAreaElement||e instanceof HTMLInputElement)Object.getOwnPropertyDescriptor(e instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(e,prompt);
-    else e.textContent=prompt;
-    e.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:prompt}));
-  },{selector:settings.composer,prompt:job.prompt}));
-  if(references.length){
-    check();job.stage='uploading';notify();await step(upload(muse,references));
-    const deadline=Date.now()+90000;let stable=0,ready=false;
-    while(Date.now()<deadline){
-      check();const state=await step(dom(muse,attachmentState,{before,count:references.length,selector:settings.attachmentReadySelector,submitSelector:settings.submit}));
-      if(state.ready){if(!stable)stable=Date.now();if(Date.now()-stable>=1000){ready=true;break;}}else stable=0;
-      await step(delay(250));
+  const profileKey=accountProfileKey(slot),currentSession=sessionId(profileKey);
+  if(recover && ((job.submissionProfileKey && job.submissionProfileKey!==profileKey)||(job.submissionSessionId && job.submissionSessionId!==currentSession)))throw Error('Mở lại đúng trình duyệt và phiên tài khoản đã gửi prompt trước khi tìm video.');
+  if(!recover)await step(licenseManager.ensureAllowed());
+  check();if(!settings.output)throw Error('Chọn thư mục lưu video trước.');
+  const stage=(value,message)=>{check();job.stage=value;job.stageMessage=message;notify();};
+  if(!recover){
+    const wait=(nextDispatchAt.get(slot)||0)-Date.now();
+    if(wait>0){stage('cooldown','Chờ một chút trước prompt tiếp theo');await step(delay(wait));}
+    const references=job.references?.length?job.references:job.image?[job.image]:[];
+    const before=references.length?await step(dom(muse,imageSources,null)):[];
+    stage('preparing','Đang điền nguyên prompt của cảnh này');
+    await step(dom(muse,({selector,prompt})=>{
+      const list=[...document.querySelectorAll(selector)].filter(e=>e.getClientRects().length);
+      if(list.length!==1)throw Error('Không xác định được ô nhập prompt duy nhất.');
+      const e=list[0];if((e.value||e.innerText||'').trim())throw Error('Ô Muse còn bản nháp. Kiểm tra và xóa bản nháp trước khi chạy lại.');
+      e.focus();
+      if(e instanceof HTMLTextAreaElement||e instanceof HTMLInputElement)Object.getOwnPropertyDescriptor(e instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(e,prompt);
+      else e.textContent=prompt;
+      e.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:prompt}));
+    },{selector:settings.composer,prompt:job.prompt}));
+    if(references.length){
+      stage('uploading','Đang tải ảnh tham chiếu của cảnh');await step(upload(muse,references));
+      const deadline=Date.now()+90000;let stable=0,ready=false;
+      while(Date.now()<deadline){
+        check();const state=await step(dom(muse,attachmentState,{before,count:references.length,selector:settings.attachmentReadySelector,submitSelector:settings.submit}));
+        if(state.ready){if(!stable)stable=Date.now();if(Date.now()-stable>=1000){ready=true;break;}}else stable=0;
+        await step(delay(250));
+      }
+      if(!ready)throw Error('Chưa xác nhận được ảnh tham chiếu sẵn sàng trong Muse. Kiểm tra ô đính kèm hoặc cấu hình selector ảnh sẵn sàng; tool chưa gửi prompt.');
     }
-    if(!ready)throw Error('Chưa xác nhận được ảnh tham chiếu sẵn sàng trong Muse. Kiểm tra ô đính kèm hoặc cấu hình selector ảnh sẵn sàng; tool chưa gửi prompt.');
-
   }
-  check();previous=[...new Set([...previous,...await step(dom(muse,selector=>[...document.querySelectorAll(selector)].map(v=>v.currentSrc||v.src).filter(Boolean),settings.video))])];
-  check();job.stage='submitting';job.mayHaveSubmitted=true;await step(save());check();
-  if(settings.submit)await step(dom(muse,selector=>{const a=[...document.querySelectorAll(selector)].filter(e=>e.getClientRects().length);if(a.length!==1||a[0].disabled)throw Error('Nút gửi chưa sẵn sàng.');a[0].click();},settings.submit));
-  else if(muse.external)await step(muse.pressEnter());
-  else {muse.webContents.sendInputEvent({type:'keyDown',keyCode:'Return'});muse.webContents.sendInputEvent({type:'keyUp',keyCode:'Return'});}
-  job.stage='waiting';notify();const deadline=Date.now()+settings.timeoutMinutes*60000;
-  while(Date.now()<deadline){
-    await step(delay(1500));check();
-    const url=await step(dom(muse,({selector,previous})=>{const v=[...document.querySelectorAll(selector)].find(v=>{const src=v.currentSrc||v.src;return src&&!previous.includes(src)&&v.readyState>=2&&v.videoWidth>0&&v.duration>0&&Number.isFinite(v.duration);});return v?v.currentSrc||v.src:null;},{selector:settings.video,previous}));
-    if(url){check();job.stage='downloading';notify();return step(download(muse,url,job,signal));}
+  try{
+  check();await step(dom(muse,beginTracking,{id:job.id,prompt:job.prompt,videoSelector:settings.video,messageSelector:settings.messageSelector,recover}));
+  if(!recover){
+    stage('submitting','Đang gửi một prompt');job.submissionProfileKey=profileKey;job.submissionSessionId=currentSession;job.mayHaveSubmitted=true;job.submittedAt=new Date().toISOString();await step(save());check();
+    await step(dom(muse,({id,selector})=>{
+      const state=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]?.get(id);if(!state)throw Error('Tác vụ đã dừng; không gửi prompt.');
+      if(selector){const a=[...document.querySelectorAll(selector)].filter(e=>e.getClientRects().length);if(a.length!==1||a[0].disabled)throw Error('Nút gửi chưa sẵn sàng.');a[0].click();}
+    },{id:job.id,selector:settings.submit}));
+    check();
+    if(!settings.submit){
+      if(muse.external)await step(muse.pressEnter({id:job.id,signal}));
+      else {muse.webContents.sendInputEvent({type:'keyDown',keyCode:'Return'});muse.webContents.sendInputEvent({type:'keyUp',keyCode:'Return'});}
+    }
   }
-  throw Error('Hết thời gian chờ video mới. Kiểm tra Muse trước khi chạy lại.');
+  stage('confirming',recover?'Đang tìm video đã tạo của đúng prompt':'Chờ Muse xác nhận đã nhận prompt');
+  const deadline=Date.now()+settings.timeoutMinutes*60000,ackDeadline=Date.now()+45000;
+    while(Date.now()<deadline){
+      check();const result=await step(dom(muse,pollTracking,{id:job.id}));
+      if(result.error)throw Error(result.error);
+      if(result.phase==='waiting-prompt' && Date.now()>ackDeadline)throw Error('Chưa xác nhận Muse nhận đúng prompt. Tool đã dừng gửi tiếp; mở chat để kiểm tra rồi dùng Lấy video đã tạo.');
+      job.progress=Number.isFinite(result.progress)?result.progress:null;
+      if(result.ready){
+        job.resultReadyAt=new Date().toISOString();job.downloadStartedAt=new Date().toISOString();
+        stage('downloading','Đã tìm đúng phản hồi · đang tải video về máy');await step(save());
+        const output=await step(download(muse,job,signal));
+        nextDispatchAt.set(slot,Date.now()+settings.cooldownSeconds*1000);return output;
+      }
+      stage(result.phase==='waiting-prompt'?'confirming':'waiting',result.message || result.stage || (result.phase==='waiting-prompt'?'Chờ xác nhận prompt trong chat':result.phase==='rendering'?'Muse đang tạo video cho cảnh này':'Đã nhận đúng prompt · chờ video trả về'));
+      await step(delay(1500));
+    }
+    throw Error('Hết thời gian chờ video của prompt này. Tool không gửi tiếp hoặc lấy video từ cảnh khác. Mở chat rồi dùng Lấy video đã tạo.');
+  }finally{
+    const cleanup=dom(muse,endTracking,{id:job.id}).catch(()=>{});
+    if(!signal.aborted)await cleanup;
+  }
 }
 
 async function mergeProject() {
-  if (queue.active || merging || packaging) throw Error('Chờ xử lý hiện tại hoàn tất trước khi nối.');
+  if (queue.active || starting || merging || packaging) throw Error('Chờ xử lý hiện tại hoàn tất trước khi nối.');
   if (!settings.output) throw Error('Chọn thư mục lưu video trước.');
   merging = true; mergeProgress = 'Chuẩn bị nối video…'; mergeError = ''; notify();
   try {
@@ -248,7 +304,7 @@ function invalidateOutputs() {
   mergedOutput='';mergeProgress='';mergeError='';editPackageDir='';packageProgress='';packageError='';
 }
 async function packageProject() {
-  if (queue.active || merging || packaging) throw Error('Chờ xử lý hiện tại hoàn tất trước khi xuất clip.');
+  if (queue.active || starting || merging || packaging) throw Error('Chờ xử lý hiện tại hoàn tất trước khi xuất clip.');
   if (!settings.output) throw Error('Chọn thư mục lưu video trước.');
   packaging=true;packageError='';packageProgress='Chuẩn bị gói clip rời…';notify();
   try {
@@ -281,6 +337,10 @@ app.whenReady().then(async () => {
     state: () => snapshot(),
     activateKey:async token=>{await licenseManager.activate(token);notify();return snapshot();},
     add: async data => { if (merging || packaging) throw Error('Chờ xử lý đầu ra xong trước khi thêm prompt.'); invalidateOutputs(); await queue.add(data); return snapshot(); },
+    retryDownload: async id=>{
+      if(queue.active||merging||packaging||starting||resettingAccounts.size)throw Error('Chờ xử lý hiện tại hoàn tất.');
+      invalidateOutputs();queue.recover(id,(job,signal)=>runJob(job,0,signal,{recover:true})).catch(e=>dialog.showErrorBox('Lấy video đã tạo',e.message)).finally(notify);return snapshot();
+    },
     retry: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); invalidateOutputs(); await queue.retry(id); return snapshot(); },
     remove: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); invalidateOutputs(); await queue.remove(id); return snapshot(); },
     browser: async index => { await openMuse(Number(index ?? 0)); return true; },
@@ -289,20 +349,21 @@ app.whenReady().then(async () => {
       if(merging || packaging) throw Error('Đang xử lý đầu ra video.');
       if(resettingAccounts.size) throw Error('Chờ đăng xuất tài khoản hoàn tất trước khi chạy.');
       if(queue.active || starting) return snapshot();
-      await licenseManager.ensureAllowed();
       const epoch=runEpoch;starting=true;notify();
       try {
+        await licenseManager.ensureAllowed();
+        if(epoch!==runEpoch || flushingQuit)return snapshot();
         for(let i=0;i<settings.accountCount;i++) {if(epoch!==runEpoch)return snapshot();assertMuse(browsers.get(i));}
         if(settings.autoMerge) await checkTools(settings.ffmpeg);
-        if(epoch!==runEpoch || flushingQuit || queue.active) return snapshot();
-        queue.concurrency=settings.accountCount;
+        if(epoch!==runEpoch || flushingQuit || queue.active || merging || packaging || resettingAccounts.size) return snapshot();
+        queue.concurrency=settings.dispatchMode==='parallel'?settings.accountCount:1;
         queue.start().then(async()=>{
           if(!queue.paused && queue.jobs.length && queue.jobs.every(j=>j.status==='completed')) {
             if(settings.autoMerge) await mergeProject();else if(settings.autoPackage) await packageProject();
           }
         }).catch(e=>dialog.showErrorBox('Lỗi xử lý hàng đợi',e.message)).finally(notify);
         return snapshot();
-      } finally {starting=false;notify();}
+      } finally {if(epoch===runEpoch)starting=false;notify();}
     },
     merge: async () => { await mergeProject(); return snapshot(); },
     packageClips: async () => { await packageProject(); return snapshot(); },
@@ -338,6 +399,10 @@ app.whenReady().then(async () => {
       if (resettingAccounts.size || queue.active || starting || opening.size || externalLaunches.size || merging || packaging) throw Error('Chờ tác vụ hiện tại kết thúc trước khi đổi cài đặt.');
       for (const k of ['composer','fileInput','submit','video']) { if (typeof data[k] !== 'string' || data[k].length > 2000) throw Error('Selector không hợp lệ.'); }
       if (!data.composer.trim() || !data.fileInput.trim() || !data.video.trim()) throw Error('Không được để trống selector bắt buộc.');
+      const dispatchMode=data.dispatchMode ?? settings.dispatchMode,cooldownSeconds=Number(data.cooldownSeconds ?? settings.cooldownSeconds),messageSelector=typeof data.messageSelector==='string'?data.messageSelector.trim():settings.messageSelector;
+      if(!['sequential','parallel'].includes(dispatchMode))throw Error('Chọn chế độ chạy hợp lệ.');
+      if(!Number.isFinite(cooldownSeconds)||cooldownSeconds<0||cooldownSeconds>120)throw Error('Khoảng nghỉ từ 0–120 giây.');
+      if(messageSelector.length>2000)throw Error('Selector phản hồi quá dài.');
       const attachmentReadySelector=typeof data.attachmentReadySelector==='string'?data.attachmentReadySelector.trim():settings.attachmentReadySelector;
       if(attachmentReadySelector.length>2000)throw Error('Selector ảnh quá dài.');
       const minutes = Number(data.timeoutMinutes); if (!Number.isFinite(minutes) || minutes < 1 || minutes > 120) throw Error('Thời gian chờ phải từ 1–120 phút.');
@@ -351,7 +416,7 @@ app.whenReady().then(async () => {
         resolveBrowser({choice:browserChoice,customPath:browserPath});
         browserWarnings.clear();
       }
-      settings = { ...settings, attachmentReadySelector, browserChoice, browserPath, autoMerge: data.finishAction === 'merge', autoPackage: data.finishAction === 'package', ffmpeg: data.ffmpeg.trim(), accountCount, composer: data.composer, fileInput: data.fileInput, submit: data.submit, video: data.video, timeoutMinutes: minutes }; await save(); notify(); return snapshot();
+      settings = { ...settings, dispatchMode,cooldownSeconds,messageSelector, attachmentReadySelector, browserChoice, browserPath, autoMerge: data.finishAction === 'merge', autoPackage: data.finishAction === 'package', ffmpeg: data.ffmpeg.trim(), accountCount, composer: data.composer, fileInput: data.fileInput, submit: data.submit, video: data.video, timeoutMinutes: minutes }; await save(); notify(); return snapshot();
     },
     reveal: id => { const j = queue.jobs.find(j => j.id === id); if (j?.output) shell.showItemInFolder(j.output); },
     export: async () => { const r = await dialog.showSaveDialog(main, { defaultPath: 'muse-project.json', filters: [{ name: 'JSON', extensions: ['json'] }] }); if (!r.canceled) await atomic(r.filePath, { jobs: queue.jobs }); }

@@ -132,3 +132,43 @@ test('clearLogin removes only the selected app-owned account profile and encrypt
 test('clearLogin refuses a replaced unmarked personal folder',async()=>{const t=await setup();let adapter;try{adapter=await launchExternalBrowser(t.config);await fs.rename(t.config.profileDir,t.config.profileDir+'-original');await fs.mkdir(t.config.profileDir);await fs.writeFile(path.join(t.config.profileDir,'Local State'),'keep-personal');await assert.rejects(adapter.clearLogin(),/Chưa xóa/);assert.equal(await fs.readFile(path.join(t.config.profileDir,'Local State'),'utf8'),'keep-personal');}finally{await t.cleanup(adapter);}});
 
 test('profile reset supports a legitimate parent directory alias without allowing a profile symlink',async()=>{const t=await setup();let adapter;try{const real=path.join(t.dir,'real-parent'),alias=path.join(t.dir,'parent-alias');await fs.mkdir(real);await fs.symlink(real,alias,process.platform==='win32'?'junction':'dir');t.config.profileDir=path.join(alias,'owned-profile');t.config.sessionFile=path.join(alias,'session.enc');adapter=await launchExternalBrowser(t.config);await adapter.flush();await adapter.clearLogin();await assert.rejects(fs.access(path.join(real,'owned-profile')));await assert.rejects(fs.access(path.join(real,'session.enc')));}finally{await t.cleanup(adapter);}});
+test('clearLogin removes only the selected owned profile and encrypted session backup', async () => {
+  const a=await setup({deferMuseNavigation:true}),b=await setup({deferMuseNavigation:true});let first,second;
+  try {
+    first=await launchExternalBrowser(a.config);second=await launchExternalBrowser(b.config);
+    await fs.writeFile(path.join(a.config.profileDir,'browser-storage'),'selected');await fs.writeFile(path.join(b.config.profileDir,'browser-storage'),'other account');await first.flush();await second.flush();
+    assert.equal(await first.clearLogin(),true);assert.equal(first.isDestroyed(),true);await assert.rejects(fs.access(a.config.profileDir));await assert.rejects(fs.access(a.config.sessionFile));
+    assert.equal(await fs.readFile(path.join(b.config.profileDir,'browser-storage'),'utf8'),'other account');await fs.access(b.config.sessionFile);assert.equal(second.isDestroyed(),false);assert.equal(a.context.page.events.some(e=>e[0]==='goto'),false);
+  } finally {await a.cleanup(first);await b.cleanup(second);}
+});
+test('clearLogin refuses unmarked or symlink profiles without deleting original data', async () => {
+  for(const mode of ['unmarked','symlink']) {
+    const t=await setup({deferMuseNavigation:true});let adapter;
+    try {
+      adapter=await launchExternalBrowser(t.config);await adapter.close();
+      const original=path.join(t.dir,'personal');await fs.mkdir(original);await fs.writeFile(path.join(original,'original'),'keep');
+      await fs.rm(t.config.profileDir,{recursive:true,force:true});
+      if(mode==='symlink')await fs.symlink(original,t.config.profileDir,'dir');else{await fs.mkdir(t.config.profileDir);await fs.writeFile(path.join(t.config.profileDir,'original'),'keep');}
+      await assert.rejects(adapter.clearLogin(),/Chưa xóa/);assert.equal(await fs.readFile(path.join(original,'original'),'utf8'),'keep');await fs.access(t.config.profileDir);
+    } finally {await t.cleanup(adapter);}
+  }
+});
+test('partial profile cleanup can be retried without ownership marker if directory identity is unchanged', async () => {
+  const t=await setup({deferMuseNavigation:true});let adapter;const remove=fs.rm;
+  try {
+    adapter=await launchExternalBrowser(t.config);await fs.writeFile(path.join(t.config.profileDir,'remaining'),'keep until retry');
+    fs.rm=async(directory,options)=>{if(directory===t.config.profileDir){await fs.unlink(path.join(directory,'.muse-studio-profile'));throw Error('fixture busy profile');}return remove(directory,options);};
+    await assert.rejects(adapter.clearLogin(),/Chưa xóa/);await fs.access(path.join(t.config.profileDir,'remaining'));
+    fs.rm=remove;assert.equal(await adapter.clearLogin(),true);await assert.rejects(fs.access(t.config.profileDir));await assert.rejects(fs.access(t.config.sessionFile));
+  } finally {fs.rm=remove;await t.cleanup(adapter);}
+});
+test('clearLogin waits for an in-flight cookie backup after the external browser was closed', async () => {
+  const t=await setup({deferMuseNavigation:true});let adapter,release;
+  try {
+    adapter=await launchExternalBrowser(t.config);const original=t.context.cookies.bind(t.context);
+    t.context.cookies=async()=>{const values=await original();await new Promise(resolve=>release=resolve);return values;};
+    const saving=adapter.flush();await new Promise(resolve=>setImmediate(resolve));await t.context.close();
+    let done=false;const clearing=adapter.clearLogin().then(value=>{done=true;return value;});await new Promise(resolve=>setImmediate(resolve));assert.equal(done,false);
+    release();await saving;assert.equal(await clearing,true);await assert.rejects(fs.access(t.config.sessionFile));await new Promise(resolve=>setTimeout(resolve,200));await assert.rejects(fs.access(t.config.sessionFile));
+  } finally {if(release)release();await t.cleanup(adapter);}
+});

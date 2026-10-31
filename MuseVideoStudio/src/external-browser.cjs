@@ -1,6 +1,7 @@
 const { EventEmitter } = require('node:events');
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const {capturePlaywrightDownload}=require('./download-capture.cjs');
 const { createSessionStore } = require('./session-store.cjs');
 
 const markerText = 'MuseVideoStudio dedicated browser profile\n';
@@ -202,12 +203,19 @@ async function launchExternalBrowser({ executablePath, profileDir, sessionFile, 
         if (files.length > 1 && await input.getAttribute('multiple') === null) throw Error('Ô tải ảnh Muse hiện tại chỉ nhận một ảnh.');
         await input.setInputFiles(files);
       },
-      pressEnter: async () => { await assertPage().keyboard.press('Enter'); },
+      pressEnter: async ({id,signal}={}) => {
+        if(signal?.aborted)throw Object.assign(Error('Đã dừng gửi prompt.'),{name:'AbortError'});
+        const page=assertPage();
+        if(id && !await page.evaluate(id=>Boolean(globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]?.has(id)),id))throw Error('Tác vụ đã dừng; không gửi prompt.');
+        if(signal?.aborted)throw Object.assign(Error('Đã dừng gửi prompt.'),{name:'AbortError'});
+        await page.keyboard.press('Enter');
+      },
       click: async selector => {
         const page = assertPage(), target = page.locator(selector);
         if (await target.count() !== 1 || !await target.isVisible() || !await target.isEnabled()) throw Error('Không xác định được nút sẵn sàng duy nhất trên Muse.');
         await target.click();
       },
+      captureDownload:(target,options)=>capturePlaywrightDownload(assertPage(),target,options),
       download: async (url, target, {signal}={}) => {
         const page = assertPage();
         let parsed;

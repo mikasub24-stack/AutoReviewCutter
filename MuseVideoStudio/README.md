@@ -1,4 +1,14 @@
-# Muse Video Studio 0.5.1 · Windows
+# Muse Video Studio 0.6.0 · Windows
+
+## Tạo liên tục, đúng prompt và tải về
+
+Mặc định tool chạy lần lượt và tự chuyển đến hết danh sách: xác nhận đúng prompt trong chat → chờ video trả lời prompt đó → tải và kiểm tra tệp video → chuyển prompt tiếp theo. Khi có nhiều tài khoản, chế độ lần lượt xoay vòng tài khoản; muốn dùng cùng lúc, chọn **Song song theo tài khoản** trong Cài đặt. Mỗi tài khoản vẫn chỉ giữ một tác vụ đang xử lý, không gửi thêm trước khi tải xong. Khoảng nghỉ giữa hai lượt của cùng tài khoản mặc định3 giây, điều chỉnh0–120 giây.
+
+Mỗi thẻ hiển thị cảnh/prompt gốc, giai đoạn xử lý, thời gian chờ, tiến độ Muse khi trang thực sự cung cấp và tiến độ tải khi trình duyệt cung cấp số byte. Không tạo phần trăm giả khi Muse không có số liệu. Tệp đã tải phát trực tiếp trong đúng thẻ, giữ nguyên trình phát khi trạng thái cập nhật.
+
+Tool chụp trạng thái trước khi gửi, tìm tin nhắn trùng nguyên prompt rồi gắn video ở phản hồi sau tin nhắn đó. Không lấy bất kỳ URL video mới nào trong toàn trang. Video cũ, phản hồi của prompt khác hoặc nhiều kết quả không rõ ràng không được coi là hoàn tất. Luồng tải ưu tiên nút **Tải xuống/Download** của đúng phản hồi, bắt sự kiện download trước khi bấm và chỉ đánh dấu xong sau khi lưu/kiểm tra tệp. Tên file bắt đầu bằng số cảnh, giữ đúng định dạng MP4/WebM nhận được; file dở không hiển thị là hoàn tất.
+
+Nếu video đã tạo trên Muse nhưng tác vụ lỗi/gián đoạn, mở đúng chat của tài khoản rồi bấm **Tìm / tải video đã tạo** trên thẻ. Thao tác này tìm lại chính xác prompt và tải kết quả mà không gửi prompt mới, không chạy tiếp các tác vụ đang chờ. Nếu chat có nhiều tin nhắn trùng nguyên prompt, tool báo cần kiểm tra thay vì đoán video. **Gửi lại prompt** là thao tác riêng có thể tạo clip trùng và tốn thêm credit.
 
 ## Nhập prompt và ảnh
 
@@ -19,7 +29,7 @@ Chỉ dùng chế độ **Kịch bản thô → prompt theo mẫu** khi muốn t
 
 ## Tài khoản và trình duyệt
 
-Cài đặt cho phép chọn trình duyệt tích hợp, Chrome, Edge hoặc Chromium khác. Mỗi loại trình duyệt và mỗi tài khoản dùng hồ sơ riêng do app tạo; không dùng hồ sơ Chrome/Edge cá nhân. Có thể mở tối đa4 tài khoản, mỗi tài khoản chạy một prompt và lấy việc tiếp theo khi rảnh.
+Cài đặt cho phép chọn trình duyệt tích hợp, Chrome, Edge hoặc Chromium khác. Mỗi loại trình duyệt và mỗi tài khoản dùng hồ sơ riêng do app tạo; không dùng hồ sơ Chrome/Edge cá nhân. Có thể mở tối đa4 tài khoản. Chế độ song song cho mỗi tài khoản chạy một prompt và nhận việc tiếp theo sau khi đã lưu video.
 
 Nút **Đăng xuất tài khoản này** xác nhận rồi xóa dữ liệu đăng nhập của đúng hồ sơ đang chọn; các tài khoản khác và trình duyệt cá nhân giữ nguyên. Cookie phiên được lưu mã hóa với Electron safeStorage (Windows DPAPI); không đưa vào file xuất hoặc repo. Phiên vẫn có thể bị Muse thu hồi/hết hạn.
 
@@ -29,7 +39,7 @@ Nút **Đăng xuất tài khoản này** xác nhận rồi xóa dữ liệu đă
 
 Không còn popup xác nhận ảnh mỗi tác vụ. Tool chờ preview ảnh mới, trạng thái tải kết thúc và nút gửi sẵn sàng; hỗ trợ selector ảnh sẵn sàng riêng nếu DOM Muse khác. Không nhận được tín hiệu thì báo lỗi trước khi gửi, không gửi mù. Với giao diện chỉ tạo file input sau dấu +, cần mở phần đính kèm trên Muse trước hoặc hiệu chỉnh adapter.
 
-Chưa có quyền truy cập tài khoản/DOM Muse thực để xác minh end-to-end. Player iframe/MSE, URL video tái sử dụng, nút tải đặc thù hoặc thay đổi HTML có thể cần chỉnh selector/adapter. Kiểm thử dùng Chromium/fixture cục bộ và giả lập, không thay thế chạy tài khoản thực. Không tự retry tác vụ lỗi để tránh dùng credit trùng.
+Chưa có quyền truy cập tài khoản/DOM Muse thực để xác minh end-to-end. Player iframe/MSE, giao diện chưa nhận diện được vùng phản hồi, URL video tái sử dụng hoặc thay đổi HTML có thể cần chỉnh selector/adapter. Có selector vùng phản hồi riêng trong Cài đặt; khi không gắn được chắc chắn thì dừng để kiểm tra. Kiểm thử dùng Chromium/fixture cục bộ và giả lập, không thay thế chạy tài khoản thực. Không tự retry tác vụ lỗi để tránh dùng credit trùng.
 
 ## Dùng thử, key và QR
 
@@ -45,6 +55,6 @@ Nối MP4 tùy chọn cần FFmpeg/ffprobe trên máy (chưa đóng kèm): chọ
 
 ## Phát triển và kiểm thử
 
-Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. Test UI và browser smoke cần Chromium; đặt CHROMIUM_PATH nếu khác /usr/bin/chromium. `node test/attachment-ready-smoke.cjs` kiểm tra readiness ảnh trên DOM fixture thật. FFmpeg smoke riêng: `npm run test:merge`.
+Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. Các kiểm tra `node test/cards-smoke.cjs`, `node test/muse-tracker-smoke.cjs`, `node test/download-capture-smoke.cjs` xác minh thẻ video, gắn kết quả theo prompt và tải/cancel tệp video thật từ máy chủ cục bộ; smoke tải cần FFmpeg hoặc MUSE_VIDEO_FIXTURE. Test UI và browser smoke cần Chromium; đặt CHROMIUM_PATH nếu khác /usr/bin/chromium. `node test/attachment-ready-smoke.cjs` kiểm tra readiness ảnh trên DOM fixture thật. FFmpeg smoke riêng: `npm run test:merge`.
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
