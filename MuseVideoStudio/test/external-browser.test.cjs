@@ -6,7 +6,6 @@ const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { launchExternalBrowser } = require('../src/external-browser.cjs');
-const { CHECK_URL } = require('../src/network-check.cjs');
 const key = crypto.randomBytes(32);
 const storage = {
   isEncryptionAvailable: () => true,
@@ -128,69 +127,7 @@ test('concurrent closes share one promise and close the context only once', asyn
   } finally {await t.cleanup(adapter);}
 });
 
-test('network check uses only a temporary page in the same account context and preserves Muse selection', async () => {
-  const t=await setup();let adapter;
-  try {
-    adapter=await launchExternalBrowser(t.config);const before=[...t.context.page.events];
-    const report=await adapter.checkNetwork();assert.equal(report.countryCode,'US');assert.equal(adapter.url(),'https://muse.ai/');
-    const probe=t.context.list[1];assert.equal(probe.closed,true);assert.deepEqual(t.context.page.events,before);
-    assert.equal(probe.events.find(e=>e[0]==='goto')[1],CHECK_URL);assert.equal(probe.events.find(e=>e[0]==='goto')[2].timeout,15000);
-    assert.equal(t.context.page.closed,false);assert.equal(probe.events.filter(e=>e[0]==='page-close').length,1);
-  } finally {await t.cleanup(adapter);}
-});
-test('network check returns non-US observation without treating it as an established US VPN', async () => {
-  const t=await setup();let adapter;
-  try {
-    adapter=await launchExternalBrowser(t.config);t.context.probeConfig.bodyText=JSON.stringify({success:true,ip:'2001:db8::1',country_code:'VN',country:'Vietnam'});
-    const result=await adapter.checkNetwork();assert.equal(result.countryCode,'VN');assert.equal(result.connected,undefined);assert.equal(t.context.list[1].closed,true);
-  } finally {await t.cleanup(adapter);}
-});
-test('malformed, denied, redirected, and failed probes clean up the temp tab without remote error values', async () => {
-  const variants=[{bodyText:'private invalid json'},{bodyText:JSON.stringify({success:false,message:'private API failure'})},{responseStatus:403},{redirect:'https://private.example.test/'},{failGoto:true},{failRead:true}];
-  for(const variant of variants){
-    const t=await setup();let adapter;
-    try {
-      adapter=await launchExternalBrowser(t.config);t.context.probeConfig=variant;
-      await assert.rejects(adapter.checkNetwork(),e=>e.message==='Không kiểm tra được IP và quốc gia của trình duyệt. Kiểm tra kết nối rồi thử lại.');
-      assert.equal(t.context.list[1].closed,true);assert.equal(adapter.url(),'https://muse.ai/');assert.equal(t.context.page.closed,false);
-    } finally {await t.cleanup(adapter);}
-  }
-});
-test('overall network check timeout closes its tab within 15 seconds', async testContext => {
-  const t=await setup();let adapter;
-  try {
-    adapter=await launchExternalBrowser(t.config);t.context.probeConfig.hangGoto=true;
-    testContext.mock.timers.enable({apis:['setTimeout']});
-    const checking=adapter.checkNetwork();const checked=assert.rejects(checking,/Không kiểm tra được/);
-    await new Promise(resolve=>setImmediate(resolve));testContext.mock.timers.tick(15000);await checked;
-    assert.equal(t.context.list[1].closed,true);assert.equal(t.context.page.closed,false);
-    testContext.mock.timers.reset();
-  } finally {testContext.mock.timers.reset();await t.cleanup(adapter);}
-});
-test('closed account context cannot start a network probe', async () => {
-  const t=await setup();let adapter;
-  try {adapter=await launchExternalBrowser(t.config);await adapter.close();await assert.rejects(adapter.checkNetwork(),/đã đóng/);assert.equal(t.context.list.length,1);}
-  finally {await t.cleanup(adapter);}
-});
-test('deferred startup checks US before explicitly navigating to Muse', async () => {
-  const t=await setup({deferMuseNavigation:true});let adapter;
-  try {
-    adapter=await launchExternalBrowser(t.config);assert.equal(adapter.url(),'about:blank');assert.equal(t.context.page.events.some(e=>e[0]==='goto'),false);
-    const result=await adapter.checkNetwork();assert.equal(result.countryCode,'US');assert.equal(t.context.page.events.some(e=>e[0]==='goto'),false);assert.equal(adapter.url(),'about:blank');
-    await adapter.openMuse();assert.equal(adapter.url(),'https://muse.ai/');assert.equal(t.context.page.events.filter(e=>e[0]==='goto').length,1);
-  } finally {await t.cleanup(adapter);}
-});
-test('failed or non-US pre-login check does not request Muse navigation', async () => {
-  for(const bodyText of ['invalid private body',JSON.stringify({success:true,ip:'203.0.113.10',country_code:'VN',country:'Vietnam'})]){
-    const t=await setup({deferMuseNavigation:true});let adapter;
-    try {
-      adapter=await launchExternalBrowser(t.config);t.context.probeConfig.bodyText=bodyText;
-      try {await adapter.checkNetwork();}catch{}
-      assert.equal(t.context.page.events.some(e=>e[0]==='goto'),false);assert.equal(adapter.url(),'about:blank');
-    } finally {await t.cleanup(adapter);}
-  }
-});
-
+test('deferred browser can open Muse directly without an IP-country request',async()=>{const t=await setup({deferMuseNavigation:true});let adapter;try{adapter=await launchExternalBrowser(t.config);assert.equal(t.context.events.some(e=>e[0]==='goto'),false);assert.equal(adapter.checkNetwork,undefined);await adapter.openMuse();assert.equal(adapter.url(),'https://muse.ai/');assert.ok(t.context.events.filter(e=>e[0]==='goto').every(e=>e[1]==='https://muse.ai/'));}finally{await t.cleanup(adapter);}});
 test('clearLogin removes only the selected app-owned account profile and encrypted backup',async()=>{const a=await setup(),b=await setup();let first,second;try{first=await launchExternalBrowser(a.config);second=await launchExternalBrowser(b.config);await first.flush();await second.flush();await first.clearLogin();await assert.rejects(fs.access(a.config.profileDir));await assert.rejects(fs.access(a.config.sessionFile));await fs.access(b.config.profileDir);await fs.access(b.config.sessionFile);assert.equal(second.isDestroyed(),false);}finally{await a.cleanup(first);await b.cleanup(second);}});
 test('clearLogin refuses a replaced unmarked personal folder',async()=>{const t=await setup();let adapter;try{adapter=await launchExternalBrowser(t.config);await fs.rename(t.config.profileDir,t.config.profileDir+'-original');await fs.mkdir(t.config.profileDir);await fs.writeFile(path.join(t.config.profileDir,'Local State'),'keep-personal');await assert.rejects(adapter.clearLogin(),/Chưa xóa/);assert.equal(await fs.readFile(path.join(t.config.profileDir,'Local State'),'utf8'),'keep-personal');}finally{await t.cleanup(adapter);}});
 

@@ -2,7 +2,6 @@ const { EventEmitter } = require('node:events');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { createSessionStore } = require('./session-store.cjs');
-const { CHECK_URL, parseNetworkReport } = require('./network-check.cjs');
 
 const markerText = 'MuseVideoStudio dedicated browser profile\n';
 function samePath(a, b) {
@@ -148,29 +147,6 @@ async function launchExternalBrowser({ executablePath, profileDir, sessionFile, 
     if (!current || current.isClosed()) current = context.pages().find(page=>!page.isClosed() && museURL(page.url())) || await context.newPage();
     await current.goto('https://muse.ai/', { waitUntil: 'domcontentloaded', timeout: 30000 });
   }
-  async function checkNetwork({signal}={}) {
-    if (closed || closing) throw Error('Trình duyệt tài khoản đã đóng. Hãy mở lại trước khi kiểm tra mạng.');
-    let probe, timer, onAbort, expired = false;
-    try {
-      if(signal?.aborted)throw Error('Cancelled');
-      const operation = (async () => {
-        probe = await context.newPage();
-        if (expired || closed || closing) { await probe.close(); throw Error('Check cancelled'); }
-        const response = await probe.goto(CHECK_URL, { waitUntil:'domcontentloaded', timeout:15000 });
-        if (!response || response.status() !== 200 || probe.url() !== CHECK_URL) throw Error('Invalid network check response');
-        const text = await probe.locator('body').innerText({timeout:15000});
-        if (text.length > 32768) throw Error('Response too large');
-        return parseNetworkReport(JSON.parse(text));
-      })();
-      const deadline = new Promise((_, reject) => { timer=setTimeout(()=>{expired=true;reject(Error('Check timed out'));},15000); });
-      return await Promise.race([operation,deadline,new Promise((_,reject)=>{onAbort=()=>{expired=true;reject(Error('Cancelled'));};signal?.addEventListener('abort',onAbort,{once:true});if(signal?.aborted)onAbort();})]);
-    } catch { throw Error('Không kiểm tra được IP và quốc gia của trình duyệt. Kiểm tra kết nối rồi thử lại.'); }
-    finally {
-      clearTimeout(timer);if(onAbort)signal?.removeEventListener('abort',onAbort);
-      if (probe && !probe.isClosed()) { try { await probe.close(); } catch {} }
-    }
-  }
-
   try {
     context = await engine.launchPersistentContext(profileDir, {
       executablePath, headless, acceptDownloads: true, timeout: 30000, viewport: null
@@ -208,7 +184,6 @@ async function launchExternalBrowser({ executablePath, profileDir, sessionFile, 
       isDestroyed: () => closed,
       isSessionEnabled: () => Boolean(store?.isEnabled()),
       openMuse,
-      checkNetwork,
       clearLogin,
       url: () => { try { return selectPage().url(); } catch { return current && !current.isClosed() ? current.url() : ''; } },
       show: async () => {

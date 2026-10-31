@@ -1,4 +1,4 @@
-# Muse Video Studio 0.5 · Windows
+# Muse Video Studio 0.5.1 · Windows
 
 ## Nhập prompt và ảnh
 
@@ -17,13 +17,13 @@ Chỉ dùng chế độ **Kịch bản thô → prompt theo mẫu** khi muốn t
 - **Xóa tất cả đang chờ** chỉ xóa tác vụ chưa gửi. **Xóa toàn bộ danh sách** dừng rồi xóa metadata; giữ file video đã tải.
 - Đóng cửa sổ app sẽ dừng hàng đợi, lưu phiên và đóng các trình duyệt do app mở. Chỉ một instance được chạy; mở lần nữa đưa cửa sổ đang chạy lên trước.
 
-## Tài khoản, trình duyệt và VPN
+## Tài khoản và trình duyệt
 
 Cài đặt cho phép chọn trình duyệt tích hợp, Chrome, Edge hoặc Chromium khác. Mỗi loại trình duyệt và mỗi tài khoản dùng hồ sơ riêng do app tạo; không dùng hồ sơ Chrome/Edge cá nhân. Có thể mở tối đa4 tài khoản, mỗi tài khoản chạy một prompt và lấy việc tiếp theo khi rảnh.
 
 Nút **Đăng xuất tài khoản này** xác nhận rồi xóa dữ liệu đăng nhập của đúng hồ sơ đang chọn; các tài khoản khác và trình duyệt cá nhân giữ nguyên. Cookie phiên được lưu mã hóa với Electron safeStorage (Windows DPAPI); không đưa vào file xuất hoặc repo. Phiên vẫn có thể bị Muse thu hồi/hết hạn.
 
-Mục VPN chỉ mở trang nhà cung cấp/ứng dụng VPN do người dùng cài; **không kèm máy chủ, tài khoản hoặc tự kết nối tunnel**. Người dùng cần đăng ký VPN, chọn gói có máy chủ USA và kết nối trong app VPN. Khi bật yêu cầu USA (mặc định), tool kiểm tra IP từ chính session trình duyệt trước điều hướng đăng nhập Muse và trước gửi prompt. Thất bại hoặc chưa ra US thì dừng. Quan sát US tại endpoint kiểm tra không chứng minh mọi lưu lượng qua cùng tuyến; VPN hệ thống thường dùng chung cho tất cả tài khoản.
+**Bản 0.5.1 đã bỏ toàn bộ mục VPN/IP Mỹ và kiểm tra quốc gia.** Muse mở trực tiếp trong trình duyệt đã chọn. Cấu hình IP/VPN cũ tự loại bỏ khi nâng cấp; cookie, trial/key và tác vụ được giữ nguyên.
 
 ## Gửi ảnh và giới hạn Muse
 
@@ -47,4 +47,4 @@ Nối MP4 tùy chọn cần FFmpeg/ffprobe trên máy (chưa đóng kèm): chọ
 
 Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. Test UI và browser smoke cần Chromium; đặt CHROMIUM_PATH nếu khác /usr/bin/chromium. `node test/attachment-ready-smoke.cjs` kiểm tra readiness ảnh trên DOM fixture thật. FFmpeg smoke riêng: `npm run test:merge`.
 
-Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, IP trước đăng nhập, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
+Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.

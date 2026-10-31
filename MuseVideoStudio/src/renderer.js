@@ -61,16 +61,12 @@ function renderDrafts(){
   $('commitDrafts').disabled=$('createDrafts').disabled=!drafts.length;
 }
 function render(next){
-  if(!next)return;state=next;const jobs=state.jobs,indexBefore=Number($('accountPicker').value||0),network=state.network||{checking:[],reports:[],errors:[]};
+  if(!next)return;state=next;const jobs=state.jobs,indexBefore=Number($('accountPicker').value||0);
   $('accountPicker').replaceChildren(...Array.from({length:state.settings.accountCount},(_,i)=>{const o=el('option','',`Tài khoản ${i+1}`);o.value=i;return o;}));
   $('accountPicker').value=Math.min(indexBefore,state.settings.accountCount-1);const index=Number($('accountPicker').value);
   const browserName=({builtin:'Trình duyệt tích hợp',chrome:'Google Chrome',edge:'Microsoft Edge',custom:'Chromium tùy chọn'})[state.settings.browserChoice||'builtin'];$('browserInfo').textContent=browserName;
   const account=state.accounts?.find(a=>a.index===index);$('sessionStatus').textContent=account?.warning||(account?.rememberSession?'Cookie phiên lưu mã hóa riêng trên máy.':'Mỗi tài khoản giữ một phiên đăng nhập riêng.');
-  $('logoutAccount').textContent=`Đăng xuất TK ${index+1} · ${browserName}`;$('logoutAccount').disabled=state.active||state.starting||state.merging||state.packaging||network.checking.length>0||state.resettingAccounts?.length>0;
-  const report=network.reports.find(r=>r.index===index),problem=network.errors.find(r=>r.index===index),checking=network.checking.includes(index);
-  $('checkUSA').disabled=checking;$('vpnClient').disabled=state.active||state.starting;
-  $('networkStatus').dataset.state=checking?'checking':problem?'error':report?.countryCode==='US'?'us':report?'other':'unchecked';
-  $('networkStatus').textContent=checking?'Đang kiểm tra IP của trình duyệt…':problem?problem.message:report?`TK ${index+1}: ${report.countryCode==='US'?'IP Mỹ':'Chưa phải IP Mỹ'} · ${report.ip} · ${report.countryCode}`:'Chưa kiểm tra IP của tài khoản này';
+  $('logoutAccount').textContent=`Đăng xuất TK ${index+1} · ${browserName}`;$('logoutAccount').disabled=state.active||state.starting||state.merging||state.packaging||state.resettingAccounts?.length>0;
   const license=state.license;
   if(license){const expires=license.expiresAt?new Date(license.expiresAt).toLocaleString('vi-VN'):'';$('licenseSummary').textContent=license.status==='trial'?'Dùng thử đến '+expires:license.message;$('licenseStatus').textContent=license.message+(expires?' Hạn: '+expires:'');$('deviceCode').value=license.device;}
   if(state.payment){$('paymentQR').src=state.payment.qr;$('paymentContent').textContent='Nội dung chuyển khoản: '+state.payment.content;}
@@ -112,10 +108,9 @@ $('start').onclick=async()=>render(await call('start'));$('pause').onclick=async
 $('clearPending').onclick=async()=>{if(confirm('Xóa tất cả tác vụ đang chờ? Các clip đã tải vẫn giữ nguyên.'))render(await call('clearPending'));};
 $('clearList').onclick=async()=>{if(confirm('Dừng và xóa toàn bộ danh sách tác vụ? File video đã tải không bị xóa. Tác vụ đã gửi có thể còn chạy trên Muse.'))render(await call('clearList'));};
 $('folder').onclick=async()=>render(await call('folder'));$('export').onclick=()=>call('export');
-$('vpnDownload').onclick=()=>call('vpnDownload');$('vpnClient').onclick=()=>call('openVpnClient');$('checkUSA').onclick=async()=>render(await call('checkUSA',Number($('accountPicker').value)));
-$('configure').onclick=()=>{for(const name of ['composer','fileInput','submit','video','attachmentReadySelector','timeoutMinutes','accountCount','ffmpeg','browserChoice','browserPath','vpnProvider','vpnClientPath'])$('settingsForm').elements.namedItem(name).value=state.settings[name]??'';$('settingsForm').elements.namedItem('requireUSA').checked=Boolean(state.settings.requireUSA);$('settingsForm').elements.namedItem('finishAction').value=state.settings.autoMerge?'merge':state.settings.autoPackage?'package':'keep';$('settingsDialog').showModal();};
+$('configure').onclick=()=>{for(const name of ['composer','fileInput','submit','video','attachmentReadySelector','timeoutMinutes','accountCount','ffmpeg','browserChoice','browserPath'])$('settingsForm').elements.namedItem(name).value=state.settings[name]??'';$('settingsForm').elements.namedItem('finishAction').value=state.settings.autoMerge?'merge':state.settings.autoPackage?'package':'keep';$('settingsDialog').showModal();};
 $('closeSettings').onclick=()=>$('settingsDialog').close();$('settingsForm').onsubmit=async e=>{e.preventDefault();const result=await call('settings',Object.fromEntries(new FormData(e.target)));if(result){render(result);$('settingsDialog').close();toast('Đã lưu cấu hình.');}};
-for(const[id,method,name]of[['chooseBrowser','chooseBrowser','browserPath'],['chooseVpnClient','chooseVpnClient','vpnClientPath']])$(id).onclick=async()=>{const file=await call(method);if(file){$('settingsForm').elements.namedItem(name).value=file;if(id==='chooseBrowser')$('settingsForm').elements.namedItem('browserChoice').value='custom';}};
+for(const[id,method,name]of[['chooseBrowser','chooseBrowser','browserPath']])$(id).onclick=async()=>{const file=await call(method);if(file){$('settingsForm').elements.namedItem(name).value=file;if(id==='chooseBrowser')$('settingsForm').elements.namedItem('browserChoice').value='custom';}};
 $('chooseFfmpeg').onclick=async()=>{const result=await call('chooseFfmpeg');if(result){render(result);$('settingsForm').elements.namedItem('ffmpeg').value=result.settings.ffmpeg;}};
 $('mergeNow').onclick=async()=>render(await call('merge'));$('revealMerged').onclick=()=>call('revealMerged');$('packageClips').onclick=async()=>render(await call('packageClips'));$('openPackage').onclick=()=>call('openPackage');
 document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{filter=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===b));render(state);});$('navQueue').onclick=()=>window.scrollTo({top:0,behavior:'smooth'});

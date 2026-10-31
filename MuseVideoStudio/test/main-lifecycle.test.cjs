@@ -254,25 +254,7 @@ test('quit during external browser launch waits and closes the late browser inst
   } finally {release();await fs.rm(dir,{recursive:true,force:true});}
 });
 
-test('USA requirement blocks native Muse navigation before login when the browser reports Vietnam',async()=>{
-  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-country-gate-'));
-  try {
-    const app=await boot(dir,{networkProbe:async()=>({ip:'203.0.113.10',countryCode:'VN',countryName:'Vietnam',observedAt:new Date().toISOString()})});
-    assert.equal(app.invoke('state').settings.requireUSA,true);
-    await assert.rejects(app.invoke('browser',0),/chưa có IP Mỹ/);
-    assert.equal(app.windows.length,1);assert.equal(app.invoke('state').network.reports[0].countryCode,'VN');
-    await app.stop();
-  } finally {await fs.rm(dir,{recursive:true,force:true});}
-});
-test('USA requirement fails closed when IP lookup fails and never opens Muse',async()=>{
-  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-country-gate-'));
-  try {
-    const app=await boot(dir,{networkProbe:async()=>{throw Error('Không kiểm tra được IP.');}});
-    await assert.rejects(app.invoke('browser',0),/Không kiểm tra/);
-    assert.equal(app.windows.length,1);assert.equal(app.invoke('state').network.errors.length,1);await app.stop();
-  } finally {await fs.rm(dir,{recursive:true,force:true});}
-});
-
+test('legacy USA preference is removed and native Muse login does not check geolocation',async()=>{const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-no-geo-'));let probes=0;try{await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{requireUSA:true,vpnProvider:'windscribe',vpnClientPath:'C:/old-vpn.exe'}}));const app=await boot(dir,{networkProbe:async()=>{probes++;throw Error('IP endpoint unavailable');}});assert.equal(app.invoke('state').settings.requireUSA,undefined);assert.equal(app.invoke('state').settings.vpnProvider,undefined);assert.equal(app.invoke('state').network,undefined);await app.invoke('browser',0);assert.equal(probes,0);assert.equal(app.windows[1].url,'https://muse.ai/');assert.equal(app.handlers.has('studio:checkUSA'),false);await app.stop();const saved=JSON.parse(await fs.readFile(path.join(dir,'studio.json'),'utf8'));assert.equal(saved.settings.requireUSA,undefined);}finally{await fs.rm(dir,{recursive:true,force:true});}});
 test('logout resets only selected native account and keeps the other login and downloaded files',async()=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-logout-'));try{
   const app=await boot(dir,{initialCookies:{'persist:muse-account-1':[cookie('one')],'persist:muse-account-2':[cookie('two')]}});await app.invoke('browser',0);await app.invoke('browser',1);

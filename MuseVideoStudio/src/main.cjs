@@ -12,7 +12,6 @@ const { createSessionStore } = require('./session-store.cjs');
 const { resolveBrowser } = require('./browser-discovery.cjs');
 const { launchExternalBrowser } = require('./external-browser.cjs');
 const { createHash,randomUUID } = require('node:crypto');
-const { checkElectronNetwork } = require('./electron-network-check.cjs');
 const ownsInstance = app.requestSingleInstanceLock();
 if (!ownsInstance) app.quit();
 app.on('second-instance', () => { if(main && !main.isDestroyed()) { if(main.isMinimized()) main.restore(); main.show(); main.focus(); } });
@@ -21,14 +20,11 @@ let merging = false, mergeProgress = '', mergedOutput = '', mergeError = '';
 let main, queue, settings, stateFile;
 const browsers = new Map(), profiles = new Map(), opening = new Map(), externalLaunches = new Map(), browserWarnings = new Map();
 let quitAllowed = false, flushingQuit = false, starting = false, runEpoch=0;
-const shutdownController=new AbortController();
-const networkChecks = new Map(), networkReports = new Map(), networkErrors = new Map();
 const resettingAccounts = new Set(), accountResets = new Map();
-const vpnSites = {windscribe:'https://windscribe.com/',proton:'https://protonvpn.com/'};
-const defaults = { attachmentReadySelector:'', requireUSA: true, vpnProvider:'windscribe', vpnClientPath:'', browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', timeoutMinutes: 15 };
+const defaults = { attachmentReadySelector:'', browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', timeoutMinutes: 15 };
 async function atomic(file, data) { await fs.writeFile(file + '.tmp', JSON.stringify(data, null, 2)); await fs.rename(file + '.tmp', file); }
 function snapshot() {
-  return {jobs:queue.jobs,settings,license:licenseManager?.status(),payment:paymentDetails,starting,resettingAccounts:[...resettingAccounts],network:{checking:[...networkChecks.keys()],reports:[...networkReports].map(([index,report])=>({index,...report})),errors:[...networkErrors].map(([index,message])=>({index,message}))},active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,
+  return {jobs:queue.jobs,settings,license:licenseManager?.status(),payment:paymentDetails,starting,resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,
     accounts:Array.from({length:settings.accountCount},(_,index)=>{
       const browser=browsers.get(index),external=settings.browserChoice !== 'builtin';
       return {index,opened:external ? Boolean(browser?.external && !browser.isDestroyed()) : profiles.has(index),rememberSession:external ? Boolean(browser?.external && browser.isSessionEnabled()) : profiles.get(index)?.store.isEnabled() || false,warning:external ? browserWarnings.get(index) || '' : profiles.get(index)?.warning || ''};
@@ -76,35 +72,6 @@ async function ensureExternalBrowser(index) {
   externalLaunches.set(index,launch);
   try{return await launch;}finally{externalLaunches.delete(index);}
 }
-async function observeNetwork(index) {
-  validAccount(index);
-  if(resettingAccounts.size) throw Error('Chờ đăng xuất tài khoản hoàn tất trước khi kiểm tra mạng.');
-  if(flushingQuit) throw Error('Ứng dụng đang đóng.');
-  if(networkChecks.has(index)) return networkChecks.get(index);
-  networkErrors.delete(index);networkReports.delete(index);
-  const check=(async()=>{
-    try {
-      let report;
-      if(settings.browserChoice!=='builtin') {
-        const browser=await ensureExternalBrowser(index);
-        if(!browser || flushingQuit) throw Error('Ứng dụng đang đóng.');
-        report=await browser.checkNetwork({signal:shutdownController.signal});
-      } else {
-        const profile=await prepareNativeProfile(index);
-        if(flushingQuit) throw Error('Ứng dụng đang đóng.');
-        report=await checkElectronNetwork({BrowserWindow,session:profile.session,signal:shutdownController.signal});
-      }
-      networkReports.set(index,report);return report;
-    } catch(e) {networkErrors.set(index,e.message);throw e;}
-  })();
-  networkChecks.set(index,check);notify();
-  try{return await check;}finally{networkChecks.delete(index);notify();}
-}
-async function requireUS(index) {
-  if(!settings.requireUSA) return;
-  const report=await observeNetwork(index);
-  if(report.countryCode!=='US') throw Error(`Tài khoản ${index+1} chưa có IP Mỹ (đang ghi nhận ${report.countryCode}). Hãy bật VPN và chọn máy chủ USA trước khi mở Muse.`);
-}
 async function openMuse(index = 0) {
   validAccount(index);
   if(resettingAccounts.size) throw Error('Chờ đăng xuất tài khoản hoàn tất trước khi mở Muse.');
@@ -113,17 +80,17 @@ async function openMuse(index = 0) {
     try {
       const existing=browsers.get(index);
       if(existing && !existing.isDestroyed() && existing.museStarted) {
-        await requireUS(index);if(!flushingQuit) await existing.show();return;
+        if(!flushingQuit) await existing.show();return;
       }
       if(settings.browserChoice!=='builtin') {
         const browser=await ensureExternalBrowser(index);
         if(!browser || flushingQuit) return;
-        await requireUS(index);if(flushingQuit) return;
+        if(flushingQuit) return;
         await browser.openMuse();browser.museStarted=true;notify();return;
       }
       const profile=await prepareNativeProfile(index);
       if(flushingQuit) return;
-      await requireUS(index);if(flushingQuit) return;
+      if(flushingQuit) return;
       const muse=new BrowserWindow({width:1250,height:850,title:`Muse — Tài khoản ${index+1}`,webPreferences:{session:profile.session,nodeIntegration:false,contextIsolation:true,sandbox:true}});
       browsers.set(index,muse);muse.museStarted=true;
       muse.webContents.setWindowOpenHandler(()=>({action:'deny'}));
@@ -136,7 +103,7 @@ async function openMuse(index = 0) {
 }
 
 function accountOperationBusy() {
-  return queue.active || starting || merging || packaging || opening.size || networkChecks.size || externalLaunches.size;
+  return queue.active || starting || merging || packaging || opening.size || externalLaunches.size;
 }
 function logoutAccount(index) {
   validAccount(index);
@@ -170,7 +137,6 @@ function logoutAccount(index) {
       browsers.delete(index);profiles.delete(index);
       if([...clearResults,...deleteResults].some(result=>result.status==='rejected')) throw Error('Chưa xóa được đầy đủ dữ liệu đăng nhập của tài khoản đã chọn. Vui lòng thử lại.');
     }
-    networkReports.delete(index);networkErrors.delete(index);
     return snapshot();
   })();
   accountResets.set(index,task);
@@ -228,7 +194,7 @@ async function runJob(job,slot,signal) {
   const muse=browsers.get(slot),check=()=>{if(signal.aborted)throw stoppedError();},step=promise=>abortable(promise,signal);
   check();job.account=slot+1;assertMuse(muse);
   await step(licenseManager.ensureAllowed());check();
-  await step(requireUS(slot));check();
+  check();
   if(!settings.output)throw Error('Chọn thư mục lưu video trước.');
   const references=job.references?.length?job.references:job.image?[job.image]:[];
   let previous=await step(dom(muse,selector=>[...document.querySelectorAll(selector)].map(v=>v.currentSrc||v.src).filter(Boolean),settings.video));
@@ -252,7 +218,7 @@ async function runJob(job,slot,signal) {
       await step(delay(250));
     }
     if(!ready)throw Error('Chưa xác nhận được ảnh tham chiếu sẵn sàng trong Muse. Kiểm tra ô đính kèm hoặc cấu hình selector ảnh sẵn sàng; tool chưa gửi prompt.');
-    await step(requireUS(slot));
+
   }
   check();previous=[...new Set([...previous,...await step(dom(muse,selector=>[...document.querySelectorAll(selector)].map(v=>v.currentSrc||v.src).filter(Boolean),settings.video))])];
   check();job.stage='submitting';job.mayHaveSubmitted=true;await step(save());check();
@@ -297,6 +263,8 @@ app.whenReady().then(async () => {
   let stored = {};
   try { stored = JSON.parse(await fs.readFile(stateFile, 'utf8')); } catch (e) { if (e.code !== 'ENOENT') throw e; }
   settings = { ...defaults, ...stored.settings };
+  // Discard obsolete IP/VPN preferences from v0.5 so they cannot gate login.
+  for(const key of ['requireUSA','vpnProvider','vpnClientPath'])delete settings[key];
   await fs.mkdir(app.getPath('userData'),{recursive:true});
   const device=deviceCode();licenseManager=await createLicense({file:path.join(app.getPath('userData'),'license.enc'),safeStorage,device,publicKey:await fs.readFile(path.join(__dirname,'license-public.pem'),'utf8')});paymentDetails=await payment(device);
   // v0.2 changes the default to separate clips, including upgrades from v0.1.
@@ -324,7 +292,7 @@ app.whenReady().then(async () => {
       await licenseManager.ensureAllowed();
       const epoch=runEpoch;starting=true;notify();
       try {
-        for(let i=0;i<settings.accountCount;i++) {if(epoch!==runEpoch)return snapshot();assertMuse(browsers.get(i));await requireUS(i);}
+        for(let i=0;i<settings.accountCount;i++) {if(epoch!==runEpoch)return snapshot();assertMuse(browsers.get(i));}
         if(settings.autoMerge) await checkTools(settings.ffmpeg);
         if(epoch!==runEpoch || flushingQuit || queue.active) return snapshot();
         queue.concurrency=settings.accountCount;
@@ -335,20 +303,6 @@ app.whenReady().then(async () => {
         }).catch(e=>dialog.showErrorBox('Lỗi xử lý hàng đợi',e.message)).finally(notify);
         return snapshot();
       } finally {starting=false;notify();}
-    },
-    checkUSA: async index=>{try{await observeNetwork(Number(index??0));}catch{}return snapshot();},
-    chooseVpnClient: async()=>{
-      const result=await dialog.showOpenDialog(main,{properties:['openFile'],title:'Chọn ứng dụng VPN đã cài trên Windows',filters:[{name:'Ứng dụng Windows',extensions:['exe']}]});
-      return result.canceled?'':result.filePaths[0];
-    },
-    vpnDownload: async()=>{await shell.openExternal(vpnSites[settings.vpnProvider]);},
-    openVpnClient: async()=>{
-      if(queue.active || starting) throw Error('Tạm dừng hàng đợi trước khi đổi VPN.');
-      if(!settings.vpnClientPath) throw Error('Cài VPN, sau đó chọn tệp ứng dụng VPN trong Cài đặt.');
-      const stat=await fs.stat(settings.vpnClientPath);
-      if(!path.isAbsolute(settings.vpnClientPath) || !stat.isFile() || path.extname(settings.vpnClientPath).toLowerCase()!=='.exe') throw Error('Chọn tệp .exe của ứng dụng VPN đã cài.');
-      networkReports.clear();networkErrors.clear();notify();
-      if(await shell.openPath(settings.vpnClientPath)) throw Error('Không mở được ứng dụng VPN. Kiểm tra đường dẫn đã chọn.');
     },
     merge: async () => { await mergeProject(); return snapshot(); },
     packageClips: async () => { await packageProject(); return snapshot(); },
@@ -381,7 +335,7 @@ app.whenReady().then(async () => {
     },
     folder: async () => { if (queue.active || merging || packaging) throw Error('Chờ hàng đợi dừng trước khi đổi thư mục.'); const r = await dialog.showOpenDialog(main, { properties: ['openDirectory','createDirectory'] }); if (!r.canceled) { settings.output = r.filePaths[0]; await save(); notify(); } return snapshot(); },
     settings: async data => {
-      if (resettingAccounts.size || queue.active || starting || networkChecks.size || opening.size || externalLaunches.size || merging || packaging) throw Error('Chờ tác vụ hiện tại kết thúc trước khi đổi cài đặt.');
+      if (resettingAccounts.size || queue.active || starting || opening.size || externalLaunches.size || merging || packaging) throw Error('Chờ tác vụ hiện tại kết thúc trước khi đổi cài đặt.');
       for (const k of ['composer','fileInput','submit','video']) { if (typeof data[k] !== 'string' || data[k].length > 2000) throw Error('Selector không hợp lệ.'); }
       if (!data.composer.trim() || !data.fileInput.trim() || !data.video.trim()) throw Error('Không được để trống selector bắt buộc.');
       const attachmentReadySelector=typeof data.attachmentReadySelector==='string'?data.attachmentReadySelector.trim():settings.attachmentReadySelector;
@@ -397,12 +351,7 @@ app.whenReady().then(async () => {
         resolveBrowser({choice:browserChoice,customPath:browserPath});
         browserWarnings.clear();
       }
-      const vpnProvider=data.vpnProvider ?? settings.vpnProvider;
-      if(!Object.hasOwn(vpnSites,vpnProvider)) throw Error('Nhà cung cấp VPN không hợp lệ.');
-      const vpnClientPath=typeof data.vpnClientPath==='string'?data.vpnClientPath.trim():settings.vpnClientPath;
-      if(vpnClientPath && (!path.isAbsolute(vpnClientPath) || path.extname(vpnClientPath).toLowerCase()!=='.exe')) throw Error('Đường dẫn ứng dụng VPN cần là tệp .exe trên máy.');
-      networkReports.clear();networkErrors.clear();
-      settings = { ...settings, attachmentReadySelector, requireUSA:data.requireUSA===true || data.requireUSA==='on',vpnProvider,vpnClientPath,browserChoice, browserPath, autoMerge: data.finishAction === 'merge', autoPackage: data.finishAction === 'package', ffmpeg: data.ffmpeg.trim(), accountCount, composer: data.composer, fileInput: data.fileInput, submit: data.submit, video: data.video, timeoutMinutes: minutes }; await save(); notify(); return snapshot();
+      settings = { ...settings, attachmentReadySelector, browserChoice, browserPath, autoMerge: data.finishAction === 'merge', autoPackage: data.finishAction === 'package', ffmpeg: data.ffmpeg.trim(), accountCount, composer: data.composer, fileInput: data.fileInput, submit: data.submit, video: data.video, timeoutMinutes: minutes }; await save(); notify(); return snapshot();
     },
     reveal: id => { const j = queue.jobs.find(j => j.id === id); if (j?.output) shell.showItemInFolder(j.output); },
     export: async () => { const r = await dialog.showSaveDialog(main, { defaultPath: 'muse-project.json', filters: [{ name: 'JSON', extensions: ['json'] }] }); if (!r.canceled) await atomic(r.filePath, { jobs: queue.jobs }); }
@@ -415,13 +364,12 @@ app.on('before-quit', event => {
   if (!ownsInstance || quitAllowed) return;
   event.preventDefault();
   if (flushingQuit) return;
-  flushingQuit=true;runEpoch++;starting=false;shutdownController.abort();main?.hide?.();
+  flushingQuit=true;runEpoch++;starting=false;main?.hide?.();
   (async () => {
     if(queue)await queue.stop();
     const closingExternal=Promise.allSettled([...browsers.values()].filter(browser=>browser.external&&!browser.isDestroyed()).map(browser=>browser.close()));
     for(const browser of browsers.values())if(!browser.external&&!browser.isDestroyed())browser.destroy();
     await Promise.allSettled([...accountResets.values()]);
-    await Promise.allSettled([...networkChecks.values()]);
     await Promise.allSettled([...externalLaunches.values()]);
     const externalResults=await closingExternal;
     const results = await Promise.allSettled([...profiles.values()].map(async profile=>{

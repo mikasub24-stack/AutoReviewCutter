@@ -5,8 +5,6 @@ require('./main-lifecycle.test.cjs');
 require('./browser-discovery.test.cjs');
 require('./external-browser.test.cjs');
 require('./script-planner.test.cjs');
-require('./network-check.test.cjs');
-require('./electron-network-check.test.cjs');
 require('./prompt-import.test.cjs');
 require('./reference-map.test.cjs');
 require('./license.test.cjs');
