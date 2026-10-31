@@ -1,0 +1,34 @@
+<!doctype html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; img-src data:; form-action 'none'; base-uri 'none'"><title>Cấp key Muse — dành cho chủ phần mềm</title><style>*{box-sizing:border-box}body{font:15px Segoe UI,Arial,sans-serif;background:#111318;color:#e8eaf0;margin:0;padding:40px 20px}main{max-width:760px;margin:auto;background:#1b1e26;border:1px solid #343947;border-radius:16px;padding:28px}h1{font-size:24px;margin:0 0 12px;color:#f6c15c}p{color:#abb2c2;line-height:1.65}label{display:block;margin:20px 0 8px}input,select,textarea{font:inherit;width:100%;border:1px solid #424958;border-radius:8px;background:#11151b;color:#eef1f7;padding:12px}textarea{min-height:140px;resize:vertical;overflow-wrap:anywhere;font-size:13px}button{font:inherit;padding:12px 18px;background:#f6c15c;color:#251e12;border:0;border-radius:8px;font-weight:600;cursor:pointer;margin:15px 8px 0 0}button.secondary{background:#343d4c;color:#e5eaf3}small{color:#9aa5b8;line-height:1.6;display:block;margin-top:8px}.notice{border-left:3px solid #c29b50;padding:10px 14px;background:#28251f}#status{color:#e5c78c;white-space:pre-wrap}#expiry{color:#91cfb2}.row{display:flex;gap:15px}.row>div{flex:1}button:disabled{opacity:.5;cursor:wait}</style></head><body><main><h1>Cấp key Muse Video Studio</h1><p>Công cụ riêng của chủ phần mềm, chạy cục bộ trên máy bạn. Không cần cài Node.js. Dùng cho khóa xác minh đang có trong bản app 0.5.</p><p class="notice">Khách gửi mã máy → bạn xác nhận thanh toán → chọn thời hạn và tạo key. Không gửi khóa riêng cho khách. Công cụ này không gửi dữ liệu lên mạng.</p><label>1. Chọn khóa ký riêng của bạn (.pem)</label><input id="privateFile" type="file" accept=".pem,.txt"><small>Tệp riêng do bạn lưu. Không phải license-public.pem trong mã nguồn GitHub.</small><label>2. Mã máy khách gửi</label><input id="device" placeholder="24 ký tự, lấy từ mục Dùng thử / Kích hoạt key" spellcheck="false" autocomplete="off"><div class="row"><div><label>3. Thời hạn key</label><select id="days"><option value="1">1 ngày — 24 giờ</option><option value="7">7 ngày</option><option value="30" selected>30 ngày</option><option value="90">90 ngày</option><option value="365">365 ngày</option><option value="custom">Tùy chọn</option></select></div><div><label>Số ngày tùy chọn</label><input id="customDays" type="number" min="1" max="3650" value="30" disabled></div></div><button id="issue">Tạo key cho máy này</button><p id="status" role="status"></p><p id="expiry"></p><label>Key gửi cho khách</label><textarea id="output" readonly placeholder="Key hợp lệ sẽ xuất hiện tại đây"></textarea><button id="copy" class="secondary">Sao chép key</button><small>Key bắt đầu tính thời hạn ngay lúc cấp, không phải lúc khách nhập. Key gắn với đúng mã máy. Khách dán nguyên chuỗi vào app và bấm Kích hoạt key. Đặt ngày giờ máy cấp key đúng trước khi tạo.</small></main><script>
+(function(){
+'use strict';
+const EXPECTED_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAC57rwwBF2OMneIs9h6Pk7c1vfOV6ydkD4E2CGt0m8+0=\n-----END PUBLIC KEY-----\n";
+function pemBytes(pem){const body=pem.replace(/-----BEGIN [^-]+-----|-----END [^-]+-----|\s/g,'');return Uint8Array.from(atob(body),c=>c.charCodeAt(0));}
+function base64url(bytes){let binary='';for(const b of new Uint8Array(bytes))binary+=String.fromCharCode(b);return btoa(binary).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');}
+async function issueKey({pem,device,days,now=Date.now(),publicKey=EXPECTED_PUBLIC_KEY}){
+ device=String(device||'').trim().toUpperCase();days=Number(days);
+ if(!/^[A-F0-9]{24}$/.test(device))throw Error('Mã máy cần đúng24 ký tự lấy từ app của khách.');
+ if(!Number.isInteger(days)||days<1||days>3650)throw Error('Thời hạn cần từ1 đến3650 ngày.');
+ if(typeof pem!=='string'||!pem.includes('-----BEGIN PRIVATE KEY-----'))throw Error('Chọn đúng tệp khóa ký riêng .pem, không phải khóa công khai.');
+ if(!crypto?.subtle)throw Error('Trình duyệt chưa hỗ trợ mã hóa. Mở tệp bằng Chrome/Edge mới.');
+ try{
+  const privateKey=await crypto.subtle.importKey('pkcs8',pemBytes(pem),{name:'Ed25519'},false,['sign']);
+  const verifyKey=await crypto.subtle.importKey('spki',pemBytes(publicKey),{name:'Ed25519'},false,['verify']);
+  const data={product:'MuseVideoStudio',device,issuedAt:now,expiresAt:now+days*86400000},payload=new TextEncoder().encode(JSON.stringify(data));
+  const signature=await crypto.subtle.sign({name:'Ed25519'},privateKey,payload);
+  if(!await crypto.subtle.verify({name:'Ed25519'},verifyKey,signature,payload))throw Error('wrong-key');
+  return {token:base64url(payload)+'.'+base64url(signature),device,issuedAt:data.issuedAt,expiresAt:data.expiresAt};
+ }catch{throw Error('Khóa riêng không khớp bản app này hoặc trình duyệt chưa hỗ trợ Ed25519. Kiểm tra tệp khóa và dùng Chrome/Edge mới.');}
+}
+globalThis.KeyIssuer={issueKey};
+if(typeof document==='undefined')return;
+const $=id=>document.getElementById(id);
+$('days').onchange=()=>$('customDays').disabled=$('days').value!=='custom';
+$('issue').onclick=async()=>{
+ $('status').textContent='';$('expiry').textContent='';$('output').value='';
+ const file=$('privateFile').files[0];if(!file){$('status').textContent='Chọn tệp khóa ký riêng trước.';return;}
+ $('issue').disabled=true;
+ try{const result=await issueKey({pem:await file.text(),device:$('device').value,days:$('days').value==='custom'?$('customDays').value:$('days').value});$('output').value=result.token;$('expiry').textContent='Hết hạn: '+new Date(result.expiresAt).toLocaleString('vi-VN');$('status').textContent='Đã tạo key. Sao chép chuỗi bên dưới và gửi cho đúng khách có mã máy này.';}catch(e){$('status').textContent=e.message;}finally{$('issue').disabled=false;}
+};
+$('copy').onclick=async()=>{if(!$('output').value)return;try{await navigator.clipboard.writeText($('output').value);$('status').textContent='Đã sao chép key.';}catch{$('output').select();$('status').textContent='Nhấn Ctrl+C để sao chép key đang chọn.';}};
+})();
+</script></body></html>

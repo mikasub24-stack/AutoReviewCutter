@@ -1,0 +1,36 @@
+name: Publish Muse owner key issuer
+on:
+  workflow_dispatch:
+  push:
+    branches: [muse-video-studio]
+    paths:
+      - '.github/workflows/muse-key-issuer.yml'
+      - 'MuseVideoStudio/tools/key-issuer.html'
+      - 'MuseVideoStudio/tools/key-issuer.test.cjs'
+      - 'MuseVideoStudio/tools/HUONG-DAN-CAP-KEY.txt'
+permissions:
+  contents: write
+jobs:
+  owner-tool:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify compatible signed key creation
+        run: node MuseVideoStudio/tools/key-issuer.test.cjs
+      - name: Package public owner tool without private key
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root = Path('MuseVideoStudio/tools')
+          with zipfile.ZipFile('Muse-Key-Issuer.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+              for name in ['key-issuer.html', 'HUONG-DAN-CAP-KEY.txt']:
+                  archive.write(root / name, name)
+          PY
+      - name: Publish download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create muse-key-issuer-v1 Muse-Key-Issuer.zip --target "$GITHUB_SHA" --title "Muse owner key issuer" --notes "Offline key issuer UI for the software owner. No private signing key is included."

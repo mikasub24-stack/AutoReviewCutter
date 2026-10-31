@@ -1,3 +1,11 @@
+# Cấp key bằng giao diện (không cần Node.js)
+
+Tải gói Muse-Key-Issuer.zip ở Releases, giải nén và mở key-issuer.html bằng Chrome/Edge mới. Chọn private.pem đã sao lưu riêng, dán mã máy khách gửi, chọn số ngày và bấm Tạo key. Gửi chuỗi key kết quả cho đúng khách; khách nhập ở mục Dùng thử / Kích hoạt key trong app.
+
+Công cụ không có khóa riêng bên trong. Bất kỳ ai tải gói HTML cũng không thể tạo key được app chấp nhận nếu không có khóa riêng tương ứng. Khóa riêng không rời khỏi trình duyệt khi dùng công cụ cục bộ; CSP chặn kết nối mạng. Giao diện kiểm tra khóa chọn có khớp khóa xác minh của bản app 0.5 hay không.
+
+Key bắt đầu tính thời hạn ngay lúc cấp. Key 1 ngày có hiệu lực24 giờ. 24 giờ dùng thử tự động trong app không cần chủ phần mềm tạo key trước.
+
 # Cấp key dành cho chủ phần mềm
 
 App cho dùng thử 24 giờ từ lần mở đầu tiên. Hết hạn chỉ chặn tạo/gửi prompt mới; vẫn có thể mở app để nhập key, xem danh sách hoặc xuất file đã có.

@@ -1,0 +1,14 @@
+CẤP KEY — DÀNH RIÊNG CHO CHỦ PHẦN MỀM
+
+1. Giải nén gói công cụ, mở key-issuer.html bằng Chrome hoặc Edge mới.
+2. Chọn tệp khóa ký riêng private.pem đã lưu trên máy. Không phải license-public.pem.
+3. Khách mở app → Dùng thử / Kích hoạt key → Sao chép mã máy và gửi cho bạn.
+4. Sau khi bạn xác nhận thanh toán, dán mã máy, chọn1/7/30 ngày hoặc thời hạn khác và bấm Tạo key.
+5. Sao chép KEY kết quả gửi cho khách. Khách dán key vào app rồi bấm Kích hoạt key.
+
+Key1 ngày có hiệu lực24 giờ tính từ lúc cấp. Key gắn với một mã máy.
+Khóa ký riêng KHÔNG nằm trong gói tải này và KHÔNG nằm trên GitHub.
+Không gửi private.pem cho khách hoặc đưa lên kho công khai.
+Gói này dành cho khóa xác minh của app Muse Video Studio0.5.
+Chuyển khoản không tự động cấp key; chủ phần mềm kiểm tra giao dịch thủ công.
+Công cụ chạy cục bộ, không gửi khóa/mã máy lên mạng.
