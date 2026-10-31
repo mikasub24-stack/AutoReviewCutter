@@ -1,0 +1,9 @@
+const{test}=require('node:test'),assert=require('node:assert/strict');const{importPrompts}=require('../src/prompt-import.js');
+const sample=n=>`PROMPT ${String(n).padStart(2,'0')} — 8 seconds\nVIDEO PROMPT (standalone; copy independently):\n\nCHARACTER: A fictional cook.\n\nKITCHEN: A small kitchen. TIMED ACTIONS: 0–2 seconds: turn. 2–8 seconds: stir. CAMERA: slow push. Exactly 8 seconds.\n\nENGLISH VOICEOVER: Narration ${n}.\n`;
+test('60 prepared prompts remain 60 complete jobs, with no wrappers, narration or chapter metadata sent',()=>{
+ const text='DEMO TITLE\n60 standalone prompts\nINTRO\n'+Array.from({length:60},(_,i)=>sample(i+1)+(i===1?'1. FIRST CHAPTER\n':'')).join('');const jobs=importPrompts(text);
+ assert.equal(jobs.length,60);jobs.forEach((j,i)=>{assert.equal(j.number,i+1);assert.equal(j.durationSeconds,8);assert.ok(j.prompt.startsWith('CHARACTER:'));assert.match(j.prompt,/TIMED ACTIONS/);assert.equal(j.prompt.includes('Tạo video'),false);assert.equal(j.prompt.includes('VOICEOVER'),false);assert.equal(j.prompt.includes('CHAPTER'),false);assert.equal(j.voiceover,`Narration ${i+1}.`);});
+});
+test('paragraphs and sentence punctuation inside a ready prompt never create new scenes',()=>{const s='Visual: A person.\n\nMotion: Walk. Stop.\nCamera: Dolly in.';const jobs=importPrompts(s);assert.equal(jobs.length,1);assert.equal(jobs[0].prompt,s);});
+test('inline scene text and prepared long prompts are retained without arbitrary length splitting',()=>{const s='Scene 1: '+('Long visual movement. '.repeat(80))+'\nScene 2: Finish.';const jobs=importPrompts(s);assert.equal(jobs.length,2);assert.ok(jobs[0].prompt.length>1000);assert.equal(jobs[1].prompt,'Finish.');});
+test('line splitting requires explicit mode and empty imports fail',()=>{assert.equal(importPrompts('one\ntwo').length,1);assert.equal(importPrompts('one\ntwo',{mode:'lines'}).length,2);assert.throws(()=>importPrompts(' '));});

@@ -1,13 +1,18 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, session, safeStorage } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { Queue } = require('./queue.cjs');
+const { Queue,stoppedError,abortable } = require('./queue.cjs');
+const {imageSources,attachmentState}=require('./attachment-ready.cjs');
+const {createLicense,deviceCode}=require('./license.cjs');
+const {payment}=require('./payment.cjs');
+let licenseManager,paymentDetails;
 const { mergeVideos, checkTools } = require('./merge.cjs');
 const { exportEditPackage } = require('./edit-package.cjs');
 const { createSessionStore } = require('./session-store.cjs');
 const { resolveBrowser } = require('./browser-discovery.cjs');
 const { launchExternalBrowser } = require('./external-browser.cjs');
-const { createHash } = require('node:crypto');
+const { createHash,randomUUID } = require('node:crypto');
+const { checkElectronNetwork } = require('./electron-network-check.cjs');
 const ownsInstance = app.requestSingleInstanceLock();
 if (!ownsInstance) app.quit();
 app.on('second-instance', () => { if(main && !main.isDestroyed()) { if(main.isMinimized()) main.restore(); main.show(); main.focus(); } });
@@ -15,11 +20,15 @@ let packaging = false, packageProgress = '', editPackageDir = '', packageError =
 let merging = false, mergeProgress = '', mergedOutput = '', mergeError = '';
 let main, queue, settings, stateFile;
 const browsers = new Map(), profiles = new Map(), opening = new Map(), externalLaunches = new Map(), browserWarnings = new Map();
-let quitAllowed = false, flushingQuit = false;
-const defaults = { browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', timeoutMinutes: 15 };
+let quitAllowed = false, flushingQuit = false, starting = false, runEpoch=0;
+const shutdownController=new AbortController();
+const networkChecks = new Map(), networkReports = new Map(), networkErrors = new Map();
+const resettingAccounts = new Set(), accountResets = new Map();
+const vpnSites = {windscribe:'https://windscribe.com/',proton:'https://protonvpn.com/'};
+const defaults = { attachmentReadySelector:'', requireUSA: true, vpnProvider:'windscribe', vpnClientPath:'', browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', timeoutMinutes: 15 };
 async function atomic(file, data) { await fs.writeFile(file + '.tmp', JSON.stringify(data, null, 2)); await fs.rename(file + '.tmp', file); }
 function snapshot() {
-  return {jobs:queue.jobs,settings,active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,
+  return {jobs:queue.jobs,settings,license:licenseManager?.status(),payment:paymentDetails,starting,resettingAccounts:[...resettingAccounts],network:{checking:[...networkChecks.keys()],reports:[...networkReports].map(([index,report])=>({index,...report})),errors:[...networkErrors].map(([index,message])=>({index,message}))},active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,
     accounts:Array.from({length:settings.accountCount},(_,index)=>{
       const browser=browsers.get(index),external=settings.browserChoice !== 'builtin';
       return {index,opened:external ? Boolean(browser?.external && !browser.isDestroyed()) : profiles.has(index),rememberSession:external ? Boolean(browser?.external && browser.isSessionEnabled()) : profiles.get(index)?.store.isEnabled() || false,warning:external ? browserWarnings.get(index) || '' : profiles.get(index)?.warning || ''};
@@ -35,47 +44,137 @@ function assertMuse(muse) {
   if (u.protocol !== 'https:' || !(u.hostname === 'muse.ai' || u.hostname.endsWith('.muse.ai'))) throw Error('Hãy mở trang chat trên muse.ai.');
 }
 async function dom(muse, fn, arg) { assertMuse(muse); if(muse.external) return muse.evaluate(fn,arg); return muse.webContents.executeJavaScript(`(${fn.toString()})(${JSON.stringify(arg)})`, true); }
+async function prepareNativeProfile(index) {
+  let profile=profiles.get(index);
+  if(!profile) {
+    const accountSession=session.fromPartition(`persist:muse-account-${index+1}`);
+    profile={session:accountSession,store:null,warning:''};
+    profile.store=createSessionStore({session:accountSession,safeStorage,file:path.join(app.getPath('userData'),'account-sessions',`account-${index+1}.enc`),onError:message=>{profile.warning=message;notify();}});
+    profiles.set(index,profile);
+    profile.ready=(async()=>{
+      const status=await profile.store.restore();
+      profile.warning=status.error || (!status.available ? 'Máy chưa hỗ trợ lưu mã hóa cookie phiên; cookie có thời hạn vẫn được lưu trong hồ sơ.' : '');
+      profile.store.start();
+    })();
+  }
+  await profile.ready;return profile;
+}
+function validAccount(index) {
+  if(!Number.isInteger(index) || index<0 || index>=settings.accountCount) throw Error('Tài khoản không hợp lệ.');
+}
+async function ensureExternalBrowser(index) {
+  const existing=browsers.get(index);
+  if(existing?.external && !existing.isDestroyed()) return existing;
+  if(externalLaunches.has(index)) return externalLaunches.get(index);
+  const executablePath=resolveBrowser({choice:settings.browserChoice,customPath:settings.browserPath});
+  const key=settings.browserChoice==='custom' ? 'custom-'+createHash('sha256').update(executablePath).digest('hex').slice(0,16) : settings.browserChoice;
+  const launch=(async()=>{
+    const browser=await launchExternalBrowser({executablePath,profileDir:path.join(app.getPath('userData'),'external-browser-profiles',key,`account-${index+1}`),sessionFile:path.join(app.getPath('userData'),'external-account-sessions',key,`account-${index+1}.enc`),safeStorage,deferMuseNavigation:true,onWarning:message=>{browserWarnings.set(index,message);notify();},onClosed:()=>notify()});
+    if(flushingQuit) {await browser.close();return null;}
+    browsers.set(index,browser);return browser;
+  })();
+  externalLaunches.set(index,launch);
+  try{return await launch;}finally{externalLaunches.delete(index);}
+}
+async function observeNetwork(index) {
+  validAccount(index);
+  if(resettingAccounts.size) throw Error('Chờ đăng xuất tài khoản hoàn tất trước khi kiểm tra mạng.');
+  if(flushingQuit) throw Error('Ứng dụng đang đóng.');
+  if(networkChecks.has(index)) return networkChecks.get(index);
+  networkErrors.delete(index);networkReports.delete(index);
+  const check=(async()=>{
+    try {
+      let report;
+      if(settings.browserChoice!=='builtin') {
+        const browser=await ensureExternalBrowser(index);
+        if(!browser || flushingQuit) throw Error('Ứng dụng đang đóng.');
+        report=await browser.checkNetwork({signal:shutdownController.signal});
+      } else {
+        const profile=await prepareNativeProfile(index);
+        if(flushingQuit) throw Error('Ứng dụng đang đóng.');
+        report=await checkElectronNetwork({BrowserWindow,session:profile.session,signal:shutdownController.signal});
+      }
+      networkReports.set(index,report);return report;
+    } catch(e) {networkErrors.set(index,e.message);throw e;}
+  })();
+  networkChecks.set(index,check);notify();
+  try{return await check;}finally{networkChecks.delete(index);notify();}
+}
+async function requireUS(index) {
+  if(!settings.requireUSA) return;
+  const report=await observeNetwork(index);
+  if(report.countryCode!=='US') throw Error(`Tài khoản ${index+1} chưa có IP Mỹ (đang ghi nhận ${report.countryCode}). Hãy bật VPN và chọn máy chủ USA trước khi mở Muse.`);
+}
 async function openMuse(index = 0) {
-  if (!Number.isInteger(index) || index < 0 || index >= settings.accountCount) throw Error('Tài khoản không hợp lệ.');
-  const existing = browsers.get(index);
-  if (existing && !existing.isDestroyed()) { await existing.show(); return; }
-  if (opening.has(index)) return opening.get(index);
-  const task = (async () => {
-    if(settings.browserChoice !== 'builtin') {
-      const executablePath=resolveBrowser({choice:settings.browserChoice,customPath:settings.browserPath});
-      const key=settings.browserChoice === 'custom' ? 'custom-' + createHash('sha256').update(executablePath).digest('hex').slice(0,16) : settings.browserChoice;
-      const launch=(async()=>{
-        const browser=await launchExternalBrowser({executablePath,profileDir:path.join(app.getPath('userData'),'external-browser-profiles',key,`account-${index+1}`),sessionFile:path.join(app.getPath('userData'),'external-account-sessions',key,`account-${index+1}.enc`),safeStorage,onWarning:message=>{browserWarnings.set(index,message);notify();},onClosed:()=>notify()});
-        if(flushingQuit) {await browser.close();return;}
-        browsers.set(index,browser);notify();
-      })();
-      externalLaunches.set(index,launch);
-      try {await launch;} finally {externalLaunches.delete(index);}
-      return;
-    }
-    let profile = profiles.get(index);
-    if (!profile) {
-      const accountSession = session.fromPartition(`persist:muse-account-${index + 1}`);
-      profile = { session: accountSession, store: null, warning: '' };
-      profile.store = createSessionStore({session:accountSession,safeStorage,file:path.join(app.getPath('userData'),'account-sessions',`account-${index + 1}.enc`),onError:message=>{profile.warning=message;notify();}});
-      profiles.set(index,profile);
-      profile.ready = (async () => {
-        const status = await profile.store.restore();
-        profile.warning = status.error || (!status.available ? 'Máy chưa hỗ trợ lưu mã hóa cookie phiên; cookie có thời hạn vẫn được lưu trong hồ sơ.' : '');
-        profile.store.start();
-      })();
-      await profile.ready;
-    }
-    await profile.ready;
-    if (flushingQuit) return;
-    const muse = new BrowserWindow({width:1250,height:850,title:`Muse — Tài khoản ${index + 1}`,webPreferences:{session:profile.session,nodeIntegration:false,contextIsolation:true,sandbox:true}});
-    browsers.set(index,muse);
-    muse.webContents.setWindowOpenHandler(() => ({action:'deny'}));
-    muse.on('closed', () => { if(flushingQuit) return; profile.store.flush().catch(()=>{profile.warning='Chưa lưu được phiên đăng nhập.';notify();}); });
-    await muse.loadURL('https://muse.ai/'); notify();
+  validAccount(index);
+  if(resettingAccounts.size) throw Error('Chờ đăng xuất tài khoản hoàn tất trước khi mở Muse.');
+  if(opening.has(index)) return opening.get(index);
+  const task=(async()=>{
+    try {
+      const existing=browsers.get(index);
+      if(existing && !existing.isDestroyed() && existing.museStarted) {
+        await requireUS(index);if(!flushingQuit) await existing.show();return;
+      }
+      if(settings.browserChoice!=='builtin') {
+        const browser=await ensureExternalBrowser(index);
+        if(!browser || flushingQuit) return;
+        await requireUS(index);if(flushingQuit) return;
+        await browser.openMuse();browser.museStarted=true;notify();return;
+      }
+      const profile=await prepareNativeProfile(index);
+      if(flushingQuit) return;
+      await requireUS(index);if(flushingQuit) return;
+      const muse=new BrowserWindow({width:1250,height:850,title:`Muse — Tài khoản ${index+1}`,webPreferences:{session:profile.session,nodeIntegration:false,contextIsolation:true,sandbox:true}});
+      browsers.set(index,muse);muse.museStarted=true;
+      muse.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+      muse.on('closed',()=>{if(flushingQuit || resettingAccounts.has(index))return;profile.store.flush().catch(()=>{profile.warning='Chưa lưu được phiên đăng nhập.';notify();});});
+      await muse.loadURL('https://muse.ai/');notify();
+    } catch(e) {if(!flushingQuit) throw e;}
   })();
   opening.set(index,task);
-  try { await task; } finally { opening.delete(index); }
+  try{await task;}finally{opening.delete(index);}
+}
+
+function accountOperationBusy() {
+  return queue.active || starting || merging || packaging || opening.size || networkChecks.size || externalLaunches.size;
+}
+function logoutAccount(index) {
+  validAccount(index);
+  if(flushingQuit || accountOperationBusy() || resettingAccounts.size) throw Error('Chờ hàng đợi, kiểm tra mạng và các thao tác trình duyệt hoàn tất trước khi đăng xuất.');
+  resettingAccounts.add(index);notify();
+  const task=(async()=>{
+    const browserName=({builtin:'Trình duyệt tích hợp',chrome:'Google Chrome',edge:'Microsoft Edge',custom:'Trình duyệt tùy chọn'})[settings.browserChoice];
+    const choice=await dialog.showMessageBox(main,{type:'warning',buttons:['Hủy','Đăng xuất tài khoản này'],defaultId:0,cancelId:0,message:`Đăng xuất ${browserName} — Tài khoản ${index+1}?`,detail:'Chỉ xóa dữ liệu đăng nhập trong hồ sơ riêng của tài khoản này do Muse Studio quản lý. Các tài khoản khác, trình duyệt cá nhân và video đã tải vẫn được giữ nguyên.'});
+    if(choice.response!==1) return snapshot();
+    if(flushingQuit || accountOperationBusy()) throw Error('Ứng dụng đang bận. Hãy thử đăng xuất lại sau khi thao tác hiện tại hoàn tất.');
+    if(settings.browserChoice!=='builtin') {
+      const browser=await ensureExternalBrowser(index);
+      if(!browser) throw Error('Không mở được hồ sơ tài khoản để đăng xuất.');
+      await browser.clearLogin();
+      browsers.delete(index);browserWarnings.delete(index);
+    } else {
+      const browser=browsers.get(index),profile=profiles.get(index);
+      if(browser && !browser.external && !browser.isDestroyed()) browser.destroy();
+      const selectedSession=profile?.session || session.fromPartition(`persist:muse-account-${index+1}`);
+      if(profile) {
+        await profile.ready;
+        // dispose detaches cookie observers before its final serialized flush.
+        // Even if that flush fails, continue clearing and deleting this backup.
+        try {await profile.store.dispose();} catch {}
+      }
+      const clearResults=await Promise.allSettled([selectedSession.clearStorageData(),selectedSession.clearCache()]);
+      try {await selectedSession.cookies.flushStore();} catch {clearResults.push({status:'rejected'});}
+      try {selectedSession.flushStorageData();} catch {clearResults.push({status:'rejected'});}
+      const backup=path.join(app.getPath('userData'),'account-sessions',`account-${index+1}.enc`);
+      const deleteResults=await Promise.allSettled([fs.rm(backup,{force:true}),fs.rm(backup+'.tmp',{force:true})]);
+      browsers.delete(index);profiles.delete(index);
+      if([...clearResults,...deleteResults].some(result=>result.status==='rejected')) throw Error('Chưa xóa được đầy đủ dữ liệu đăng nhập của tài khoản đã chọn. Vui lòng thử lại.');
+    }
+    networkReports.delete(index);networkErrors.delete(index);
+    return snapshot();
+  })();
+  accountResets.set(index,task);
+  return task.finally(()=>{accountResets.delete(index);resettingAccounts.delete(index);notify();});
 }
 
 async function upload(muse, files) {
@@ -92,16 +191,19 @@ async function upload(muse, files) {
   } finally { debug.detach(); }
 }
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-async function download(muse, url, job) {
+async function download(muse, url, job, signal) {
   const target = path.join(settings.output, `muse-${job.id}.mp4`);
   await fs.mkdir(settings.output, { recursive: true });
-  if(muse.external) {await muse.download(url,target);await validateMp4(target);return target;}
+  if(muse.external) {await muse.download(url,target,{signal});await validateMp4(target);return target;}
   const session = muse.webContents.session;
   return new Promise((resolve, reject) => {
     let timer, item;
-    function cleanup() { clearTimeout(timer); session.removeListener('will-download', onDownload); }
+    function cleanup() { clearTimeout(timer); session.removeListener('will-download', onDownload); signal?.removeEventListener('abort',cancel); }
+    function cancel(){item?.cancel();cleanup();reject(stoppedError());}
+    signal?.addEventListener('abort',cancel,{once:true});
     function onDownload(event, candidate, contents) {
       if (contents !== muse.webContents || candidate.getURLChain()[0] !== url) return;
+      if(signal?.aborted){candidate.cancel();cleanup();return;}
       item = candidate; item.setSavePath(target);
       item.once('done', async (_, status) => {
         cleanup();
@@ -122,58 +224,50 @@ async function validateMp4(target) {
   try {await fd.read(bytes,0,12,0);} finally {await fd.close();}
   if(!stat.size || bytes.toString('ascii',4,8)!=='ftyp') throw Error('Kết quả tải về không phải MP4 hợp lệ. Kiểm tra video trong Muse.');
 }
-async function runJob(job, slot) {
-  const muse = browsers.get(slot);
-  job.account = slot + 1;
-  assertMuse(muse);
-  if (!settings.output) throw Error('Chọn thư mục lưu video trước.');
-  // Snapshot old video URLs before sending so previous results cannot complete a new job.
-  let previous = await dom(muse, selector => Array.from(document.querySelectorAll(selector)).map(v => v.currentSrc || v.src).filter(Boolean), settings.video);
-  const references = job.references?.length ? job.references : job.image ? [job.image] : [];
-  if (references.length) {
-    await upload(muse, references);
-    // Upload completion is site-specific. Do not submit blindly after a guessed delay.
-    const choice = await dialog.showMessageBox(muse.external ? main : muse, { type: 'question', buttons: ['Ảnh đã tải xong — Gửi prompt', 'Dừng tác vụ'], defaultId: 0, cancelId: 1, message: 'Kiểm tra ảnh đính kèm trên Muse', detail: 'Chỉ tiếp tục khi ảnh đã tải xong. Bản đầu tiên cần bước kiểm tra này vì chưa xác minh được dấu hiệu tải ảnh hoàn tất trên Muse.' });
-    if (choice.response !== 0) throw Error('Đã dừng trước khi gửi prompt.');
-  }
-  previous = [...new Set([...previous, ...await dom(muse, selector => [...document.querySelectorAll(selector)].map(v => v.currentSrc || v.src).filter(Boolean), settings.video)])];
-  await dom(muse, ({ selector, prompt }) => {
-    const matches = [...document.querySelectorAll(selector)].filter(e => e.getClientRects().length);
-    if (matches.length !== 1) throw Error('Không xác định được ô chat duy nhất. Chỉnh CSS selector ô chat trong Cài đặt.');
-    const e = matches[0];
-    if ((e.value || e.innerText || '').trim()) throw Error('Ô chat đang có nội dung. Hãy gửi hoặc xóa bản nháp trước.');
+async function runJob(job,slot,signal) {
+  const muse=browsers.get(slot),check=()=>{if(signal.aborted)throw stoppedError();},step=promise=>abortable(promise,signal);
+  check();job.account=slot+1;assertMuse(muse);
+  await step(licenseManager.ensureAllowed());check();
+  await step(requireUS(slot));check();
+  if(!settings.output)throw Error('Chọn thư mục lưu video trước.');
+  const references=job.references?.length?job.references:job.image?[job.image]:[];
+  let previous=await step(dom(muse,selector=>[...document.querySelectorAll(selector)].map(v=>v.currentSrc||v.src).filter(Boolean),settings.video));
+  const before=references.length?await step(dom(muse,imageSources,null)):[];
+  check();job.stage='preparing';notify();
+  await step(dom(muse,({selector,prompt})=>{
+    const list=[...document.querySelectorAll(selector)].filter(e=>e.getClientRects().length);
+    if(list.length!==1)throw Error('Không xác định được ô nhập prompt duy nhất.');
+    const e=list[0];if((e.value||e.innerText||'').trim())throw Error('Ô Muse còn bản nháp. Kiểm tra và xóa bản nháp trước khi chạy lại.');
     e.focus();
-    if (e instanceof HTMLTextAreaElement || e instanceof HTMLInputElement) {
-      Object.getOwnPropertyDescriptor(e instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value').set.call(e, prompt);
-    } else { e.textContent = prompt; }
-    e.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: prompt }));
-  }, { selector: settings.composer, prompt: job.prompt });
-  if (settings.submit) {
-    await dom(muse, selector => {
-      const a = [...document.querySelectorAll(selector)].filter(e => e.getClientRects().length);
-      if (a.length !== 1 || a[0].disabled) throw Error('Không xác định được nút gửi sẵn sàng.');
-      a[0].click();
-    }, settings.submit);
-  } else if(muse.external) {
-    await muse.pressEnter();
-  } else {
-    muse.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Return' });
-    muse.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Return' });
+    if(e instanceof HTMLTextAreaElement||e instanceof HTMLInputElement)Object.getOwnPropertyDescriptor(e instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(e,prompt);
+    else e.textContent=prompt;
+    e.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:prompt}));
+  },{selector:settings.composer,prompt:job.prompt}));
+  if(references.length){
+    check();job.stage='uploading';notify();await step(upload(muse,references));
+    const deadline=Date.now()+90000;let stable=0,ready=false;
+    while(Date.now()<deadline){
+      check();const state=await step(dom(muse,attachmentState,{before,count:references.length,selector:settings.attachmentReadySelector,submitSelector:settings.submit}));
+      if(state.ready){if(!stable)stable=Date.now();if(Date.now()-stable>=1000){ready=true;break;}}else stable=0;
+      await step(delay(250));
+    }
+    if(!ready)throw Error('Chưa xác nhận được ảnh tham chiếu sẵn sàng trong Muse. Kiểm tra ô đính kèm hoặc cấu hình selector ảnh sẵn sàng; tool chưa gửi prompt.');
+    await step(requireUS(slot));
   }
-  const deadline = Date.now() + settings.timeoutMinutes * 60000;
-  while (Date.now() < deadline) {
-    await delay(2000);
-    const url = await dom(muse, ({ selector, previous }) => {
-      const v = [...document.querySelectorAll(selector)].find(v => {
-        const src = v.currentSrc || v.src;
-        return src && !previous.includes(src) && v.readyState >= 2 && v.videoWidth > 0 && v.duration > 0 && Number.isFinite(v.duration);
-      });
-      return v ? v.currentSrc || v.src : null;
-    }, { selector: settings.video, previous });
-    if (url) return download(muse, url, job);
+  check();previous=[...new Set([...previous,...await step(dom(muse,selector=>[...document.querySelectorAll(selector)].map(v=>v.currentSrc||v.src).filter(Boolean),settings.video))])];
+  check();job.stage='submitting';job.mayHaveSubmitted=true;await step(save());check();
+  if(settings.submit)await step(dom(muse,selector=>{const a=[...document.querySelectorAll(selector)].filter(e=>e.getClientRects().length);if(a.length!==1||a[0].disabled)throw Error('Nút gửi chưa sẵn sàng.');a[0].click();},settings.submit));
+  else if(muse.external)await step(muse.pressEnter());
+  else {muse.webContents.sendInputEvent({type:'keyDown',keyCode:'Return'});muse.webContents.sendInputEvent({type:'keyUp',keyCode:'Return'});}
+  job.stage='waiting';notify();const deadline=Date.now()+settings.timeoutMinutes*60000;
+  while(Date.now()<deadline){
+    await step(delay(1500));check();
+    const url=await step(dom(muse,({selector,previous})=>{const v=[...document.querySelectorAll(selector)].find(v=>{const src=v.currentSrc||v.src;return src&&!previous.includes(src)&&v.readyState>=2&&v.videoWidth>0&&v.duration>0&&Number.isFinite(v.duration);});return v?v.currentSrc||v.src:null;},{selector:settings.video,previous}));
+    if(url){check();job.stage='downloading';notify();return step(download(muse,url,job,signal));}
   }
-  throw Error('Chưa tìm thấy video mới trước thời hạn. Kiểm tra Muse và selector video. Không tự gửi lại để tránh tạo trùng.');
+  throw Error('Hết thời gian chờ video mới. Kiểm tra Muse trước khi chạy lại.');
 }
+
 async function mergeProject() {
   if (queue.active || merging || packaging) throw Error('Chờ xử lý hiện tại hoàn tất trước khi nối.');
   if (!settings.output) throw Error('Chọn thư mục lưu video trước.');
@@ -203,6 +297,8 @@ app.whenReady().then(async () => {
   let stored = {};
   try { stored = JSON.parse(await fs.readFile(stateFile, 'utf8')); } catch (e) { if (e.code !== 'ENOENT') throw e; }
   settings = { ...defaults, ...stored.settings };
+  await fs.mkdir(app.getPath('userData'),{recursive:true});
+  const device=deviceCode();licenseManager=await createLicense({file:path.join(app.getPath('userData'),'license.enc'),safeStorage,device,publicKey:await fs.readFile(path.join(__dirname,'license-public.pem'),'utf8')});paymentDetails=await payment(device);
   // v0.2 changes the default to separate clips, including upgrades from v0.1.
   if (stored.configVersion !== 2) { settings.autoMerge = false; settings.autoPackage = false; }
   mergedOutput = stored.mergedOutput || ''; mergeError = stored.mergeError || '';
@@ -210,28 +306,49 @@ app.whenReady().then(async () => {
   queue = new Queue({ jobs: stored.jobs || [], save, run: runJob, notify });
   await save();
   main = new BrowserWindow({ width: 1450, height: 950, minWidth: 1000, minHeight: 700, backgroundColor: '#101114', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true } });
+  main.on('close',event=>{if(!quitAllowed){event.preventDefault();app.quit();}});
   main.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   main.webContents.on('will-navigate', e => e.preventDefault());
   const handlers = {
     state: () => snapshot(),
+    activateKey:async token=>{await licenseManager.activate(token);notify();return snapshot();},
     add: async data => { if (merging || packaging) throw Error('Chờ xử lý đầu ra xong trước khi thêm prompt.'); invalidateOutputs(); await queue.add(data); return snapshot(); },
     retry: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); invalidateOutputs(); await queue.retry(id); return snapshot(); },
     remove: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); invalidateOutputs(); await queue.remove(id); return snapshot(); },
     browser: async index => { await openMuse(Number(index ?? 0)); return true; },
+    logoutAccount: async index => {await logoutAccount(Number(index??0));return snapshot();},
     start: async () => {
-      if (merging || packaging) throw Error('Đang xử lý đầu ra video.');
-      if (queue.active) return snapshot();
-      for (let i = 0; i < settings.accountCount; i++) assertMuse(browsers.get(i));
-      if (settings.autoMerge) await checkTools(settings.ffmpeg);
-      if (queue.active || merging || packaging) return snapshot();
-      queue.concurrency = settings.accountCount;
-      queue.start().then(async () => {
-        if (!queue.paused && queue.jobs.length && queue.jobs.every(j=>j.status==='completed')) {
-          if (settings.autoMerge) await mergeProject();
-          else if (settings.autoPackage) await packageProject();
-        }
-      }).catch(e=>dialog.showErrorBox('Lỗi xử lý hàng đợi',e.message)).finally(notify);
-      notify(); return snapshot();
+      if(merging || packaging) throw Error('Đang xử lý đầu ra video.');
+      if(resettingAccounts.size) throw Error('Chờ đăng xuất tài khoản hoàn tất trước khi chạy.');
+      if(queue.active || starting) return snapshot();
+      await licenseManager.ensureAllowed();
+      const epoch=runEpoch;starting=true;notify();
+      try {
+        for(let i=0;i<settings.accountCount;i++) {if(epoch!==runEpoch)return snapshot();assertMuse(browsers.get(i));await requireUS(i);}
+        if(settings.autoMerge) await checkTools(settings.ffmpeg);
+        if(epoch!==runEpoch || flushingQuit || queue.active) return snapshot();
+        queue.concurrency=settings.accountCount;
+        queue.start().then(async()=>{
+          if(!queue.paused && queue.jobs.length && queue.jobs.every(j=>j.status==='completed')) {
+            if(settings.autoMerge) await mergeProject();else if(settings.autoPackage) await packageProject();
+          }
+        }).catch(e=>dialog.showErrorBox('Lỗi xử lý hàng đợi',e.message)).finally(notify);
+        return snapshot();
+      } finally {starting=false;notify();}
+    },
+    checkUSA: async index=>{try{await observeNetwork(Number(index??0));}catch{}return snapshot();},
+    chooseVpnClient: async()=>{
+      const result=await dialog.showOpenDialog(main,{properties:['openFile'],title:'Chọn ứng dụng VPN đã cài trên Windows',filters:[{name:'Ứng dụng Windows',extensions:['exe']}]});
+      return result.canceled?'':result.filePaths[0];
+    },
+    vpnDownload: async()=>{await shell.openExternal(vpnSites[settings.vpnProvider]);},
+    openVpnClient: async()=>{
+      if(queue.active || starting) throw Error('Tạm dừng hàng đợi trước khi đổi VPN.');
+      if(!settings.vpnClientPath) throw Error('Cài VPN, sau đó chọn tệp ứng dụng VPN trong Cài đặt.');
+      const stat=await fs.stat(settings.vpnClientPath);
+      if(!path.isAbsolute(settings.vpnClientPath) || !stat.isFile() || path.extname(settings.vpnClientPath).toLowerCase()!=='.exe') throw Error('Chọn tệp .exe của ứng dụng VPN đã cài.');
+      networkReports.clear();networkErrors.clear();notify();
+      if(await shell.openPath(settings.vpnClientPath)) throw Error('Không mở được ứng dụng VPN. Kiểm tra đường dẫn đã chọn.');
     },
     merge: async () => { await mergeProject(); return snapshot(); },
     packageClips: async () => { await packageProject(); return snapshot(); },
@@ -246,13 +363,29 @@ app.whenReady().then(async () => {
       const r=await dialog.showOpenDialog(main,{properties:['openFile'],title:'Chọn ffmpeg.exe (ffprobe.exe phải ở cùng thư mục)'});
       if(!r.canceled){await checkTools(r.filePaths[0]);settings.ffmpeg=r.filePaths[0];await save();notify();}return snapshot();
     },
-    pause: () => { queue.pause(); notify(); return snapshot(); },
-    images: async () => { const r = await dialog.showOpenDialog(main, { properties: ['openFile','multiSelections'], filters: [{ name: 'Ảnh', extensions: ['png','jpg','jpeg','webp'] }] }); return r.canceled ? [] : r.filePaths; },
+    pause: () => {queue.pause();notify();return snapshot();},
+    stop: async()=>{runEpoch++;starting=false;await queue.stop();notify();return snapshot();},
+    clearPending: async()=>{if(merging||packaging)throw Error('Chờ xử lý đầu ra hoàn tất.');invalidateOutputs();await queue.clearPending();return snapshot();},
+    clearList: async()=>{if(merging||packaging)throw Error('Chờ xử lý đầu ra hoàn tất.');runEpoch++;starting=false;await queue.clearAll();invalidateOutputs();await save();notify();return snapshot();},
+    applyReferences: async data=>{
+      if(data?.assignments){for(const row of data.assignments){const j=queue.jobs.find(x=>x.id===row.id&&x.status==='pending');if(j){if(!Array.isArray(row.references)||row.references.some(x=>typeof x!=='string'))throw Error('Ảnh không hợp lệ.');j.references=[...row.references];j.image=j.references[0]||'';}}await queue.publish();}
+      else await queue.applyReferences(data?.files||[]);return snapshot();
+    },
+    images: async options=>{const r=await dialog.showOpenDialog(main,{properties:options?.multiple===false?['openFile']:['openFile','multiSelections'],filters:[{name:'Ảnh',extensions:['png','jpg','jpeg','webp']}]});return r.canceled?[]:r.filePaths;},
+    imageFolder: async()=>{const r=await dialog.showOpenDialog(main,{properties:['openDirectory']});if(r.canceled)return[];const entries=await fs.readdir(r.filePaths[0],{withFileTypes:true});return entries.filter(e=>e.isFile()&&/\.(png|jpe?g|webp)$/i.test(e.name)).map(e=>path.join(r.filePaths[0],e.name));},
+    pasteReference: async data=>{
+      const bytes=Buffer.from(data?.bytes||[]);if(!bytes.length||bytes.length>32*1024*1024)throw Error('Ảnh dán cần nhỏ hơn 32 MB.');
+      const ext=bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))?'.png':bytes[0]===255&&bytes[1]===216?'.jpg':bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP'?'.webp':'';
+      if(!ext)throw Error('Chỉ nhận ảnh PNG, JPEG hoặc WebP.');
+      const folder=path.join(app.getPath('userData'),'reference-imports');await fs.mkdir(folder,{recursive:true});const name=typeof data.name==='string'?data.name.split(/[\\/]/).pop().replace(/\.[^.]+$/,'').replace(/[^\p{L}\p{N}_-]/gu,'_').slice(0,60):'image';const file=path.join(folder,name+'_'+randomUUID()+ext);await fs.writeFile(file,bytes,{flag:'wx'});return file;
+    },
     folder: async () => { if (queue.active || merging || packaging) throw Error('Chờ hàng đợi dừng trước khi đổi thư mục.'); const r = await dialog.showOpenDialog(main, { properties: ['openDirectory','createDirectory'] }); if (!r.canceled) { settings.output = r.filePaths[0]; await save(); notify(); } return snapshot(); },
     settings: async data => {
-      if (queue.active || merging || packaging) throw Error('Chờ tác vụ hiện tại kết thúc trước khi đổi cài đặt.');
+      if (resettingAccounts.size || queue.active || starting || networkChecks.size || opening.size || externalLaunches.size || merging || packaging) throw Error('Chờ tác vụ hiện tại kết thúc trước khi đổi cài đặt.');
       for (const k of ['composer','fileInput','submit','video']) { if (typeof data[k] !== 'string' || data[k].length > 2000) throw Error('Selector không hợp lệ.'); }
       if (!data.composer.trim() || !data.fileInput.trim() || !data.video.trim()) throw Error('Không được để trống selector bắt buộc.');
+      const attachmentReadySelector=typeof data.attachmentReadySelector==='string'?data.attachmentReadySelector.trim():settings.attachmentReadySelector;
+      if(attachmentReadySelector.length>2000)throw Error('Selector ảnh quá dài.');
       const minutes = Number(data.timeoutMinutes); if (!Number.isFinite(minutes) || minutes < 1 || minutes > 120) throw Error('Thời gian chờ phải từ 1–120 phút.');
       const accountCount = Number(data.accountCount); if (!Number.isInteger(accountCount) || accountCount < 1 || accountCount > 4) throw Error('Chọn từ 1–4 tài khoản.');
       if(typeof data.ffmpeg !== 'string' || !data.ffmpeg.trim()) throw Error('Nhập đường dẫn FFmpeg hoặc ffmpeg nếu đã thêm vào PATH.');
@@ -264,7 +397,12 @@ app.whenReady().then(async () => {
         resolveBrowser({choice:browserChoice,customPath:browserPath});
         browserWarnings.clear();
       }
-      settings = { ...settings, browserChoice, browserPath, autoMerge: data.finishAction === 'merge', autoPackage: data.finishAction === 'package', ffmpeg: data.ffmpeg.trim(), accountCount, composer: data.composer, fileInput: data.fileInput, submit: data.submit, video: data.video, timeoutMinutes: minutes }; await save(); notify(); return snapshot();
+      const vpnProvider=data.vpnProvider ?? settings.vpnProvider;
+      if(!Object.hasOwn(vpnSites,vpnProvider)) throw Error('Nhà cung cấp VPN không hợp lệ.');
+      const vpnClientPath=typeof data.vpnClientPath==='string'?data.vpnClientPath.trim():settings.vpnClientPath;
+      if(vpnClientPath && (!path.isAbsolute(vpnClientPath) || path.extname(vpnClientPath).toLowerCase()!=='.exe')) throw Error('Đường dẫn ứng dụng VPN cần là tệp .exe trên máy.');
+      networkReports.clear();networkErrors.clear();
+      settings = { ...settings, attachmentReadySelector, requireUSA:data.requireUSA===true || data.requireUSA==='on',vpnProvider,vpnClientPath,browserChoice, browserPath, autoMerge: data.finishAction === 'merge', autoPackage: data.finishAction === 'package', ffmpeg: data.ffmpeg.trim(), accountCount, composer: data.composer, fileInput: data.fileInput, submit: data.submit, video: data.video, timeoutMinutes: minutes }; await save(); notify(); return snapshot();
     },
     reveal: id => { const j = queue.jobs.find(j => j.id === id); if (j?.output) shell.showItemInFolder(j.output); },
     export: async () => { const r = await dialog.showSaveDialog(main, { defaultPath: 'muse-project.json', filters: [{ name: 'JSON', extensions: ['json'] }] }); if (!r.canceled) await atomic(r.filePath, { jobs: queue.jobs }); }
@@ -277,14 +415,15 @@ app.on('before-quit', event => {
   if (!ownsInstance || quitAllowed) return;
   event.preventDefault();
   if (flushingQuit) return;
-  if (queue?.active || merging || packaging) {
-    const answer = dialog.showMessageBoxSync({type:'warning',buttons:['Tiếp tục chạy','Thoát'],defaultId:0,cancelId:0,message:'Đang xử lý video. Thoát sẽ ngắt tác vụ trong app; video đã gửi có thể vẫn được tạo trên Muse.'});
-    if (answer === 0) return;
-  }
-  flushingQuit=true; queue?.pause();
+  flushingQuit=true;runEpoch++;starting=false;shutdownController.abort();main?.hide?.();
   (async () => {
+    if(queue)await queue.stop();
+    const closingExternal=Promise.allSettled([...browsers.values()].filter(browser=>browser.external&&!browser.isDestroyed()).map(browser=>browser.close()));
+    for(const browser of browsers.values())if(!browser.external&&!browser.isDestroyed())browser.destroy();
+    await Promise.allSettled([...accountResets.values()]);
+    await Promise.allSettled([...networkChecks.values()]);
     await Promise.allSettled([...externalLaunches.values()]);
-    const externalResults=await Promise.allSettled([...browsers.values()].filter(browser=>browser.external && !browser.isDestroyed()).map(browser=>browser.close()));
+    const externalResults=await closingExternal;
     const results = await Promise.allSettled([...profiles.values()].map(async profile=>{
       await profile.ready;
       const results = await Promise.allSettled([profile.store.dispose(), Promise.resolve().then(()=>profile.session.flushStorageData())]);

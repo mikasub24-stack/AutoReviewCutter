@@ -44,10 +44,15 @@ jobs:
           retention-days: 30
       - name: Create download ZIP
         shell: pwsh
-        run: Compress-Archive -Path dist/MuseVideoStudio-0.3.0-Windows.exe -DestinationPath dist/MuseVideoStudio-0.3-Windows.zip -CompressionLevel Optimal
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $zip = "MuseVideoStudio-$version-Windows.zip"
+          Compress-Archive -Path "dist/MuseVideoStudio-$version-Windows.exe" -DestinationPath "dist/$zip" -CompressionLevel Optimal
+          "MUSE_VERSION=$version" >> $env:GITHUB_ENV
+          "MUSE_ZIP=$zip" >> $env:GITHUB_ENV
       - name: Publish Windows download
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create muse-studio-v0.3.0 dist/MuseVideoStudio-0.3-Windows.zip --target $env:GITHUB_SHA --title "Muse Video Studio 0.3 — Windows" --notes "Windows portable build. Download the ZIP, extract it and run the EXE. This prototype has local automated tests; Muse login/video generation and Windows browser integration still require real-account validation."
+          gh release create "muse-studio-v$env:MUSE_VERSION" "dist/$env:MUSE_ZIP" --target $env:GITHUB_SHA --title "Muse Video Studio $env:MUSE_VERSION — Windows" --notes "Download the ZIP, extract and run the EXE. VPN support opens your own VPN client and verifies US egress before app navigation to Muse; no VPN server/account is included. See README for setup and remaining real-service validation."

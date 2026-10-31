@@ -1,83 +1,42 @@
-// UI-only smoke test with a mocked IPC bridge; does not connect to Muse.
-const { chromium } = require('playwright-core');
-const http = require('node:http');
-const fs = require('node:fs/promises');
-const path = require('node:path');
-const assert = require('node:assert/strict');
-(async () => {
-  const server = http.createServer(async(req,res)=>{
-    const files={'/':'index.html','/style.css':'style.css','/renderer.js':'renderer.js','/script-planner.js':'script-planner.js'};
-    const file=files[req.url];if(!file){res.writeHead(404);res.end();return;}
-    res.setHeader('Content-Type',file.endsWith('.css')?'text/css':file.endsWith('.js')?'application/javascript':'text/html');
-    res.end(await fs.readFile(path.resolve(__dirname,'../src',file)));
+// Real Chromium UI test with mocked IPC; no Muse calls or payments.
+const{chromium}=require('playwright-core'),http=require('http'),fs=require('fs/promises'),path=require('path'),assert=require('assert/strict');
+const{importPrompts}=require('../src/prompt-import.js');
+(async()=>{
+ const fixture=process.env.PROMPT_FIXTURE_PATH?await fs.readFile(process.env.PROMPT_FIXTURE_PATH,'utf8'):Array.from({length:60},(_,i)=>`PROMPT ${i+1} — 8 seconds\nVIDEO PROMPT (standalone):\nCharacter: Fictional person.\n\nTIMED ACTIONS: Move smoothly. CAMERA: slow pan. Exactly 8 seconds.\n\nENGLISH VOICEOVER: Narration ${i+1}.`).join('\n');
+ const server=http.createServer(async(req,res)=>{const map={'/':'index.html','/style.css':'style.css','/renderer.js':'renderer.js','/script-planner.js':'script-planner.js','/prompt-import.js':'prompt-import.js','/reference-map.js':'reference-map.js'},name=map[req.url];if(!name){res.writeHead(404);return res.end();}res.setHeader('Content-Type',name.endsWith('.js')?'application/javascript':name.endsWith('.css')?'text/css':'text/html');res.end(await fs.readFile(path.join(__dirname,'../src',name)));});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+ try{
+  const page=await browser.newPage({viewport:{width:1450,height:1100}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+  await page.addInitScript(()=>{
+   const s={jobs:[],active:false,paused:true,network:{checking:[],reports:[],errors:[]},license:{status:'trial',device:'TESTDEVICE',expiresAt:Date.now()+86400000,message:'Dùng thử 24 giờ'},settings:{requireUSA:true,vpnProvider:'windscribe',vpnClientPath:'',browserChoice:'builtin',browserPath:'',output:'C:\\Videos',autoMerge:false,autoPackage:false,ffmpeg:'ffmpeg',accountCount:2,composer:'textarea',fileInput:'input[type=file]',submit:'',video:'video',attachmentReadySelector:'',timeoutMinutes:15}};window.calls=[];let listener,id=0;
+   window.studio={onUpdate:fn=>listener=fn,invoke:async(name,data)=>{
+    window.calls.push({name,data});
+    if(name==='images')return data?.multiple===false?['C:\\Refs\\character.png']:['C:\\Refs\\03.png','C:\\Refs\\01.png','C:\\Refs\\02.png'];
+    if(name==='imageFolder')return['C:\\Refs\\02.png','C:\\Refs\\01.png','C:\\Refs\\03.png'];
+    if(name==='add')s.jobs.push(...data.map(j=>({...j,id:String(++id),status:'pending'})));
+    if(name==='start'){s.active=true;s.paused=false;if(s.jobs.length)s.jobs[0].status='running';}
+    if(name==='stop'){s.active=false;s.paused=true;s.jobs.forEach(j=>{if(j.status==='running')j.status='interrupted';});}
+    if(name==='clearPending')s.jobs=s.jobs.filter(j=>j.status!=='pending');if(name==='clearList')s.jobs=[];
+    if(name==='applyReferences')for(const row of data.assignments){const j=s.jobs.find(j=>j.id===row.id);j.references=row.references;}
+    if(name==='settings'){Object.assign(s.settings,data);s.settings.accountCount=Number(data.accountCount);s.settings.autoMerge=data.finishAction==='merge';s.settings.autoPackage=data.finishAction==='package';}
+    if(name==='checkUSA')s.network.reports=[{index:data,ip:'203.0.113.8',countryCode:'US',countryName:'United States',observedAt:new Date().toISOString()}];
+    return structuredClone(s);
+   }};
   });
-  await new Promise(r=>server.listen(0,'127.0.0.1',r));
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
-  try {
-    const page = await browser.newPage({ viewport: { width: 1450, height: 1200 } });
-    const errors = []; page.on('pageerror', e => errors.push(e.message));
-    await page.addInitScript(() => {
-      let listener; let imageCall=0;
-      const state={jobs:[],active:false,paused:true,settings:{browserChoice:'builtin',browserPath:'',output:'C:\\Videos',autoMerge:false,autoPackage:false,ffmpeg:'ffmpeg',accountCount:2,composer:'textarea',fileInput:'input[type=file]',submit:'',video:'video',timeoutMinutes:15}};
-      window.testCalls=[];
-      window.completeJobs=()=>{state.jobs=state.jobs.map(j=>({...j,status:'completed',output:'C:\\Videos\\'+j.id+'.mp4'}));listener(structuredClone(state));};
-      window.studio={onUpdate:fn=>listener=fn,invoke:async(name,data)=>{
-        window.testCalls.push({name,data});
-        if(name==='start') return structuredClone(state);
-        if(name==='images') return ++imageCall===1 ? ['C:\\References\\one.png','C:\\References\\style.png'] : ['C:\\References\\two.png'];
-        if(name==='add') state.jobs.push(...data.map((j,i)=>({...j,id:String(i),status:'pending'})));
-        if(name==='settings') { Object.assign(state.settings,data);state.settings.accountCount=Number(data.accountCount);state.settings.autoMerge=data.finishAction==='merge';state.settings.autoPackage=data.finishAction==='package'; }
-        if(name==='packageClips') {state.editPackageDir='C:\\Videos\\CapCut_Clips_test';state.packageProgress='Đã xuất clip';}
-        if(['state','add','settings','packageClips'].includes(name)) return structuredClone(state);
-        return true;
-      }};
-    });
-    await page.goto(`http://127.0.0.1:${server.address().port}/`);
-    await page.locator('#draftRows textarea').fill('Animate character one');
-    await page.locator('#draftRows button').filter({hasText:'Ảnh tham chiếu riêng'}).click();
-    await page.locator('#newDraft').click();
-    await page.locator('#draftRows textarea').nth(1).fill('Animate character two');
-    await page.locator('#draftRows .draftRow').nth(1).getByText('Ảnh tham chiếu riêng').click();
-    await page.locator('#commitDrafts').click();
-    const calls=await page.evaluate(()=>window.testCalls);
-    const added=calls.find(c=>c.name==='add').data;
-    assert.deepEqual(added.map(j=>j.references),[['C:\\References\\one.png','C:\\References\\style.png'],['C:\\References\\two.png']]);
-    assert.equal(await page.locator('.card').count(),2);
-    await page.locator('#configure').click();
-    assert.equal(await page.locator('select[name=finishAction]').inputValue(),'keep');
-    await page.locator('select[name=finishAction]').selectOption('package');
-    assert.equal(await page.locator('select[name=browserChoice]').inputValue(),'builtin');
-    await page.locator('select[name=browserChoice]').selectOption('edge');
-    await page.locator('input[name=accountCount]').fill('3');
-    await page.locator('#settingsForm button[type=submit]').click();
-    assert.equal(await page.locator('#accountPicker option').count(),3);
-    assert.equal(await page.locator('#browserInfo').textContent(),'Microsoft Edge');
-    await page.locator('#accountPicker').selectOption('2');await page.locator('#browser').click();
-    assert.equal(await page.evaluate(()=>window.testCalls.find(c=>c.name==='browser').data),2);
-    assert.match(await page.locator('#finishMode').textContent(),/Xuất clip cho CapCut/);
-    assert.equal(await page.locator('#packageClips').isDisabled(),true);
-    await page.evaluate(()=>window.completeJobs());
-    assert.equal(await page.locator('#packageClips').isDisabled(),false);
-    await page.locator('#packageClips').click();
-    assert.equal(await page.locator('#openPackage').isVisible(),true);
-    await page.locator('#openPackage').click();
-    assert.ok(await page.evaluate(()=>window.testCalls.some(c=>c.name==='openPackage')));
-    await page.locator('#scriptInput').fill('Cảnh 1: Đầu bếp mở cửa quán.\n\nCảnh 2: Cận cảnh món ăn nóng.');
-    await page.locator('#scriptSeconds').fill('8');
-    await page.locator('#scriptAspect').selectOption('9:16');
-    await page.locator('#planScript').click();
-    assert.equal(await page.locator('#draftRows textarea').count(),2);
-    assert.match(await page.locator('#draftRows textarea').first().inputValue(),/8 giây, tỷ lệ 9:16/);
-    assert.match(await page.locator('#draftRows textarea').nth(1).inputValue(),/Cận cảnh món ăn/);
-    page.once('dialog',dialog=>dialog.accept());
-    await page.locator('#createDrafts').click();
-    await page.waitForFunction(()=>window.testCalls.some(c=>c.name==='start'));
-    const generated=await page.evaluate(()=>window.testCalls.filter(c=>c.name==='add').at(-1).data);
-    assert.equal(generated.length,2);
-    assert.match(generated[0].source,/Đầu bếp/);
-    assert.equal(await page.locator('.card').count(),4);
-    assert.deepEqual(errors,[]);
-    await page.screenshot({path:path.resolve(__dirname,'../ui-preview.png'),fullPage:true});
-    console.log('PASS: per-prompt references, queue cards, account settings and selected account dispatch, keep/package output modes, browser choice, script planning and create-to-queue dispatch (mock bridge).');
-  } finally { await browser.close(); server.close(); }
+  await page.goto(`http://127.0.0.1:${server.address().port}/`);
+  await page.locator('#prompts').fill(fixture);await page.locator('#images').click();await page.locator('#add').click();
+  assert.equal(await page.locator('#draftRows textarea').count(),60);assert.match(await page.locator('#importInfo').textContent(),/8:00/);
+  assert.equal(await page.locator('#draftRows textarea').first().inputValue(),importPrompts(fixture)[0].prompt);
+  await page.locator('#createDrafts').click();await page.waitForFunction(()=>window.calls.some(c=>c.name==='start'));
+  const payload=await page.evaluate(()=>window.calls.find(c=>c.name==='add').data);assert.equal(payload.length,60);assert.ok(payload.every(j=>j.references[0]==='C:\\Refs\\character.png'));assert.equal(payload[0].prompt,importPrompts(fixture)[0].prompt);
+  await page.locator('#pause').click();await page.waitForFunction(()=>window.calls.some(c=>c.name==='stop'));assert.match(await page.locator('#queueState').textContent(),/Đã dừng/);
+  await page.locator('#clearPending').click();assert.equal(await page.locator('.card').count(),1);await page.locator('#clearList').click();assert.equal(await page.locator('.card').count(),0);
+  await page.locator('#prompts').fill('PROMPT 01: First complete motion prompt.\nPROMPT 02: Second motion prompt.\nPROMPT 03: Third motion prompt.');await page.locator('#referenceMode').selectOption('numbered');await page.locator('#imageFolder').click();await page.locator('#add').click();
+  assert.equal(await page.locator('#draftRows textarea').count(),3);assert.match(await page.locator('.draftRow').nth(0).locator('.referenceList').textContent(),/01.png/);assert.match(await page.locator('.draftRow').nth(1).locator('.referenceList').textContent(),/02.png/);
+  await page.locator('#commitDrafts').click();const second=await page.evaluate(()=>window.calls.filter(c=>c.name==='add').at(-1).data);assert.deepEqual(second.map(j=>j.references[0].split('\\').pop()),['01.png','02.png','03.png']);
+  await page.locator('#referenceMode').selectOption('shared');await page.locator('#images').click();await page.locator('#applyRefs').click();const assigned=await page.evaluate(()=>window.calls.find(c=>c.name==='applyReferences').data.assignments);assert.ok(assigned.every(j=>j.references[0].endsWith('character.png')));
+  await page.locator('#configure').click();await page.locator('select[name=browserChoice]').selectOption('edge');await page.locator('input[name=accountCount]').fill('3');await page.locator('#settingsForm button[type=submit]').click();await page.locator('#accountPicker').selectOption('2');await page.locator('#logoutAccount').click();assert.equal(await page.evaluate(()=>window.calls.find(c=>c.name==='logoutAccount').data),2);
+  await page.locator('#checkUSA').click();assert.match(await page.locator('#networkStatus').textContent(),/IP Mỹ/);await page.locator('#licenseButton').click();assert.match(await page.locator('#licenseStatus').textContent(),/Dùng thử/);assert.equal(await page.locator('.paymentPanel').textContent().then(s=>s.includes('PGD')),false);await page.locator('#closeLicense').click();
+  assert.deepEqual(errors,[]);await page.screenshot({path:path.join(__dirname,'../ui-preview.png'),fullPage:true});console.log('PASS: 60 prepared scenes preserved, one shared image, numbered image folder mapping, immediate stop IPC, bulk clear, per-account logout, USA check and trial UI. Mock IPC, no real Muse.');
+ }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

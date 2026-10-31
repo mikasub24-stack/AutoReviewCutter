@@ -28,6 +28,7 @@ async function exportEditPackage(jobs, { output, onProgress = () => {} } = {}) {
       file: `clips/${String(index + 1).padStart(digits, '0')}${extension}`,
       prompt: typeof job.prompt === 'string' ? job.prompt : ''
     };
+    if (typeof job.voiceover==='string' && job.voiceover.trim()) clip.voiceover=job.voiceover.trim();
     if (Number.isInteger(job.account) && job.account > 0) clip.account = job.account;
     entries.push({ source: job.output, clip });
   }
@@ -49,6 +50,7 @@ async function exportEditPackage(jobs, { output, onProgress = () => {} } = {}) {
       clips: entries.map(entry => entry.clip)
     };
     await fs.writeFile(path.join(staging, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n', { flag: 'wx' });
+    await fs.writeFile(path.join(staging,'voiceover.txt'),entries.map(e=>`${String(e.clip.order).padStart(digits,'0')}: ${e.clip.voiceover||''}`).join('\n'),{flag:'wx'});
     await fs.writeFile(path.join(staging, 'ordered-clips.txt'), entries.map(entry => entry.clip.file).join('\n') + '\n', { flag: 'wx' });
     await fs.writeFile(path.join(staging, 'HUONG-DAN-CAPCUT.txt'), [
       'MUSE VIDEO STUDIO — GÓI CLIP ĐỂ DỰNG TRONG CAPCUT',

@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { launchExternalBrowser } = require('../src/external-browser.cjs');
+const { CHECK_URL } = require('../src/network-check.cjs');
 const key = crypto.randomBytes(32);
 const storage = {
   isEncryptionAvailable: () => true,
@@ -14,22 +15,24 @@ const storage = {
 };
 class FakePage extends EventEmitter {
   constructor(events) {
-    super();this.events=events;this.address='about:blank';this.closed=false;this.inputCount=1;this.multiple='';this.visible=true;this.enabled=true;
+    super();this.events=events;this.address='about:blank';this.closed=false;this.inputCount=1;this.multiple='';this.visible=true;this.enabled=true;this.bodyText=JSON.stringify({success:true,ip:'203.0.113.10',country_code:'US',country:'United States'});this.responseStatus=200;
     this.keyboard={press:async key=>events.push(['press',key])};
   }
   url(){return this.address;} isClosed(){return this.closed;}
-  async goto(url,options){this.events.push(['goto',url,options]);if(this.failGoto)throw Error('network private details');this.address=url;}
+  async goto(url,options){this.events.push(['goto',url,options]);if(this.failGoto)throw Error('network private details');if(this.hangGoto)return new Promise(()=>{});this.address=this.redirect || url;return {status:()=>this.responseStatus};}
+  async close(){this.closed=true;this.events.push(['page-close']);this.emit('close');}
   async bringToFront(){this.events.push(['show']);}
-  locator(selector){return {count:async()=>this.inputCount,getAttribute:async()=>this.multiple,setInputFiles:async files=>this.events.push(['upload',selector,files]),isVisible:async()=>this.visible,isEnabled:async()=>this.enabled,click:async()=>this.events.push(['click',selector])};}
+  locator(selector){return {count:async()=>this.inputCount,getAttribute:async()=>this.multiple,setInputFiles:async files=>this.events.push(['upload',selector,files]),isVisible:async()=>this.visible,isEnabled:async()=>this.enabled,click:async()=>this.events.push(['click',selector]),innerText:async()=>{if(this.failRead)throw Error('private read detail');return this.bodyText;}};}
   async evaluate(fn,arg){this.events.push(['evaluate',arg]);if(typeof arg==='string' && /^(https:|blob:)/.test(arg))return;return fn(arg);}
   waitForEvent(name,options){this.events.push(['wait',name,options]);return this.downloadPromise || Promise.resolve({saveAs:async target=>{this.events.push(['download',target]);await fs.writeFile(target,'test mp4');},failure:async()=>null});}
 }
 class FakeContext extends EventEmitter {
-  constructor(){super();this.events=[];this.page=new FakePage(this.events);this.values=[];this.closed=false;this.closes=0;}
-  pages(){return [this.page];} setDefaultTimeout(value){this.events.push(['timeout',value]);}
+  constructor(){super();this.events=[];this.page=new FakePage(this.events);this.values=[];this.closed=false;this.closes=0;this.list=[this.page];this.probeConfig={};}
+  pages(){return [...this.list];}
+  async newPage(){const page=new FakePage([]);Object.assign(page,this.probeConfig);this.list.push(page);this.emit('page',page);return page;} setDefaultTimeout(value){this.events.push(['timeout',value]);}
   async cookies(){if(this.closed)throw Error('context closed');this.events.push(['cookies']);return structuredClone(this.values);}
   async addCookies(cookies){this.events.push(['restore',cookies]);this.values.push(...cookies.map(c=>({...c,expires:-1})));}
-  async close(){this.events.push(['close']);this.closed=true;this.closes++;this.page.closed=true;this.emit('close');}
+  async close(){this.events.push(['close']);this.closed=true;this.closes++;for(const p of this.list)p.closed=true;this.emit('close');}
 }
 async function setup(options = {}) {
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-external-test-'));
@@ -124,3 +127,69 @@ test('concurrent closes share one promise and close the context only once', asyn
     adapter=await launchExternalBrowser(t.config);const first=adapter.close(),second=adapter.close();assert.equal(first,second);await Promise.all([first,second]);assert.equal(t.context.closes,1);
   } finally {await t.cleanup(adapter);}
 });
+
+test('network check uses only a temporary page in the same account context and preserves Muse selection', async () => {
+  const t=await setup();let adapter;
+  try {
+    adapter=await launchExternalBrowser(t.config);const before=[...t.context.page.events];
+    const report=await adapter.checkNetwork();assert.equal(report.countryCode,'US');assert.equal(adapter.url(),'https://muse.ai/');
+    const probe=t.context.list[1];assert.equal(probe.closed,true);assert.deepEqual(t.context.page.events,before);
+    assert.equal(probe.events.find(e=>e[0]==='goto')[1],CHECK_URL);assert.equal(probe.events.find(e=>e[0]==='goto')[2].timeout,15000);
+    assert.equal(t.context.page.closed,false);assert.equal(probe.events.filter(e=>e[0]==='page-close').length,1);
+  } finally {await t.cleanup(adapter);}
+});
+test('network check returns non-US observation without treating it as an established US VPN', async () => {
+  const t=await setup();let adapter;
+  try {
+    adapter=await launchExternalBrowser(t.config);t.context.probeConfig.bodyText=JSON.stringify({success:true,ip:'2001:db8::1',country_code:'VN',country:'Vietnam'});
+    const result=await adapter.checkNetwork();assert.equal(result.countryCode,'VN');assert.equal(result.connected,undefined);assert.equal(t.context.list[1].closed,true);
+  } finally {await t.cleanup(adapter);}
+});
+test('malformed, denied, redirected, and failed probes clean up the temp tab without remote error values', async () => {
+  const variants=[{bodyText:'private invalid json'},{bodyText:JSON.stringify({success:false,message:'private API failure'})},{responseStatus:403},{redirect:'https://private.example.test/'},{failGoto:true},{failRead:true}];
+  for(const variant of variants){
+    const t=await setup();let adapter;
+    try {
+      adapter=await launchExternalBrowser(t.config);t.context.probeConfig=variant;
+      await assert.rejects(adapter.checkNetwork(),e=>e.message==='Không kiểm tra được IP và quốc gia của trình duyệt. Kiểm tra kết nối rồi thử lại.');
+      assert.equal(t.context.list[1].closed,true);assert.equal(adapter.url(),'https://muse.ai/');assert.equal(t.context.page.closed,false);
+    } finally {await t.cleanup(adapter);}
+  }
+});
+test('overall network check timeout closes its tab within 15 seconds', async testContext => {
+  const t=await setup();let adapter;
+  try {
+    adapter=await launchExternalBrowser(t.config);t.context.probeConfig.hangGoto=true;
+    testContext.mock.timers.enable({apis:['setTimeout']});
+    const checking=adapter.checkNetwork();const checked=assert.rejects(checking,/Không kiểm tra được/);
+    await new Promise(resolve=>setImmediate(resolve));testContext.mock.timers.tick(15000);await checked;
+    assert.equal(t.context.list[1].closed,true);assert.equal(t.context.page.closed,false);
+    testContext.mock.timers.reset();
+  } finally {testContext.mock.timers.reset();await t.cleanup(adapter);}
+});
+test('closed account context cannot start a network probe', async () => {
+  const t=await setup();let adapter;
+  try {adapter=await launchExternalBrowser(t.config);await adapter.close();await assert.rejects(adapter.checkNetwork(),/đã đóng/);assert.equal(t.context.list.length,1);}
+  finally {await t.cleanup(adapter);}
+});
+test('deferred startup checks US before explicitly navigating to Muse', async () => {
+  const t=await setup({deferMuseNavigation:true});let adapter;
+  try {
+    adapter=await launchExternalBrowser(t.config);assert.equal(adapter.url(),'about:blank');assert.equal(t.context.page.events.some(e=>e[0]==='goto'),false);
+    const result=await adapter.checkNetwork();assert.equal(result.countryCode,'US');assert.equal(t.context.page.events.some(e=>e[0]==='goto'),false);assert.equal(adapter.url(),'about:blank');
+    await adapter.openMuse();assert.equal(adapter.url(),'https://muse.ai/');assert.equal(t.context.page.events.filter(e=>e[0]==='goto').length,1);
+  } finally {await t.cleanup(adapter);}
+});
+test('failed or non-US pre-login check does not request Muse navigation', async () => {
+  for(const bodyText of ['invalid private body',JSON.stringify({success:true,ip:'203.0.113.10',country_code:'VN',country:'Vietnam'})]){
+    const t=await setup({deferMuseNavigation:true});let adapter;
+    try {
+      adapter=await launchExternalBrowser(t.config);t.context.probeConfig.bodyText=bodyText;
+      try {await adapter.checkNetwork();}catch{}
+      assert.equal(t.context.page.events.some(e=>e[0]==='goto'),false);assert.equal(adapter.url(),'about:blank');
+    } finally {await t.cleanup(adapter);}
+  }
+});
+
+test('clearLogin removes only the selected app-owned account profile and encrypted backup',async()=>{const a=await setup(),b=await setup();let first,second;try{first=await launchExternalBrowser(a.config);second=await launchExternalBrowser(b.config);await first.flush();await second.flush();await first.clearLogin();await assert.rejects(fs.access(a.config.profileDir));await assert.rejects(fs.access(a.config.sessionFile));await fs.access(b.config.profileDir);await fs.access(b.config.sessionFile);assert.equal(second.isDestroyed(),false);}finally{await a.cleanup(first);await b.cleanup(second);}});
+test('clearLogin refuses a replaced unmarked personal folder',async()=>{const t=await setup();let adapter;try{adapter=await launchExternalBrowser(t.config);await fs.rename(t.config.profileDir,t.config.profileDir+'-original');await fs.mkdir(t.config.profileDir);await fs.writeFile(path.join(t.config.profileDir,'Local State'),'keep-personal');await assert.rejects(adapter.clearLogin(),/Chưa xóa/);assert.equal(await fs.readFile(path.join(t.config.profileDir,'Local State'),'utf8'),'keep-personal');}finally{await t.cleanup(adapter);}});

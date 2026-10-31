@@ -52,3 +52,14 @@ test('each prompt keeps its own reference files in persisted state', async () =>
   await q.add([{prompt:'one',references:['one.png','style.png']},{prompt:'two',references:['two.png']}]);
   assert.deepEqual(stored.map(j=>j.references),[['one.png','style.png'],['two.png']]);
 });
+test('stop interrupts all active workers immediately even while run is waiting; pending jobs are untouched',async()=>{
+ const q=new Queue({...base,concurrency:2,run:(_j,_slot,signal)=>new Promise(()=>{assert.equal(signal.aborted,false);})});
+ await q.add(['a','b','c'].map(prompt=>({prompt})));const work=q.start();await new Promise(r=>setImmediate(r));
+ await Promise.race([q.stop(),new Promise((_,reject)=>setTimeout(()=>reject(Error('stop did not interrupt')),300))]);await work;
+ assert.deepEqual(q.jobs.map(j=>j.status),['interrupted','interrupted','pending']);assert.equal(q.active,false);
+});
+test('bulk delete pending keeps completed outputs; clearAll stops active job and removes list only',async()=>{
+ const q=new Queue({...base,jobs:[{id:'done',prompt:'old',status:'completed',output:'keep.mp4'}],run:()=>new Promise(()=>{})});await q.add([{prompt:'a'},{prompt:'b'}]);await q.clearPending();assert.equal(q.jobs.length,1);assert.equal(q.jobs[0].output,'keep.mp4');
+ await q.add([{prompt:'c'}]);const work=q.start();await new Promise(r=>setImmediate(r));await q.clearAll();await work;assert.equal(q.jobs.length,0);
+});
+test('bulk reference changes affect pending jobs only',async()=>{const q=new Queue({...base,jobs:[{id:'done',status:'completed',references:['old.png']}],run:async()=>''});await q.add([{prompt:'a'}]);await q.applyReferences(['common.png']);assert.deepEqual(q.jobs[0].references,['old.png']);assert.deepEqual(q.jobs[1].references,['common.png']);});

@@ -1,6 +1,6 @@
 {
   "name": "muse-video-studio",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "private": true,
   "description": "Windows desktop queue for Muse image-to-video workflows",
   "main": "src/main.cjs",
@@ -37,6 +37,7 @@
     "compression": "store"
   },
   "dependencies": {
-    "playwright-core": "^1.64.1"
+    "playwright-core": "^1.64.1",
+    "qrcode": "^1.5.4"
   }
 }

@@ -28,7 +28,7 @@ const safeStorage = {
   }
 };
 
-async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver } = {}) {
+async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, logoutResponse=1 } = {}) {
   const handlers = new Map(), sessions = new Map(), windows = [], errors = [], notices = [];
   const lifecycle = [];
   let loaded, quit;
@@ -54,7 +54,7 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
       values.push({ ...details, domain: details.domain || new URL(details.url).hostname, hostOnly: !details.domain, session: true });
     };
     const session = { partition, cookies, values,
-      flushStorageData: () => { lifecycle.push(`storage-flushed:${partition}`); }
+      flushStorageData: () => { lifecycle.push(`storage-flushed:${partition}`); },clearStorageData:async()=>{values.splice(0);lifecycle.push(`cleared:${partition}`);},clearCache:async()=>{}
     };
     sessions.set(partition, session); return session;
   }
@@ -69,6 +69,7 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
       contents.getURL = () => this.url || '';
       this.webContents = contents; windows.push(this);
     }
+    destroy(){this.destroyed=true;this.emit('closed');}
     isDestroyed() { return this.destroyed; }
     isMinimized() { return false; }
     show() {} focus() {} restore() {}
@@ -86,22 +87,24 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
 
   const dialog = {
     showErrorBox: (title, message) => { errors.push({ title, message }); loaded(); },
+    showMessageBox:async(_parent,options)=>{notices.push(options);return{response:logoutResponse};},
     showMessageBoxSync: options => { notices.push(options); return 1; },
     showSaveDialog: async () => ({ canceled: false, filePath: path.join(userData, 'export.json') })
   };
   const electron = { app, BrowserWindow, safeStorage, dialog,
     session: { fromPartition: accountSession },
-    shell: { showItemInFolder() {}, openPath: async () => '' },
+    shell: { showItemInFolder() {}, openPath: async () => '', openExternal: async()=>{} },
     ipcMain: { handle: (name, handler) => handlers.set(name, handler) }
   };
   const context = vm.createContext({
     require: name => {
       if(name === 'electron') return electron;
+      if(name === './electron-network-check.cjs') return {checkElectronNetwork:networkProbe || (async()=>({ip:'203.0.113.9',countryCode:'US',countryName:'United States',observedAt:new Date().toISOString()}))};
       if(name === './external-browser.cjs' && externalLauncher) return {launchExternalBrowser:externalLauncher};
       if(name === './browser-discovery.cjs' && browserResolver) return {resolveBrowser:browserResolver};
       return localRequire(name);
     },
-    __dirname: path.dirname(mainPath), Buffer, URL, console, setTimeout, clearTimeout
+    __dirname: path.dirname(mainPath), Buffer, URL, console, setTimeout, clearTimeout, AbortController
   });
   vm.runInContext(await fs.readFile(mainPath, 'utf8'), context, { filename: mainPath });
   if (ownsLock) await loadedPromise;
@@ -219,7 +222,7 @@ test('main routes selected external browser to independent app profiles and refu
   try {
     const app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async options=>{
       launches.push(options);let closed=false;
-      const adapter={external:true,isDestroyed:()=>closed,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},close:async()=>{closed=true;}};
+      const adapter={external:true,checkNetwork:async()=>({ip:'203.0.113.9',countryCode:'US',countryName:'United States',observedAt:new Date().toISOString()}),openMuse:async()=>{},isDestroyed:()=>closed,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},close:async()=>{closed=true;}};
       adapters.push(adapter);return adapter;
     }});
     const initial=app.invoke('state');
@@ -249,4 +252,40 @@ test('quit during external browser launch waits and closes the late browser inst
     assert.equal(app.lifecycle.includes('quit'),false);release();await opening;await quitting;
     assert.equal(closed,true);assert.equal(app.windows.length,1);
   } finally {release();await fs.rm(dir,{recursive:true,force:true});}
+});
+
+test('USA requirement blocks native Muse navigation before login when the browser reports Vietnam',async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-country-gate-'));
+  try {
+    const app=await boot(dir,{networkProbe:async()=>({ip:'203.0.113.10',countryCode:'VN',countryName:'Vietnam',observedAt:new Date().toISOString()})});
+    assert.equal(app.invoke('state').settings.requireUSA,true);
+    await assert.rejects(app.invoke('browser',0),/chưa có IP Mỹ/);
+    assert.equal(app.windows.length,1);assert.equal(app.invoke('state').network.reports[0].countryCode,'VN');
+    await app.stop();
+  } finally {await fs.rm(dir,{recursive:true,force:true});}
+});
+test('USA requirement fails closed when IP lookup fails and never opens Muse',async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-country-gate-'));
+  try {
+    const app=await boot(dir,{networkProbe:async()=>{throw Error('Không kiểm tra được IP.');}});
+    await assert.rejects(app.invoke('browser',0),/Không kiểm tra/);
+    assert.equal(app.windows.length,1);assert.equal(app.invoke('state').network.errors.length,1);await app.stop();
+  } finally {await fs.rm(dir,{recursive:true,force:true});}
+});
+
+test('logout resets only selected native account and keeps the other login and downloaded files',async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-logout-'));try{
+  const app=await boot(dir,{initialCookies:{'persist:muse-account-1':[cookie('one')],'persist:muse-account-2':[cookie('two')]}});await app.invoke('browser',0);await app.invoke('browser',1);
+  await app.invoke('logoutAccount',0);assert.equal(app.sessions.get('persist:muse-account-1').values.length,0);assert.equal(app.sessions.get('persist:muse-account-2').values[0].value,'two');assert.equal(app.windows[1].isDestroyed(),true);assert.equal(app.windows[2].isDestroyed(),false);await assert.rejects(fs.access(path.join(dir,'account-sessions','account-1.enc')));await app.stop();
+ }finally{await fs.rm(dir,{recursive:true,force:true});}
+});
+test('cancel logout preserves the selected profile',async()=>{const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-logout-'));try{const app=await boot(dir,{logoutResponse:0,initialCookies:{'persist:muse-account-1':[cookie('one')]}});await app.invoke('browser',0);await app.invoke('logoutAccount',0);assert.equal(app.windows[1].isDestroyed(),false);assert.equal(app.sessions.get('persist:muse-account-1').values.length,1);await app.stop();}finally{await fs.rm(dir,{recursive:true,force:true});}});
+test('closing the main window requests full app shutdown instead of abandoning browser windows',async()=>{const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-close-'));try{const app=await boot(dir);let prevented=false;app.windows[0].emit('close',{preventDefault(){prevented=true;}});assert.equal(prevented,true);assert.ok(app.lifecycle.includes('quit'));await app.stop();}finally{await fs.rm(dir,{recursive:true,force:true});}});
+
+test('stop IPC interrupts a waiting browser job without sending another prompt',{timeout:5000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-stop-'));await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({settings:{output:dir},configVersion:2}));let reached,submitted=0;const waiting=new Promise(r=>reached=r);
+ try{const app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>{let closed=false;return{external:true,isDestroyed:()=>closed,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},openMuse:async()=>{},evaluate:async()=>{reached();return new Promise(()=>{});},pressEnter:async()=>submitted++,close:async()=>{closed=true;}};}});
+ await app.invoke('settings',{...app.invoke('state').settings,requireUSA:false,output:dir,accountCount:1,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'original complete scene'},{prompt:'next scene'}]);await app.invoke('start');await waiting;
+ const stopped=await app.invoke('stop');assert.equal(stopped.active,false);assert.deepEqual(Array.from(stopped.jobs,j=>j.status),['interrupted','pending']);assert.equal(submitted,0);await app.invoke('clearPending');assert.equal(app.invoke('state').jobs.length,1);await app.invoke('clearList');assert.equal(app.invoke('state').jobs.length,0);await app.stop();
+ }finally{await fs.rm(dir,{recursive:true,force:true});}
 });
