@@ -157,8 +157,9 @@ test('partial profile cleanup can be retried without ownership marker if directo
   const t=await setup({deferMuseNavigation:true});let adapter;const remove=fs.rm;
   try {
     adapter=await launchExternalBrowser(t.config);await fs.writeFile(path.join(t.config.profileDir,'remaining'),'keep until retry');
-    fs.rm=async(directory,options)=>{if(directory===t.config.profileDir){await fs.unlink(path.join(directory,'.muse-studio-profile'));throw Error('fixture busy profile');}return remove(directory,options);};
-    await assert.rejects(adapter.clearLogin(),/Chưa xóa/);await fs.access(path.join(t.config.profileDir,'remaining'));
+    const canonicalProfile=await fs.realpath(t.config.profileDir);let injected=0;
+    fs.rm=async(directory,options)=>{if(directory===canonicalProfile){injected++;await fs.unlink(path.join(directory,'.muse-studio-profile'));throw Error('fixture busy profile');}return remove(directory,options);};
+    await assert.rejects(adapter.clearLogin(),/Chưa xóa/);assert.equal(injected,1);await fs.access(path.join(t.config.profileDir,'remaining'));
     fs.rm=remove;assert.equal(await adapter.clearLogin(),true);await assert.rejects(fs.access(t.config.profileDir));await assert.rejects(fs.access(t.config.sessionFile));
   } finally {fs.rm=remove;await t.cleanup(adapter);}
 });
