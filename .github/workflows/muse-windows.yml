@@ -1,0 +1,53 @@
+name: Build Muse Video Studio Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, muse-video-studio]
+    paths:
+      - 'MuseVideoStudio/src/**'
+      - 'MuseVideoStudio/test/**'
+      - 'MuseVideoStudio/package.json'
+      - 'MuseVideoStudio/package-lock.json'
+      - '.github/workflows/muse-windows.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: MuseVideoStudio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: MuseVideoStudio/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Test queue, profiles, browser adapters and script planner
+        run: npm test
+      - name: Build portable Windows app
+        run: npm run dist:win
+      - name: Upload Windows download
+        uses: actions/upload-artifact@v4
+        with:
+          name: MuseVideoStudio-Windows
+          path: MuseVideoStudio/dist/MuseVideoStudio-*-Windows.exe
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+      - name: Create download ZIP
+        shell: pwsh
+        run: Compress-Archive -Path dist/MuseVideoStudio-0.3.0-Windows.exe -DestinationPath dist/MuseVideoStudio-0.3-Windows.zip -CompressionLevel Optimal
+      - name: Publish Windows download
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create muse-studio-v0.3.0 dist/MuseVideoStudio-0.3-Windows.zip --target $env:GITHUB_SHA --title "Muse Video Studio 0.3 — Windows" --notes "Windows portable build. Download the ZIP, extract it and run the EXE. This prototype has local automated tests; Muse login/video generation and Windows browser integration still require real-account validation."
