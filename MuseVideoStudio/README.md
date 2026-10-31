@@ -1,4 +1,6 @@
-# Muse Video Studio 0.6.3 · Windows
+# Muse Video Studio 0.6.4 · Windows
+
+Icon Muse Studio riêng (M vàng + Play trắng) được nhúng vào EXE, cửa sổ ứng dụng và logo trong giao diện.
 
 ## Sửa luồng chờ và gửi của 0.6.2
 

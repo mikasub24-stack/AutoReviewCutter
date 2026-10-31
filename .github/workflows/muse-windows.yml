@@ -50,6 +50,41 @@ jobs:
           exit /b %MUSE_BROWSER_EXIT%
       - name: Build portable Windows app
         run: npm run dist:win
+      - name: Verify launcher and app EXE icons
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.Drawing
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $iconPath = (Resolve-Path "src/assets/muse-studio.ico").Path
+          $files = @("dist/MuseVideoStudio-$version-Windows.exe", "dist/win-unpacked/Muse Video Studio.exe")
+          try {
+            foreach ($file in $files) {
+              $actualIcon = [System.Drawing.Icon]::ExtractAssociatedIcon((Resolve-Path $file).Path)
+              if (-not $actualIcon) { throw "No embedded icon: $file" }
+              $expectedIcon = [System.Drawing.Icon]::new($iconPath, $actualIcon.Size)
+              $actual = $actualIcon.ToBitmap()
+              $expected = $expectedIcon.ToBitmap()
+              try {
+                $checked = 0; $matching = 0
+                for ($y = 0; $y -lt $expected.Height; $y++) {
+                  for ($x = 0; $x -lt $expected.Width; $x++) {
+                    $e = $expected.GetPixel($x, $y)
+                    if ($e.A -lt 240) { continue }
+                    $a = $actual.GetPixel($x, $y)
+                    $checked++
+                    if ([Math]::Abs([int]$a.R-$e.R) -le 4 -and [Math]::Abs([int]$a.G-$e.G) -le 4 -and [Math]::Abs([int]$a.B-$e.B) -le 4) { $matching++ }
+                  }
+                }
+                if ($checked -lt 100 -or $matching / $checked -lt 0.96) { throw "Embedded icon differs from Muse artwork: $file" }
+                Write-Host "Verified custom Muse icon in $file"
+              } finally {
+                $actual.Dispose(); $expected.Dispose(); $actualIcon.Dispose(); $expectedIcon.Dispose()
+              }
+            }
+          } catch {
+            $_ | Out-String | Add-Content test.log
+            throw
+          }
       - name: Upload Windows download
         uses: actions/upload-artifact@v4
         with:
@@ -71,7 +106,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "muse-studio-v$env:MUSE_VERSION" "dist/$env:MUSE_ZIP" --target $env:GITHUB_SHA --title "Muse Video Studio $env:MUSE_VERSION — Windows" --notes "Download the ZIP, extract and run the EXE. Runs account browsers in parallel by default; upgrades the old sequential setting once. Fixes metadata-only video players, video attachment links and send-arrow controls. Adds visible queue errors and structural chat diagnostics. Continuous queue with exact prompt/result tracking, scoped automatic downloads, progress and inline video previews. Recover existing results without resending prompts. No VPN/IP checks. Browser fixtures verified; live Muse account validation remains needed. See MuseVideoStudio/README.md."
+          gh release create "muse-studio-v$env:MUSE_VERSION" "dist/$env:MUSE_ZIP" --target $env:GITHUB_SHA --title "Muse Video Studio $env:MUSE_VERSION — Windows" --notes "Download the ZIP, extract and run the EXE. Custom Muse M/Play icon embedded in the launcher and application windows. Runs account browsers in parallel by default; upgrades the old sequential setting once. Fixes metadata-only video players, video attachment links and send-arrow controls. Adds visible queue errors and structural chat diagnostics. Continuous queue with exact prompt/result tracking, scoped automatic downloads, progress and inline video previews. Recover existing results without resending prompts. No VPN/IP checks. Browser fixtures verified; live Muse account validation remains needed. See MuseVideoStudio/README.md."
       - name: Retain public test diagnostics on failure
         if: failure()
         shell: pwsh

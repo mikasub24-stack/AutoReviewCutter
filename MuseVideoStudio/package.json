@@ -1,6 +1,6 @@
 {
   "name": "muse-video-studio",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "private": true,
   "description": "Windows desktop queue for Muse image-to-video workflows",
   "main": "src/main.cjs",
@@ -32,7 +32,8 @@
     "win": {
       "target": "portable",
       "artifactName": "MuseVideoStudio-${version}-Windows.exe",
-      "signAndEditExecutable": false
+      "signExecutable": false,
+      "icon": "src/assets/muse-studio.ico"
     },
     "compression": "store"
   },

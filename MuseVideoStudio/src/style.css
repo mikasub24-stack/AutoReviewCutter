@@ -19,3 +19,5 @@ nav .logoutButton{font-size:11px;color:#dbb9ab;border:1px solid #453731;padding:
 
 .mediaLabel{position:absolute;top:10px;left:10px;max-width:calc(100% - 65px);padding:4px 7px;border-radius:5px;font-size:9px;line-height:1.4;color:#d4d5df;background:#111b;pointer-events:none}
 #queueFailure[hidden]{display:none}#queueFailure{margin-top:18px}aside{overflow-y:auto}.brand,.profile,nav,.asideBottom{flex-shrink:0}
+
+img.logo{display:block;width:44px;height:44px;flex-shrink:0;padding:0;background:transparent;border-radius:10px}

@@ -109,7 +109,7 @@ async function openMuse(index = 0) {
       const profile=await prepareNativeProfile(index);
       if(flushingQuit) return;
       if(flushingQuit) return;
-      const muse=new BrowserWindow({width:1250,height:850,title:`Muse — Tài khoản ${index+1}`,webPreferences:{session:profile.session,nodeIntegration:false,contextIsolation:true,sandbox:true}});
+      const muse=new BrowserWindow({icon:path.join(__dirname,'assets','muse-studio.png'),width:1250,height:850,title:`Muse — Tài khoản ${index+1}`,webPreferences:{session:profile.session,nodeIntegration:false,contextIsolation:true,sandbox:true}});
       browsers.set(index,muse);muse.museStarted=true;
       muse.webContents.setWindowOpenHandler(()=>({action:'deny'}));
       muse.on('closed',()=>{if(flushingQuit || resettingAccounts.has(index))return;profile.store.flush().catch(()=>{profile.warning='Chưa lưu được phiên đăng nhập.';notify();});});
@@ -315,6 +315,7 @@ async function packageProject() {
 }
 app.whenReady().then(async () => {
   if (!ownsInstance) return;
+  app.setAppUserModelId?.('local.musevideostudio.app');
   stateFile = path.join(app.getPath('userData'), 'studio.json');
   let stored = {};
   try { stored = JSON.parse(await fs.readFile(stateFile, 'utf8')); } catch (e) { if (e.code !== 'ENOENT') throw e; }
@@ -331,7 +332,7 @@ app.whenReady().then(async () => {
   editPackageDir = stored.editPackageDir || ''; packageError = stored.packageError || '';
   queue = new Queue({ jobs: stored.jobs || [], save, run: runJob, notify });
   await save();
-  main = new BrowserWindow({ width: 1450, height: 950, minWidth: 1000, minHeight: 700, backgroundColor: '#101114', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true } });
+  main = new BrowserWindow({ icon:path.join(__dirname,'assets','muse-studio.png'), width: 1450, height: 950, minWidth: 1000, minHeight: 700, backgroundColor: '#101114', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true } });
   main.on('close',event=>{if(!quitAllowed){event.preventDefault();app.quit();}});
   main.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   main.webContents.on('will-navigate', e => e.preventDefault());
@@ -352,7 +353,7 @@ app.whenReady().then(async () => {
       const structure=await dom(muse,chatDiagnostics,{jobs:jobs.map(j=>({id:j.id,prompt:j.prompt,number:j.number})),composerSelector:settings.composer});
       const result=await dialog.showSaveDialog(main,{defaultPath:`Muse-chat-diagnostics-TK${index+1}.json`,filters:[{name:'Thông tin lỗi',extensions:['json']}]});
       if(result.canceled)return false;
-      await atomic(result.filePath,{version:app.getVersion?.()||'0.6.3',account:index+1,jobs:jobs.map(j=>({id:j.id,title:j.title,number:j.number,status:j.status,stage:j.stage,error:j.error,submittedAt:j.submittedAt})),structure});
+      await atomic(result.filePath,{version:app.getVersion?.()||'0.6.4',account:index+1,jobs:jobs.map(j=>({id:j.id,title:j.title,number:j.number,status:j.status,stage:j.stage,error:j.error,submittedAt:j.submittedAt})),structure});
       shell.showItemInFolder?.(result.filePath);return true;
     },
     logoutAccount: async index => {await logoutAccount(Number(index??0));return snapshot();},
