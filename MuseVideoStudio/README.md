@@ -1,6 +1,14 @@
-# Muse Video Studio 0.7.1 · Windows
+# Muse Video Studio 0.8.0 · Windows
 
 Icon Muse Studio riêng (M vàng + Play trắng) được nhúng vào EXE, cửa sổ ứng dụng và logo trong giao diện.
+
+## Một danh sách, Test chung mọi trình duyệt (0.8.0)
+
+Một nút **Test tất cả trình duyệt** tự mở 1–4 phiên đã chọn, chỉ gửi “Bắt đầu công việc mới nhé”. Phải thấy câu thử mới trong chat và phản hồi mới của Muse rồi mới mở nút Chạy/Tiếp tục. Test không tạo, không bắt đầu và không tiêu thụ prompt trong hàng chờ. Test chờ ô chat tải xong; có bản nháp/ảnh khác sẽ giữ nguyên và báo rõ. Đóng/đổi trang hoặc khởi động lại app cần Test lại. Đăng nhập lần đầu vẫn thực hiện trực tiếp trong cửa sổ Muse.
+
+Tất cả cảnh nằm trong danh sách theo thứ tự gốc, không cần đổi tab Đang chạy. Từng ô hiển thị ảnh/gửi/tạo/tải, phần trăm thật khi có, thời gian chờ và tên tệp sau khi lưu thành công. Xong ô nào thì ô đó báo **Đã xong**, tài khoản đó tự nhận cảnh tiếp theo. Chọn 4 trình duyệt chạy được 4 cảnh cùng lúc. Danh sách cuộn riêng và tự theo cảnh mới, có thể tắt tự theo; phần prompt và xuất/ghép được thu gọn.
+
+**Dừng, Chạy/Tiếp tục, Mở thư mục video** nằm cạnh nhau ngay trên danh sách. Khi khởi động lại, hàng chờ được khôi phục, Test chung rồi Tiếp tục. Chưa thấy đúng prompt trong chat phải báo **Chưa xác nhận Muse nhận prompt**, không đánh dấu đã nhận dựa vào việc bấm Gửi. Tiếp tục mặc định giữ attempt cũ; cảnh chưa từng được xác nhận có echo và vẫn vắng mặt trước/sau lần Test mới có thể gửi lại một lần trên chính tài khoản cũ.
 
 ## Sửa nhận clip và đặt tên (0.7.1)
 

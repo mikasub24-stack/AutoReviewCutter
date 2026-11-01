@@ -28,7 +28,7 @@ const safeStorage = {
   }
 };
 
-async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, domTimeoutMs=20000, logoutResponse=1 } = {}) {
+async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, domTimeoutMs=20000, logoutResponse=1, autoTestReady=true } = {}) {
   const handlers = new Map(), sessions = new Map(), windows = [], errors = [], notices = [];
   const lifecycle = [],updates=[];
   let loaded, quit;
@@ -101,7 +101,7 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
       if(name === 'electron') return electron;
       if(name==='./license.cjs' && licenseGate){const real=localRequire(name);return{...real,createLicense:async options=>{const manager=await real.createLicense(options),ensure=manager.ensureAllowed;manager.ensureAllowed=async()=>{licenseGate.entered();await licenseGate.wait;return ensure();};return manager;}};}
       if(name === './electron-network-check.cjs') return {checkElectronNetwork:networkProbe || (async()=>({ip:'203.0.113.9',countryCode:'US',countryName:'United States',observedAt:new Date().toISOString()}))};
-      if(name === './external-browser.cjs' && externalLauncher) return {launchExternalBrowser:externalLauncher};
+      if(name === './external-browser.cjs' && externalLauncher) return {launchExternalBrowser:async(...args)=>{const adapter=await externalLauncher(...args),evaluate=adapter.evaluate;adapter.evaluate=(fn,arg)=>autoTestReady&&fn.name==='verifyBrowserTest'?Promise.resolve(true):evaluate?.(fn,arg);return adapter;}};
       if(name === './browser-discovery.cjs' && browserResolver) return {resolveBrowser:browserResolver};
       return localRequire(name);
     },
@@ -113,7 +113,11 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
   assert.deepEqual(errors, []);
 
   return { handlers, sessions, windows, lifecycle, notices, errors,updates,
-    invoke: (name, data, sender = windows[0]?.webContents) => handlers.get(`studio:${name}`)({ sender }, data),
+    invoke: (name, data, sender = windows[0]?.webContents) => {
+      // Legacy queue fixtures isolate dispatch from the separately tested browser handshake.
+      if(name==='start'&&autoTestReady)vm.runInContext("for(const [index,browser] of browsers)browserTests.set(index,{browser,status:'ready',token:'fixture'});",context);
+      return handlers.get(`studio:${name}`)({ sender }, data);
+    },
     async stop() {
       let prevented = false;const priorQuits=lifecycle.filter(x=>x==='quit').length;
       app.emit('before-quit', { preventDefault() { prevented = true; } });
@@ -428,5 +432,41 @@ test('uncertain remote stop resumes the original attempt and retries downloading
   await app.invoke('stop');assert.equal(app.invoke('state').jobs[0].remoteStop.state,'unavailable');await app.invoke('start');await until(()=>downloads===1);
   assert.equal(sent,1);assert.equal(app.invoke('state').jobs[0].status,'running');assert.equal(app.invoke('state').jobs[1].status,'pending');assert.equal(attempts[1].recover,true);assert.equal(attempts[1].id,attempts[0].id);
   await until(()=>!app.invoke('state').active,10000);assert.equal(sent,2);assert.equal(downloads,3);assert.ok(app.invoke('state').jobs.every(j=>j.status==='completed'));await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
+
+test('browser Test verifies four replies without dispatching queue; only explicit Start sends four video prompts',{timeout:12000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-test-handshake-'));let app,launched=0;const sent=[],begins=[];let replies=false;
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir}}));
+  app=await boot(dir,{autoTestReady:false,browserResolver:()=>'/test/chrome',externalLauncher:async()=>{
+   const index=launched++;return{external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},openMuse:async()=>{},close:async()=>{},evaluate:async(fn,arg)=>{
+    if(fn.name==='browserStop')return {state:'confirmed',clicked:false};
+    if(fn.name==='prepareBrowserProbe'){assert.equal(arg.text,'Bắt đầu công việc mới nhé');return true;}
+    if(fn.name==='missingBrowserPrompts')return [];
+    if(fn.name==='beginTracking'){begins.push({index,...arg});return {};}
+    if(fn.name==='submitPrompt'){sent.push({index,id:arg.id});return {clicked:true};}
+    if(fn.name==='pollBrowserProbe')return {echoSeen:true,replySeen:replies,message:replies?'Muse đã phản hồi':'Chờ phản hồi mới'};
+    if(fn.name==='verifyBrowserTest')return true;
+    if(fn.name==='pollTracking')return {phase:'waiting-prompt',ready:false,echoMatched:false};
+    return null;
+   }};
+  }});
+  await app.invoke('settings',{...app.invoke('state').settings,accountCount:4,browserChoice:'chrome',output:dir,cooldownSeconds:0,finishAction:'keep'});
+  await app.invoke('add',Array.from({length:6},(_,i)=>({prompt:'Video scene '+(i+1)})));
+  await assert.rejects(app.invoke('start'),/Mở Muse|Test trình duyệt/);
+  const probe=app.invoke('testBrowsers');await until(()=>sent.length===4);
+  assert.equal(app.invoke('state').active,false);assert.ok(app.invoke('state').jobs.every(j=>j.status==='pending'));
+  assert.equal(app.invoke('state').browserTests.some(t=>t.status==='ready'),false);
+  await assert.rejects(app.invoke('start'),/Test trình duyệt/);
+  replies=true;await probe;
+  assert.ok(app.invoke('state').browserTests.every(t=>t.status==='ready'));
+  assert.equal(sent.length,4);assert.ok(begins.every(b=>b.prompt==='Bắt đầu công việc mới nhé'));
+  await app.invoke('start');await until(()=>sent.length===8);
+  assert.equal(app.invoke('state').jobs.filter(j=>j.status==='running').length,4);
+  assert.equal(app.invoke('state').jobs.filter(j=>j.status==='pending').length,2);
+  assert.ok(app.invoke('state').jobs.filter(j=>j.status==='running').every(j=>!j.acknowledgedAt));
+  await app.invoke('stop');await app.stop();
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });

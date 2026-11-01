@@ -94,7 +94,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   }
   const playable=v=>videoLink(v)||(v.tagName==='VIDEO'&&/^(https:|blob:)/i.test(source(v)));
   function rememberContext(root){const parents=[];for(let p=root.parentElement,depth=0;p&&p!==document.body&&depth<8;p=p.parentElement,depth++)if(!p.querySelector('textarea,input,[contenteditable="true"],[role="textbox"],nav,aside'))parents.push(p);return parents;}
-  function result(phase,stage,root=s.responseRoot) {return {id,phase,stage,echoAliases:[...s.echoAliases],echoMatched:Boolean(s.echo),echoKey:s.echoRoot?.id||s.echoRoot?.getAttribute('data-message-id')||s.echoRoot?.getAttribute('data-id')||'',echoMarker:s.echoRoot?.getAttribute('data-muse-studio-attempt')||'',ready:phase==='ready',progress:progress(root),...(phase==='ready'?{url:source(s.video),fingerprint:s.fingerprint}:{})};}
+  function result(phase,stage,root=s.responseRoot) {return {id,phase,stage,responseMatched:Boolean(root?.isConnected&&s.echoRoot&&following(s.echoRoot,root)),echoAliases:[...s.echoAliases],echoMatched:Boolean(s.echo),echoKey:s.echoRoot?.id||s.echoRoot?.getAttribute('data-message-id')||s.echoRoot?.getAttribute('data-id')||'',echoMarker:s.echoRoot?.getAttribute('data-muse-studio-attempt')||'',ready:phase==='ready',progress:progress(root),...(phase==='ready'?{url:source(s.video),fingerprint:s.fingerprint}:{})};}
   s.poll=()=>{
     let echoes=echoCandidates();
     if(!s.echo&&!echoes.length&&recover&&(echoKey||echoMarker)){const exact=echoCandidates(true);if(exact.length===1)echoes=exact;else if(exact.length>1)throw Error('Có nhiều tin nhắn trùng prompt nhưng ID cũ đã thay đổi. Không chọn clip khi chưa xác định được cảnh.');}
@@ -179,6 +179,24 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     return {action:'source',clicked:false,needsMenu:false,url:source(s.video)};
   };
   const prior=echoCandidates(true).length;s.hadPriorSame=recover?prior>1:prior>0;
+  s.probe=()=>{
+    const current=s.poll();
+    const meaningful=text=>text.length>=3&&/[\p{L}\p{N}]/u.test(text)&&!/^((?:muse )?(?:is )?thinking|đang (?:suy nghĩ|xử lý|trả lời)|loading|typing)[.…\s]*$/i.test(text);
+    if(!current.echoMatched)return{echoSeen:false,replySeen:false,message:'Chưa thấy câu test trong chat'};
+    if(current.responseMatched&&meaningful(norm(s.responseRoot?.innerText)))return{echoSeen:true,replySeen:true,message:'Muse đã phản hồi câu test',snippet:norm(s.responseRoot.innerText).slice(0,160)};
+    for(const scope of rememberContext(s.echoRoot)){
+      let branch=s.echoRoot;while(branch.parentElement&&branch.parentElement!==scope)branch=branch.parentElement;
+      let next=branch.nextElementSibling;
+      for(let n=0;next&&n<4;next=next.nextElementSibling,n++){
+        if(author(next).kind==='user')break;
+        const text=norm(next.innerText),ref=next.getAttribute('data-response-to')||next.getAttribute('data-parent-message-id');
+        if(!meaningful(text)||text===wanted||next.tagName!==branch.tagName||next.matches('nav,aside')||next.querySelector('textarea,input,nav,aside,[data-message-role="user"],[data-role="user"]'))continue;
+        if(ref&&![s.echoRoot.id,s.echoRoot.getAttribute('data-message-id'),s.echoRoot.getAttribute('data-id')].includes(ref.replace(/^#/,'')))continue;
+        if(!s.baseline.has(next)&&(s.added.get(next)||0)>=s.echoEpoch){s.responseRoot=next;return{echoSeen:true,replySeen:true,message:'Muse đã có phản hồi mới',snippet:text.slice(0,160)};}
+      }
+    }
+    return{echoSeen:true,replySeen:false,message:'Đã thấy câu test · chờ Muse phản hồi mới'};
+  };
   map.set(id,s);
   return {id,phase:'waiting-prompt',stage:'Đã chụp trạng thái trước khi gửi prompt',ready:false,progress:null};
 }
@@ -196,4 +214,5 @@ function endTracking({id}) {
   const map=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')],state=map?.get(id);
   state?.observer?.disconnect();state?.downloadController?.abort();const stops=globalThis[Symbol.for('MuseVideoStudio.stopRequests.v1')];if(stops)for(const key of stops)if(key.startsWith(id+':'))stops.delete(key);return map?.delete(id)||false;
 }
-module.exports={beginTracking,pollTracking,downloadAction,endTracking};
+function pollBrowserProbe({id}){const s=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]?.get(id);if(!s)throw Error('Test không còn gắn với tab này.');return s.probe();}
+module.exports={pollBrowserProbe,beginTracking,pollTracking,downloadAction,endTracking};

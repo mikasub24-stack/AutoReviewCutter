@@ -1,6 +1,6 @@
 // Real browser / real decoded media fixture. Does not contact Muse or submit jobs.
 const { chromium } = require('playwright-core');
-const { beginTracking, pollTracking, downloadAction, endTracking } = require('../src/muse-tracker.cjs');
+const { beginTracking, pollTracking, pollBrowserProbe, downloadAction, endTracking } = require('../src/muse-tracker.cjs');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const fs = require('node:fs/promises');
@@ -31,6 +31,18 @@ const assert = require('node:assert/strict');
       },{id,role,text,src,ref,parent});
     }
     async function ready(id){await page.waitForFunction(id=>{const v=document.querySelector(`#${id} video`);return v&&v.readyState>=2&&v.videoWidth>0&&v.duration>0;},id);}
+    // Test must observe a NEW echo and NEW reply in the same thread.
+    await append({id:'prior-test',role:'user',text:'Bắt đầu công việc mới nhé'});
+    await append({id:'prior-reply',text:'Old ready reply'});
+    await page.evaluate(beginTracking,{id:'probe',prompt:'Bắt đầu công việc mới nhé'});
+    assert.equal((await page.evaluate(pollBrowserProbe,{id:'probe'})).echoSeen,false);
+    await append({id:'probe-echo',role:'user',text:'Bắt đầu công việc mới nhé'});
+    assert.equal((await page.evaluate(pollBrowserProbe,{id:'probe'})).replySeen,false);
+    await append({id:'sidebar-reply',text:'Unrelated new sidebar reply',parent:'unrelated'});
+    assert.equal((await page.evaluate(pollBrowserProbe,{id:'probe'})).replySeen,false);
+    await append({id:'probe-reply',text:'Sẵn sàng, bạn muốn làm gì?'});
+    assert.equal((await page.evaluate(pollBrowserProbe,{id:'probe'})).replySeen,true);
+    await reset();
     // Existing videos, the composer itself, and unrelated global media cannot
     // satisfy a pending prompt. The delayed matching response may complete it.
     await append({id:'old',text:'Older result',src:'/old.webm'});await ready('old');

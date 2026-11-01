@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);
-let state,drafts=[],referenceFiles=[],filter='all',dirty=true,committed=false,toastTimer;
-const labels={pending:'Đang chờ',running:'Đang xử lý',completed:'Hoàn tất',failed:'Cần kiểm tra',interrupted:'Đã dừng'};
+let state,drafts=[],referenceFiles=[],filter='all',restoredQueue=false,firstSnapshot=true,manualScrollUntil=0,lastActiveIds=new Set(),dirty=true,committed=false,toastTimer;
+const labels={pending:'Đang chờ',running:'Đang xử lý',completed:'Đã xong',failed:'Cần kiểm tra',interrupted:'Đã dừng'};
 function toast(text){$('toast').textContent=text;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,10000);}
 async function call(name,data){try{return await window.studio.invoke(name,data);}catch(e){toast(e.message.replace(/^Error invoking remote method '[^']+': Error: /,''));return null;}}
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;}
@@ -30,12 +30,14 @@ async function create(startNow,fromInput=false){
   }
   if(!drafts.length||drafts.some(d=>!d.prompt.trim()))return toast('Nhập prompt cho từng dòng hoặc xóa dòng trống.');
   if(startNow){
+    if(state.testing)return toast('Chờ Test trình duyệt hoàn tất.');
+    if(!state.browserTests?.length||state.browserTests.some(t=>t.status!=='ready'))return toast('Bấm Test trình duyệt và chờ Muse phản hồi trước khi tạo video.');
     if(state.active||state.starting||state.stopping||state.merging||state.packaging)return toast('Dừng hàng đợi hiện tại trước khi tạo lượt mới.');
     if(!state.settings.output)return toast('Chọn thư mục lưu video trước.');
     if(!confirm(`Thêm ${drafts.length} prompt và chạy toàn bộ tác vụ đang chờ? Tạo video có thể dùng credit Muse. Tool gửi nguyên prompt đã xem, cùng ảnh tham chiếu của từng cảnh.`))return;
   }
   const result=await call('add',drafts.map(d=>({...d,image:d.references?.[0]||'',references:d.references||[]})));
-  if(result){drafts=[];committed=true;dirty=false;renderDrafts();render(result);if(startNow)render(await call('start'));}
+  if(result){$('editorPanel').open=false;drafts=[];committed=true;dirty=false;renderDrafts();render(result);if(startNow)render(await call('start'));$('queueWorkspace').scrollIntoView({block:'start',behavior:'smooth'});}
 }
 async function pasteImages(event,target){
   const files=[...(event.clipboardData?.files||event.dataTransfer?.files||[])].filter(f=>f.type.startsWith('image/'));
@@ -62,7 +64,7 @@ function renderDrafts(){
 }
 
 const jobCards=new Map();
-const stageLabels={preparing:'Chuẩn bị tác vụ',uploading:'Đang tải ảnh tham chiếu',submitting:'Đang gửi prompt',confirming:'Đang xác nhận Muse đã nhận prompt',waiting:'Đang chờ Muse tạo video',downloading:'Đang tải video về máy',cooldown:'Nghỉ trước lượt tiếp theo'};
+const stageLabels={preparing:'Chuẩn bị tác vụ',uploading:'Đang tải ảnh tham chiếu',submitting:'Đang gửi prompt',confirming:'Chưa xác nhận Muse nhận prompt',waiting:'Đang chờ Muse tạo video',downloading:'Đang tải video về máy',cooldown:'Nghỉ trước lượt tiếp theo'};
 function localFileUrl(file){
   if(typeof file!=='string'||!file)return '';
   const normalized=file.replace(/\\/g,'/');
@@ -90,16 +92,20 @@ function makeCard(id){
   const stage=el('div','jobStage'),stageName=el('strong','stageName'),stageMessage=el('p','stageMessage'),observed=el('div','observedProgress'),progress=el('progress','jobProgress'),progressText=el('span','progressText'),elapsed=el('span','elapsed');
   progress.max=100;observed.append(progress,progressText);stage.append(stageName,stageMessage,observed,elapsed);
   const source=el('details','jobSource'),sourceTitle=el('summary','','Nội dung gốc'),sourceBody=el('p');source.append(sourceTitle,sourceBody);
+  const disclosure=el('details','promptDisclosure');disclosure.append(el('summary','','Nội dung prompt'),prompt);
+  const steps=el('div','phaseSteps');for(const title of ['Ảnh','Gửi','Tạo','Tải'])steps.append(el('span','',title));
+  const activity=el('progress','activityBar');activity.removeAttribute('value');activity.setAttribute('aria-label','Đang xử lý, chưa có phần trăm từ Muse');stage.append(activity);
+  const fileLine=el('p','fileLine');
   const error=el('p','error'),actions=el('div','cardActions');
-  const row={card,preview,media,number,mediaLabel,body,badge,title,prompt,meta,stage,stageName,stageMessage,observed,progress,progressText,elapsed,source,sourceBody,error,actions,job:null,mediaKey:null};
+  const row={card,preview,media,number,mediaLabel,body,badge,title,prompt,meta,stage,stageName,stageMessage,observed,progress,progressText,elapsed,source,sourceBody,error,actions,job:null,mediaKey:null,steps,activity,fileLine};
   function action(label,fn){const button=el('button','secondary',label);button.onclick=fn;actions.append(button);return button;}
   row.reveal=action('Mở vị trí video',()=>call('reveal',row.job.id));
   row.recover=action('Tìm / tải video đã tạo',async()=>render(await call('retryDownload',row.job.id)));
   row.recover.title='Tìm kết quả từ prompt đã gửi, không gửi lại prompt mới.';
   row.retry=action('Gửi lại prompt',async()=>{if(confirm('Kiểm tra Muse trước. Gửi lại prompt có thể tạo video trùng nếu tác vụ trước đã gửi.'))render(await call('retry',row.job.id));});
   row.remove=action('Xóa',async()=>render(await call('remove',row.job.id)));
-  row.edit=action('Đưa về sửa',async()=>{const result=await call('remove',row.job.id);if(result){drafts.push({...row.job});renderDrafts();render(result);}});
-  body.append(badge,title,prompt,meta,stage,source,error,actions);card.append(preview,body);return row;
+  row.edit=action('Đưa về sửa',async()=>{const result=await call('remove',row.job.id);if(result){drafts.push({...row.job});$('editorPanel').open=true;renderDrafts();render(result);$('editorPanel').scrollIntoView({block:'nearest'});}});
+  body.append(badge,title,meta,steps,stage,fileLine,disclosure,source,error,actions);card.append(preview,body);return row;
 }
 function updateMedia(row,job){
   const output=localFileUrl(job.output),image=localFileUrl(job.lockedInput?.references?.[0]?.path||job.image||job.references?.[0]);
@@ -117,15 +123,15 @@ function updateMedia(row,job){
   }else row.media.append(el('span','glyph','▷'));
 }
 function updateCard(row,job,index){
-  row.job=job;updateMedia(row,job);
+  row.job=job;row.card.dataset.status=job.status;updateMedia(row,job);
   const displayNumber=Number.isInteger(job.number)&&job.number>0?job.number:job.order||index+1;
   text(row.number,'#'+displayNumber);text(row.title,job.title||`Prompt ${displayNumber}`);row.card.setAttribute('aria-label',`${job.title||'Prompt '+displayNumber} · ${labels[job.status]||job.status}`);
   row.badge.className='badge '+job.status;text(row.badge,labels[job.status]||job.status);text(row.prompt,job.lockedInput?.prompt||job.prompt);
   text(row.meta,`${job.lockedInput?'🔒 Đã khóa · ':''}${job.references?.length||0} ảnh tham chiếu${job.account?' · TK '+job.account:''}${job.durationSeconds?' · '+job.durationSeconds+'s':''}`);
   const active=job.status==='running';
-  const stageName=job.status==='completed'?'Đã lưu video':stageLabels[job.stage]||labels[job.status]||'Đang chờ';
+  const stageName=job.status==='completed'?'✓ Đã tải xong video':stageLabels[job.stage]||labels[job.status]||'Đang chờ';
   text(row.stageName,stageName);row.stage.classList.toggle('active',active);
-  text(row.stageMessage,job.stageMessage||'');row.stageMessage.hidden=!row.stageMessage.textContent;
+  text(row.stageMessage,job.stageMessage||'');row.stageMessage.title=job.stageMessage||'';row.stageMessage.hidden=!row.stageMessage.textContent;
   let observed=null,label='';
   const bytes=job.downloadProgress;
   if(job.stage==='downloading'&&bytes&&Number.isFinite(bytes.receivedBytes)&&bytes.receivedBytes>=0){
@@ -133,6 +139,10 @@ function updateCard(row,job,index){
     if(Number.isFinite(bytes.totalBytes)&&bytes.totalBytes>0){observed=Math.min(100,100*bytes.receivedBytes/bytes.totalBytes);label+=` / ${bytesText(bytes.totalBytes)} · ${observed.toFixed(0)}%`;}
   }else if(job.status==='running'&&['waiting','confirming'].includes(job.stage)&&typeof job.progress==='number'&&Number.isFinite(job.progress)&&job.progress>=0&&job.progress<=100){observed=job.progress;label=`Muse: ${job.progress.toFixed(0)}%`;}
   row.observed.hidden=!label;row.progress.hidden=observed===null;if(observed!==null)row.progress.value=observed;text(row.progressText,label);
+  row.activity.hidden=!active||observed!==null;
+  const phase=job.status==='completed'?4:({preparing:0,uploading:0,submitting:1,confirming:1,waiting:2,downloading:3,cooldown:0})[job.stage]??-1;
+  [...row.steps.children].forEach((step,index)=>{step.className=index<phase?'done':active&&index===phase?'current':'';});
+  text(row.fileLine,job.output?'✓ '+job.output.split(/[\\/]/).pop():'');row.fileLine.hidden=!job.output;
   updateElapsed(row);
   const source=typeof job.source==='string'?job.source.trim():'';row.source.hidden=!source||source===job.prompt?.trim();text(row.sourceBody,source);
   text(row.error,job.error||'');row.error.hidden=!job.error;
@@ -143,6 +153,7 @@ function updateCard(row,job,index){
   row.card.hidden=!(filter==='all'||(filter==='failed'?['failed','interrupted'].includes(job.status):job.status===filter));
 }
 function renderJobs(jobs){
+  requestAnimationFrame(fitQueueViewport);
   const ids=new Set(jobs.map(job=>job.id));
   for(const [id,row]of jobCards)if(!ids.has(id)){row.media.querySelector('video')?.pause();row.card.remove();jobCards.delete(id);}
   let cursor=$('jobs').firstElementChild;
@@ -154,11 +165,17 @@ function renderJobs(jobs){
     if(row.card===cursor)cursor=cursor.nextElementSibling;else $('jobs').insertBefore(row.card,cursor);
   });
   $('empty').hidden=jobs.length>0;
+  const activeIds=new Set(jobs.filter(j=>j.status==='running').map(j=>j.id));
+  const next=jobs.find(j=>activeIds.has(j.id)&&!lastActiveIds.has(j.id));lastActiveIds=activeIds;
+  if(next&&$('followRunning').checked&&Date.now()>manualScrollUntil){
+    requestAnimationFrame(()=>{const card=jobCards.get(next.id)?.card,grid=$('jobs');if(!card)return;const c=card.getBoundingClientRect(),g=grid.getBoundingClientRect();if(c.top<g.top||c.bottom>g.bottom)grid.scrollTo({top:grid.scrollTop+c.top-g.top,behavior:'smooth'});});
+  }
 }
+
 setInterval(()=>{for(const row of jobCards.values())if(row.job?.status==='running')updateElapsed(row);},1000);
 
 function render(next){
-  if(!next)return;state=next;const jobs=state.jobs,indexBefore=Number($('accountPicker').value||0);
+  if(!next)return;state=next;if(firstSnapshot){restoredQueue=state.jobs.length>0;$('editorPanel').open=!restoredQueue;firstSnapshot=false;}const jobs=state.jobs,indexBefore=Number($('accountPicker').value||0);
   $('accountPicker').replaceChildren(...Array.from({length:state.settings.accountCount},(_,i)=>{const o=el('option','',`Tài khoản ${i+1}`);o.value=i;return o;}));
   $('accountPicker').value=Math.min(indexBefore,state.settings.accountCount-1);const index=Number($('accountPicker').value);
   const browserName=({builtin:'Trình duyệt tích hợp',chrome:'Google Chrome',edge:'Microsoft Edge',custom:'Chromium tùy chọn'})[state.settings.browserChoice||'builtin'];$('browserInfo').textContent=browserName;
@@ -167,17 +184,37 @@ function render(next){
   const license=state.license;
   if(license){const expires=license.expiresAt?new Date(license.expiresAt).toLocaleString('vi-VN'):'';$('licenseSummary').textContent=license.status==='trial'?'Dùng thử đến '+expires:license.message;$('licenseStatus').textContent=license.message+(expires?' Hạn: '+expires:'');$('deviceCode').value=license.device;}
   if(state.payment){$('paymentQR').src=state.payment.qr;$('paymentContent').textContent='Nội dung chuyển khoản: '+state.payment.content;}
-  $('parallelInfo').textContent=state.settings.dispatchMode==='parallel'?`Song song ${state.settings.accountCount} tài khoản · mỗi tài khoản 1 prompt`:'Lần lượt · tải xong từng video mới gửi tiếp';
+  $('parallelInfo').textContent=state.settings.dispatchMode==='parallel'?`Song song ${state.settings.accountCount} trình duyệt · mỗi trình duyệt 1 prompt`:'Lần lượt · tải xong từng video mới gửi tiếp';
   $('total').textContent=$('navCount').textContent=$('allCount').textContent=jobs.length;$('folderPath').textContent=state.settings.output||'Chưa chọn thư mục';
   $('queueState').textContent=state.stopping?'Đang bấm dừng trong Muse…':state.starting?'Đang kiểm tra trước khi chạy':state.active?state.paused?'Đang dừng…':'Đang chạy':'Đã dừng';
   $('start').disabled=state.active||state.starting||state.stopping||state.merging||state.packaging||!jobs.some(j=>['pending','interrupted','failed'].includes(j.status));$('start').textContent=jobs.some(j=>['interrupted','failed'].includes(j.status))?'▶ Tiếp tục hàng đợi':'▶ Chạy hàng đợi';$('pause').disabled=state.stopping||(!state.active&&!state.starting&&!jobs.some(j=>j.mayHaveSubmitted&&['interrupted','failed'].includes(j.status)));
   $('clearPending').disabled=!jobs.some(j=>j.status==='pending');$('clearList').disabled=state.stopping||!jobs.length;
-  const complete=jobs.length&&jobs.every(j=>j.status==='completed'),busy=state.active||state.starting||state.stopping||state.merging||state.packaging;
+  const complete=jobs.length&&jobs.every(j=>j.status==='completed'),busy=state.testing||state.active||state.starting||state.stopping||state.merging||state.packaging;
   $('mergeNow').disabled=$('packageClips').disabled=busy||!complete;
   $('mergeStatus').textContent=state.mergeError||state.mergeProgress||state.mergedOutput||(state.settings.autoMerge?'Tự nối khi đủ video.':'Chỉ nối khi bạn chọn; giữ clip nguồn.');$('revealMerged').hidden=!state.mergedOutput;
   $('packageStatus').textContent=state.packageError||state.packageProgress||state.editPackageDir||'Xuất clip rời đúng thứ tự để nhập vào CapCut.';$('openPackage').hidden=!state.editPackageDir;
   $('finishMode').textContent='Sau khi tạo xong: '+(state.settings.autoMerge?'Nối MP4':state.settings.autoPackage?'Xuất clip CapCut':'Giữ clip riêng');
-  $('summary').textContent=`${jobs.filter(j=>j.status==='completed').length} / ${jobs.length} video hoàn tất`;
+  const done=jobs.filter(j=>j.status==='completed'),running=jobs.filter(j=>j.status==='running'),pending=jobs.filter(j=>j.status==='pending'),interrupted=jobs.filter(j=>['failed','interrupted'].includes(j.status));
+  $('summary').textContent=`${done.length} / ${jobs.length} video đã lưu`;
+  $('runningCount').textContent=`${running.length} đang làm`;$('pendingCount').textContent=`${pending.length} đang chờ`;$('attentionCount').textContent=`${interrupted.length} cảnh dở / lỗi`;
+  $('overallProgress').max=Math.max(1,jobs.length);$('overallProgress').value=done.length;
+  const tested=state.browserTests?.length===state.settings.accountCount&&state.browserTests.every(t=>t.status==='ready');
+  $('testBrowsers').disabled=Boolean(busy);$('testBrowsers').textContent=state.testing?'Đang test…':'Test tất cả trình duyệt';
+  $('browserTests').replaceChildren(...Array.from({length:state.settings.accountCount},(_,index)=>{const t=state.browserTests?.find(t=>t.index===index);return el('span','browserTest '+(t?.status||''),'Trình duyệt '+(index+1)+': '+(t?.message||'Chưa test'));}));
+  $('start').disabled=$('start').disabled||Boolean(state.testing)||!tested;
+  if(state.testing){$('queueState').textContent='Đang Test · chưa chạy prompt video';$('pause').disabled=Boolean(state.stopping);}
+  $('parallelAccounts').value=String(state.settings.accountCount);$('parallelAccounts').disabled=busy;
+  $('openAll').textContent=`Mở ${state.settings.accountCount} trình duyệt`;$('openAll').disabled=busy;
+  $('openOutput').disabled=!state.settings.output;$('folder').disabled=busy;
+  const unfinished=jobs.length>done.length;
+  $('start').textContent=unfinished&&(restoredQueue||interrupted.length||jobs.some(j=>j.startedAt))?'▶ Tiếp tục':'▶ Chạy hàng đợi';
+  if(!state.active&&!state.starting&&!state.stopping&&jobs.length&&!unfinished)$('queueState').textContent='✓ Đã xong tất cả';
+  const notice=state.startError||state.startHint||(restoredQueue&&unfinished&&!state.active&&!state.starting?`Đã khôi phục ${jobs.length} cảnh: ${pending.length} chờ, ${interrupted.length} dở. Bấm Test trình duyệt, chờ Muse phản hồi rồi Tiếp tục từ chỗ dừng.`:'');
+  text($('resumeNotice'),notice);$('resumeNotice').hidden=!notice;$('resumeNotice').classList.toggle('errorNotice',Boolean(state.startError));
+  const recent=[...done].sort((a,b)=>(timeValue(b.finishedAt)||0)-(timeValue(a.finishedAt)||0)).slice(0,4);
+  $('recentCompletions').textContent=recent.length?'✓ Vừa xong: '+recent.map(j=>`#${j.number||j.order||jobs.indexOf(j)+1} → ${j.output?.split(/[\\/]/).pop()||'đã lưu'}`).join(' · '):'';
+  $('recentCompletions').hidden=!recent.length;
+
   const failed=jobs.filter(j=>['failed','interrupted'].includes(j.status)&&j.error);
   $('queueFailure').hidden=Boolean(state.active||!failed.length);
   $('queueFailureText').textContent=failed.length?`${failed[0].title||'Prompt '+(jobs.indexOf(failed[0])+1)} · ${failed[0].error}`:'';
@@ -194,6 +231,7 @@ $('applyRefs').onclick=async()=>{remapDrafts();const result=mapped(state.jobs.fi
 $('referencePaste').onpaste=e=>pasteImages(e);$('referencePaste').ondragover=e=>e.preventDefault();$('referencePaste').ondrop=e=>pasteImages(e);
 $('browser').onclick=()=>call('browser',Number($('accountPicker').value));$('accountPicker').onchange=()=>render(state);
 $('logoutAccount').onclick=async()=>render(await call('logoutAccount',Number($('accountPicker').value)));
+$('testBrowsers').onclick=async()=>render(await call('testBrowsers'));
 $('start').onclick=async()=>render(await call('start'));$('pause').onclick=async()=>render(await call('stop'));
 $('clearPending').onclick=async()=>{if(confirm('Xóa tất cả tác vụ đang chờ? Các clip đã tải vẫn giữ nguyên.'))render(await call('clearPending'));};
 $('clearList').onclick=async()=>{if(confirm('Dừng và xóa toàn bộ danh sách tác vụ? File video đã tải không bị xóa. Tác vụ đã gửi có thể còn chạy trên Muse.'))render(await call('clearList'));};
@@ -208,6 +246,16 @@ window.studio.onUpdate(render);call('state').then(render);renderDrafts();mapping
 
 $('licenseButton').onclick=()=>$('licenseDialog').showModal();$('closeLicense').onclick=()=>$('licenseDialog').close();$('copyDevice').onclick=async()=>{try{await navigator.clipboard.writeText($('deviceCode').value);toast('Đã sao chép mã máy.');}catch{$('deviceCode').select();toast('Nhấn Ctrl+C để sao chép mã máy.');}};$('activateKey').onclick=async()=>{const result=await call('activateKey',$('activationKey').value.trim());if(result){render(result);toast('Đã kích hoạt key.');}};
 
-$('showFailures').onclick=()=>{filter='failed';document.querySelectorAll('[data-filter]').forEach(b=>b.classList.toggle('active',b.dataset.filter==='failed'));render(state);$('jobs').scrollIntoView({block:'start',behavior:'smooth'});};
+$('showFailures').onclick=()=>{const job=state.jobs.find(j=>['failed','interrupted'].includes(j.status));const card=jobCards.get(job?.id)?.card,grid=$('jobs');if(card)grid.scrollTo({top:grid.scrollTop+card.getBoundingClientRect().top-grid.getBoundingClientRect().top,behavior:'smooth'});};
 
 $('diagnostics').onclick=async()=>{if(await call('diagnostics',Number($('accountPicker').value)))toast('Đã lưu thông tin cấu trúc chat. Tệp không chứa cookie hay nội dung prompt.');};
+
+$('openOutput').onclick=()=>call('openOutput');
+$('toggleEditor').onclick=()=>{$('editorPanel').open=!$('editorPanel').open;if($('editorPanel').open)$('editorPanel').scrollIntoView({block:'nearest',behavior:'smooth'});};
+$('openAll').onclick=async()=>{await Promise.all(Array.from({length:Number(state.settings.accountCount)},(_,index)=>call('browser',index)));};
+$('parallelAccounts').onchange=async()=>{const result=await call('settings',{...state.settings,accountCount:Number($('parallelAccounts').value),dispatchMode:'parallel',finishAction:state.settings.autoMerge?'merge':state.settings.autoPackage?'package':'keep'});if(result)render(result);else render(state);};
+for(const event of ['wheel','touchstart','pointerdown','keydown'])$('jobs').addEventListener(event,()=>{manualScrollUntil=Date.now()+10000;},{passive:true});
+
+function fitQueueViewport(){const grid=$('jobs'),top=grid.getBoundingClientRect().top;grid.style.maxHeight=Math.max(230,window.innerHeight-Math.max(0,top)-22)+'px';}
+window.addEventListener('resize',fitQueueViewport);
+new ResizeObserver(fitQueueViewport).observe($('queueControls'));
