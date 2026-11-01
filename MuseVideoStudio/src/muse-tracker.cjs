@@ -187,16 +187,17 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       // Never use a direct download link or guess the second element globally.
       const target=menu[0],controlled=s.menuOpener?.getAttribute('aria-controls');
       if(controlled&&!controlled.split(/\s+/).some(id=>document.getElementById(id)?.contains(target)))throw Error('Lệnh tải không thuộc menu của clip này.');
+      const rowChildren=p=>[...p.children].filter(e=>visible(e)&&!e.matches('svg,[aria-hidden="true"],[role="separator"]')&&/[\p{L}\p{N}]/u.test(text(e)));
       let popup=target.closest('[role="menu"]');
       if(!popup){
         for(let p=target.parentElement;p&&p!==document.body;p=p.parentElement){
           if(p.contains(s.video)||p.contains(s.echoRoot)||p.querySelector('textarea,input,video'))break;
-          if([...p.children].filter(visible).length>=2){popup=p;break;}
+          if(rowChildren(p).length>=2){popup=p;break;}
         }
       }
       if(!popup)throw Error('Chưa xác định được dòng thứ hai trong menu của clip.');
       const interactive=[...popup.querySelectorAll('[role="menuitem"],button,a,[role="button"]')].filter(visible);
-      const rows=interactive.length?interactive.filter(e=>!interactive.some(parent=>parent!==e&&parent.contains(e))):[...popup.children].filter(e=>visible(e)&&e.getAttribute('role')!=='separator');
+      const rows=interactive.length?interactive.filter(e=>!interactive.some(parent=>parent!==e&&parent.contains(e))):rowChildren(popup);
       if(rows.length<2||!(rows[1]===target||rows[1].contains(target)))throw Error('Dòng thứ hai của menu chưa phải Tải xuống. Chưa bấm để tránh tải nhầm.');
       if(rows[1].disabled||rows[1].getAttribute('aria-disabled')==='true')return {action:'waiting-menu',clicked:false,needsMenu:true};
       menu[0].click();s.menuPending=false;return {action:'clicked',clicked:true,needsMenu:false};
