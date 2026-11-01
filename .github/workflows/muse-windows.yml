@@ -50,6 +50,8 @@ jobs:
           if errorlevel 1 (type test.log & exit /b 1)
           call node test/scene-flow-smoke.cjs >> test.log 2>&1
           if errorlevel 1 (type test.log & exit /b 1)
+          call node test/ten-sessions-smoke.cjs >> test.log 2>&1
+          if errorlevel 1 (type test.log & exit /b 1)
           call node test/browser-probe-smoke.cjs >> test.log 2>&1
           if errorlevel 1 (type test.log & exit /b 1)
           call node test/browser-stop-smoke.cjs >> test.log 2>&1
@@ -125,7 +127,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "muse-studio-v$env:MUSE_VERSION" "dist/$env:MUSE_ZIP" --target $env:GITHUB_SHA --title "Muse Video Studio V1 — $env:MUSE_VERSION Windows" --notes "V1 update1.1.1: supports up to10 independently signed-in accounts/browser sessions and10 parallel scene workers; safe shared-reference caching under concurrent dispatch. English and Vietnamese interface with a live language selector and saved preference. English by default. New English tagline FROM IDEAS TO MOTION and turquoise branding. Labels, settings, progress and exit confirmation localized while preserving user prompt/draft/title/source/path content. Includes one main app instance, removed desktop menus, Exit completely/Stay confirmation and three-dot menu video downloads. Download ZIP, extract and run EXE. Automated Windows/Edge fixtures verified; live Muse account validation remains needed."
+          gh release view "muse-studio-v$env:MUSE_VERSION" > $null 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            gh release create "muse-studio-v$env:MUSE_VERSION" --target $env:GITHUB_SHA --title "Muse Video Studio — $env:MUSE_VERSION Windows" --notes "Ten parallel sessions upload reference images and send exact scene prompts. Downloads use the matching clip's three-dot menu and its second Download row; completion requires a validated saved video. Test sends only the opening sentence and does not disable Run/Continue. Existing account profiles, projects and output files are preserved. Automated fixtures verified; live Muse account validation remains needed."
+            if ($LASTEXITCODE -ne 0) {
+              gh release view "muse-studio-v$env:MUSE_VERSION"
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
+          }
+          gh release upload "muse-studio-v$env:MUSE_VERSION" "dist/$env:MUSE_ZIP" --clobber
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Retain public test diagnostics on failure
         if: failure()
         shell: pwsh

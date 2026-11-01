@@ -5,6 +5,10 @@ on:
     branches: [main, muse-video-studio]
     paths:
       - 'MuseVideoStudio/tools/build-installer.cjs'
+      - 'MuseVideoStudio/src/**'
+      - 'MuseVideoStudio/test/**'
+      - 'MuseVideoStudio/package.json'
+      - 'MuseVideoStudio/package-lock.json'
       - 'MuseVideoStudio/tools/test-installer.ps1'
       - '.github/workflows/muse-windows-installer.yml'
 permissions:
@@ -32,6 +36,16 @@ jobs:
           set MUSE_TEST_EXIT=%ERRORLEVEL%
           type installer-test.log
           exit /b %MUSE_TEST_EXIT%
+      - name: Verify ten sessions, menu download and nonblocking Test in Edge
+        shell: cmd
+        run: |
+          set "CHROMIUM_PATH=C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+          if not exist "%CHROMIUM_PATH%" set "CHROMIUM_PATH=C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+          for %%T in (ten-sessions-smoke scene-flow-smoke muse-tracker-smoke browser-probe-smoke ui-smoke) do (
+            node test/%%T.cjs >> installer-test.log 2>&1
+            if errorlevel 1 (type installer-test.log & exit /b 1)
+          )
+          type installer-test.log
       - name: Build Windows setup
         shell: pwsh
         run: |
@@ -57,7 +71,10 @@ jobs:
           gh release view "muse-studio-v$version" > $null 2>&1
           if ($LASTEXITCODE -ne 0) {
             gh release create "muse-studio-v$version" --target $env:GITHUB_SHA --title "Muse Video Studio V1 — $version Windows" --notes "Windows setup installer. Run the Setup.exe to choose an installation folder and create desktop/Start menu shortcuts."
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            if ($LASTEXITCODE -ne 0) {
+              gh release view "muse-studio-v$version"
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
           }
           gh release upload "muse-studio-v$version" "dist/MuseVideoStudio-$version-Setup.exe" --clobber
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

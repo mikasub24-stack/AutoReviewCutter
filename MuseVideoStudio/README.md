@@ -1,8 +1,8 @@
-# Muse Video Studio V1 · 1.1.1 · Windows
+# Muse Video Studio V1 · 1.1.2 · Windows
 
 ## Bản cài đặt Windows
 
-Tải `MuseVideoStudio-1.1.1-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
+Tải `MuseVideoStudio-1.1.2-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
 
 Build riêng: `node tools/build-installer.cjs` trên Windows. Workflow installer kiểm thử cài đặt, shortcut, mở app, một cửa sổ chính và gỡ cài đặt trước khi thêm Setup.exe vào release hiện tại.
 
@@ -139,3 +139,11 @@ Nối MP4 tùy chọn cần FFmpeg/ffprobe trên máy (chưa đóng kèm): chọ
 Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. Các kiểm tra `node test/submit-diagnostics-smoke.cjs`, `node test/cards-smoke.cjs`, `node test/muse-tracker-smoke.cjs`, `node test/download-capture-smoke.cjs` xác minh thẻ video, gắn kết quả theo prompt và tải/cancel tệp video thật từ máy chủ cục bộ; smoke tải cần FFmpeg hoặc MUSE_VIDEO_FIXTURE. Test UI và browser smoke cần Chromium; đặt CHROMIUM_PATH nếu khác /usr/bin/chromium. `node test/attachment-ready-smoke.cjs` kiểm tra readiness ảnh trên DOM fixture thật. FFmpeg smoke riêng: `npm run test:merge`.
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
+
+## Update 1.1.2
+
+- Ten account workers upload their locked reference images and submit exact scene prompts independently. External Chrome/Edge sessions keep processing when their windows are in the background.
+- Downloads open the three-dot menu belonging to the matched clip and require the second row to be Download / Tải xuống. Direct links and other clips' controls are never used as a fallback. A scene completes only after the downloaded video is validated and saved to its ordered output filename.
+- Test sends only `Bắt đầu công việc mới nhé`. Run/Continue remains available, safely cancels unfinished Test work before editing the composer, and does not wait for a Test reply.
+- Existing application identity, saved projects, account profiles, licenses, references and output files remain unchanged. The installer continues to preserve application data on uninstall.
+- Regression coverage: `npm test`, plus Chromium/Edge fixtures `test/ten-sessions-smoke.cjs`, `test/scene-flow-smoke.cjs`, `test/muse-tracker-smoke.cjs` and `test/ui-smoke.cjs`. Fixtures use local video/image data; live Muse account behavior still needs verification.

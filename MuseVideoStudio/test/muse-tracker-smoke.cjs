@@ -58,7 +58,7 @@ const assert = require('node:assert/strict');
     await new Promise(resolve=>setTimeout(resolve,60));
     await page.evaluate(()=>{const v=document.createElement('video');v.preload='auto';v.src='/matching.webm';v.width=160;v.height=90;document.getElementById('result-one').append(v);});await ready('result-one');
     state=await page.evaluate(pollTracking,{id:'one'});assert.equal(state.ready,true);assert.equal(state.url,'https://muse.ai/matching.webm');assert.equal(state.progress,37);
-    assert.equal((await page.evaluate(downloadAction,{id:'one'})).url,'https://muse.ai/matching.webm');
+    await assert.rejects(page.evaluate(downloadAction,{id:'one'}),/menu …/);
     assert.equal(await page.evaluate(endTracking,{id:'one'}),true);
     // A response for another user prompt and a response appearing before the
     // submitted echo must not be bound to this job.
@@ -79,10 +79,21 @@ const assert = require('node:assert/strict');
     await reset();await page.evaluate(beginTracking,{id:'menu',prompt:'Menu target',messageSelector:'article'});await append({id:'u-menu',role:'user',text:'Menu target'});await append({id:'menu-result',src:'/menu.webm',ref:'u-menu'});await ready('menu-result');
     await page.evaluate(()=>{
       const old=document.createElement('button');old.setAttribute('role','menuitem');old.textContent='Tải xuống';old.onclick=()=>globalThis.__wrongDownload=true;document.body.append(old);
-      const more=document.createElement('button');more.textContent='…';more.setAttribute('aria-haspopup','menu');more.onclick=()=>{const menu=document.createElement('div');menu.setAttribute('role','menu');const b=document.createElement('button');b.setAttribute('role','menuitem');b.textContent='Tải xuống';b.onclick=()=>globalThis.__matchedDownload=true;menu.append(b);document.body.append(menu);};document.getElementById('menu-result').append(more);
+      const more=document.createElement('button');more.textContent='…';more.setAttribute('aria-haspopup','menu');more.onclick=()=>{const menu=document.createElement('div');menu.setAttribute('role','menu');const b=document.createElement('button');b.setAttribute('role','menuitem');b.textContent='Tải xuống';b.onclick=()=>globalThis.__matchedDownload=true;const share=document.createElement('button');share.setAttribute('role','menuitem');share.textContent='Chia sẻ';menu.append(share,b);document.body.append(menu);};document.getElementById('menu-result').append(more);
     });
     const first=await page.evaluate(downloadAction,{id:'menu',phase:'auto'});assert.equal(first.needsMenu,true);assert.equal(first.clicked,false);
     const second=await page.evaluate(downloadAction,{id:'menu',phase:'menu'});assert.equal(second.clicked,true);assert.equal(await page.evaluate(()=>globalThis.__matchedDownload),true);assert.equal(await page.evaluate(()=>Boolean(globalThis.__wrongDownload)),false);
+    // Refuse a reordered popup even if its first row says Download. A direct
+    // download control in the response must never bypass the clip menu.
+    await reset();await page.evaluate(beginTracking,{id:'wrong-row',prompt:'Wrong menu row'});await append({id:'wrong-row-user',role:'user',text:'Wrong menu row'});await append({id:'wrong-row-result',src:'/wrong-row.webm',ref:'wrong-row-user'});await ready('wrong-row-result');
+    await page.evaluate(()=>{
+      window.wrongRowClicked=false;const root=document.getElementById('wrong-row-result');
+      const direct=document.createElement('button');direct.textContent='Download';direct.onclick=()=>window.wrongRowClicked=true;root.append(direct);
+      const more=document.createElement('button');more.textContent='…';more.onclick=()=>{const popup=document.createElement('div');popup.setAttribute('role','menu');popup.innerHTML='<button role="menuitem">Tải xuống</button><button role="menuitem">Chia sẻ</button>';popup.firstElementChild.onclick=()=>window.wrongRowClicked=true;document.body.append(popup);};root.append(more);
+    });
+    assert.equal((await page.evaluate(downloadAction,{id:'wrong-row'})).needsMenu,true);
+    await assert.rejects(page.evaluate(downloadAction,{id:'wrong-row',phase:'menu'}),/Dòng thứ hai/);
+    assert.equal(await page.evaluate(()=>window.wrongRowClicked),false);
     // Recovery can bind an existing exact unique echo, but does not guess among
     // repeated historical prompts.
     await reset();await append({id:'u-recover',role:'user',text:'Recover exact prompt'});await append({id:'recover-result',src:'/recover.webm',ref:'u-recover'});await ready('recover-result');
@@ -103,7 +114,7 @@ const assert = require('node:assert/strict');
     // Custom role-less popup reuses hidden DOM and exposes a fresh exact-label
     // span only after the result's own More control. Old visible labels remain.
     await reset();await page.evaluate(beginTracking,{id:'custom-menu',prompt:'Custom menu target'});await append({id:'u-custom-menu',role:'user',text:'Custom menu target'});await append({id:'custom-menu-result',src:'/custom-menu.webm',ref:'u-custom-menu'});await ready('custom-menu-result');
-    await page.evaluate(()=>{globalThis.__customRight=false;globalThis.__customWrong=false;const old=document.createElement('div');old.innerHTML='<span>Tải xuống</span>';old.onclick=()=>globalThis.__customWrong=true;document.body.append(old);const popup=document.createElement('div');popup.id='reused-popup';popup.style.display='none';popup.innerHTML='<div><span>Tải xuống</span></div>';popup.firstElementChild.onclick=()=>globalThis.__customRight=true;document.body.append(popup);const more=document.createElement('button');more.textContent='…';more.onclick=()=>popup.style.display='block';document.getElementById('custom-menu-result').append(more);});
+    await page.evaluate(()=>{globalThis.__customRight=false;globalThis.__customWrong=false;const old=document.createElement('div');old.innerHTML='<span>Tải xuống</span>';old.onclick=()=>globalThis.__customWrong=true;document.body.append(old);const popup=document.createElement('div');popup.id='reused-popup';popup.style.display='none';popup.innerHTML='<div><span>Chia sẻ</span></div><div><span>Tải xuống</span></div>';popup.lastElementChild.onclick=()=>globalThis.__customRight=true;document.body.append(popup);const more=document.createElement('button');more.textContent='…';more.onclick=()=>popup.style.display='block';document.getElementById('custom-menu-result').append(more);});
     const opened=await page.evaluate(downloadAction,{id:'custom-menu',phase:'auto'});assert.equal(opened.needsMenu,true);const clicked=await page.evaluate(downloadAction,{id:'custom-menu',phase:'menu'});assert.equal(clicked.clicked,true);assert.equal(await page.evaluate(()=>globalThis.__customRight),true);assert.equal(await page.evaluate(()=>globalThis.__customWrong),false);
     // An unknown-author response row can report real DOM progress before a
     // video element exists; no elapsed-time percentage is fabricated.
@@ -120,7 +131,7 @@ const assert = require('node:assert/strict');
     // Explicit video attachment link with image thumbnail, no HTML video tag.
     await reset();await page.evaluate(beginTracking,{id:'attachment',prompt:'Attachment target'});await append({id:'u-attachment',role:'user',text:'Attachment target'});
     await page.evaluate(()=>{const r=document.createElement('article');r.dataset.messageRole='assistant';r.innerHTML='<a href="/clip.mp4?signature=secret" download="clip.mp4"><img alt="Preview"></a>';document.getElementById('thread').append(r);});
-    const attachment=await page.evaluate(pollTracking,{id:'attachment'});assert.equal(attachment.ready,true);assert.match(attachment.url,/clip\.mp4/);assert.equal((await page.evaluate(downloadAction,{id:'attachment'})).action,'source');
+    const attachment=await page.evaluate(pollTracking,{id:'attachment'});assert.equal(attachment.ready,true);assert.match(attachment.url,/clip\.mp4/);await assert.rejects(page.evaluate(downloadAction,{id:'attachment'}),/menu …/);
     // Repeated text in history must not hijack a resumed attempt.
     await reset();await append({id:'u-old-repeat',role:'user',text:'Repeated resume target'});await append({id:'r-old-repeat',src:'/old-repeat.webm',ref:'u-old-repeat'});await ready('r-old-repeat');
     await page.evaluate(beginTracking,{id:'new-attempt',prompt:'Repeated resume target'});await append({id:'u-new-repeat',role:'user',text:'Repeated resume target'});await append({id:'r-new-repeat',src:'/new-repeat.webm',ref:'u-new-repeat'});await ready('r-new-repeat');
@@ -212,7 +223,7 @@ const assert = require('node:assert/strict');
       document.getElementById('svg-user').classList.add('bubble');
       const result=document.getElementById('svg-result'),video=result.querySelector('video'),bubble=document.createElement('div');bubble.className='bubble';result.append(bubble);bubble.append(video);
       const button=document.createElement('button');button.innerHTML='<svg width="20" height="20"><circle cx="4" cy="10" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="16" cy="10" r="1"/></svg>';
-      button.onclick=()=>{const menu=document.createElement('div');menu.textContent='Tải xuống';menu.onclick=()=>window.svgDownloaded=true;document.body.append(menu);};result.append(button);
+      button.onclick=()=>{const menu=document.createElement('div');menu.innerHTML='<div>Chia sẻ</div><div>Tải xuống</div>';menu.lastElementChild.onclick=()=>window.svgDownloaded=true;document.body.append(menu);};result.append(button);
     });
     assert.equal((await page.evaluate(pollTracking,{id:'svg-menu'})).ready,true);
     assert.equal((await page.evaluate(downloadAction,{id:'svg-menu'})).needsMenu,true);

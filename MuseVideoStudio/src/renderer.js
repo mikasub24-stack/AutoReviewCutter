@@ -198,7 +198,7 @@ function render(next){
   $('overallProgress').max=Math.max(1,jobs.length);$('overallProgress').value=done.length;
   $('testBrowsers').disabled=Boolean(busy);$('testBrowsers').textContent=state.testing?'Đang gửi câu bắt đầu…':'Gửi câu bắt đầu';
   $('browserTests').replaceChildren(...Array.from({length:state.settings.accountCount},(_,index)=>{const t=state.browserTests?.find(t=>t.index===index);return el('span','browserTest '+(t?.status||''),'Trình duyệt '+(index+1)+': '+(t?.message||'Chưa gửi câu bắt đầu'));}));
-  if(state.testing){$('queueState').textContent=state.starting?'Chuẩn bị gửi cảnh…':'Đang gửi câu bắt đầu · bạn có thể bấm Chạy';$('pause').disabled=Boolean(state.stopping);}
+  if(state.testing&&!state.active){$('queueState').textContent=state.starting?'Chuẩn bị gửi cảnh…':'Đang gửi câu bắt đầu · bạn có thể bấm Chạy';$('pause').disabled=Boolean(state.stopping);}
   $('parallelAccounts').value=String(state.settings.accountCount);$('parallelAccounts').disabled=busy;
   $('openAll').textContent=`Mở ${state.settings.accountCount} trình duyệt`;$('openAll').disabled=busy;
   $('openOutput').disabled=!state.settings.output;$('folder').disabled=busy;

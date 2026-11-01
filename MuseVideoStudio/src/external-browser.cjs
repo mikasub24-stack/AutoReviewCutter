@@ -152,6 +152,7 @@ async function launchExternalBrowser({ executablePath, profileDir, sessionFile, 
   }
   try {
     context = await engine.launchPersistentContext(profileDir, {
+      args: ['--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'],
       executablePath, headless, acceptDownloads: true, timeout: 30000, viewport: null
     });
     context.setDefaultTimeout(15000);

@@ -48,6 +48,7 @@ test('launches a dedicated persistent browser with bounded startup, restores enc
     adapter=await launchExternalBrowser(t.config);
     assert.equal(t.launches[0].profile,await fs.realpath(t.config.profileDir));assert.equal(t.launches[0].config.timeout,30000);assert.equal(t.launches[0].config.headless,false);
     assert.equal(t.launches[0].config.acceptDownloads,true);assert.equal(adapter.external,true);assert.equal(adapter.isSessionEnabled(),true);
+    for(const flag of ['--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding'])assert.ok(t.launches[0].config.args.includes(flag));
     assert.ok(t.context.events.findIndex(e=>e[0]==='restore')<t.context.events.findIndex(e=>e[0]==='goto'));
     assert.equal(adapter.url(),'https://muse.ai/');assert.equal(t.context.values[0].name,'__Host-login');assert.equal(t.context.values[0].domain,'muse.ai');
   } finally {await t.cleanup(adapter);}

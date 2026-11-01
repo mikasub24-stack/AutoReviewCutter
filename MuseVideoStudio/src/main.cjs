@@ -212,21 +212,6 @@ async function triggerTrackedDownload(muse,id,signal) {
   const check=()=>{if(signal.aborted)throw stoppedError();};
   check();let action=await abortable(dom(muse,downloadAction,{id,phase:'auto'}),signal);
   if(action.clicked && !action.needsMenu)return;
-  if(action.action==='source' && action.url){
-    const url=new URL(action.url);
-    if(url.username||url.password||!['https:','blob:'].includes(url.protocol))throw Error('Địa chỉ video chưa hợp lệ.');
-    check();
-    if(!muse.external){muse.webContents.downloadURL(action.url);return;}
-    await abortable(dom(muse,async ({id,source})=>{
-      const state=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]?.get(id);if(!state)throw Error('Đã dừng tải.');
-      state.downloadController=new AbortController();
-      const response=await fetch(source,{credentials:'include',signal:state.downloadController.signal});if(!response.ok)throw Error('Chưa tải được nguồn video.');
-      const blob=await response.blob();if(state.downloadController.signal.aborted)throw Error('Đã dừng tải.');
-      const url=URL.createObjectURL(blob),a=document.createElement('a');
-      a.href=url;a.download='muse-video.mp4';a.style.display='none';document.body.appendChild(a);
-      try{a.click();}finally{a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}
-    },{id,source:action.url}),signal);return;
-  }
   const deadline=Date.now()+6000;
   while(action.needsMenu && Date.now()<deadline){
     await abortable(delay(200),signal);check();
@@ -406,7 +391,7 @@ async function testBrowsers(){
       }catch(e){entry.status=signal.aborted?'canceled':'failed';entry.message=signal.aborted?'Đã dừng Test':e.message;}
       finally{if(entry.browser){if(signal.aborted&&entry.prepared){await Promise.allSettled([...probeMutations]);await dom(entry.browser,clearBrowserProbeDraft,{composerSelector:settings.composer,text:'Bắt đầu công việc mới nhé'}).catch(()=>{});}void dom(entry.browser,endTracking,{id:entry.id}).catch(()=>{});}notify();}
     }));
-  }finally{testing=false;probeController=null;finishProbe();main?.show();main?.focus();notify();}
+  }finally{testing=false;probeController=null;finishProbe();if(!starting&&!queue.active&&!flushingQuit){main?.show();main?.focus();}notify();}
   return snapshot();
 }
 async function stopAll(){

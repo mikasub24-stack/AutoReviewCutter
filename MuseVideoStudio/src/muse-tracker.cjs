@@ -183,11 +183,24 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       const menu=controls().filter(e=>isDownload(e)&&!s.menuBaseline.has(e));
       if(menu.length>1)throw Error('Có nhiều lệnh tải mới xuất hiện. Không thể chọn an toàn.');
       if(!menu.length)return {action:'waiting-menu',clicked:false,needsMenu:true};
+      // Require the menu opened by this clip, including portals/reused popups.
+      // Never use a direct download link or guess the second element globally.
+      const target=menu[0],controlled=s.menuOpener?.getAttribute('aria-controls');
+      if(controlled&&!controlled.split(/\s+/).some(id=>document.getElementById(id)?.contains(target)))throw Error('Lệnh tải không thuộc menu của clip này.');
+      let popup=target.closest('[role="menu"]');
+      if(!popup){
+        for(let p=target.parentElement;p&&p!==document.body;p=p.parentElement){
+          if(p.contains(s.video)||p.contains(s.echoRoot)||p.querySelector('textarea,input,video'))break;
+          if([...p.children].filter(visible).length>=2){popup=p;break;}
+        }
+      }
+      if(!popup)throw Error('Chưa xác định được dòng thứ hai trong menu của clip.');
+      const interactive=[...popup.querySelectorAll('[role="menuitem"],button,a,[role="button"]')].filter(visible);
+      const rows=interactive.length?interactive.filter(e=>!interactive.some(parent=>parent!==e&&parent.contains(e))):[...popup.children].filter(e=>visible(e)&&e.getAttribute('role')!=='separator');
+      if(rows.length<2||!(rows[1]===target||rows[1].contains(target)))throw Error('Dòng thứ hai của menu chưa phải Tải xuống. Chưa bấm để tránh tải nhầm.');
+      if(rows[1].disabled||rows[1].getAttribute('aria-disabled')==='true')return {action:'waiting-menu',clicked:false,needsMenu:true};
       menu[0].click();s.menuPending=false;return {action:'clicked',clicked:true,needsMenu:false};
     }
-    const direct=controls(s.responseRoot).filter(isDownload);
-    if(direct.length>1)throw Error('Phản hồi có nhiều nút tải. Không thể xác định nút đúng.');
-    if(direct.length===1){if(videoLink(direct[0]))return{action:'source',clicked:false,needsMenu:false,url:direct[0].href};direct[0].click();return {action:'clicked',clicked:true,needsMenu:false};}
     let more=[];
     for(let scope=s.responseRoot,depth=0;scope&&scope!==document.body&&depth<4;scope=scope.parentElement,depth++){
       if(scope!==s.responseRoot&&(scope.contains(s.echoRoot)||scope.querySelector('textarea,input,[contenteditable="true"],nav,aside')))break;
@@ -197,8 +210,8 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       if(more.length)break;
     }
     if(more.length>1)throw Error('Có nhiều menu trong phản hồi. Không thể xác định menu tải video.');
-    if(more.length===1){s.menuBaseline=new Set(controls());s.menuPending=true;more[0].click();return {action:'waiting-menu',clicked:false,needsMenu:true};}
-    return {action:'source',clicked:false,needsMenu:false,url:source(s.video)};
+    if(more.length===1){s.menuBaseline=new Set(controls());s.menuOpener=more[0];s.menuPending=true;more[0].click();return {action:'waiting-menu',clicked:false,needsMenu:true};}
+    throw Error('Chưa thấy menu … của đúng clip. Chưa tải video.');
   };
   const prior=echoCandidates(true).length;s.hadPriorSame=recover?prior>1:prior>0;
   s.probe=()=>{
