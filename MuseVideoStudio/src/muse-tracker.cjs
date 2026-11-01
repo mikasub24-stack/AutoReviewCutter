@@ -1,12 +1,13 @@
 // These functions execute inside the Muse document through either browser
 // adapter. Keep every browser helper inside beginTracking's closure so the
 // exported function can be serialized without Node imports or outer variables.
-function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = '', recover = false, recoverRequireAnchor = false, echoMarker='',echoKey='',echoAliases=[] }) {
+function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = '', recover = false, recoverRequireAnchor = false, echoMarker='',echoKey='',echoAliases=[],otherPrompts=[] }) {
   const key = Symbol.for('MuseVideoStudio.promptTrackers.v1');
   const map = globalThis[key] || (globalThis[key] = new Map());
   if (!id || typeof prompt !== 'string' || !prompt.trim()) throw Error('Tác vụ cần mã và prompt đầy đủ.');
   const norm = value => String(value || '').replace(/\s+/g, ' ').trim();
   const wanted = norm(prompt),previous=map.get(id);
+  const others=[...new Set((Array.isArray(otherPrompts)?otherPrompts:[]).map(norm).filter(p=>p.length>=8&&p!==wanted))];
   if(previous){
     if(!recover)throw Error('Tác vụ này đã được theo dõi.');
     if(previous.prompt!==wanted)throw Error('Mã lượt gửi đang giữ prompt khác. Không thay thế cảnh đang chờ.');
@@ -74,18 +75,42 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     // Unknown chat markup: find the nearest repeated sibling row containing the
     // next response, rather than expanding to document/body/app-wide media.
     // A row for a different prompt before the video blocks this fallback.
-    s.genericResponseRoot=null;
+    s.genericResponseRoot=null;s.genericSpan=null;
     let branch=root;
     for(let parent=root.parentElement,depth=0;parent && parent!==document.body && depth<5;branch=parent,parent=parent.parentElement,depth++) {
       if(parent.querySelector('textarea,input,[contenteditable="true"],[role="textbox"],nav,aside'))continue;
+      const filled=n=>Boolean(norm(n.textContent)||n.querySelector('video,progress,[role="progressbar"],button,a'));
       let next=branch.nextElementSibling;
-      while(next&&!norm(next.textContent)&&!next.querySelector('video,progress,[role="progressbar"],button,a'))next=next.nextElementSibling;
+      while(next&&!filled(next))next=next.nextElementSibling;
       if(!next||next.tagName!==branch.tagName)continue;
-      const freshMedia=mediaNodes(next).some(v=>(recover||(!s.baseline.has(v)&&!s.baselineSources.has(source(v)))));
-      const actualProgress=next.querySelector('progress,[role="progressbar"],[aria-valuenow]');
-      if(freshMedia||actualProgress){s.genericResponseRoot=next;return parent;}
+      // Muse may answer with several rows (a sentence, the clip, then a note). In a
+      // live send only this prompt is in flight in this window, so every new row
+      // after its echo belongs to its reply: look through the next few rows, and
+      // stop at another prompt's row, a different kind of element or the composer.
+      // Recovery has no before-send baseline, so it also stops at any row that
+      // shows another queued prompt (or the Test sentence), never reading past it.
+      let found=null;const span=[];
+      for(let rows=0;next&&rows<12;next=next.nextElementSibling){
+        if(!filled(next))continue;
+        rows++;
+        if(next.tagName!==branch.tagName||next.hasAttribute('data-muse-studio-attempt')||next.querySelector('[data-muse-studio-attempt],textarea,input,[contenteditable="true"],[role="textbox"]'))break;
+        if(recover){const text=norm(next.textContent);if(others.some(p=>text.includes(p)))break;}
+        span.push(next);
+        const freshMedia=mediaNodes(next).some(v=>(recover||(!s.baseline.has(v)&&!s.baselineSources.has(source(v)))));
+        const actualProgress=next.querySelector('progress,[role="progressbar"],[aria-valuenow]');
+        if(!found&&(freshMedia||actualProgress))found=next;
+      }
+      // Only clips inside these rows can belong to this prompt; rows past the stop
+      // point are other turns. Two clips inside them stay ambiguous and fail closed.
+      if(found){s.genericResponseRoot=found;s.genericSpan=span;return parent;}
     }
     return null;
+  }
+  // Short reason shown on the card while no reply is bound to this prompt, so a
+  // stuck scene says what the tool can and cannot see in the chat.
+  function hint(){
+    const fresh=[...document.querySelectorAll('video')].filter(v=>s.echoRoot?.isConnected&&following(s.echoRoot,v)&&(recover||(!s.baseline.has(v)&&!s.baselineSources.has(source(v))))).length;
+    return fresh?`thấy ${fresh} video mới nhưng chưa gắn được vào đúng prompt`:'chưa thấy video mới trong chat';
   }
 
   function responseRoot(video,thread) {
@@ -124,7 +149,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       if(anchored.length!==1)return result('waiting-response','Muse đang dựng lại tin nhắn · chờ khôi phục đúng cảnh gốc',null);
       s.echo=anchored[0].leaf;s.echoRoot=anchored[0].root;s.echoContexts=rememberContext(s.echoRoot);s.echoNativeKey=s.echoRoot.id||s.echoRoot.getAttribute('data-message-id')||s.echoRoot.getAttribute('data-id')||'';if(s.echoNativeKey)s.echoAliases.add(s.echoNativeKey);s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.ready=false;s.responseRoot=null;s.video=null;
     }
-    const thread=threadRoot(s.echoRoot);if(!thread)return result('waiting-response','Chưa xác định được vùng phản hồi cho prompt này');
+    const thread=threadRoot(s.echoRoot);if(!thread)return {...result('waiting-response','Chưa xác định được vùng phản hồi cho prompt này'),hint:hint()};
     if(s.ready&&(!s.video?.isConnected||!s.responseRoot?.isConnected)){s.ready=false;s.video=null;s.responseRoot=null;}
     if(s.ready&&s.video&&(source(s.video)!==s.fingerprint))throw Error('Kết quả đã thay đổi. Dừng tải để tránh lấy nhầm video.');
     // Every poll, including immediately before download, checks the prompt and
@@ -136,6 +161,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     const candidates=[];
     for(const video of mediaNodes(thread)) {
       if(!following(s.echoRoot,video))continue;
+      if(s.genericSpan&&!s.genericSpan.some(row=>row.contains(video)))continue;
       if(!recover&&(s.baseline.has(video)||s.baselineSources.has(source(video))))continue;
       const root=responseRoot(video,thread);
       if(!root||root.contains(s.echo)||!following(s.echoRoot,root))continue;
@@ -156,7 +182,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
         return a.kind==='assistant'&&a.root===root&&!root.contains(s.echo)&&following(s.echoRoot,root)&&!userRoots.some(user=>following(user,root))&&(recover||(!s.baseline.has(root)&&(s.added.get(root)||0)>=s.echoEpoch))&&(!ref||echoIds.has(ref.replace(/^#/,'')));
       });
       if(possible.length===1){s.responseRoot=possible[0];return result('rendering','Muse đang xử lý prompt này',possible[0]);}
-      return result('waiting-response','Đang chờ video phản hồi cho đúng prompt này');
+      return {...result('waiting-response','Đang chờ video phản hồi cho đúng prompt này'),hint:hint()};
     }
     s.video=candidates[0].video;s.responseRoot=candidates[0].root;
     if(!playable(s.video))return result('rendering','Muse đang tạo hoặc tải dữ liệu video');

@@ -312,7 +312,7 @@ async function runJob(job,worker,signal,{recover=false}={}) {
   }
   const trackerId=job.trackerId||job.id;
   try{
-    await step(dom(muse,beginTracking,{id:trackerId,prompt,videoSelector:settings.video,messageSelector:settings.messageSelector,recover,echoKey:recover?job.echoKey||receipt?.echoKey:'',echoMarker:recover?job.echoMarker||receipt?.echoMarker:'',echoAliases:recover?[...new Set([...(job.echoAliases||[]),receipt?.echoKey].filter(Boolean))]:[]}));
+    await step(dom(muse,beginTracking,{id:trackerId,prompt,videoSelector:settings.video,messageSelector:settings.messageSelector,recover,echoKey:recover?job.echoKey||receipt?.echoKey:'',echoMarker:recover?job.echoMarker||receipt?.echoMarker:'',echoAliases:recover?[...new Set([...(job.echoAliases||[]),receipt?.echoKey].filter(Boolean))]:[],otherPrompts:recover?[...queue.jobs.filter(j=>j.id!==job.id).map(j=>j.lockedInput?.prompt||j.prompt),'Bắt đầu công việc mới nhé'].filter(Boolean):[]}));
     if(!recover){
       stage('submitting','Đang gửi đúng prompt và ảnh đã khóa');
       job.submissionProfileKey=profileKey;job.submissionSessionId=currentSession;job.submissionProtocol=1;job.mayHaveSubmitted=true;job.submittedAt=null;await step(save());check();
@@ -341,7 +341,7 @@ async function runJob(job,worker,signal,{recover=false}={}) {
         }catch(e){check();stage('downloading','Chưa lưu được video · giữ đúng kết quả và thử tải lại: '+e.message);await step(delay(5000));continue;}
       }
       if(!warned&&Date.now()>warnAt){warned=true;job.late=true;}
-      stage(!result.echoMatched?'confirming':'waiting',(job.late?'Muse chậm hơn thời gian dự kiến · vẫn giữ cảnh này. ':'')+(!result.echoMatched?'Chưa thấy đúng prompt trong chat Muse':!result.responseMatched?'Đã thấy tin nhắn · chờ Muse phản hồi':result.stage||'Chờ đúng video của prompt'));
+      stage(!result.echoMatched?'confirming':'waiting',(job.late?'Muse chậm hơn thời gian dự kiến · vẫn giữ cảnh này. ':'')+(!result.echoMatched?'Chưa thấy đúng prompt trong chat Muse':!result.responseMatched?'Đã thấy tin nhắn · chờ Muse phản hồi'+(result.hint?' ('+result.hint+')':''):result.stage||'Chờ đúng video của prompt'));
       await step(delay(1500));
     }
   }finally{

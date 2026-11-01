@@ -16,6 +16,8 @@ Lưu hàng đợi & phiên riêng trên máy|Queue and sessions stored on this d
 Tạo video|Create videos
 Trình duyệt tích hợp|Built-in browser
 Phiên tài khoản|Account session
+Liên hệ|Contact
+Quét mã bằng Zalo để nhắn cho chủ phần mềm.|Scan with Zalo to message the software owner.
 Mở Muse / Đăng nhập|Open Muse / Sign in
 Đăng xuất tài khoản này|Sign out of this account
 Mỗi tài khoản giữ một phiên đăng nhập riêng.|Each account keeps its own sign-in session.
@@ -216,6 +218,7 @@ Nút Gửi của Muse chưa sẵn sàng. Chờ ảnh tải xong rồi thử lạ
 Đang kiểm tra ảnh đã khóa trong ô soạn thảo|Checking locked reference images in the composer
 Chưa thấy đúng prompt trong chat Muse|The exact prompt has not appeared in Muse chat
 Đã thấy tin nhắn · chờ Muse phản hồi|Message found · Waiting for Muse response
+chưa thấy video mới trong chat|no new video in the chat yet
 Đúng phản hồi của cảnh này · đang lưu video về máy|Matched scene result · Saving video
 Đã tải và lưu video về máy|Video downloaded and saved
 Đang mở Muse|Opening Muse
@@ -237,6 +240,8 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
     const patterns=[
       [/^Phiên bản (.+)$/,m=>'Version '+m[1]],
       [/^Tài khoản (\d+)$/,m=>'Account '+m[1]],
+      [/^Đã thấy tin nhắn · chờ Muse phản hồi \((.+)\)$/,m=>'Message found · Waiting for Muse response ('+t(m[1])+')'],
+      [/^thấy (\d+) video mới nhưng chưa gắn được vào đúng prompt$/,m=>'found '+m[1]+' new video(s) not yet bound to this prompt'],
       [/^Tài khoản này chỉ chạy khi chọn «Chạy song song» từ (\d+) trình duyệt\.$/,m=>'This account only runs when "Parallel browsers" is set to '+m[1]+' or more.'],
       [/^Đăng xuất TK (\d+) · (.+)$/,m=>'Sign out · Account '+m[1]+' · '+t(m[2])],
       [/^(\d+) \/ (\d+) video đã lưu$/,m=>m[1]+' / '+m[2]+' videos saved'],

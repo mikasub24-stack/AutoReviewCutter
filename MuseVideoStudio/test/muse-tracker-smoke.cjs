@@ -110,6 +110,24 @@ const assert = require('node:assert/strict');
     await reset();await page.evaluate(()=>{document.getElementById('thread').removeAttribute('data-chat-thread');});await page.evaluate(beginTracking,{id:'generic',prompt:'Generic exact prompt'});
     await page.evaluate(()=>{const row=document.createElement('div');row.className='row';row.id='generic-user';row.innerHTML='<div><p>Generic exact prompt</p></div><div><button>copy</button></div>';document.getElementById('thread').append(row);});
     await page.evaluate(()=>{const row=document.createElement('div');row.className='row';row.id='generic-result';row.innerHTML='<div><video preload="auto" src="/generic.webm"></video></div><div><button>…</button></div>';document.getElementById('thread').append(row);});await ready('generic-result');assert.equal((await page.evaluate(pollTracking,{id:'generic'})).ready,true);
+    // Muse can answer with several rows (a sentence, the clip, then a note). The
+    // clip still binds to its own prompt; a second clip stays ambiguous.
+    const mkRow=(id,html)=>page.evaluate(a=>{const r=document.createElement('div');r.className='row';r.id=a.id;r.innerHTML=a.html;document.getElementById('thread').append(r);},{id,html});
+    await reset();await page.evaluate(()=>document.getElementById('thread').removeAttribute('data-chat-thread'));await page.evaluate(beginTracking,{id:'multi-row',prompt:'Multi row prompt'});
+    await mkRow('mr-user','<div><p>Multi row prompt</p></div><div><button>copy</button></div>');await mkRow('mr-text','<div><p>Here is the clip you asked for</p></div>');
+    let multi=await page.evaluate(pollTracking,{id:'multi-row'});assert.equal(multi.ready,false);assert.equal(multi.responseMatched,false);assert.equal(multi.hint,'chưa thấy video mới trong chat');
+    await mkRow('mr-clip','<div><video preload="auto" src="/multi-row.webm"></video></div><div><button>…</button></div>');await mkRow('mr-note','<div><p>Check the length please</p></div>');await ready('mr-clip');
+    multi=await page.evaluate(pollTracking,{id:'multi-row'});assert.equal(multi.ready,true);assert.equal(multi.responseMatched,true);assert.equal(multi.url,'https://muse.ai/multi-row.webm');
+    await mkRow('mr-clip-2','<div><video preload="auto" src="/multi-row-2.webm"></video></div>');await assert.rejects(page.evaluate(pollTracking,{id:'multi-row'}),/nhiều video/);
+    // Recovery after a restart reads the same multi-row reply, but never past
+    // another queued prompt's row.
+    await reset();await page.evaluate(()=>document.getElementById('thread').removeAttribute('data-chat-thread'));
+    await mkRow('rr-user','<div><p>Recover multi prompt</p></div><div><button>copy</button></div>');await mkRow('rr-text','<div><p>Here you go</p></div>');await mkRow('rr-clip','<div><video preload="auto" src="/recover-multi.webm"></video></div>');
+    await mkRow('rr-next','<div><p>Next queued prompt text</p></div><div><button>copy</button></div>');await mkRow('rr-next-clip','<div><video preload="auto" src="/recover-next.webm"></video></div>');await ready('rr-clip');await ready('rr-next-clip');
+    await page.evaluate(beginTracking,{id:'rr',prompt:'Recover multi prompt',recover:true,otherPrompts:['Next queued prompt text','Bắt đầu công việc mới nhé']});
+    const recovered=await page.evaluate(pollTracking,{id:'rr'});assert.equal(recovered.ready,true);assert.equal(recovered.url,'https://muse.ai/recover-multi.webm');
+    await page.evaluate(()=>{const m=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')];for(const s of m.values())s.observer?.disconnect();m.clear();});
+    await page.evaluate(beginTracking,{id:'rr-blind',prompt:'Recover multi prompt',recover:true});await assert.rejects(page.evaluate(pollTracking,{id:'rr-blind'}),/nhiều video/);
     await reset();await page.evaluate(beginTracking,{id:'response-selector',prompt:'Response selector target',messageSelector:'.answer'});await append({id:'u-selector',role:'user',text:'Response selector target'});await append({id:'selector-result',src:'/selector.webm',ref:'u-selector'});await page.evaluate(()=>document.getElementById('selector-result').classList.add('answer'));await ready('selector-result');assert.equal((await page.evaluate(pollTracking,{id:'response-selector'})).ready,true);
     // Custom role-less popup reuses hidden DOM and exposes a fresh exact-label
     // span only after the result's own More control. Old visible labels remain.

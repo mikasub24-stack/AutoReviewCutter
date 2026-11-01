@@ -49,6 +49,7 @@ nav span { float: right; padding: 1px 6px; background: #245752; border-radius: 5
 nav .logoutButton { font-size: 10px; border-color: #473c3d; color: #c6a8a7; padding: 8px 10px; margin-top: 8px; }
 .sessionStatus { margin: 7px 9px 14px; padding: 0; font-size: 10px; line-height: 1.5; color: #7e91ad; }
 .asideBottom { margin-top: auto; padding-top: 20px; font-size: 10px; color: #adbbce; flex-shrink: 0; }
+.contactButton { display: block; width: 100%; margin: 0 0 14px; padding: 9px 12px; text-align: center; }
 .asideBottom small { margin-top: 10px; font-size: 9px; color: #7185a2; line-height: 1.7; }
 .dot { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #7ebd9c; }
 main { margin-left: var(--sidebar); width: calc(100% - var(--sidebar)); max-width: 1900px; padding: 24px 28px 16px; }
@@ -196,6 +197,10 @@ dialog { width: 650px; max-width: calc(100vw - 40px); padding: 24px; color: #e6e
 dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .dialogHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .dialogHeader .secondary { padding: 7px 10px; }
+.contactDialog { width: 380px; }
+.contactPanel { text-align: center; }
+.contactPanel img { display: block; width: 300px; max-width: 100%; height: auto; margin: 6px auto 12px; background: white; border-radius: 10px; }
+.contactPanel p { font-size: 12px; line-height: 1.7; }
 .paymentPanel { margin-top: 20px; padding-top: 18px; border-top: 1px solid #3c4b65; text-align: center; }
 .paymentPanel img { width: 250px; max-width: 100%; background: white; border-radius: 10px; margin: 12px 0; }
 .paymentPanel p { font-size: 11px; line-height: 1.8; }

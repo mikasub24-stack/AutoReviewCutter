@@ -1,10 +1,10 @@
 Continue in 1.1.6 resubmits unfinished scenes with new attempt IDs, ignoring tentative send flags and old receipts. Completed files are kept. The sidebar now displays the actual application version.
 
-# Muse Video Studio V1 · 1.1.8 · Windows
+# Muse Video Studio V1 · 1.1.9 · Windows
 
 ## Bản cài đặt Windows
 
-Tải `MuseVideoStudio-1.1.8-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
+Tải `MuseVideoStudio-1.1.9-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
 
 Build riêng: `node tools/build-installer.cjs` trên Windows. Workflow installer kiểm thử cài đặt, shortcut, mở app, một cửa sổ chính và gỡ cài đặt trước khi thêm Setup.exe vào release hiện tại.
 
@@ -141,6 +141,13 @@ Nối MP4 tùy chọn cần FFmpeg/ffprobe trên máy (chưa đóng kèm): chọ
 Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. Các kiểm tra `node test/submit-diagnostics-smoke.cjs`, `node test/cards-smoke.cjs`, `node test/muse-tracker-smoke.cjs`, `node test/download-capture-smoke.cjs` xác minh thẻ video, gắn kết quả theo prompt và tải/cancel tệp video thật từ máy chủ cục bộ; smoke tải cần FFmpeg hoặc MUSE_VIDEO_FIXTURE. Test UI và browser smoke cần Chromium; đặt CHROMIUM_PATH nếu khác /usr/bin/chromium. `node test/attachment-ready-smoke.cjs` kiểm tra readiness ảnh trên DOM fixture thật. FFmpeg smoke riêng: `npm run test:merge`.
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
+
+## Update 1.1.9
+
+- Sửa cảnh kẹt ở «Đã thấy tin nhắn · chờ Muse phản hồi» dù video đã hiện trong chat: Muse đôi khi trả lời bằng nhiều khối (một câu, clip, rồi một ghi chú) và tool chỉ nhìn khối ngay sau prompt. Giờ tool đọc các khối trả lời đến trước prompt kế tiếp, vẫn chỉ nhận đúng một clip của đúng prompt; có hai clip thì vẫn dừng để không tải nhầm. Khôi phục sau khi mở lại app dùng cùng cách, không đọc quá dòng prompt khác trong hàng đợi.
+- Khi cảnh còn chờ, thẻ ghi thêm lý do trong ngoặc (đã thấy mấy video mới nhưng chưa gắn được vào prompt, hoặc chưa thấy video mới).
+- Thêm nút «Liên hệ» ở cuối thanh bên: bấm để xem mã QR Zalo của chủ phần mềm.
+- Đã thử trên trang giả dựng bằng Chromium thật; chưa thử trên tài khoản Muse thật.
 
 ## Update 1.1.8
 
