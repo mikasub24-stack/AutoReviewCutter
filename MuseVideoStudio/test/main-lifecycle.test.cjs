@@ -28,7 +28,7 @@ const safeStorage = {
   }
 };
 
-async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, domTimeoutMs=20000, logoutResponse=1 } = {}) {
+async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, domTimeoutMs=20000, logoutResponse=1,closeResponse=1,closeGate } = {}) {
   const handlers = new Map(), sessions = new Map(), windows = [], errors = [], notices = [];
   const lifecycle = [],updates=[];
   let loaded, quit;
@@ -71,8 +71,9 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
     }
     destroy(){this.destroyed=true;this.emit('closed');}
     isDestroyed() { return this.destroyed; }
-    isMinimized() { return false; }
-    show() {} focus() {} restore() {}
+    isMinimized() { return Boolean(this.minimized); }
+    setMenu(value){this.menu=value;}setMenuBarVisibility(value){this.menuVisible=value;}
+    show(){this.shown=(this.shown||0)+1;}focus(){this.focused=(this.focused||0)+1;}restore(){this.minimized=false;this.restored=true;}
     async loadFile() {
       // The renderer can issue IPC immediately at load time.
       assert.ok(handlers.has('studio:state'));
@@ -87,11 +88,11 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
 
   const dialog = {
     showErrorBox: (title, message) => { errors.push({ title, message }); loaded(); },
-    showMessageBox:async(_parent,options)=>{notices.push(options);return{response:logoutResponse};},
+    showMessageBox:async(_parent,options)=>{notices.push(options);if(options.title==='Thoát Muse Video Studio?'){if(closeGate)await closeGate;return{response:closeResponse};}return{response:logoutResponse};},
     showMessageBoxSync: options => { notices.push(options); return 1; },
     showSaveDialog: async () => ({ canceled: false, filePath: path.join(userData, 'export.json') })
   };
-  const electron = { app, BrowserWindow, safeStorage, dialog,
+  const electron = { app, BrowserWindow, safeStorage, dialog,Menu:{setApplicationMenu:value=>{lifecycle.push(value===null?'menu-removed':'menu-set');}},
     session: { fromPartition: accountSession },
     shell: { showItemInFolder() {}, openPath: async () => '', openExternal: async()=>{} },
     ipcMain: { handle: (name, handler) => handlers.set(name, handler) }
@@ -112,7 +113,7 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
   else await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(errors, []);
 
-  return { handlers, sessions, windows, lifecycle, notices, errors,updates,
+  return { app,handlers, sessions, windows, lifecycle, notices, errors,updates,
     invoke: (name, data, sender = windows[0]?.webContents) => {
       return handlers.get(`studio:${name}`)({ sender }, data);
     },
@@ -265,7 +266,25 @@ test('logout resets only selected native account and keeps the other login and d
  }finally{await fs.rm(dir,{recursive:true,force:true});}
 });
 test('cancel logout preserves the selected profile',async()=>{const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-logout-'));try{const app=await boot(dir,{logoutResponse:0,initialCookies:{'persist:muse-account-1':[cookie('one')]}});await app.invoke('browser',0);await app.invoke('logoutAccount',0);assert.equal(app.windows[1].isDestroyed(),false);assert.equal(app.sessions.get('persist:muse-account-1').values.length,1);await app.stop();}finally{await fs.rm(dir,{recursive:true,force:true});}});
-test('closing the main window requests full app shutdown instead of abandoning browser windows',async()=>{const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-close-'));try{const app=await boot(dir);let prevented=false;app.windows[0].emit('close',{preventDefault(){prevented=true;}});assert.equal(prevented,true);assert.ok(app.lifecycle.includes('quit'));await app.stop();}finally{await fs.rm(dir,{recursive:true,force:true});}});
+test('closing main asks once; Stay preserves windows and queue, Exit requests app shutdown',async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-close-'));let app,release;
+ try{
+  const gate=new Promise(r=>release=r);app=await boot(dir,{closeResponse:1,closeGate:gate});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Keep this pending scene'}]);
+  let prevented=0;app.windows[0].emit('close',{preventDefault(){prevented++;}});app.windows[0].emit('close',{preventDefault(){prevented++;}});
+  assert.equal(prevented,2);assert.equal(app.notices.length,1);assert.deepEqual(Array.from(app.notices[0].buttons),['Thoát hẳn','Ở lại']);assert.equal(app.notices[0].defaultId,1);assert.equal(app.notices[0].cancelId,1);assert.equal(app.lifecycle.includes('quit'),false);
+  release();await new Promise(r=>setImmediate(r));assert.equal(app.lifecycle.includes('quit'),false);assert.equal(app.windows[1].isDestroyed(),false);assert.equal(app.invoke('state').jobs.length,1);await app.stop();
+  app=await boot(dir,{closeResponse:0});app.windows[0].emit('close',{preventDefault(){}});await until(()=>app.lifecycle.includes('quit'));await app.stop();
+ }finally{release?.();if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+test('opening again restores and focuses the sole main window; all native windows have no menu',async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-single-window-'));let app;
+ try{
+  app=await boot(dir);app.windows[0].minimized=true;app.app.emit('second-instance');app.app.emit('second-instance');
+  assert.equal(app.windows.length,1);assert.equal(app.windows[0].restored,true);assert.equal(app.windows[0].focused,2);assert.equal(app.lifecycle.includes('menu-removed'),true);
+  await app.invoke('browser',0);await app.invoke('browser',0);assert.equal(app.windows.length,2);
+  for(const window of app.windows){assert.equal(window.menu,null);assert.equal(window.menuVisible,false);}await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
 
 test('stop IPC interrupts a waiting browser job without sending another prompt',{timeout:5000},async()=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-stop-'));await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({settings:{output:dir},configVersion:2}));let reached,submitted=0;const waiting=new Promise(r=>reached=r);

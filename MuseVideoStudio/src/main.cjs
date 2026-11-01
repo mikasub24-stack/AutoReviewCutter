@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, session, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, session, safeStorage, Menu } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { Queue,stoppedError,abortable } = require('./queue.cjs');
@@ -21,9 +21,11 @@ const { createSessionStore } = require('./session-store.cjs');
 const { resolveBrowser } = require('./browser-discovery.cjs');
 const { launchExternalBrowser } = require('./external-browser.cjs');
 const { createHash,randomUUID } = require('node:crypto');
-const ownsInstance = app.requestSingleInstanceLock();
+const ownsInstance = app.requestSingleInstanceLock({appId:'local.musevideostudio.app'});
 if (!ownsInstance) app.quit();
-app.on('second-instance', () => { if(main && !main.isDestroyed()) { if(main.isMinimized()) main.restore(); main.show(); main.focus(); } });
+let pendingFocus=false,closePrompt=null;
+function focusMain(){if(flushingQuit)return;if(!main||main.isDestroyed()){pendingFocus=true;return;}if(main.isMinimized())main.restore();main.show();main.focus();pendingFocus=false;}
+app.on('second-instance',focusMain);
 let packaging = false, packageProgress = '', editPackageDir = '', packageError = '';
 let merging = false, mergeProgress = '', mergedOutput = '', mergeError = '';
 let main, queue, settings, stateFile;
@@ -119,6 +121,7 @@ async function openMuse(index = 0) {
       if(flushingQuit) return;
       if(flushingQuit) return;
       const muse=new BrowserWindow({icon:path.join(__dirname,'assets','muse-studio.png'),width:1250,height:850,title:`Muse — Tài khoản ${index+1}`,webPreferences:{session:profile.session,backgroundThrottling:false,nodeIntegration:false,contextIsolation:true,sandbox:true}});
+      muse.setMenu(null);muse.setMenuBarVisibility(false);
       browsers.set(index,muse);muse.museStarted=true;
       muse.webContents.setWindowOpenHandler(()=>({action:'deny'}));
       muse.on('closed',()=>{if(flushingQuit || resettingAccounts.has(index))return;profile.store.flush().catch(()=>{profile.warning='Chưa lưu được phiên đăng nhập.';notify();});});
@@ -459,6 +462,7 @@ async function packageProject() {
 app.whenReady().then(async () => {
   if (!ownsInstance) return;
   app.setAppUserModelId?.('local.musevideostudio.app');
+  Menu.setApplicationMenu(null);
   stateFile = path.join(app.getPath('userData'), 'studio.json');
   let stored = {};
   try { stored = JSON.parse(await fs.readFile(stateFile, 'utf8')); } catch (e) { if (e.code !== 'ENOENT') throw e; }
@@ -476,7 +480,15 @@ app.whenReady().then(async () => {
   queue = new Queue({ jobs: stored.jobs || [], save, run: runJob, notify });
   await save();
   main = new BrowserWindow({ icon:path.join(__dirname,'assets','muse-studio.png'), width: 1450, height: 950, minWidth: 1000, minHeight: 700, backgroundColor: '#101114', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true } });
-  main.on('close',event=>{if(!quitAllowed){event.preventDefault();app.quit();}});
+  main.setMenu(null);main.setMenuBarVisibility(false);
+  main.on('close',event=>{
+    if(quitAllowed)return;
+    event.preventDefault();if(flushingQuit||closePrompt)return;
+    closePrompt=dialog.showMessageBox(main,{type:'question',title:'Thoát Muse Video Studio?',message:'Bạn muốn thoát hẳn ứng dụng?',detail:'Thoát hẳn sẽ dừng hàng đợi, lưu tiến trình và đóng các trình duyệt do ứng dụng mở.',buttons:['Thoát hẳn','Ở lại'],defaultId:1,cancelId:1,noLink:true})
+      .then(result=>{if(result.response===0&&!flushingQuit)app.quit();})
+      .catch(()=>{if(!main.isDestroyed())main.focus();})
+      .finally(()=>{closePrompt=null;});
+  });
   main.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   main.webContents.on('will-navigate', e => e.preventDefault());
   const handlers = {
@@ -597,6 +609,7 @@ app.whenReady().then(async () => {
   };
   for (const [name, handler] of Object.entries(handlers)) ipcMain.handle('studio:' + name, (event, data) => { if (event.sender !== main.webContents) throw Error('Unauthorized window'); return handler(data); });
   await main.loadFile(path.join(__dirname, 'index.html'));
+  if(pendingFocus)focusMain();
 }).catch(e => { dialog.showErrorBox('Không thể mở ứng dụng', e.message); app.quit(); });
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', event => {

@@ -1,4 +1,9 @@
-# Muse Video Studio V1 · 1.0.0 · Windows
+# Muse Video Studio V1 · 1.0.1 · Windows
+
+## Cửa sổ và thoát ứng dụng (1.0.1)
+
+Một instance app chính: mở lại sẽ khôi phục cửa sổ đang thu nhỏ và đưa app đang chạy lên trước. Các cửa sổ app và Muse tích hợp không có thanh File/Edit/View/Window. Bấm X ở app chính hỏi **Thoát hẳn / Ở lại**; mặc định và Esc là Ở lại, hàng chờ tiếp tục hoạt động. Chọn Thoát hẳn mới dừng/lưu hàng chờ và đóng các trình duyệt do app quản lý. Bấm X nhiều lần chỉ mở một hộp hỏi.
+
 
 Icon Muse Studio riêng (M vàng + Play trắng) được nhúng vào EXE, cửa sổ ứng dụng và logo trong giao diện.
 

@@ -27,7 +27,7 @@ async function until(check,message,ms=15000){const end=Date.now()+ms;while(!awai
   app=new EventEmitter();app.requestSingleInstanceLock=()=>true;app.whenReady=()=>Promise.resolve();app.getPath=()=>dir;app.quit=()=>shutdown();
   class Window extends EventEmitter{
    constructor(){super();this.webContents=new EventEmitter();this.webContents.setWindowOpenHandler=()=>{};this.webContents.send=(_name,state)=>updates.push(structuredClone(state.jobs));mainWindow=this;}
-   isDestroyed(){return false;}show(){}focus(){}hide(){}async loadFile(){loadMain();}
+   setMenu(){}setMenuBarVisibility(){}isDestroyed(){return false;}show(){}focus(){}hide(){}async loadFile(){loadMain();}
   }
   const cipherKey=crypto.randomBytes(32),safeStorage={isEncryptionAvailable:()=>true,getSelectedStorageBackend:()=> 'test-keyring'};
   // Real encryption is used by the production trial manager; no owner key is involved.
@@ -57,7 +57,7 @@ async function until(check,message,ms=15000){const end=Date.now()+ms;while(!awai
     };
    },{prompt});
   },evaluate:(fn,arg)=>page.evaluate(fn,arg),upload:async(selector,files)=>{await page.locator(selector).setInputFiles(files);},pinPage:()=>{},releasePage:()=>{},captureDownload:async(target,options)=>{downloads.push(target);await page.evaluate(()=>window.trace.push({type:'download'}));return capturePlaywrightDownload(page,target,options);},close:async()=>{closed=true;}};
-  const electron={app,BrowserWindow:Window,safeStorage,session:{},shell:{openPath:async()=>'',showItemInFolder:()=>{}},dialog:{showErrorBox:(title,message)=>{errors.push({title,message});loadMain();},showMessageBoxSync:()=>1},ipcMain:{handle:(name,fn)=>handlers.set(name,fn)}};
+  const electron={app,Menu:{setApplicationMenu(){}},BrowserWindow:Window,safeStorage,session:{},shell:{openPath:async()=>'',showItemInFolder:()=>{}},dialog:{showErrorBox:(title,message)=>{errors.push({title,message});loadMain();},showMessageBoxSync:()=>1},ipcMain:{handle:(name,fn)=>handlers.set(name,fn)}};
   const sandbox=vm.createContext({require:name=>name==='electron'?electron:name==='./external-browser.cjs'?{launchExternalBrowser:async()=>adapter}:name==='./browser-discovery.cjs'?{resolveBrowser:()=>'/fixture/chrome'}:localRequire(name),__dirname:path.dirname(mainPath),Buffer,URL,console,setTimeout,clearTimeout,AbortController});
   vm.runInContext(await fs.readFile(mainPath,'utf8'),sandbox,{filename:mainPath});await loaded;assert.deepEqual(errors,[]);
   const invoke=(name,data)=>handlers.get('studio:'+name)({sender:mainWindow.webContents},data),state=()=>invoke('state');
