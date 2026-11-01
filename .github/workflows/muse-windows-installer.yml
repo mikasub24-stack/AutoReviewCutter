@@ -5,11 +5,13 @@ on:
     branches: [main, muse-video-studio]
     paths:
       - 'MuseVideoStudio/tools/build-installer.cjs'
+      - 'MuseVideoStudio/tools/installer-shortcuts.nsh'
       - 'MuseVideoStudio/src/**'
       - 'MuseVideoStudio/test/**'
       - 'MuseVideoStudio/package.json'
       - 'MuseVideoStudio/package-lock.json'
       - 'MuseVideoStudio/tools/test-installer.ps1'
+      - 'MuseVideoStudio/tools/test-installer-ui.ps1'
       - '.github/workflows/muse-windows-installer.yml'
 permissions:
   contents: write
@@ -71,7 +73,7 @@ jobs:
           $version = (Get-Content package.json | ConvertFrom-Json).version
           gh release view "muse-studio-v$version" > $null 2>&1
           if ($LASTEXITCODE -ne 0) {
-            gh release create "muse-studio-v$version" --target $env:GITHUB_SHA --title "Muse Video Studio V1 — $version Windows" --notes "Windows setup installer. Continue resubmits unfinished scenes using locked prompts and references with fresh attempt IDs; tentative send flags and stale receipts cannot skip submission. Completed clips and existing account/project data are preserved. A per-scene Regenerate button explicitly reruns only that scene, keeping previous videos and saving a new filename. The sidebar shows the actual version. Ten parallel sessions and exact clip menu downloads verified with Edge fixtures; installation, launch and uninstall verified on Windows."
+            gh release create "muse-studio-v$version" --target $env:GITHUB_SHA --title "Muse Video Studio V1 — $version Windows" --notes "Windows setup installer with Desktop/Start menu shortcut repair and a checked Run Muse Video Studio option on the Finish page. Continue resubmits unfinished scenes using locked prompts and references with fresh attempt IDs; tentative send flags and stale receipts cannot skip submission. Completed clips and existing account/project data are preserved. A per-scene Regenerate button explicitly reruns only that scene, keeping previous videos and saving a new filename. The sidebar shows the actual version. Ten parallel sessions and exact clip menu downloads verified with Edge fixtures; shortcut repair, interactive Finish launch and uninstall verified on Windows."
             if ($LASTEXITCODE -ne 0) {
               gh release view "muse-studio-v$version"
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

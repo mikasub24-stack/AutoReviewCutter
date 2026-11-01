@@ -6,6 +6,7 @@ build({targets:Platform.WINDOWS.createTarget('nsis',Arch.x64),publish:'never',co
  ...base,
  win:{...base.win,target:'nsis',artifactName:`MuseVideoStudio-${version}-Setup.exe`},
  nsis:{oneClick:false,perMachine:false,allowElevation:false,allowToChangeInstallationDirectory:true,
-  createDesktopShortcut:true,createStartMenuShortcut:true,shortcutName:'Muse Video Studio',
-  deleteAppDataOnUninstall:false,runAfterFinish:false,installerLanguages:['en_US','vi_VN'],displayLanguageSelector:true}
+  createDesktopShortcut:'always',createStartMenuShortcut:true,shortcutName:'Muse Video Studio',
+  include:require('node:path').join(__dirname,'installer-shortcuts.nsh'),
+  deleteAppDataOnUninstall:false,runAfterFinish:true,installerLanguages:['en_US','vi_VN'],displayLanguageSelector:true}
 }}).catch(error=>{console.error(error);process.exitCode=1;});

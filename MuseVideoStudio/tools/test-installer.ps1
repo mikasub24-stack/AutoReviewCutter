@@ -11,8 +11,20 @@ $startMenu = Join-Path ([Environment]::GetFolderPath('Programs')) 'Muse Video St
 foreach ($shortcut in @($desktop, $startMenu)) {
   if (-not (Test-Path $shortcut)) { throw "Missing installed shortcut: $shortcut" }
 }
-$process = Start-Process -FilePath $exe -PassThru
+$wsh = New-Object -ComObject WScript.Shell
+foreach ($shortcut in @($desktop, $startMenu)) {
+  if ($wsh.CreateShortcut($shortcut).TargetPath -ne $exe) { throw "Wrong shortcut target: $shortcut" }
+  Remove-Item $shortcut
+}
+$repaired = Start-Process -FilePath $setup -ArgumentList '/S', "/D=$installRoot" -Wait -PassThru
+if ($repaired.ExitCode -ne 0) { throw "Repair installation exited with $($repaired.ExitCode)" }
+foreach ($shortcut in @($desktop, $startMenu)) {
+  if (-not (Test-Path $shortcut)) { throw "Reinstall failed to restore shortcut: $shortcut" }
+  if ($wsh.CreateShortcut($shortcut).TargetPath -ne $exe) { throw "Wrong repaired shortcut target: $shortcut" }
+}
+Write-Host 'Verified reinstall restores deleted Desktop and Start menu shortcuts.'
 try {
+  & "$PSScriptRoot/test-installer-ui.ps1" -Setup $setup -InstallRoot $installRoot
   $deadline = (Get-Date).AddSeconds(40)
   do {
     Start-Sleep -Milliseconds 500
@@ -37,4 +49,4 @@ $deadline = (Get-Date).AddSeconds(40)
 while ((Test-Path $exe) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 500 }
 if (Test-Path $exe) { throw 'Uninstaller did not remove installed executable.' }
 if ((Test-Path $desktop) -or (Test-Path $startMenu)) { throw 'Uninstaller left application shortcuts.' }
-Write-Host 'PASS: per-user installation, desktop/Start menu shortcuts, installed app launch, single main window and uninstall.'
+Write-Host 'PASS: per-user installation, shortcut targets and repair, interactive Finish launches app, single main window and uninstall.'

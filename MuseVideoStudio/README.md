@@ -1,10 +1,10 @@
-Continue in 1.1.5 resubmits unfinished scenes with new attempt IDs, ignoring tentative send flags and old receipts. Completed files are kept. The sidebar now displays the actual application version.
+Continue in 1.1.6 resubmits unfinished scenes with new attempt IDs, ignoring tentative send flags and old receipts. Completed files are kept. The sidebar now displays the actual application version.
 
-# Muse Video Studio V1 · 1.1.5 · Windows
+# Muse Video Studio V1 · 1.1.6 · Windows
 
 ## Bản cài đặt Windows
 
-Tải `MuseVideoStudio-1.1.5-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
+Tải `MuseVideoStudio-1.1.6-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
 
 Build riêng: `node tools/build-installer.cjs` trên Windows. Workflow installer kiểm thử cài đặt, shortcut, mở app, một cửa sổ chính và gỡ cài đặt trước khi thêm Setup.exe vào release hiện tại.
 
@@ -43,7 +43,7 @@ Giao diện dùng bảng điều khiển gọn và chữ dễ đọc hơn; các 
 
 ## Gửi ảnh + prompt trước khi chờ và tải (0.8.1)
 
-Từ 1.1.5, Tiếp tục luôn gửi lại các cảnh chưa hoàn tất: dùng prompt/ảnh đã khóa, đúng tài khoản và mã lượt gửi mới. Cờ đã gửi tạm, protocol, receipt, ID tin nhắn hay kết quả của lượt cũ không được dùng để tự chuyển sang chờ/tải. Chỉ nút Lấy video đã tạo mới khôi phục kết quả cũ.
+Từ 1.1.6, Tiếp tục luôn gửi lại các cảnh chưa hoàn tất: dùng prompt/ảnh đã khóa, đúng tài khoản và mã lượt gửi mới. Cờ đã gửi tạm, protocol, receipt, ID tin nhắn hay kết quả của lượt cũ không được dùng để tự chuyển sang chờ/tải. Chỉ nút Lấy video đã tạo mới khôi phục kết quả cũ.
 
 Nếu bản nháp đã có đúng prompt nhưng chưa có ảnh, vẫn tải ảnh tham chiếu đã khóa lên. Tự mở nút + / đính kèm và mục tải ảnh khi Muse chưa tạo input chọn tệp; hỗ trợ input ẩn và input tạm thời, cả trình duyệt tích hợp và Chrome/Edge. Tránh đính kèm hai lần và kiểm tra dừng trước khi gắn tệp.
 
@@ -142,7 +142,7 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
-## Update 1.1.5
+## Update 1.1.6
 
 - Ten account workers upload their locked reference images and submit exact scene prompts independently. External Chrome/Edge sessions keep processing when their windows are in the background.
 - Downloads open the three-dot menu belonging to the matched clip and require the second row to be Download / Tải xuống. Direct links and other clips' controls are never used as a fallback. A scene completes only after the downloaded video is validated and saved to its ordered output filename.
@@ -151,3 +151,5 @@ Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang 
 - Regression coverage: `npm test`, plus Chromium/Edge fixtures `test/ten-sessions-smoke.cjs`, `test/scene-flow-smoke.cjs`, `test/muse-tracker-smoke.cjs` and `test/ui-smoke.cjs`. Fixtures use local video/image data; live Muse account behavior still needs verification.
 
 Nút **Tạo lại** cạnh Mở vị trí video / Xóa chỉ chạy lại cảnh đã hoàn thành được chọn. Video cũ được giữ và vẫn mở được khi tạo lại lỗi; bản mới lưu bằng tên riêng (ví dụ `001 (2).mp4`). Cảnh khác không chạy lại. Nút tạm khóa khi hàng đợi đang chạy; dừng hoặc chờ xong trước khi chọn tạo lại.
+
+Bộ cài 1.1.6 tạo/khôi phục shortcut Desktop và Start menu khi cài hoặc cài lại. Trang Hoàn tất hiện lựa chọn mở Muse Video Studio và chọn sẵn; bấm Hoàn tất để mở app. Chế độ cài ngầm không tự mở giao diện. Kiểm thử Windows kiểm tra đường dẫn shortcut, xóa shortcut rồi cài lại để xác nhận khôi phục, và thao tác trang Hoàn tất để xác nhận app mở thật.
