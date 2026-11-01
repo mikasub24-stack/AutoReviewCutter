@@ -52,7 +52,7 @@ async function until(check,message,ms=15000){const end=Date.now()+ms;while(!awai
     button.onclick=()=>{
      if(button.getAttribute('aria-label')==='Stop'){button.setAttribute('aria-label','Send');button.textContent='Send';return;}
      const text=composer.value,files=Array.from(input.files).map(f=>f.name);composer.value='';
-     if(text==='Bắt đầu công việc mới nhé'){bubble('warmup-user','user',text);bubble('warmup-reply','assistant','OK, mình sẵn sàng. Bạn muốn bắt đầu công việc mới nào?');window.trace.push({type:'warmup'});return;}
+     if(text==='Bắt đầu công việc mới nhé'){bubble('warmup-user','user',text);window.trace.push({type:'warmup'});return;}
      window.sceneSent.push({text,files});window.trace.push({type:'send',text,files});document.getElementById('previews').replaceChildren();input.value='';button.setAttribute('aria-label','Stop');button.textContent='Stop';
     };
    },{prompt});
@@ -62,7 +62,7 @@ async function until(check,message,ms=15000){const end=Date.now()+ms;while(!awai
   vm.runInContext(await fs.readFile(mainPath,'utf8'),sandbox,{filename:mainPath});await loaded;assert.deepEqual(errors,[]);
   const invoke=(name,data)=>handlers.get('studio:'+name)({sender:mainWindow.webContents},data),state=()=>invoke('state');
   await invoke('testBrowsers');
-  assert.equal(state().active,false);assert.equal(state().jobs[0].status,'interrupted');assert.equal(downloads.length,0);assert.equal((await page.evaluate(()=>window.sceneSent)).length,0);assert.ok(state().browserTests.every(t=>t.status==='ready'));
+  assert.equal(state().active,false);assert.equal(state().jobs[0].status,'interrupted');assert.equal(downloads.length,0);assert.equal((await page.evaluate(()=>window.sceneSent)).length,0);assert.ok(state().browserTests.every(t=>t.status==='sent'));
   // An earlier failed upload may have left exact text but no attached image.
   // Reusing that text must still perform a real upload before clicking Send.
   await page.locator('textarea').fill(prompt);
@@ -81,6 +81,6 @@ async function until(check,message,ms=15000){const end=Date.now()+ms;while(!awai
   assert.ok(index('upload')<index('send')&&index('send')<index('echo')&&index('echo')<index('reply')&&index('reply')<index('media')&&index('media')<index('download'),JSON.stringify(trace.map(t=>t.type)));
   assert.ok(updates.some(rows=>rows[0]?.stage==='uploading'));assert.ok(updates.some(rows=>rows[0]?.stage==='submitting'));assert.ok(updates.some(rows=>rows[0]?.stage==='confirming'));assert.ok(updates.some(rows=>rows[0]?.stage==='waiting'));assert.ok(updates.some(rows=>rows[0]?.stage==='downloading'));assert.deepEqual(errors,[]);
   app.emit('before-quit',{preventDefault(){}});await quit;
-  console.log('PASS: production main + Chromium restores stale acknowledged job, Test only warms chat, Continue uploads locked reference even with a matching image-less draft and sends exact prompt, then confirms echo, waits for NEW generation and saves only its video. No live Muse.');
+  console.log('PASS: production main + Chromium restores stale acknowledged job, opening sentence completes without a reply, Continue uploads locked reference even with a matching image-less draft and sends exact prompt, then confirms echo, waits for NEW generation and saves only its video. No live Muse.');
  }finally{if(app&&quitWait){app.emit('before-quit',{preventDefault(){}});await quitWait;}if(browser)await browser.close();await fs.rm(dir,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

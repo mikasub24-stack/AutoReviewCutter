@@ -1,5 +1,5 @@
 // Serialized helpers execute only in the selected Muse account document.
-function prepareBrowserProbe({composerSelector,text}) {
+function prepareBrowserProbe({id,composerSelector,text}) {
   const visible=e=>e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden';
   const inputs=[...document.querySelectorAll(composerSelector)].filter(visible);
   if(!inputs.length)return false;
@@ -11,6 +11,7 @@ function prepareBrowserProbe({composerSelector,text}) {
     if(root.querySelector('[role="log"],[role="feed"],nav,aside,video'))break;
     if([...root.querySelectorAll('img')].some(visible))throw Error('Ô chat còn ảnh đính kèm. Gỡ ảnh trước khi Test.');
   }
+  if(id){const key=Symbol.for('MuseVideoStudio.promptTrackers.v1'),map=globalThis[key]||(globalThis[key]=new Map());map.set(id,{id,prompt:String(text).replace(/\s+/g,' ').trim()});}
   if(old===text)return true;
   e.focus();
   if(e instanceof HTMLTextAreaElement||e instanceof HTMLInputElement)Object.getOwnPropertyDescriptor(e instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(e,text);
@@ -28,4 +29,11 @@ function missingBrowserPrompts({jobs}){
   const texts=new Set([...document.querySelectorAll('body *')].filter(e=>e.getClientRects().length&&!e.closest('textarea,input,[contenteditable="true"],[role="textbox"],aside,nav,[data-role="assistant"],[data-message-author-role="assistant"]')).map(e=>norm(e.innerText)));
   return jobs.filter(j=>!texts.has(norm(j.prompt))).map(j=>j.id);
 }
-module.exports={prepareBrowserProbe,verifyBrowserTest,missingBrowserPrompts};
+function clearBrowserProbeDraft({composerSelector,text}){
+  const inputs=[...document.querySelectorAll(composerSelector)].filter(e=>e.getClientRects().length);
+  if(inputs.length!==1)return false;const e=inputs[0];
+  if((e.value||e.innerText||'').trim()!==text)return false;
+  if(e instanceof HTMLTextAreaElement||e instanceof HTMLInputElement)Object.getOwnPropertyDescriptor(e instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(e,'');else e.textContent='';
+  e.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'deleteContentBackward',data:null}));return true;
+}
+module.exports={clearBrowserProbeDraft,prepareBrowserProbe,verifyBrowserTest,missingBrowserPrompts};

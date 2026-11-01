@@ -1,6 +1,12 @@
-# Muse Video Studio 0.8.1 · Windows
+# Muse Video Studio 0.8.2 · Windows
 
 Icon Muse Studio riêng (M vàng + Play trắng) được nhúng vào EXE, cửa sổ ứng dụng và logo trong giao diện.
+
+## Giao diện gọn và câu mở đầu tùy chọn (0.8.2)
+
+**Gửi câu bắt đầu** chỉ gửi “Bắt đầu công việc mới nhé” một lần tới mỗi trình duyệt đã chọn rồi kết thúc. Không chờ tin nhắn echo, không chờ Muse trả lời, không khóa Tạo/Chạy/Tiếp tục. Có thể bấm chạy trực tiếp; app tự mở các trình duyệt cần dùng và chờ ô chat tải xong. Nếu đang gửi câu mở đầu mà bấm chạy, app kết thúc phần này trước khi nhập cảnh để tránh ghi chồng ô chat. Đăng nhập lần đầu vẫn thực hiện trực tiếp trong cửa sổ Muse.
+
+Giao diện dùng bảng điều khiển gọn và chữ dễ đọc hơn; các nút chạy, dừng, thư mục nằm ngay trên một danh sách cảnh. Tiến trình và video ở đúng từng ô, giữ thứ tự; tối đa bốn trình duyệt chạy bốn ô song song. Nhập prompt và xuất/ghép video nằm trong các vùng thu gọn. Các kiểm tra đúng prompt/ảnh và đúng video vẫn áp dụng cho tác vụ tạo video.
 
 ## Gửi ảnh + prompt trước khi chờ và tải (0.8.1)
 
@@ -12,11 +18,11 @@ Trạng thái đi theo bằng chứng: nhập prompt/đính kèm → gửi → x
 
 ## Một danh sách, Test chung mọi trình duyệt (0.8.0)
 
-Một nút **Test tất cả trình duyệt** tự mở 1–4 phiên đã chọn, chỉ gửi “Bắt đầu công việc mới nhé”. Phải thấy câu thử mới trong chat và phản hồi mới của Muse rồi mới mở nút Chạy/Tiếp tục. Test không tạo, không bắt đầu và không tiêu thụ prompt trong hàng chờ. Test chờ ô chat tải xong; có bản nháp/ảnh khác sẽ giữ nguyên và báo rõ. Đóng/đổi trang hoặc khởi động lại app cần Test lại. Đăng nhập lần đầu vẫn thực hiện trực tiếp trong cửa sổ Muse.
+Một nút **Test tất cả trình duyệt** tự mở 1–4 phiên đã chọn, chỉ gửi “Bắt đầu công việc mới nhé”. Từ 0.8.2, nút này chỉ gửi câu mở đầu và không phải điều kiện mở nút Chạy/Tiếp tục. Test không tạo, không bắt đầu và không tiêu thụ prompt trong hàng chờ. Test chờ ô chat tải xong; có bản nháp/ảnh khác sẽ giữ nguyên và báo rõ. Có thể chạy trực tiếp sau khi mở lại app, không cần Test. Đăng nhập lần đầu vẫn thực hiện trực tiếp trong cửa sổ Muse.
 
 Tất cả cảnh nằm trong danh sách theo thứ tự gốc, không cần đổi tab Đang chạy. Từng ô hiển thị ảnh/gửi/tạo/tải, phần trăm thật khi có, thời gian chờ và tên tệp sau khi lưu thành công. Xong ô nào thì ô đó báo **Đã xong**, tài khoản đó tự nhận cảnh tiếp theo. Chọn 4 trình duyệt chạy được 4 cảnh cùng lúc. Danh sách cuộn riêng và tự theo cảnh mới, có thể tắt tự theo; phần prompt và xuất/ghép được thu gọn.
 
-**Dừng, Chạy/Tiếp tục, Mở thư mục video** nằm cạnh nhau ngay trên danh sách. Khi khởi động lại, hàng chờ được khôi phục, Test chung rồi Tiếp tục. Chưa thấy đúng prompt trong chat phải báo **Chưa xác nhận Muse nhận prompt**, không đánh dấu đã nhận dựa vào việc bấm Gửi. Tiếp tục giữ attempt có bằng chứng của luồng gửi mới; cảnh dở từ bản cũ chưa có bằng chứng quay về gửi ảnh/prompt trên chính tài khoản cũ.
+**Dừng, Chạy/Tiếp tục, Mở thư mục video** nằm cạnh nhau ngay trên danh sách. Khi khởi động lại, hàng chờ được khôi phục, bấm Tiếp tục để chạy. Chưa thấy đúng prompt trong chat phải báo **Chưa xác nhận Muse nhận prompt**, không đánh dấu đã nhận dựa vào việc bấm Gửi. Tiếp tục giữ attempt có bằng chứng của luồng gửi mới; cảnh dở từ bản cũ chưa có bằng chứng quay về gửi ảnh/prompt trên chính tài khoản cũ.
 
 ## Sửa nhận clip và đặt tên (0.7.1)
 

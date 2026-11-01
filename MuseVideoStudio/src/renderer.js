@@ -30,8 +30,6 @@ async function create(startNow,fromInput=false){
   }
   if(!drafts.length||drafts.some(d=>!d.prompt.trim()))return toast('Nhập prompt cho từng dòng hoặc xóa dòng trống.');
   if(startNow){
-    if(state.testing)return toast('Chờ Test trình duyệt hoàn tất.');
-    if(!state.browserTests?.length||state.browserTests.some(t=>t.status!=='ready'))return toast('Bấm Test trình duyệt và chờ Muse phản hồi trước khi tạo video.');
     if(state.active||state.starting||state.stopping||state.merging||state.packaging)return toast('Dừng hàng đợi hiện tại trước khi tạo lượt mới.');
     if(!state.settings.output)return toast('Chọn thư mục lưu video trước.');
     if(!confirm(`Thêm ${drafts.length} prompt và chạy toàn bộ tác vụ đang chờ? Tạo video có thể dùng credit Muse. Tool gửi nguyên prompt đã xem, cùng ảnh tham chiếu của từng cảnh.`))return;
@@ -198,18 +196,16 @@ function render(next){
   $('summary').textContent=`${done.length} / ${jobs.length} video đã lưu`;
   $('runningCount').textContent=`${running.length} đang làm`;$('pendingCount').textContent=`${pending.length} đang chờ`;$('attentionCount').textContent=`${interrupted.length} cảnh dở / lỗi`;
   $('overallProgress').max=Math.max(1,jobs.length);$('overallProgress').value=done.length;
-  const tested=state.browserTests?.length===state.settings.accountCount&&state.browserTests.every(t=>t.status==='ready');
-  $('testBrowsers').disabled=Boolean(busy);$('testBrowsers').textContent=state.testing?'Đang test…':'Test tất cả trình duyệt';
-  $('browserTests').replaceChildren(...Array.from({length:state.settings.accountCount},(_,index)=>{const t=state.browserTests?.find(t=>t.index===index);return el('span','browserTest '+(t?.status||''),'Trình duyệt '+(index+1)+': '+(t?.message||'Chưa test'));}));
-  $('start').disabled=$('start').disabled||Boolean(state.testing)||!tested;
-  if(state.testing){$('queueState').textContent='Đang Test · chưa chạy prompt video';$('pause').disabled=Boolean(state.stopping);}
+  $('testBrowsers').disabled=Boolean(busy);$('testBrowsers').textContent=state.testing?'Đang gửi câu bắt đầu…':'Gửi câu bắt đầu';
+  $('browserTests').replaceChildren(...Array.from({length:state.settings.accountCount},(_,index)=>{const t=state.browserTests?.find(t=>t.index===index);return el('span','browserTest '+(t?.status||''),'Trình duyệt '+(index+1)+': '+(t?.message||'Chưa gửi câu bắt đầu'));}));
+  if(state.testing){$('queueState').textContent=state.starting?'Chuẩn bị gửi cảnh…':'Đang gửi câu bắt đầu · bạn có thể bấm Chạy';$('pause').disabled=Boolean(state.stopping);}
   $('parallelAccounts').value=String(state.settings.accountCount);$('parallelAccounts').disabled=busy;
   $('openAll').textContent=`Mở ${state.settings.accountCount} trình duyệt`;$('openAll').disabled=busy;
   $('openOutput').disabled=!state.settings.output;$('folder').disabled=busy;
   const unfinished=jobs.length>done.length;
   $('start').textContent=unfinished&&(restoredQueue||interrupted.length||jobs.some(j=>j.startedAt))?'▶ Tiếp tục':'▶ Chạy hàng đợi';
   if(!state.active&&!state.starting&&!state.stopping&&jobs.length&&!unfinished)$('queueState').textContent='✓ Đã xong tất cả';
-  const notice=state.startError||state.startHint||(restoredQueue&&unfinished&&!state.active&&!state.starting?`Đã khôi phục ${jobs.length} cảnh: ${pending.length} chờ, ${interrupted.length} dở. Bấm Test trình duyệt, chờ Muse phản hồi rồi Tiếp tục từ chỗ dừng.`:'');
+  const notice=state.startError||state.startHint||(restoredQueue&&unfinished&&!state.active&&!state.starting?`Đã khôi phục ${jobs.length} cảnh: ${pending.length} chờ, ${interrupted.length} dở. Bấm Tiếp tục để gửi và chạy từ chỗ dừng. Test trình duyệt là tùy chọn.`:'');
   text($('resumeNotice'),notice);$('resumeNotice').hidden=!notice;$('resumeNotice').classList.toggle('errorNotice',Boolean(state.startError));
   const recent=[...done].sort((a,b)=>(timeValue(b.finishedAt)||0)-(timeValue(a.finishedAt)||0)).slice(0,4);
   $('recentCompletions').textContent=recent.length?'✓ Vừa xong: '+recent.map(j=>`#${j.number||j.order||jobs.indexOf(j)+1} → ${j.output?.split(/[\\/]/).pop()||'đã lưu'}`).join(' · '):'';

@@ -28,7 +28,7 @@ const{importPrompts}=require('../src/prompt-import.js');
   await page.locator('#prompts').fill(fixture);await page.locator('#images').click();await page.locator('#add').click();
   assert.equal(await page.locator('#draftRows textarea').count(),60);assert.match(await page.locator('#importInfo').textContent(),/8:00/);
   assert.equal(await page.locator('#draftRows textarea').first().inputValue(),importPrompts(fixture)[0].prompt);
-  await page.locator('#testBrowsers').click();await page.locator('#createDrafts').click();await page.waitForFunction(()=>window.calls.some(c=>c.name==='start'));
+  await page.locator('#createDrafts').click();await page.waitForFunction(()=>window.calls.some(c=>c.name==='start'));
   const payload=await page.evaluate(()=>window.calls.find(c=>c.name==='add').data);assert.equal(payload.length,60);assert.ok(payload.every(j=>j.references[0]==='C:\\Refs\\character.png'));assert.equal(payload[0].prompt,importPrompts(fixture)[0].prompt);
   await page.locator('#pause').click();await page.waitForFunction(()=>window.calls.some(c=>c.name==='stop'));assert.match(await page.locator('#queueState').textContent(),/Đã dừng/);
   await page.locator('.queueMenu summary').click();await page.locator('#clearPending').click();assert.equal(await page.locator('.card').count(),1);await page.locator('#clearList').click();assert.equal(await page.locator('.card').count(),0);

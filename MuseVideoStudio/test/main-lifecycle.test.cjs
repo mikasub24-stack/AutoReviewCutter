@@ -28,7 +28,7 @@ const safeStorage = {
   }
 };
 
-async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, domTimeoutMs=20000, logoutResponse=1, autoTestReady=true } = {}) {
+async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, domTimeoutMs=20000, logoutResponse=1 } = {}) {
   const handlers = new Map(), sessions = new Map(), windows = [], errors = [], notices = [];
   const lifecycle = [],updates=[];
   let loaded, quit;
@@ -101,7 +101,7 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
       if(name === 'electron') return electron;
       if(name==='./license.cjs' && licenseGate){const real=localRequire(name);return{...real,createLicense:async options=>{const manager=await real.createLicense(options),ensure=manager.ensureAllowed;manager.ensureAllowed=async()=>{licenseGate.entered();await licenseGate.wait;return ensure();};return manager;}};}
       if(name === './electron-network-check.cjs') return {checkElectronNetwork:networkProbe || (async()=>({ip:'203.0.113.9',countryCode:'US',countryName:'United States',observedAt:new Date().toISOString()}))};
-      if(name === './external-browser.cjs' && externalLauncher) return {launchExternalBrowser:async(...args)=>{const adapter=await externalLauncher(...args),evaluate=adapter.evaluate;adapter.evaluate=(fn,arg)=>autoTestReady&&fn.name==='verifyBrowserTest'?Promise.resolve(true):evaluate?.(fn,arg);return adapter;}};
+      if(name === './external-browser.cjs' && externalLauncher) return {launchExternalBrowser:externalLauncher};
       if(name === './browser-discovery.cjs' && browserResolver) return {resolveBrowser:browserResolver};
       return localRequire(name);
     },
@@ -114,8 +114,6 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
 
   return { handlers, sessions, windows, lifecycle, notices, errors,updates,
     invoke: (name, data, sender = windows[0]?.webContents) => {
-      // Legacy queue fixtures isolate dispatch from the separately tested browser handshake.
-      if(name==='start'&&autoTestReady)vm.runInContext("for(const [index,browser] of browsers)browserTests.set(index,{browser,status:'ready',token:'fixture'});",context);
       return handlers.get(`studio:${name}`)({ sender }, data);
     },
     async stop() {
@@ -436,18 +434,18 @@ test('uncertain remote stop resumes the original attempt and retries downloading
 });
 
 
-test('browser Test verifies four replies without dispatching queue; only explicit Start sends four video prompts',{timeout:12000},async()=>{
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-test-handshake-'));let app,launched=0;const sent=[],begins=[];let replies=false;
+test('one warmup sends to four browsers and finishes without any reply; only Start sends video prompts',{timeout:12000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-test-handshake-'));let app,launched=0;const sent=[],begins=[];
  try{
   await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir}}));
-  app=await boot(dir,{autoTestReady:false,browserResolver:()=>'/test/chrome',externalLauncher:async()=>{
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>{
    const index=launched++;return{external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},openMuse:async()=>{},close:async()=>{},evaluate:async(fn,arg)=>{
     if(fn.name==='browserStop')return {state:'confirmed',clicked:false};
-    if(fn.name==='prepareBrowserProbe'){assert.equal(arg.text,'Bắt đầu công việc mới nhé');return true;}
+    if(fn.name==='prepareBrowserProbe'){assert.equal(arg.text,'Bắt đầu công việc mới nhé');begins.push({index,id:arg.id,prompt:arg.text});return true;}
     if(fn.name==='missingBrowserPrompts')return [];
     if(fn.name==='beginTracking'){begins.push({index,...arg});return {};}
     if(fn.name==='submitPrompt'){sent.push({index,id:arg.id});return {clicked:true};}
-    if(fn.name==='pollBrowserProbe')return {echoSeen:true,replySeen:replies,message:replies?'Muse đã phản hồi':'Chờ phản hồi mới'};
+    if(fn.name==='pollBrowserProbe')throw Error('Warmup must not wait for Muse reply');
     if(fn.name==='verifyBrowserTest')return true;
     if(fn.name==='pollTracking')return {phase:'waiting-prompt',ready:false,echoMatched:false};
     return null;
@@ -455,13 +453,9 @@ test('browser Test verifies four replies without dispatching queue; only explici
   }});
   await app.invoke('settings',{...app.invoke('state').settings,accountCount:4,browserChoice:'chrome',output:dir,cooldownSeconds:0,finishAction:'keep'});
   await app.invoke('add',Array.from({length:6},(_,i)=>({prompt:'Video scene '+(i+1)})));
-  await assert.rejects(app.invoke('start'),/Mở Muse|Test trình duyệt/);
-  const probe=app.invoke('testBrowsers');await until(()=>sent.length===4);
+  await app.invoke('testBrowsers');
   assert.equal(app.invoke('state').active,false);assert.ok(app.invoke('state').jobs.every(j=>j.status==='pending'));
-  assert.equal(app.invoke('state').browserTests.some(t=>t.status==='ready'),false);
-  await assert.rejects(app.invoke('start'),/Test trình duyệt/);
-  replies=true;await probe;
-  assert.ok(app.invoke('state').browserTests.every(t=>t.status==='ready'));
+  assert.equal(app.invoke('state').testing,false);assert.ok(app.invoke('state').browserTests.every(t=>t.status==='sent'));
   assert.equal(sent.length,4);assert.ok(begins.every(b=>b.prompt==='Bắt đầu công việc mới nhé'));
   await app.invoke('start');await until(()=>sent.length===8);
   assert.equal(app.invoke('state').jobs.filter(j=>j.status==='running').length,4);
@@ -483,7 +477,7 @@ test('ready without current prompt and response evidence never enters download',
   },captureDownload:async(target,{trigger})=>{downloads++;await trigger();await fs.writeFile(target,fixtureMp4());}})});
   await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Exact current scene'}]);await app.invoke('start');
   await until(()=>polls===1);assert.equal(downloads,0);assert.equal(app.invoke('state').jobs[0].stage,'confirming');assert.equal(app.invoke('state').jobs[0].resultReadyAt,null);assert.equal(app.invoke('state').jobs[0].progress,null);
-  echo=true;await until(()=>polls===2);assert.equal(downloads,0);assert.equal(app.invoke('state').jobs[0].stage,'waiting');assert.ok(app.invoke('state').jobs[0].submissionReceipt);assert.equal(app.invoke('state').jobs[0].progress,null);
+  echo=true;await until(()=>polls>=2&&app.invoke('state').jobs[0].stage==='waiting');assert.equal(downloads,0);assert.equal(app.invoke('state').jobs[0].stage,'waiting');assert.ok(app.invoke('state').jobs[0].submissionReceipt);assert.equal(app.invoke('state').jobs[0].progress,null);
   response=true;await until(()=>!app.invoke('state').active);assert.equal(downloads,1);assert.equal(app.invoke('state').jobs[0].status,'completed');await app.stop();
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
@@ -502,4 +496,42 @@ test('rejected Send validation stays unsent and Continue retries sending instead
   assert.equal(app.invoke('state').jobs[0].mayHaveSubmitted,false);assert.equal(app.invoke('state').jobs[0].status,'failed');assert.equal(sends,0);
   fail=false;await app.invoke('start');await until(()=>!app.invoke('state').active);assert.equal(sends,1);assert.equal(app.invoke('state').jobs[0].status,'completed');await app.stop();
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
+
+test('Start needs no Test, opens accounts, waits for composer, and failed warmup never blocks Continue',{timeout:8000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-optional-warmup-'));let app,launched=0,send=0,draftAttempts=0;
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>{launched++;return{external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',openMuse:async()=>{},show:async()=>{},close:async()=>{},evaluate:async(fn,arg)=>{
+   if(fn.name==='prepareBrowserProbe')throw Error('Optional warmup cannot find its send control');
+   if(fn.name==='submitPrompt'){send++;return{clicked:true};}
+   if(fn.name==='browserStop')return{state:'confirmed',clicked:false};
+   if(fn.name==='pollTracking')return{phase:'waiting-prompt',echoMatched:false,ready:false};
+   if(arg?.prompt&&!arg?.id){draftAttempts++;return draftAttempts<3?{notReady:true}:{reused:false};}return null;
+  }};}});
+  await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('add',[{prompt:'Send without testing first'}]);
+  await app.invoke('start');await until(()=>send===1);assert.equal(launched,1);assert.ok(draftAttempts>=3);assert.equal(app.invoke('state').browserTests[0].status,'not-tested');
+  await app.invoke('stop');await app.invoke('testBrowsers');assert.equal(app.invoke('state').browserTests[0].status,'failed');
+  await app.invoke('start');await until(()=>send===2);assert.equal(app.invoke('state').active,true);await app.invoke('stop');await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
+test('Start ends warmup safely without waiting for reply or overlapping composer writes',{timeout:8000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-warmup-handoff-'));let app,release,preparing=false,sends=0,cleared=false;
+ const gate=new Promise(r=>release=r);
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',openMuse:async()=>{},show:async()=>{},close:async()=>{},evaluate:async(fn,arg)=>{
+   if(fn.name==='prepareBrowserProbe'){preparing=true;await gate;return true;}
+   if(fn.name==='clearBrowserProbeDraft'){cleared=true;return true;}
+   if(fn.name==='submitPrompt'){assert.equal(cleared,true);sends++;return{clicked:true};}
+   if(fn.name==='browserStop')return{state:'confirmed',clicked:false};
+   if(fn.name==='pollTracking')return{phase:'waiting-prompt',echoMatched:false,ready:false};
+   return null;
+  }})});
+  await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('add',[{prompt:'Scene after canceling warmup'}]);
+  const warmup=app.invoke('testBrowsers');await until(()=>preparing);const start=app.invoke('start');await new Promise(r=>setTimeout(r,30));assert.equal(sends,0);
+  release();await warmup;await start;await until(()=>sends===1);assert.equal(app.invoke('state').testing,false);await app.invoke('stop');await app.stop();
+ }finally{release();if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
