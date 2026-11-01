@@ -18,7 +18,7 @@ while ((Get-Date) -lt $deadline -and -not $finished) {
       foreach ($button in $buttons) {
         if (-not $button.Current.IsEnabled -or $button.Current.IsOffscreen) { continue }
         $name = $button.Current.Name.Replace('&','').Trim()
-        if ($name -match '^(Finish|Hoàn tất|Kết thúc)$') {
+        if ($name -match '^(Finish|Ho\u00e0n t\u1ea5t|K\u1ebft th\u00fac)$') {
           $checks = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::CheckBox))
           $run = @($checks | Where-Object { $_.Current.Name -match 'Muse Video Studio' })
           if ($run.Count -ne 1) { throw 'Finish page must offer Run Muse Video Studio.' }
@@ -29,7 +29,7 @@ while ((Get-Date) -lt $deadline -and -not $finished) {
           Write-Host 'Verified visible Finish page with Run Muse Video Studio checked; clicked Finish.'
           break
         }
-        if ($name -match '^(OK|Next\s*>?|Install|Tiếp\s*>?|Cài đặt)$') {
+        if ($name -match '^(OK|Next\s*>?|Install|Ti\u1ebfp\s*>?|C\u00e0i \u0111\u1eb7t)$') {
           $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
           break
         }
