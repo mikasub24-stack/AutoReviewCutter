@@ -205,6 +205,19 @@ const assert = require('node:assert/strict');
     const upgraded=await page.evaluate(beginTracking,{id:'manual-upgrade',prompt:'Manual historical scene',recover:true,recoverRequireAnchor:true,echoKey:'missing-current-attempt'});
     assert.notEqual(upgraded.retained,true);
     assert.equal((await page.evaluate(pollTracking,{id:'manual-upgrade'})).recoveryUnbound,true);
+    await reset();await page.evaluate(beginTracking,{id:'svg-menu',prompt:'New clip with adjacent menu',messageSelector:'.bubble'});
+    await append({id:'svg-user',role:'user',text:'New clip with adjacent menu'});
+    await append({id:'svg-result',src:'/svg-menu.webm',ref:'svg-user'});
+    await page.evaluate(()=>{
+      document.getElementById('svg-user').classList.add('bubble');
+      const result=document.getElementById('svg-result'),video=result.querySelector('video'),bubble=document.createElement('div');bubble.className='bubble';result.append(bubble);bubble.append(video);
+      const button=document.createElement('button');button.innerHTML='<svg width="20" height="20"><circle cx="4" cy="10" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="16" cy="10" r="1"/></svg>';
+      button.onclick=()=>{const menu=document.createElement('div');menu.textContent='Tải xuống';menu.onclick=()=>window.svgDownloaded=true;document.body.append(menu);};result.append(button);
+    });
+    assert.equal((await page.evaluate(pollTracking,{id:'svg-menu'})).ready,true);
+    assert.equal((await page.evaluate(downloadAction,{id:'svg-menu'})).needsMenu,true);
+    assert.equal((await page.evaluate(downloadAction,{id:'svg-menu',phase:'menu'})).clicked,true);
+    assert.equal(await page.evaluate(()=>window.svgDownloaded),true);
     console.log('PASS: real Chromium decoded-video tracker fixture — exact prompt binding, delayed result/progress, old/unrelated/wrong/out-of-order media rejection, ambiguity fail-closed, scoped menu download and unique recovery. No live Muse requests.');
   } finally {if(browser)await browser.close();await fs.rm(dir,{recursive:true,force:true});}
 })().catch(error=>{console.error(error);process.exitCode=1;});

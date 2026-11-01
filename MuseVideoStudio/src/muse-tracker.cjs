@@ -188,7 +188,14 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     const direct=controls(s.responseRoot).filter(isDownload);
     if(direct.length>1)throw Error('Phản hồi có nhiều nút tải. Không thể xác định nút đúng.');
     if(direct.length===1){if(videoLink(direct[0]))return{action:'source',clicked:false,needsMenu:false,url:direct[0].href};direct[0].click();return {action:'clicked',clicked:true,needsMenu:false};}
-    const more=[...s.responseRoot.querySelectorAll('button,[role="button"]')].filter(e=>visible(e)&&(/^(?:\.{3}|…|⋯|more(?:\s.*)?|options|menu|thêm|tùy\s*chọn)$/i.test(text(e))||e.getAttribute('aria-haspopup')==='menu'));
+    let more=[];
+    for(let scope=s.responseRoot,depth=0;scope&&scope!==document.body&&depth<4;scope=scope.parentElement,depth++){
+      if(scope!==s.responseRoot&&(scope.contains(s.echoRoot)||scope.querySelector('textarea,input,[contenteditable="true"],nav,aside')))break;
+      const media=mediaNodes(scope);if(media.length!==1||media[0]!==s.video)break;
+      more=[...scope.querySelectorAll('button,[role="button"],div[tabindex],span[tabindex]')].filter(e=>visible(e)&&(/^(?:\.{3}|…|⋯|more(?:\s.*)?|options|menu|thêm|tùy\s*chọn)$/i.test(text(e))||e.getAttribute('aria-haspopup')==='menu'||Boolean(e.querySelector('svg.lucide-ellipsis,svg.lucide-more-horizontal,[data-icon="more-horizontal"],[data-lucide="ellipsis"]'))||[...e.querySelectorAll('svg')].some(svg=>{const dots=[...svg.querySelectorAll('circle')];return dots.length===3&&dots.every(d=>d.getAttribute('cy')===dots[0].getAttribute('cy'));})));
+      more=more.filter(e=>!more.some(child=>child!==e&&e.contains(child)));
+      if(more.length)break;
+    }
     if(more.length>1)throw Error('Có nhiều menu trong phản hồi. Không thể xác định menu tải video.');
     if(more.length===1){s.menuBaseline=new Set(controls());s.menuPending=true;more[0].click();return {action:'waiting-menu',clicked:false,needsMenu:true};}
     return {action:'source',clicked:false,needsMenu:false,url:source(s.video)};

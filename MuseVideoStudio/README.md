@@ -1,6 +1,10 @@
-# Muse Video Studio 0.8.2 · Windows
+# Muse Video Studio V1 · 1.0.0 · Windows
 
 Icon Muse Studio riêng (M vàng + Play trắng) được nhúng vào EXE, cửa sổ ứng dụng và logo trong giao diện.
+
+## Tải qua menu ba chấm (V1)
+
+Nhận diện nút ba chấm dạng biểu tượng SVG cạnh đúng video, kể cả hàng thao tác nằm ngoài khung player. Mở menu rồi chọn Tải xuống; chỉ hoàn tất khi tệp video đã lưu và kiểm tra xong.
 
 ## Giao diện gọn và câu mở đầu tùy chọn (0.8.2)
 
