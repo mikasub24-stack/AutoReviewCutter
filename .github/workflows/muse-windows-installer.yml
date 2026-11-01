@@ -42,7 +42,7 @@ jobs:
           set "CHROMIUM_PATH=C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
           if not exist "%CHROMIUM_PATH%" set "CHROMIUM_PATH=C:\Program Files\Microsoft\Edge\Application\msedge.exe"
           set "MUSE_TRACKER_VIDEO_FIXTURE=test\fixtures\solid-blue.webm"
-          for %%T in (ten-sessions-smoke scene-flow-smoke muse-tracker-smoke browser-probe-smoke ui-smoke) do (
+          for %%T in (ten-sessions-smoke scene-flow-smoke muse-tracker-smoke browser-probe-smoke cards-smoke ui-smoke) do (
             node test/%%T.cjs >> installer-test.log 2>&1
             if errorlevel 1 (type installer-test.log & exit /b 1)
           )
@@ -71,7 +71,7 @@ jobs:
           $version = (Get-Content package.json | ConvertFrom-Json).version
           gh release view "muse-studio-v$version" > $null 2>&1
           if ($LASTEXITCODE -ne 0) {
-            gh release create "muse-studio-v$version" --target $env:GITHUB_SHA --title "Muse Video Studio V1 — $version Windows" --notes "Windows setup installer. Continue resubmits unfinished scenes using locked prompts and references with fresh attempt IDs; tentative send flags and stale receipts cannot skip submission. Completed clips and existing account/project data are preserved. The sidebar shows the actual version. Ten parallel sessions and exact clip menu downloads verified with Edge fixtures; installation, launch and uninstall verified on Windows."
+            gh release create "muse-studio-v$version" --target $env:GITHUB_SHA --title "Muse Video Studio V1 — $version Windows" --notes "Windows setup installer. Continue resubmits unfinished scenes using locked prompts and references with fresh attempt IDs; tentative send flags and stale receipts cannot skip submission. Completed clips and existing account/project data are preserved. A per-scene Regenerate button explicitly reruns only that scene, keeping previous videos and saving a new filename. The sidebar shows the actual version. Ten parallel sessions and exact clip menu downloads verified with Edge fixtures; installation, launch and uninstall verified on Windows."
             if ($LASTEXITCODE -ne 0) {
               gh release view "muse-studio-v$version"
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

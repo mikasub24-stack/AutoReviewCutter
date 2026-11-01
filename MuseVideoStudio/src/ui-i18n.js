@@ -158,6 +158,9 @@ Mở vị trí video|Show video in folder
 Tìm / tải video đã tạo|Find / download existing video
 Tìm kết quả từ prompt đã gửi, không gửi lại prompt mới.|Find the result of the existing prompt without submitting it again.
 Gửi lại prompt|Resubmit prompt
+Video trước|Previous video
+Tạo lại|Regenerate
+Tạo lại cảnh này; giữ video cũ.|Regenerate this scene; keep the previous video.
 Xóa|Remove
 Đưa về sửa|Edit scene
 Video đã tải|Saved video

@@ -465,6 +465,18 @@ app.whenReady().then(async () => {
       if(stopping||queue.active||merging||packaging||starting||resettingAccounts.size)throw Error('Chờ xử lý hiện tại hoàn tất.');
       invalidateOutputs();queue.recover(id,(job,signal)=>runJob(job,0,signal,{recover:true})).catch(e=>dialog.showErrorBox(ui('Lấy video đã tạo','Recover existing video'),e.message)).finally(notify);return snapshot();
     },
+    regenerate: async id=>{
+      if(accountOperationBusy()||resettingAccounts.size)throw Error('Chờ hoặc dừng tác vụ hiện tại trước khi tạo lại.');
+      const job=queue.jobs.find(j=>j.id===id);if(!job||job.status!=='completed'||!job.output)throw Error('Chỉ tạo lại cảnh đã hoàn thành.');
+      const index=Math.max(0,Number(job.account||1)-1);validAccount(index);
+      const epoch=runEpoch;starting=true;notify();
+      try{
+        await licenseManager.ensureAllowed();await openMuse(index);
+        if(epoch!==runEpoch||flushingQuit||stopping)return snapshot();
+        invalidateOutputs();queue.regenerate(id).catch(e=>dialog.showErrorBox(ui('Tạo lại','Regenerate'),e.message)).finally(notify);
+      }finally{starting=false;notify();}
+      return snapshot();
+    },
     retry: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); const browser=browsers.get(Number(queue.jobs.find(j=>j.id===id)?.account)-1);invalidateOutputs(); await queue.retry(id);browser?.releasePage?.(id); return snapshot(); },
     remove: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); const removed=queue.jobs.find(j=>j.id===id);invalidateOutputs(); await queue.remove(id);browsers.get(Number(removed?.account)-1)?.releasePage?.(id);if(removed?.trackerId)void dom(browsers.get(Number(removed.account)-1),endTracking,{id:removed.trackerId}).catch(()=>{}); return snapshot(); },
     browser: async index => { await openMuse(Number(index ?? 0)); return true; },
@@ -564,7 +576,7 @@ app.whenReady().then(async () => {
       }
       settings = { ...settings, stopSelector, dispatchMode,cooldownSeconds,messageSelector, attachmentReadySelector, browserChoice, browserPath, autoMerge: data.finishAction === 'merge', autoPackage: data.finishAction === 'package', ffmpeg: data.ffmpeg.trim(), accountCount, composer: data.composer, fileInput: data.fileInput, submit: data.submit, video: data.video, timeoutMinutes: minutes }; await save(); notify(); return snapshot();
     },
-    reveal: id => { const j = queue.jobs.find(j => j.id === id); if (j?.output) shell.showItemInFolder(j.output); },
+    reveal: id => { const j = queue.jobs.find(j => j.id === id); if (j?.output||j?.previousOutput) shell.showItemInFolder(j.output||j.previousOutput); },
     export: async () => { const r = await dialog.showSaveDialog(main, { defaultPath: 'muse-project.json', filters: [{ name: 'JSON', extensions: ['json'] }] }); if (!r.canceled) await atomic(r.filePath, { jobs: queue.jobs }); }
   };
   for (const [name, handler] of Object.entries(handlers)) ipcMain.handle('studio:' + name, (event, data) => { if (event.sender !== main.webContents) throw Error('Unauthorized window'); return handler(data); });

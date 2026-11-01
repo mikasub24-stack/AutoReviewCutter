@@ -139,3 +139,17 @@ test('recovery rejects unsent pending or completed jobs, and empty outputs never
  assert.throws(()=>q.recover('done',async()=>''),/tác vụ lỗi/);
  await q.add([{prompt:'new'}]);await q.start();assert.equal(q.jobs[2].status,'failed');assert.match(q.jobs[2].error,/Chưa xác nhận/);
 });
+
+test('Regenerate runs only the chosen completed scene and preserves previous video paths',async()=>{
+ let release;const gate=new Promise(r=>release=r),ran=[];
+ const q=new Queue({save:async()=>{},jobs:[{id:'done',status:'completed',prompt:'Original scene',number:1,account:2,output:'001.mp4',lockedInput:{prompt:'Original scene',references:[]}},{id:'kept',status:'completed',prompt:'Keep',output:'002.mp4'},{id:'pending',status:'pending',prompt:'Not selected'}],run:async(job,slot)=>{ran.push(job.id);assert.equal(slot,1);assert.equal(job.resumeMode,'resubmit');await gate;return '001 (2).mp4';}});
+ const run=q.regenerate('done');await new Promise(r=>setImmediate(r));
+ assert.equal(q.jobs[0].previousOutput,'001.mp4');assert.deepEqual(q.jobs[0].previousOutputs,['001.mp4']);assert.equal(q.jobs[0].status,'running');
+ assert.throws(()=>q.regenerate('kept'),/Chờ/);release();await run;
+ assert.deepEqual(ran,['done']);assert.equal(q.jobs[0].output,'001 (2).mp4');assert.equal(q.jobs[1].output,'002.mp4');assert.equal(q.jobs[2].status,'pending');
+});
+
+test('a failed Regenerate preserves previous output and never dispatches other scenes',async()=>{
+ const q=new Queue({save:async()=>{},jobs:[{id:'done',status:'completed',prompt:'One scene',output:'old.mp4'},{id:'other',status:'completed',prompt:'Other scene',output:'other.mp4'},{id:'pending',status:'pending',prompt:'Later'}],run:async job=>{assert.equal(job.id,'done');throw Error('Generation failed');}});
+ await q.regenerate('done');assert.equal(q.jobs[0].status,'failed');assert.equal(q.jobs[0].output,'');assert.equal(q.jobs[0].previousOutput,'old.mp4');assert.deepEqual(q.jobs[0].previousOutputs,['old.mp4']);assert.equal(q.jobs[1].status,'completed');assert.equal(q.jobs[1].output,'other.mp4');assert.equal(q.jobs[2].status,'pending');
+});

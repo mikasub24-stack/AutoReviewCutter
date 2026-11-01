@@ -102,13 +102,15 @@ function makeCard(id){
   row.recover.title='Tìm kết quả từ prompt đã gửi, không gửi lại prompt mới.';
   row.retry=action('Gửi lại prompt',async()=>{if(confirm('Kiểm tra Muse trước. Gửi lại prompt có thể tạo video trùng nếu tác vụ trước đã gửi.'))render(await call('retry',row.job.id));});
   row.remove=action('Xóa',async()=>render(await call('remove',row.job.id)));
+  row.regenerate=action('Tạo lại',async()=>render(await call('regenerate',row.job.id)));
+  row.regenerate.title='Tạo lại cảnh này; giữ video cũ.';
   row.edit=action('Đưa về sửa',async()=>{const result=await call('remove',row.job.id);if(result){drafts.push({...row.job});$('editorPanel').open=true;renderDrafts();render(result);$('editorPanel').scrollIntoView({block:'nearest'});}});
   body.append(badge,title,meta,steps,stage,fileLine,disclosure,source,error,actions);card.append(preview,body);return row;
 }
 function updateMedia(row,job){
-  const output=localFileUrl(job.output),image=localFileUrl(job.lockedInput?.references?.[0]?.path||job.image||job.references?.[0]);
+  const output=localFileUrl(job.output||job.previousOutput),image=localFileUrl(job.lockedInput?.references?.[0]?.path||job.image||job.references?.[0]);
   const key=output?'video:'+output:image?'image:'+image:'empty';
-  text(row.mediaLabel,output?'Video đã tải':image?'Ảnh tham chiếu':'Chưa có video');
+  text(row.mediaLabel,output?(!job.output&&job.previousOutput?'Video trước':'Video đã tải'):image?'Ảnh tham chiếu':'Chưa có video');
   if(row.mediaKey===key)return;
   const previousVideo=row.media.querySelector('video');if(previousVideo)previousVideo.pause();
   row.media.replaceChildren();row.mediaKey=key;row.preview.classList.toggle('hasVideo',Boolean(output));
@@ -140,11 +142,12 @@ function updateCard(row,job,index){
   row.activity.hidden=!active||observed!==null;
   const phase=job.status==='completed'?4:({entering:0,recovering:-1,preparing:0,uploading:0,submitting:1,confirming:1,waiting:2,downloading:3,cooldown:0})[job.stage]??-1;
   [...row.steps.children].forEach((step,index)=>{step.className=index<phase?'done':active&&index===phase?'current':'';});
-  text(row.fileLine,job.output?'✓ '+job.output.split(/[\\/]/).pop():'');row.fileLine.hidden=!job.output;
+  text(row.fileLine,job.output?'✓ '+job.output.split(/[\\/]/).pop():job.previousOutput?'Bản trước: '+job.previousOutput.split(/[\\/]/).pop():'');row.fileLine.hidden=!(job.output||job.previousOutput);
   updateElapsed(row);
   const source=typeof job.source==='string'?job.source.trim():'';row.source.hidden=!source||source===job.prompt?.trim();text(row.sourceBody,source);
   text(row.error,job.error||'');row.error.hidden=!job.error;
-  row.reveal.hidden=!job.output;
+  row.reveal.hidden=!(job.output||job.previousOutput);
+  row.regenerate.hidden=job.status!=='completed';row.regenerate.disabled=Boolean(state.active||state.starting||state.stopping||state.testing||state.merging||state.packaging);
   const recoverable=['failed','interrupted'].includes(job.status)&&Boolean(job.mayHaveSubmitted||job.submittedAt||job.resultReadyAt);
   row.recover.hidden=!recoverable;row.recover.disabled=Boolean(state.active||state.starting||state.stopping||state.merging||state.packaging);
   row.retry.hidden=!['failed','interrupted'].includes(job.status);row.remove.hidden=job.status==='running';row.edit.hidden=job.status!=='pending'||Boolean(job.lockedInput);row.retry.disabled=Boolean(state.active||state.starting||state.stopping);

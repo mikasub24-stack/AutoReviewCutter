@@ -94,5 +94,18 @@ class Queue {
     })();
     return this.runningPromise;
   }
+  regenerate(id){
+    if(this.active)throw Error('Chờ hoặc dừng tác vụ hiện tại trước khi tạo lại.');
+    const job=this.jobs.find(item=>item.id===id);
+    if(!job||job.status!=='completed'||!job.output)throw Error('Chỉ tạo lại cảnh đã hoàn thành.');
+    job.previousOutputs=[...new Set([...(job.previousOutputs||[]),job.output])];
+    job.previousOutput=job.output;job.resumeMode='resubmit';
+    this.paused=false;this.active=true;
+    this.runningPromise=(async()=>{
+      try{await this.executeJob(job,(item,signal)=>this.run(item,Math.max(0,Number(item.account||1)-1),signal),false);if(job.status==='completed')delete job.resumeMode;}
+      finally{this.active=false;}
+    })();
+    return this.runningPromise;
+  }
 }
 module.exports={Queue,stoppedError,abortable};
