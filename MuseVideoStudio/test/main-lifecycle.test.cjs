@@ -293,7 +293,7 @@ test('main binds each prompt transaction and waits for validated saved video bef
       evaluate:async(fn,arg)=>{
         if(fn.name==='submitPrompt'){sent.push(draft);return{clicked:true};}
         if(fn.name==='beginTracking'){trackers.push({...arg});return{phase:'waiting-prompt'};}
-        if(fn.name==='pollTracking')return ready?{phase:'ready',ready:true,progress:null}:{phase:'rendering',ready:false,progress:37,stage:'Fixture is creating this scene'};
+        if(fn.name==='pollTracking')return ready?{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null}:{phase:'rendering',ready:false,echoMatched:true,responseMatched:true,progress:37,stage:'Fixture is creating this scene'};
         if(fn.name==='downloadAction')return{action:'clicked',clicked:true,needsMenu:false};
         if(arg?.prompt && !arg?.id)draft=arg.prompt;return null;
       },pressEnter:async()=>{sent.push(draft);},
@@ -318,7 +318,7 @@ test('main recovery downloads the existing matched result without submitting any
   try{
     await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1},jobs:[{id:'recover-job',prompt:'Existing exact scene',account:1,status:'interrupted',mayHaveSubmitted:true},{id:'pending-job',prompt:'Later scene',status:'pending'}]}));
     app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},openMuse:async()=>{},close:async()=>{},pressEnter:async()=>submissions++,
-      evaluate:async(fn,arg)=>{if(fn.name==='beginTracking')recovered=arg;if(fn.name==='pollTracking')return{phase:'ready',ready:true,progress:null};if(fn.name==='downloadAction')return{action:'clicked',clicked:true,needsMenu:false};return null;},
+      evaluate:async(fn,arg)=>{if(fn.name==='beginTracking')recovered=arg;if(fn.name==='pollTracking')return{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null};if(fn.name==='downloadAction')return{action:'clicked',clicked:true,needsMenu:false};return null;},
       captureDownload:async(target,{trigger})=>{await trigger();await fs.writeFile(target,fixtureMp4());}
     })});
     await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('retryDownload','recover-job');await until(()=>!app.invoke('state').active);
@@ -373,7 +373,7 @@ test('two account browsers submit together and the faster account takes the next
   app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>{
    const slot=launched++;let draft='';return{external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},openMuse:async()=>{},close:async()=>{},evaluate:async(fn,arg)=>{
     if(fn.name==='submitPrompt'){assert.equal(busy[slot],0);busy[slot]++;sent[slot].push(draft);return{clicked:true};}
-    if(fn.name==='pollTracking')return{phase:'ready',ready:true,progress:null};
+    if(fn.name==='pollTracking')return{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null};
     if(fn.name==='downloadAction')return{action:'clicked',clicked:true,needsMenu:false};
     if(arg?.prompt&&!arg?.id)draft=arg.prompt;return null;
    },captureDownload:async(target,{trigger})=>{await trigger();if(slot===0){slowDownloading=true;await slow;}await fs.writeFile(target,fixtureMp4());busy[slot]--;}};
@@ -394,7 +394,7 @@ test('Stop clicks Muse cancellation and Continue resubmits the same locked scene
    if(fn.name==='beginTracking'){attempts.push(arg);return{};}
    if(fn.name==='submitPrompt'){sent.push(draft);return{clicked:true};}
    if(fn.name==='browserStop'){if(arg.request){stopClicks++;return{state:'requested',clicked:true};}return{state:'confirmed',clicked:false};}
-   if(fn.name==='pollTracking')return sent.length===1?new Promise(()=>{}):{phase:'ready',ready:true,echoMatched:true,echoKey:'new-reply',progress:null};
+   if(fn.name==='pollTracking')return sent.length===1?new Promise(()=>{}):{phase:'ready',ready:true,echoMatched:true,responseMatched:true,echoKey:'new-reply',progress:null};
    if(fn.name==='downloadAction')return{action:'clicked',clicked:true};if(arg?.prompt&&!arg?.id)draft=arg.prompt;return null;
   },captureDownload:async(target,{trigger})=>{await trigger();await fs.writeFile(target,fixtureMp4());}})});
   await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Locked original scene'},{prompt:'Next scene'}]);await app.invoke('start');await until(()=>sent.length===1);
@@ -408,7 +408,7 @@ test('a temporary DOM timeout while Muse creates does not fail, resend or dispat
   await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
   app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',openMuse:async()=>{},show:async()=>{},close:async()=>{},evaluate:async(fn)=>{
    if(fn.name==='submitPrompt'){sent++;return{clicked:true};}
-   if(fn.name==='pollTracking'){polls++;if(polls===1)throw Object.assign(Error('temporary lag'),{code:'MUSE_DOM_TIMEOUT'});return{phase:'ready',ready:true,progress:null};}
+   if(fn.name==='pollTracking'){polls++;if(polls===1)throw Object.assign(Error('temporary lag'),{code:'MUSE_DOM_TIMEOUT'});return{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null};}
    if(fn.name==='downloadAction')return{action:'clicked',clicked:true};return null;
   },captureDownload:async(target,{trigger})=>{await trigger();await fs.writeFile(target,fixtureMp4());}})});
   await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Slow scene'},{prompt:'Later scene'}]);await app.invoke('start');await until(()=>polls===1);
@@ -425,7 +425,7 @@ test('uncertain remote stop resumes the original attempt and retries downloading
    if(fn.name==='beginTracking'){attempts.push(arg);if(arg.recover)recovering=true;return{};}
    if(fn.name==='submitPrompt'){sent++;return{clicked:true};}
    if(fn.name==='browserStop')return{state:'unavailable',clicked:false};
-   if(fn.name==='pollTracking')return recovering?{phase:'ready',ready:true,progress:null}:new Promise(()=>{});
+   if(fn.name==='pollTracking')return recovering?{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null}:new Promise(()=>{});
    if(fn.name==='downloadAction')return{action:'clicked',clicked:true};return null;
   },captureDownload:async(target,{trigger})=>{await trigger();downloads++;if(downloads===1)throw Error('Server transfer is not ready yet');await fs.writeFile(target,fixtureMp4());}})});
   await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Original pending result'},{prompt:'Later scene'}]);await app.invoke('start');await until(()=>sent===1);
@@ -468,5 +468,38 @@ test('browser Test verifies four replies without dispatching queue; only explici
   assert.equal(app.invoke('state').jobs.filter(j=>j.status==='pending').length,2);
   assert.ok(app.invoke('state').jobs.filter(j=>j.status==='running').every(j=>!j.acknowledgedAt));
   await app.invoke('stop');await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
+test('ready without current prompt and response evidence never enters download',{timeout:10000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-send-phases-'));let app,echo=false,response=false,downloads=0,polls=0;
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',openMuse:async()=>{},show:async()=>{},close:async()=>{},evaluate:async(fn)=>{
+   if(fn.name==='submitPrompt')return{clicked:true};
+   if(fn.name==='browserStop')return{state:'confirmed',clicked:false};
+   if(fn.name==='pollTracking'){polls++;return{phase:'ready',ready:true,echoMatched:echo,responseMatched:response,echoKey:echo?'current-scene':'',progress:100};}
+   if(fn.name==='downloadAction')return{action:'clicked',clicked:true};return null;
+  },captureDownload:async(target,{trigger})=>{downloads++;await trigger();await fs.writeFile(target,fixtureMp4());}})});
+  await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Exact current scene'}]);await app.invoke('start');
+  await until(()=>polls===1);assert.equal(downloads,0);assert.equal(app.invoke('state').jobs[0].stage,'confirming');assert.equal(app.invoke('state').jobs[0].resultReadyAt,null);assert.equal(app.invoke('state').jobs[0].progress,null);
+  echo=true;await until(()=>polls===2);assert.equal(downloads,0);assert.equal(app.invoke('state').jobs[0].stage,'waiting');assert.ok(app.invoke('state').jobs[0].submissionReceipt);assert.equal(app.invoke('state').jobs[0].progress,null);
+  response=true;await until(()=>!app.invoke('state').active);assert.equal(downloads,1);assert.equal(app.invoke('state').jobs[0].status,'completed');await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
+test('rejected Send validation stays unsent and Continue retries sending instead of recovering a video',{timeout:5000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-send-retry-'));let app,sends=0,fail=true;
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',openMuse:async()=>{},show:async()=>{},close:async()=>{},evaluate:async(fn)=>{
+   if(fn.name==='submitPrompt'){if(fail)throw Error('Nút Gửi chưa sẵn sàng; chưa gửi prompt.');sends++;return{clicked:true};}
+   if(fn.name==='browserStop')return{state:'confirmed',clicked:false};
+   if(fn.name==='pollTracking')return{phase:'ready',ready:true,echoMatched:true,responseMatched:true};
+   if(fn.name==='downloadAction')return{action:'clicked',clicked:true};return null;
+  },captureDownload:async(target,{trigger})=>{await trigger();await fs.writeFile(target,fixtureMp4());}})});
+  await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Scene must be sent first'}]);await app.invoke('start');await until(()=>!app.invoke('state').active);
+  assert.equal(app.invoke('state').jobs[0].mayHaveSubmitted,false);assert.equal(app.invoke('state').jobs[0].status,'failed');assert.equal(sends,0);
+  fail=false;await app.invoke('start');await until(()=>!app.invoke('state').active);assert.equal(sends,1);assert.equal(app.invoke('state').jobs[0].status,'completed');await app.stop();
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });

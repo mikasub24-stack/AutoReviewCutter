@@ -10,7 +10,7 @@ function abortable(promise,signal){
   });
 }
 function resetRunFields(job, stage='pending') {
-  Object.assign(job,{stage,stageMessage:'',progress:null,downloadProgress:null,submittedAt:null,mayHaveSubmitted:false,submissionProfileKey:null,submissionSessionId:null,resultReadyAt:null,downloadStartedAt:null,downloadCompletedAt:null,startedAt:null,finishedAt:null,error:'',output:''});
+  Object.assign(job,{stage,stageMessage:'',progress:null,downloadProgress:null,submissionProtocol:null,submissionReceipt:null,acknowledgedAt:null,confirmedResponseAt:null,submittedAt:null,mayHaveSubmitted:false,submissionProfileKey:null,submissionSessionId:null,resultReadyAt:null,downloadStartedAt:null,downloadCompletedAt:null,startedAt:null,finishedAt:null,error:'',output:''});
   job.account=undefined;
   return job;
 }
@@ -23,7 +23,7 @@ class Queue {
   async add(items){
     if(!Array.isArray(items)||!items.length||items.some(j=>typeof j.prompt!=='string'||!j.prompt.trim()))throw Error('Mỗi tác vụ cần một prompt.');
     const nextOrder=Math.max(0,...this.jobs.map(j=>j.order||0));
-    this.jobs.push(...items.map((j,index)=>({order:nextOrder+index+1,id:randomUUID(),prompt:j.prompt.trim(),source:typeof j.source==='string'?j.source:'',title:typeof j.title==='string'?j.title:'',number:Number.isInteger(j.number)?j.number:null,voiceover:typeof j.voiceover==='string'?j.voiceover:'',durationSeconds:Number.isFinite(j.durationSeconds)&&j.durationSeconds>0?j.durationSeconds:null,image:j.image||j.references?.[0]||'',references:Array.isArray(j.references)?[...j.references]:j.image?[j.image]:[],status:'pending',stage:'pending',stageMessage:'',progress:null,downloadProgress:null,submittedAt:null,mayHaveSubmitted:false,submissionProfileKey:null,submissionSessionId:null,resultReadyAt:null,downloadStartedAt:null,downloadCompletedAt:null,startedAt:null,finishedAt:null,error:'',output:'',createdAt:Date.now()})));
+    this.jobs.push(...items.map((j,index)=>({order:nextOrder+index+1,id:randomUUID(),prompt:j.prompt.trim(),source:typeof j.source==='string'?j.source:'',title:typeof j.title==='string'?j.title:'',number:Number.isInteger(j.number)?j.number:null,voiceover:typeof j.voiceover==='string'?j.voiceover:'',durationSeconds:Number.isFinite(j.durationSeconds)&&j.durationSeconds>0?j.durationSeconds:null,image:j.image||j.references?.[0]||'',references:Array.isArray(j.references)?[...j.references]:j.image?[j.image]:[],status:'pending',stage:'pending',stageMessage:'',progress:null,downloadProgress:null,submissionProtocol:null,submissionReceipt:null,acknowledgedAt:null,confirmedResponseAt:null,submittedAt:null,mayHaveSubmitted:false,submissionProfileKey:null,submissionSessionId:null,resultReadyAt:null,downloadStartedAt:null,downloadCompletedAt:null,startedAt:null,finishedAt:null,error:'',output:'',createdAt:Date.now()})));
     await this.publish();
   }
   async retry(id){const j=this.jobs.find(x=>x.id===id);if(!j||!['failed','interrupted'].includes(j.status))throw Error('Chỉ chạy lại tác vụ lỗi hoặc bị gián đoạn.');delete j.resumeMode;resetRunFields(j);j.status='pending';await this.publish();}

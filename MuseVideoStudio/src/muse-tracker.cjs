@@ -1,14 +1,24 @@
 // These functions execute inside the Muse document through either browser
 // adapter. Keep every browser helper inside beginTracking's closure so the
 // exported function can be serialized without Node imports or outer variables.
-function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = '', recover = false, echoMarker='',echoKey='',echoAliases=[] }) {
+function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = '', recover = false, recoverRequireAnchor = false, echoMarker='',echoKey='',echoAliases=[] }) {
   const key = Symbol.for('MuseVideoStudio.promptTrackers.v1');
   const map = globalThis[key] || (globalThis[key] = new Map());
   if (!id || typeof prompt !== 'string' || !prompt.trim()) throw Error('Tác vụ cần mã và prompt đầy đủ.');
-  const savedAliases=[...new Set([...echoAliases,...(recover&&map.get(id)?.echoAliases?[...map.get(id).echoAliases]:[]),...(echoKey?[echoKey]:[])])];
-  if (map.has(id)) { if (!recover) throw Error('Tác vụ này đã được theo dõi.'); map.get(id).observer?.disconnect(); map.delete(id); }
   const norm = value => String(value || '').replace(/\s+/g, ' ').trim();
-  const wanted = norm(prompt);
+  const wanted = norm(prompt),previous=map.get(id);
+  if(previous){
+    if(!recover)throw Error('Tác vụ này đã được theo dõi.');
+    if(previous.prompt!==wanted)throw Error('Mã lượt gửi đang giữ prompt khác. Không thay thế cảnh đang chờ.');
+    if(previous.documentBody===document.body&&document.body.isConnected&&(!recoverRequireAnchor||!previous.recover||previous.recoverRequireAnchor)){
+      // Keep the original before-send baseline. Rebuilding it during Continue
+      // would turn a merely delayed first echo into arbitrary chat history.
+      for(const alias of echoAliases)if(alias)previous.echoAliases.add(alias);
+      return {id,phase:'tracking-retained',stage:'Tiếp tục giữ đúng lượt gửi đang chờ',ready:false,progress:null,retained:true};
+    }
+    previous.observer?.disconnect();map.delete(id);
+  }
+  const savedAliases=[...new Set([...echoAliases,...(recover&&map.get(id)?.echoAliases?[...map.get(id).echoAliases]:[]),...(echoKey?[echoKey]:[])])];
   const visible = e => Boolean(e?.isConnected && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden');
   const following = (a,b) => Boolean(a?.isConnected && b?.isConnected && !(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_DISCONNECTED) && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING));
   const composer = e => Boolean(e.closest('textarea,input,[contenteditable="true"],[role="textbox"]'));
@@ -29,7 +39,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   // Validate selectors now rather than partially submitting then discovering a
   // malformed configuration. A selector must resolve to actual video elements.
   document.querySelectorAll(videoSelector); if(messageSelector)document.querySelectorAll(messageSelector);
-  const s={echoAliases:new Set(savedAliases),id,prompt:wanted,recover,videoSelector,messageSelector,baseline:new Set(document.querySelectorAll('*')),baselineSources:new Set(mediaNodes(document).map(source).filter(Boolean)),added:new WeakMap(),textChanged:new WeakMap(),sequence:0,echo:null,echoRoot:null,responseRoot:null,video:null,fingerprint:'',ready:false,menuPending:false,menuBaseline:null};
+  const s={documentBody:document.body,echoAliases:new Set(savedAliases),id,prompt:wanted,recover,recoverRequireAnchor,videoSelector,messageSelector,baseline:new Set(document.querySelectorAll('*')),baselineSources:new Set(mediaNodes(document).map(source).filter(Boolean)),added:new WeakMap(),textChanged:new WeakMap(),sequence:0,echo:null,echoRoot:null,responseRoot:null,video:null,fingerprint:'',ready:false,menuPending:false,menuBaseline:null};
   s.observer=new MutationObserver(records=>{
     for(const record of records) {
       const seq=++s.sequence;
@@ -38,11 +48,11 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     }
   });
   s.observer.observe(document.body,{subtree:true,childList:true,characterData:true});
+  const recoveryKeys=new Set(savedAliases);
+  const anchorMatches=root=>[root.id,root.getAttribute('data-message-id'),root.getAttribute('data-id')].some(key=>key&&recoveryKeys.has(key))||Boolean(echoMarker&&root.getAttribute('data-muse-studio-attempt')===echoMarker);
   function echoCandidates(all=false) {
     const matches=[...document.body.querySelectorAll('*')].filter(e=>visible(e)&&!composer(e)&&norm(e.innerText ?? e.textContent)===wanted&&(all||recover||!s.baseline.has(e))&&author(e).kind!=='assistant');
-    const preferred=!all&&recover&&(echoKey||echoMarker)?matches.filter(e=>{const root=author(e).root||e.closest('[data-muse-studio-attempt]')||e;return echoKey?(root.id===echoKey||root.getAttribute('data-message-id')===echoKey||root.getAttribute('data-id')===echoKey):root.getAttribute('data-muse-studio-attempt')===echoMarker;}):matches;
-    const restricted=all?matches:preferred.length||echoKey?preferred:matches;
-    const leaves=restricted.filter(e=>!matches.some(other=>other!==e&&e.contains(other)));
+    const leaves=matches.filter(e=>!matches.some(other=>other!==e&&e.contains(other)));
     const roots=new Map();
     for(const leaf of leaves) {
       const known=author(leaf);
@@ -52,7 +62,10 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       if(!all&&!recover && s.baseline.has(root))continue;
       roots.set(root,{leaf,root});
     }
-    return [...roots.values()];
+    const candidates=[...roots.values()];
+    if(all||!recover||(!recoverRequireAnchor&&!echoKey&&!echoMarker))return candidates;
+    const anchored=candidates.filter(e=>anchorMatches(e.root));
+    return recoverRequireAnchor||anchored.length||echoKey?anchored:candidates;
   }
   function threadRoot(root) {
     const known=root.parentElement?.closest('[role="log"],[role="feed"],[data-chat-thread],[data-testid="conversation"],[data-testid="messages"],.messages,.conversation');
@@ -96,28 +109,29 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   function rememberContext(root){const parents=[];for(let p=root.parentElement,depth=0;p&&p!==document.body&&depth<8;p=p.parentElement,depth++)if(!p.querySelector('textarea,input,[contenteditable="true"],[role="textbox"],nav,aside'))parents.push(p);return parents;}
   function result(phase,stage,root=s.responseRoot) {return {id,phase,stage,responseMatched:Boolean(root?.isConnected&&s.echoRoot&&following(s.echoRoot,root)),echoAliases:[...s.echoAliases],echoMatched:Boolean(s.echo),echoKey:s.echoRoot?.id||s.echoRoot?.getAttribute('data-message-id')||s.echoRoot?.getAttribute('data-id')||'',echoMarker:s.echoRoot?.getAttribute('data-muse-studio-attempt')||'',ready:phase==='ready',progress:progress(root),...(phase==='ready'?{url:source(s.video),fingerprint:s.fingerprint}:{})};}
   s.poll=()=>{
+    if(s.echo?.isConnected&&s.echoRoot?.isConnected&&(!s.echoRoot.contains(s.echo)||norm(s.echo.innerText??s.echo.textContent)!==wanted||author(s.echo).kind==='assistant'))throw Error('Tin nhắn của cảnh đã thay đổi. Không lấy video từ câu Test hay cảnh khác.');
     let echoes=echoCandidates();
-    if(!s.echo&&!echoes.length&&recover&&(echoKey||echoMarker)){const exact=echoCandidates(true);if(exact.length===1)echoes=exact;else if(exact.length>1)throw Error('Có nhiều tin nhắn trùng prompt nhưng ID cũ đã thay đổi. Không chọn clip khi chưa xác định được cảnh.');}
+    if(!s.echo&&!echoes.length&&recover&&!recoverRequireAnchor&&(echoKey||echoMarker)){const exact=echoCandidates(true);if(exact.length===1)echoes=exact;else if(exact.length>1)throw Error('Có nhiều tin nhắn trùng prompt nhưng ID cũ đã thay đổi. Không chọn clip khi chưa xác định được cảnh.');}
     if(!s.echo&&echoes.length>1)throw Error('Có nhiều tin nhắn trùng chính xác prompt. Không xác định được video của tác vụ; hãy dùng chat riêng hoặc xử lý thủ công.');
     if(!s.echo) {
-      if(!echoes.length)return result('waiting-prompt','Chờ Muse hiển thị đúng prompt đã gửi');
+      if(!echoes.length){if(recover&&recoverRequireAnchor)return {...result('recovery-unbound','Chưa xác nhận được tin nhắn của đúng lượt gửi cũ',null),recoveryUnbound:true,historicalEchoCount:echoCandidates(true).length};return result('waiting-prompt','Chờ Muse hiển thị đúng prompt đã gửi');}
       s.echo=echoes[0].leaf;s.echoRoot=echoes[0].root;s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.echoNativeKey=s.echoRoot.id||s.echoRoot.getAttribute('data-message-id')||s.echoRoot.getAttribute('data-id')||'';if(s.echoNativeKey)s.echoAliases.add(s.echoNativeKey);s.echoContexts=rememberContext(s.echoRoot);s.echoEpoch=Math.max(s.added.get(s.echo)||0,s.added.get(s.echoRoot)||0,s.textChanged.get(s.echo)||0);
     }
     if(!s.echo.isConnected||!s.echoRoot.isConnected){
       const all=echoCandidates(true);
       let anchored=all.filter(e=>e.root===s.echoRoot||e.root.getAttribute('data-muse-studio-attempt')===id||(s.echoNativeKey&&[e.root.id,e.root.getAttribute('data-message-id'),e.root.getAttribute('data-id')].includes(s.echoNativeKey)));
-      if(!anchored.length&&all.length===1&&s.echoContexts?.some(parent=>parent.isConnected&&parent.contains(all[0].root)))anchored=all;
+      if(!recoverRequireAnchor&&!anchored.length&&all.length===1&&s.echoContexts?.some(parent=>parent.isConnected&&parent.contains(all[0].root)))anchored=all;
       if(anchored.length!==1)return result('waiting-response','Muse đang dựng lại tin nhắn · chờ khôi phục đúng cảnh gốc',null);
       s.echo=anchored[0].leaf;s.echoRoot=anchored[0].root;s.echoContexts=rememberContext(s.echoRoot);s.echoNativeKey=s.echoRoot.id||s.echoRoot.getAttribute('data-message-id')||s.echoRoot.getAttribute('data-id')||'';if(s.echoNativeKey)s.echoAliases.add(s.echoNativeKey);s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.ready=false;s.responseRoot=null;s.video=null;
     }
     const thread=threadRoot(s.echoRoot);if(!thread)return result('waiting-response','Chưa xác định được vùng phản hồi cho prompt này');
     if(s.ready&&(!s.video?.isConnected||!s.responseRoot?.isConnected)){s.ready=false;s.video=null;s.responseRoot=null;}
-    if(s.ready) {
-      const videos=mediaNodes(s.responseRoot);
-      if(!s.video.isConnected||videos.length!==1||videos[0]!==s.video||source(s.video)!==s.fingerprint)throw Error('Kết quả đã thay đổi hoặc không còn duy nhất. Dừng tải để tránh lấy nhầm video.');
-      return playable(s.video)?result('ready','Video của prompt đã sẵn sàng tải'):result('rendering','Đang chờ dữ liệu video có thể phát');
-    }
-    const userRoots=[...thread.querySelectorAll('*')].filter(e=>author(e).kind==='user'&&author(e).root===e&&e!==s.echoRoot&&following(s.echoRoot,e));
+    if(s.ready&&s.video&&(source(s.video)!==s.fingerprint))throw Error('Kết quả đã thay đổi. Dừng tải để tránh lấy nhầm video.');
+    // Every poll, including immediately before download, checks the prompt and
+    // response boundaries again. A live DOM node can be recycled for Test or
+    // another turn without being disconnected.
+    s.ready=false;
+    const userRoots=[...thread.querySelectorAll('*')].filter(e=>e!==s.echoRoot&&following(s.echoRoot,e)&&((author(e).kind==='user'&&author(e).root===e)||e.hasAttribute('data-muse-studio-attempt')));
     const echoIds=new Set([...s.echoAliases,s.echoRoot.id,s.echoRoot.getAttribute('data-message-id'),s.echoRoot.getAttribute('data-id')].filter(Boolean));
     const candidates=[];
     for(const video of mediaNodes(thread)) {
@@ -133,6 +147,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     }
     if(candidates.length>1)throw Error('Có nhiều video sau prompt này. Dừng để tránh gán hoặc tải nhầm kết quả.');
     if(!candidates.length) {
+      s.responseRoot=null;s.video=null;
       if(s.genericResponseRoot && author(s.genericResponseRoot).kind!=='user' && (recover || (!s.baseline.has(s.genericResponseRoot)&&(s.added.get(s.genericResponseRoot)||0)>=s.echoEpoch))) {
         s.responseRoot=s.genericResponseRoot;return result('rendering','Muse đang xử lý prompt này',s.genericResponseRoot);
       }

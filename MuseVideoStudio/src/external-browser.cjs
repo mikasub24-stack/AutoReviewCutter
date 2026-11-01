@@ -1,6 +1,7 @@
 const { EventEmitter } = require('node:events');
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const {ensureAttachmentInput}=require('./attachment-input.cjs');
 const {capturePlaywrightDownload}=require('./download-capture.cjs');
 const { createSessionStore } = require('./session-store.cjs');
 
@@ -197,14 +198,49 @@ async function launchExternalBrowser({ executablePath, profileDir, sessionFile, 
         await page.bringToFront();
       },
       evaluate: (fn, arg) => assertPage().evaluate(fn, arg),
-      upload: async (selector, files) => {
+      upload: async (selector, files, {composerSelector,signal}={}) => {
         const page = assertPage();
         if (!Array.isArray(files) || !files.length) throw Error('Chọn ít nhất một ảnh tham chiếu.');
         await Promise.all(files.map(file => fs.access(file)));
         const input = page.locator(selector);
-        if (await input.count() !== 1) throw Error('Không xác định được ô tải ảnh duy nhất. Mở nút + trên Muse hoặc chỉnh selector.');
-        if (files.length > 1 && await input.getAttribute('multiple') === null) throw Error('Ô tải ảnh Muse hiện tại chỉ nhận một ảnh.');
-        await input.setInputFiles(files);
+        const check=()=>{assertPage();if(signal?.aborted)throw Object.assign(Error('Đã dừng tải ảnh; chưa gửi prompt.'),{name:'AbortError'});};
+        let chooserTask,finished=false,attachmentClaimed=false;
+        const setInput=async()=>{
+          check();
+          if(await input.count()!==1)throw Error('Không xác định được ô tải ảnh duy nhất. Mở nút + trên Muse hoặc chỉnh selector.');
+          if(files.length>1&&await input.getAttribute('multiple')===null)throw Error('Ô tải ảnh Muse hiện tại chỉ nhận một ảnh.');
+          check();if(attachmentClaimed){if(chooserTask)await chooserTask;return;}attachmentClaimed=true;
+          await input.setInputFiles(files);
+        };
+        const count=await input.count();
+        if(count===1)return setInput();
+        if(count>1||!composerSelector)throw Error('Không xác định được ô tải ảnh duy nhất. Mở nút + trên Muse hoặc chỉnh selector.');
+        const onChooser=chooser=>{
+          if(finished||attachmentClaimed)return;
+          attachmentClaimed=true;chooserTask=(async()=>{
+            check();
+            if(files.length>1&&!chooser.isMultiple())throw Error('Ô tải ảnh Muse hiện tại chỉ nhận một ảnh.');
+            await chooser.setFiles(files);
+          })();
+          chooserTask.catch(()=>{});
+        };
+        page.on('filechooser',onChooser);
+        try{
+          const deadline=Date.now()+6000;let first=true,lastMessage='Chưa mở được ô tải ảnh.';
+          while(Date.now()<deadline){
+            check();
+            if(chooserTask){await chooserTask;return;}
+            const found=await input.count();
+            if(chooserTask){await chooserTask;return;}
+            if(found===1){await setInput();return;}
+            if(found>1)throw Error('Không xác định được ô tải ảnh duy nhất.');
+            const state=await page.evaluate(ensureAttachmentInput,{composerSelector,fileInputSelector:selector,reset:first});first=false;
+            lastMessage=state.message||lastMessage;
+            if(chooserTask){await chooserTask;return;}
+            await new Promise(resolve=>setTimeout(resolve,100));
+          }
+          throw Error(lastMessage+' Chưa gửi prompt; kiểm tra nút đính kèm trong Muse.');
+        }finally{finished=true;page.off('filechooser',onChooser);}
       },
       pressEnter: async ({id,signal}={}) => {
         if(signal?.aborted)throw Object.assign(Error('Đã dừng gửi prompt.'),{name:'AbortError'});

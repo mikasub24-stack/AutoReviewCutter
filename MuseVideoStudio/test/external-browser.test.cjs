@@ -184,3 +184,35 @@ test('an active job pins its Muse tab and never falls back to another tab after 
   adapter.releasePage('scene-one');assert.equal(await adapter.evaluate(()=>43),43);
  }finally{await t.cleanup(adapter);}
 });
+
+
+test('mount-on-attach uploads through intercepted file chooser once and detaches listener',async()=>{
+ const t=await setup();let adapter;
+ try{
+  adapter=await launchExternalBrowser(t.config);const file=path.join(t.dir,'scene.png');await fs.writeFile(file,'fixture');
+  const page=t.context.page;page.inputCount=0;let choices=0,opens=0;
+  page.evaluate=async(fn,arg)=>{assert.equal(fn.name,'ensureAttachmentInput');assert.equal(arg.composerSelector,'textarea');opens++;page.inputCount=1;page.emit('filechooser',{isMultiple:()=>false,setFiles:async files=>{choices++;assert.deepEqual(files,[file]);}});return{ready:false,clicked:true,message:'Opened'};};
+  await adapter.upload('input[type=file]',[file],{composerSelector:'textarea'});
+  assert.equal(opens,1);assert.equal(choices,1);assert.equal(t.context.events.filter(e=>e[0]==='upload').length,0);assert.equal(page.listenerCount('filechooser'),0);
+ }finally{await t.cleanup(adapter);}
+});
+test('mount-on-attach handles input mounted without chooser and refuses an ambiguous menu',async()=>{
+ const t=await setup();let adapter;
+ try{
+  adapter=await launchExternalBrowser(t.config);const file=path.join(t.dir,'scene.png');await fs.writeFile(file,'fixture');
+  const page=t.context.page;page.inputCount=0;page.evaluate=async()=>{page.inputCount=1;return{ready:false,clicked:true};};
+  await adapter.upload('input[type=file]',[file],{composerSelector:'textarea'});assert.equal(t.context.events.filter(e=>e[0]==='upload').length,1);assert.equal(page.listenerCount('filechooser'),0);
+  page.inputCount=0;page.evaluate=async()=>{throw Error('Có nhiều nút đính kèm');};
+  await assert.rejects(adapter.upload('input[type=file]',[file],{composerSelector:'textarea'}),/nhiều nút/);assert.equal(page.listenerCount('filechooser'),0);
+ }finally{await t.cleanup(adapter);}
+});
+test('stopped attachment preparation does not click or set files after abort',async()=>{
+ const t=await setup();let adapter;
+ try{
+  adapter=await launchExternalBrowser(t.config);const file=path.join(t.dir,'scene.png');await fs.writeFile(file,'fixture');
+  const page=t.context.page;page.inputCount=0;let clicks=0;const controller=new AbortController();
+  page.evaluate=async()=>{clicks++;controller.abort();return{ready:false,clicked:true};};
+  await assert.rejects(adapter.upload('input[type=file]',[file],{composerSelector:'textarea',signal:controller.signal}),/Đã dừng/);
+  assert.equal(clicks,1);assert.equal(t.context.events.filter(e=>e[0]==='upload').length,0);assert.equal(page.listenerCount('filechooser'),0);
+ }finally{await t.cleanup(adapter);}
+});

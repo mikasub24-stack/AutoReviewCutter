@@ -44,6 +44,12 @@ jobs:
           if not exist "%CHROMIUM_PATH%" set "CHROMIUM_PATH=C:\Program Files\Microsoft\Edge\Application\msedge.exe"
           call node test/submit-diagnostics-smoke.cjs >> test.log 2>&1
           if errorlevel 1 (type test.log & exit /b 1)
+          call node test/attachment-input-smoke.cjs >> test.log 2>&1
+          if errorlevel 1 (type test.log & exit /b 1)
+          call node test/native-upload-smoke.cjs >> test.log 2>&1
+          if errorlevel 1 (type test.log & exit /b 1)
+          call node test/scene-flow-smoke.cjs >> test.log 2>&1
+          if errorlevel 1 (type test.log & exit /b 1)
           call node test/browser-probe-smoke.cjs >> test.log 2>&1
           if errorlevel 1 (type test.log & exit /b 1)
           call node test/browser-stop-smoke.cjs >> test.log 2>&1
@@ -115,7 +121,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "muse-studio-v$env:MUSE_VERSION" "dist/$env:MUSE_ZIP" --target $env:GITHUB_SHA --title "Muse Video Studio $env:MUSE_VERSION — Windows" --notes "Download ZIP, extract and run EXE. One Test All Browsers button sends only a warmup sentence to all selected browsers, requires a fresh echo and meaningful Muse reply, then enables explicit Run/Continue. The queue never starts from Test. Up to four parallel scene cards remain in one ordered grid with inline progress, saved-file completion, Stop/Continue and Open Output Folder controls. Restores unfinished queue after restart. Preserves exact prompt/reference locking, scoped video downloads and numbered output files. Automated unit and Edge fixtures verified; live Muse account validation remains needed. See MuseVideoStudio/README.md."
+          gh release create "muse-studio-v$env:MUSE_VERSION" "dist/$env:MUSE_ZIP" --target $env:GITHUB_SHA --title "Muse Video Studio $env:MUSE_VERSION — Windows" --notes "Download ZIP, extract and run EXE. Fixes stale restored jobs skipping reference upload and prompt send, then jumping straight to old video downloads. Automatic recovery requires exact prompt and attempt identity; unbound old jobs submit the locked prompt and references first. Reused prompt drafts with no images now upload references. Opens the composer attachment menu for dynamic/hidden/detached file inputs in native and external browsers; prevents duplicate attachment and checks Stop. Requires current prompt and response evidence before download. Real Chromium integration verifies upload, exact prompt send, echo, generation wait, NEW video download and validated saved output. Preserves one Test All Browsers, four parallel inline cards and saved queues. Automated Windows/Edge fixtures passed; live Muse account validation remains needed. See MuseVideoStudio/README.md."
       - name: Retain public test diagnostics on failure
         if: failure()
         shell: pwsh

@@ -1,6 +1,14 @@
-# Muse Video Studio 0.8.0 · Windows
+# Muse Video Studio 0.8.1 · Windows
 
 Icon Muse Studio riêng (M vàng + Play trắng) được nhúng vào EXE, cửa sổ ứng dụng và logo trong giao diện.
+
+## Gửi ảnh + prompt trước khi chờ và tải (0.8.1)
+
+Sửa cảnh cũ có cờ đã nhận nhưng chưa gửi thật bị đưa thẳng vào lấy video lịch sử. Cảnh dở từ bản cũ chưa có bằng chứng của luồng gửi ảnh/prompt sẽ quay về đính kèm ảnh và gửi mới trên đúng phiên khi Tiếp tục. Lượt gửi mới dùng bằng chứng riêng; nếu dừng mà chưa xác nhận tin nhắn, giữ lượt đó để kiểm tra tiếp, không gửi trùng. Khôi phục tự động phải khớp nguyên prompt và ID/marker của đúng lượt gửi. Câu Test và clip cũ trùng prompt không thay thế lượt gửi mới. Mỗi lần tải kiểm tra lại ranh giới tin nhắn để tránh DOM bị tái sử dụng.
+
+Nếu bản nháp đã có đúng prompt nhưng chưa có ảnh, vẫn tải ảnh tham chiếu đã khóa lên. Tự mở nút + / đính kèm và mục tải ảnh khi Muse chưa tạo input chọn tệp; hỗ trợ input ẩn và input tạm thời, cả trình duyệt tích hợp và Chrome/Edge. Tránh đính kèm hai lần và kiểm tra dừng trước khi gắn tệp.
+
+Trạng thái đi theo bằng chứng: nhập prompt/đính kèm → gửi → xác nhận tin nhắn → chờ video đúng phản hồi → tải → lưu xong. Cờ ready thiếu đúng tin nhắn/phản hồi không được phép tải. Kiểm thử tích hợp chạy main với Chromium, ảnh PNG được tải thật và tệp WebM tải thật từ fixture cục bộ, gồm lỗi cũ có acknowledgement sai, clip lịch sử trùng prompt và bản nháp thiếu ảnh. Chưa xác minh bằng tài khoản Muse thật.
 
 ## Một danh sách, Test chung mọi trình duyệt (0.8.0)
 
@@ -8,7 +16,7 @@ Một nút **Test tất cả trình duyệt** tự mở 1–4 phiên đã chọn
 
 Tất cả cảnh nằm trong danh sách theo thứ tự gốc, không cần đổi tab Đang chạy. Từng ô hiển thị ảnh/gửi/tạo/tải, phần trăm thật khi có, thời gian chờ và tên tệp sau khi lưu thành công. Xong ô nào thì ô đó báo **Đã xong**, tài khoản đó tự nhận cảnh tiếp theo. Chọn 4 trình duyệt chạy được 4 cảnh cùng lúc. Danh sách cuộn riêng và tự theo cảnh mới, có thể tắt tự theo; phần prompt và xuất/ghép được thu gọn.
 
-**Dừng, Chạy/Tiếp tục, Mở thư mục video** nằm cạnh nhau ngay trên danh sách. Khi khởi động lại, hàng chờ được khôi phục, Test chung rồi Tiếp tục. Chưa thấy đúng prompt trong chat phải báo **Chưa xác nhận Muse nhận prompt**, không đánh dấu đã nhận dựa vào việc bấm Gửi. Tiếp tục mặc định giữ attempt cũ; cảnh chưa từng được xác nhận có echo và vẫn vắng mặt trước/sau lần Test mới có thể gửi lại một lần trên chính tài khoản cũ.
+**Dừng, Chạy/Tiếp tục, Mở thư mục video** nằm cạnh nhau ngay trên danh sách. Khi khởi động lại, hàng chờ được khôi phục, Test chung rồi Tiếp tục. Chưa thấy đúng prompt trong chat phải báo **Chưa xác nhận Muse nhận prompt**, không đánh dấu đã nhận dựa vào việc bấm Gửi. Tiếp tục giữ attempt có bằng chứng của luồng gửi mới; cảnh dở từ bản cũ chưa có bằng chứng quay về gửi ảnh/prompt trên chính tài khoản cũ.
 
 ## Sửa nhận clip và đặt tên (0.7.1)
 

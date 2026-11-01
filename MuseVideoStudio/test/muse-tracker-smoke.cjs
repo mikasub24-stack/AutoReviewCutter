@@ -88,7 +88,8 @@ const assert = require('node:assert/strict');
     await reset();await append({id:'u-recover',role:'user',text:'Recover exact prompt'});await append({id:'recover-result',src:'/recover.webm',ref:'u-recover'});await ready('recover-result');
     await page.evaluate(beginTracking,{id:'recover',prompt:'Recover exact prompt',recover:true,messageSelector:'article'});assert.equal((await page.evaluate(pollTracking,{id:'recover'})).ready,true);
     await append({id:'u-recover-dupe',role:'user',text:'Recover exact prompt'});assert.equal((await page.evaluate(pollTracking,{id:'recover'})).url,'https://muse.ai/recover.webm');
-    await page.evaluate(beginTracking,{id:'recover',prompt:'Recover exact prompt',recover:true,messageSelector:'article'});await assert.rejects(page.evaluate(pollTracking,{id:'recover'}),/nhiều tin nhắn/);
+    const retainedRecovery=await page.evaluate(beginTracking,{id:'recover',prompt:'Recover exact prompt',recover:true,messageSelector:'article'});assert.equal(retainedRecovery.retained,true);assert.equal((await page.evaluate(pollTracking,{id:'recover'})).url,'https://muse.ai/recover.webm');
+    await page.evaluate(beginTracking,{id:'ambiguous-history',prompt:'Recover exact prompt',recover:true,messageSelector:'article'});await assert.rejects(page.evaluate(pollTracking,{id:'ambiguous-history'}),/nhiều tin nhắn/);
     // A single fragment may add the user echo and assistant response in one
     // mutation record; DOM order still binds the unique response correctly.
     await reset();await page.evaluate(beginTracking,{id:'fragment',prompt:'One fragment target'});
@@ -152,6 +153,58 @@ const assert = require('node:assert/strict');
     await append({id:'second-identical-turn',role:'user',text:'Unique restart scene'});
     await page.evaluate(beginTracking,{id:'ambiguous-restart',prompt:'Unique restart scene',recover:true,echoKey:'missing-key',echoMarker:'missing-marker'});
     await assert.rejects(page.evaluate(pollTracking,{id:'ambiguous-restart'}),/nhiều tin nhắn/);
+    // Automatic Continue requires the original attempt anchor, not a unique
+    // historical prompt that happens to have identical text and an old video.
+    await reset();await append({id:'old-scene-echo',role:'user',text:'Exact original scene'});await append({id:'old-scene-result',src:'/old-scene.webm',ref:'old-scene-echo'});
+    await append({id:'reused-attempt-id',role:'user',text:'Bắt đầu công việc mới nhé'});await append({id:'warmup-reply',text:'Sẵn sàng'});
+    await page.evaluate(beginTracking,{id:'strict-resume',prompt:'Exact original scene',recover:true,recoverRequireAnchor:true,echoKey:'reused-attempt-id',echoMarker:'stale-marker'});
+    const strictUnbound=await page.evaluate(pollTracking,{id:'strict-resume'});assert.equal(strictUnbound.ready,false);assert.equal(strictUnbound.echoMatched,false);assert.equal(strictUnbound.recoveryUnbound,true);assert.equal(strictUnbound.historicalEchoCount,1);
+    await assert.rejects(page.evaluate(downloadAction,{id:'strict-resume'}),/chưa sẵn sàng/);
+    // A valid exact attempt anchor still recovers its own existing result.
+    await page.evaluate(beginTracking,{id:'strict-good',prompt:'Exact original scene',recover:true,recoverRequireAnchor:true,echoKey:'old-scene-echo'});
+    assert.equal((await page.evaluate(pollTracking,{id:'strict-good'})).url,'https://muse.ai/old-scene.webm');
+    // Recycling the same connected echo leaf for the warmup must revoke ready,
+    // even though its native ID, parent and previously matched video survive.
+    await reset();await page.evaluate(beginTracking,{id:'recycled',prompt:'Recycled scene'});await append({id:'recycled-echo',role:'user',text:'Recycled scene'});await append({id:'recycled-result',src:'/recycled.webm',ref:'recycled-echo'});
+    assert.equal((await page.evaluate(pollTracking,{id:'recycled'})).ready,true);
+    await page.evaluate(()=>document.querySelector('#recycled-echo p').textContent='Bắt đầu công việc mới nhé');
+    await assert.rejects(page.evaluate(pollTracking,{id:'recycled'}),/Tin nhắn.*thay đổi/);
+    await assert.rejects(page.evaluate(downloadAction,{id:'recycled'}),/Tin nhắn.*thay đổi/);
+    // An unknown-role Test message is still an explicit turn boundary through
+    // its attempt marker; a later video cannot be assigned to the older scene.
+    await reset();await append({id:'bounded-echo',role:'user',text:'Bounded scene'});
+    await page.evaluate(()=>{const u=document.createElement('div');u.textContent='Bắt đầu công việc mới nhé';u.setAttribute('data-muse-studio-attempt','other-test');document.getElementById('thread').append(u);});
+    await append({id:'later-unrelated-video',src:'/later-warmup.webm'});
+    await page.evaluate(beginTracking,{id:'bounded',prompt:'Bounded scene',recover:true,recoverRequireAnchor:true,echoKey:'bounded-echo'});
+    assert.equal((await page.evaluate(pollTracking,{id:'bounded'})).ready,false);
+    // Moving a once-bound response beyond a newer turn invalidates the cached
+    // ready result even if the video and its URL remain unchanged.
+    await reset();await page.evaluate(beginTracking,{id:'moved-ready',prompt:'Moved scene'});await append({id:'moved-echo',role:'user',text:'Moved scene'});await append({id:'moved-result',src:'/moved.webm',ref:'moved-echo'});
+    assert.equal((await page.evaluate(pollTracking,{id:'moved-ready'})).ready,true);
+    await append({id:'later-user-turn',role:'user',text:'Other new scene'});
+    await page.evaluate(()=>document.getElementById('thread').append(document.getElementById('moved-result')));
+    assert.equal((await page.evaluate(pollTracking,{id:'moved-ready'})).ready,false);
+    await assert.rejects(page.evaluate(downloadAction,{id:'moved-ready'}),/chưa sẵn sàng/);
+    // Stop/Continue of an unacknowledged current send must retain its original
+    // baseline, so historical identical text cannot become the new attempt.
+    await reset();await append({id:'historical-delayed-echo',role:'user',text:'Delayed current scene'});await append({id:'historical-delayed-video',src:'/historical-delayed.webm',ref:'historical-delayed-echo'});
+    await page.evaluate(beginTracking,{id:'delayed-current',prompt:'Delayed current scene'});
+    assert.equal((await page.evaluate(pollTracking,{id:'delayed-current'})).echoMatched,false);
+    const retainedUnacked=await page.evaluate(beginTracking,{id:'delayed-current',prompt:'Delayed current scene',recover:true,recoverRequireAnchor:true});
+    assert.equal(retainedUnacked.retained,true);
+    const stillUnacked=await page.evaluate(pollTracking,{id:'delayed-current'});assert.equal(stillUnacked.ready,false);assert.equal(stillUnacked.echoMatched,false);
+    await append({id:'actual-delayed-echo',role:'user',text:'Delayed current scene'});await append({id:'actual-delayed-video',src:'/actual-delayed.webm',ref:'actual-delayed-echo'});
+    const deliveredLater=await page.evaluate(pollTracking,{id:'delayed-current'});assert.equal(deliveredLater.echoKey,'actual-delayed-echo');assert.equal(deliveredLater.url,'https://muse.ai/actual-delayed.webm');
+    // A different prompt cannot reuse that attempt ID, even for recovery.
+    await assert.rejects(page.evaluate(beginTracking,{id:'delayed-current',prompt:'Another scene',recover:true,recoverRequireAnchor:true}),/prompt khác/);
+    // Asking for strict recovery must not retain a previous permissive manual
+    // historical selection or treat its newly planted marker as send proof.
+    await reset();await append({id:'manual-old-echo',role:'user',text:'Manual historical scene'});await append({id:'manual-old-video',src:'/manual-historical.webm',ref:'manual-old-echo'});
+    await page.evaluate(beginTracking,{id:'manual-upgrade',prompt:'Manual historical scene',recover:true});
+    assert.equal((await page.evaluate(pollTracking,{id:'manual-upgrade'})).ready,true);
+    const upgraded=await page.evaluate(beginTracking,{id:'manual-upgrade',prompt:'Manual historical scene',recover:true,recoverRequireAnchor:true,echoKey:'missing-current-attempt'});
+    assert.notEqual(upgraded.retained,true);
+    assert.equal((await page.evaluate(pollTracking,{id:'manual-upgrade'})).recoveryUnbound,true);
     console.log('PASS: real Chromium decoded-video tracker fixture — exact prompt binding, delayed result/progress, old/unrelated/wrong/out-of-order media rejection, ambiguity fail-closed, scoped menu download and unique recovery. No live Muse requests.');
   } finally {if(browser)await browser.close();await fs.rm(dir,{recursive:true,force:true});}
 })().catch(error=>{console.error(error);process.exitCode=1;});

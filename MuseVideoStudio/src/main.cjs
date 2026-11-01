@@ -5,9 +5,10 @@ const { Queue,stoppedError,abortable } = require('./queue.cjs');
 const {saveOrderedOutput}=require('./ordered-output.cjs');
 const {lockInput}=require('./locked-input.cjs');
 const {browserStop}=require('./browser-stop.cjs');
-const {prepareBrowserProbe,verifyBrowserTest,missingBrowserPrompts}=require('./browser-probe.cjs');
+const {prepareBrowserProbe,verifyBrowserTest}=require('./browser-probe.cjs');
 const {chatDiagnostics}=require('./chat-diagnostics.cjs');
 const {submitPrompt}=require('./submit-prompt.cjs');
+const {ensureAttachmentInput,composerAttachmentSnapshot}=require('./attachment-input.cjs');
 const {imageSources,attachmentState}=require('./attachment-ready.cjs');
 const {beginTracking,pollTracking,pollBrowserProbe,downloadAction,endTracking}=require('./muse-tracker.cjs');
 const {captureElectronDownload,validateVideo}=require('./download-capture.cjs');
@@ -168,19 +169,38 @@ function logoutAccount(index) {
   return task.finally(()=>{accountResets.delete(index);resettingAccounts.delete(index);notify();});
 }
 
-async function upload(muse, files) {
-  await Promise.all(files.map(file => fs.access(file))); assertMuse(muse);
-  if(muse.external) return muse.upload(settings.fileInput,files);
-  const debug = muse.webContents.debugger;
-  if (debug.isAttached()) throw Error('Đóng DevTools của cửa sổ Muse trước khi tải ảnh.');
+async function upload(muse, files, signal) {
+  const check=()=>{if(signal?.aborted)throw stoppedError();};
+  await Promise.all(files.map(file => fs.access(file)));check();assertMuse(muse);
+  if(muse.external) return muse.upload(settings.fileInput,files,{composerSelector:settings.composer,signal});
+  const debug=muse.webContents.debugger;
+  if(debug.isAttached())throw Error('Đóng DevTools của cửa sổ Muse trước khi tải ảnh.');
   debug.attach('1.3');
-  try {
-    const { root } = await debug.sendCommand('DOM.getDocument');
-    const { nodeIds } = await debug.sendCommand('DOM.querySelectorAll', { nodeId: root.nodeId, selector: settings.fileInput });
-    if (nodeIds.length !== 1) throw Error('Không xác định được ô tải ảnh. Mở nút + trên Muse hoặc chỉnh CSS selector ô tải ảnh.');
-    await debug.sendCommand('DOM.setFileInputFiles', { files, nodeId: nodeIds[0] });
-  } finally { debug.detach(); }
+  let chooser;const onMessage=(_event,method,params)=>{if(method==='Page.fileChooserOpened')chooser=params;};
+  debug.on('message',onMessage);
+  try{
+    await debug.sendCommand('Page.enable');check();
+    await debug.sendCommand('Page.setInterceptFileChooserDialog',{enabled:true});check();
+    const deadline=Date.now()+8000;let reset=true;
+    while(Date.now()<deadline){
+      check();const state=await dom(muse,ensureAttachmentInput,{composerSelector:settings.composer,fileInputSelector:settings.fileInput,reset});reset=false;check();
+      if(chooser?.backendNodeId){await debug.sendCommand('DOM.setFileInputFiles',{files,backendNodeId:chooser.backendNodeId});check();return;}
+      if(state.ready){
+        const {root}=await debug.sendCommand('DOM.getDocument');check();
+        const {nodeIds}=await debug.sendCommand('DOM.querySelectorAll',{nodeId:root.nodeId,selector:settings.fileInput});check();
+        if(nodeIds.length!==1)throw Error('Không xác định được ô tải ảnh duy nhất trong Muse.');
+        await debug.sendCommand('DOM.setFileInputFiles',{files,nodeId:nodeIds[0]});check();return;
+      }
+      await delay(250);
+    }
+    throw Error('Chưa mở được ô tải ảnh. Kiểm tra nút + / đính kèm trong Muse; prompt chưa được gửi.');
+  }finally{
+    try{await debug.sendCommand('Page.setInterceptFileChooserDialog',{enabled:false});}catch{}
+    debug.removeListener('message',onMessage);
+    if(debug.isAttached())debug.detach();
+  }
 }
+
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function triggerTrackedDownload(muse,id,signal) {
   const check=()=>{if(signal.aborted)throw stoppedError();};
@@ -243,9 +263,19 @@ async function runJob(job,worker,signal,{recover=false}={}) {
   const stage=(value,message)=>{check();job.stage=value;job.stageMessage=message;notify();};
   const input=recover?(job.lockedInput||{prompt:job.prompt,references:[]}):await step(lockInput(job,path.join(app.getPath('userData'),'locked-references')));
   const prompt=input.prompt,references=input.references.map(r=>r.path);
+  const receipt=job.submissionReceipt,verifiedReceipt=Boolean(receipt?.version===1&&receipt.attemptId===(job.trackerId||job.id)&&receipt.promptHash===input.promptHash&&typeof input.promptHash==='string'&&JSON.stringify(receipt.referenceHashes)===JSON.stringify(input.references.map(r=>r.sha256)));
+  if(continuing&&!verifiedReceipt&&job.submissionProtocol!==1){
+    while(true){
+      const widget=await step(dom(muse,browserStop,{composerSelector:settings.composer,selector:settings.stopSelector||''}));
+      if(widget?.state==='generating'){stage('recovering','Muse còn xử lý · chờ hoàn tất trước khi gửi đúng cảnh cũ');await step(delay(1500));continue;}
+      if(widget?.state==='ambiguous'||widget?.state==='chat-changed')throw Error('Chưa xác định được trạng thái Muse để gửi cảnh này.');
+      job.resumeMode='resubmit';stage('preparing','Cảnh cũ chưa có bằng chứng gửi ảnh/prompt · bắt đầu gửi đúng cảnh');await step(save());
+      return await runJob(job,worker,signal);
+    }
+  }
   if(!recover){
     if(job.trackerId){void dom(muse,endTracking,{id:job.trackerId}).catch(()=>{});}
-    job.trackerId=randomUUID();job.echoKey='';job.echoMarker='';job.echoAliases=[];job.acknowledgedAt=null;job.confirmedResponseAt=null;job.late=false;job.mayHaveSubmitted=false;job.submittedAt=null;job.remoteStop=null;
+    job.trackerId=randomUUID();job.echoKey='';job.echoMarker='';job.echoAliases=[];job.acknowledgedAt=null;job.confirmedResponseAt=null;job.submissionReceipt=null;job.submissionProtocol=null;job.resultReadyAt=null;job.downloadStartedAt=null;job.downloadCompletedAt=null;job.late=false;job.mayHaveSubmitted=false;job.submittedAt=null;job.remoteStop=null;
     await step(save());check();
     const wait=(nextDispatchAt.get(slot)||0)-Date.now();if(wait>0){stage('cooldown','Chờ lượt gửi tiếp theo');await step(delay(wait));}
     while(true){
@@ -256,7 +286,7 @@ async function runJob(job,worker,signal,{recover=false}={}) {
       stage('preparing','Muse còn hoàn tất phản hồi trước · chưa gửi prompt mới');await step(delay(1000));
     }
     const before=references.length?await step(dom(muse,imageSources,null)):[];
-    stage('preparing','Đã khóa prompt và ảnh tham chiếu của cảnh này');
+    stage('entering','Đang nhập đúng prompt đã khóa vào ô chat');
     const draft=await step(dom(muse,({selector,prompt})=>{
       const list=[...document.querySelectorAll(selector)].filter(e=>e.getClientRects().length);
       if(list.length!==1)throw Error('Không xác định được ô nhập prompt duy nhất.');
@@ -269,14 +299,17 @@ async function runJob(job,worker,signal,{recover=false}={}) {
     },{selector:settings.composer,prompt}));
     if(references.length){
       stage('uploading','Đang kiểm tra ảnh đã khóa trong ô soạn thảo');
-      if(!draft?.reused)await step(upload(muse,references));
+      const attached=await step(dom(muse,composerAttachmentSnapshot,{composerSelector:settings.composer}));
+      const reuseImages=Boolean(attached?.count);
+      if(reuseImages&&(attached.count!==references.length||JSON.stringify(attached.tokens)!==JSON.stringify(job.preparedTokens||[])))throw Error('Ô chat còn ảnh khác hoặc chưa xác minh được ảnh đã khóa. Gỡ ảnh đó trước khi tiếp tục.');
+      if(!reuseImages){stage('uploading','Đang đính kèm '+references.length+' ảnh tham chiếu đã khóa');await step(upload(muse,references,signal));}
       const deadline=Date.now()+180000;let stable=0,ready=false;
       while(Date.now()<deadline){
         check();let state;
-        try{state=await step(dom(muse,attachmentState,{before:draft?.reused?[]:before,count:references.length,selector:settings.attachmentReadySelector,submitSelector:settings.submit,composerSelector:settings.composer}));}
+        try{state=await step(dom(muse,attachmentState,{before:reuseImages?[]:before,count:references.length,selector:settings.attachmentReadySelector,submitSelector:settings.submit,composerSelector:settings.composer}));}
         catch(e){if(!transientDOM(e))throw e;await step(delay(1000));continue;}
         if(state?.ready){
-          if(draft?.reused&&JSON.stringify(state.tokens)!==JSON.stringify(job.preparedTokens||[]))throw Error('Ảnh trong bản nháp chưa khớp bản đã khóa. Xóa bản nháp này trước khi tiếp tục.');
+          if(reuseImages&&JSON.stringify(state.tokens)!==JSON.stringify(job.preparedTokens||[]))throw Error('Ảnh trong bản nháp chưa khớp bản đã khóa. Xóa bản nháp này trước khi tiếp tục.');
           if(!stable)stable=Date.now();if(Date.now()-stable>=1000){job.preparedTokens=state.tokens;ready=true;break;}
         }else stable=0;
         await step(delay(350));
@@ -287,25 +320,31 @@ async function runJob(job,worker,signal,{recover=false}={}) {
   }
   const trackerId=job.trackerId||job.id;
   try{
-    await step(dom(muse,beginTracking,{id:trackerId,prompt,videoSelector:settings.video,messageSelector:settings.messageSelector,recover,echoKey:recover?job.echoKey:'',echoMarker:recover?job.echoMarker:'',echoAliases:recover?job.echoAliases||[]:[]}));
+    await step(dom(muse,beginTracking,{id:trackerId,prompt,videoSelector:settings.video,messageSelector:settings.messageSelector,recover,recoverRequireAnchor:continuing,echoKey:recover?job.echoKey||receipt?.echoKey:'',echoMarker:recover?job.echoMarker||receipt?.echoMarker:'',echoAliases:recover?[...new Set([...(job.echoAliases||[]),receipt?.echoKey].filter(Boolean))]:[]}));
     if(!recover){
       stage('submitting','Đang gửi đúng prompt và ảnh đã khóa');
-      job.submissionProfileKey=profileKey;job.submissionSessionId=currentSession;job.mayHaveSubmitted=true;job.submittedAt=new Date().toISOString();await step(save());check();
+      job.submissionProfileKey=profileKey;job.submissionSessionId=currentSession;job.submissionProtocol=1;job.mayHaveSubmitted=true;job.submittedAt=new Date().toISOString();await step(save());check();
       try{await step(dom(muse,submitPrompt,{id:trackerId,selector:settings.submit,composerSelector:settings.composer,attachmentTokens:job.preparedTokens}));}
-      catch(e){if(!transientDOM(e))throw e;stage('confirming','Muse đang lag · chờ xác nhận, không bấm Gửi lần nữa');}
+      catch(e){if(signal.aborted)throw e;if(!transientDOM(e)){job.mayHaveSubmitted=false;await step(save());throw e;}stage('confirming','Muse đang lag · chờ xác nhận, không bấm Gửi lần nữa');}
     }
     const warnAt=Date.now()+settings.timeoutMinutes*60000;
-    let warned=false;
-    stage('confirming',recover?'Tiếp tục kiểm tra đúng cảnh trước':'Chưa xác nhận Muse nhận prompt');
+    let warned=false,observedEcho=false;
+    stage(recover?'recovering':'confirming',recover?'Kiểm tra bằng chứng cảnh đã gửi trước khi lấy kết quả':'Chưa xác nhận Muse nhận prompt');
     while(true){
       check();let result;
       try{result=await step(dom(muse,pollTracking,{id:trackerId}));}
-      catch(e){if(!transientDOM(e))throw e;stage('waiting','Trang Muse đang lag · giữ cảnh đang chờ, không gửi trùng');await step(delay(2000));continue;}
+      catch(e){if(!transientDOM(e))throw e;stage(observedEcho?'waiting':recover?'recovering':'confirming',observedEcho?'Trang Muse đang lag · giữ đúng cảnh đã gửi, chưa có video để tải':'Trang Muse đang lag · chưa xác nhận tin nhắn prompt, chưa có video để tải');await step(delay(2000));continue;}
       if(result.error)throw Error(result.error);
+      observedEcho=Boolean(result.echoMatched);
+      if(continuing&&result.recoveryUnbound){
+        stage('recovering','Chưa tìm được đúng tin nhắn của lượt gửi · giữ cảnh, không tải video lịch sử hay gửi trùng');await step(delay(1500));continue;
+      }
+      if(result.echoMatched&&!recover&&!job.submissionReceipt){job.submissionReceipt={version:1,attemptId:trackerId,promptHash:input.promptHash,referenceHashes:input.references.map(r=>r.sha256),echoKey:result.echoKey||'',echoMarker:result.echoMarker||trackerId,observedAt:new Date().toISOString()};await step(save());}
+
       if(result.echoMatched&&(!job.acknowledgedAt||(result.echoKey&&job.echoKey!==result.echoKey))){job.acknowledgedAt=job.acknowledgedAt||new Date().toISOString();job.echoAliases=result.echoAliases||[];job.echoKey=result.echoKey||'';job.echoMarker=result.echoMarker||trackerId;await step(save());}
       if(result.responseMatched&&!job.confirmedResponseAt){job.confirmedResponseAt=new Date().toISOString();await step(save());}
-      job.progress=Number.isFinite(result.progress)?result.progress:null;
-      if(result.ready){
+      job.progress=result.echoMatched&&result.responseMatched&&Number.isFinite(result.progress)?result.progress:null;
+      if(result.ready&&result.echoMatched&&result.responseMatched){
         job.resultReadyAt=new Date().toISOString();job.downloadStartedAt=new Date().toISOString();
         stage('downloading','Đúng phản hồi của cảnh này · đang lưu video về máy');await step(save());
         try{
@@ -322,7 +361,7 @@ async function runJob(job,worker,signal,{recover=false}={}) {
         }catch(e){check();if(!transientDOM(e))throw e;}
       }
       if(!warned&&Date.now()>warnAt){warned=true;job.late=true;}
-      stage(result.phase==='waiting-prompt'?'confirming':'waiting',(job.late?'Muse chậm hơn thời gian dự kiến · vẫn giữ cảnh này. ':'')+(!result.echoMatched?'Chưa thấy đúng prompt trong chat Muse':!result.responseMatched?'Đã thấy tin nhắn · chờ Muse phản hồi':result.stage||'Chờ đúng video của prompt'));
+      stage(!result.echoMatched?'confirming':'waiting',(job.late?'Muse chậm hơn thời gian dự kiến · vẫn giữ cảnh này. ':'')+(!result.echoMatched?'Chưa thấy đúng prompt trong chat Muse':!result.responseMatched?'Đã thấy tin nhắn · chờ Muse phản hồi':result.stage||'Chờ đúng video của prompt'));
       await step(delay(1500));
     }
   }finally{
@@ -342,8 +381,6 @@ async function testBrowsers(){
         entry.status='checking';entry.message='Đang kiểm tra ô chat';notify();
         const widget=await step(dom(muse,browserStop,{composerSelector:settings.composer,selector:settings.stopSelector||''}));
         if(widget?.state==='generating')throw Error('Muse còn xử lý. Bấm Dừng hoặc chờ phản hồi xong rồi Test lại.');
-        const candidates=queue.jobs.filter(j=>Number(j.account)===index+1&&!j.acknowledgedAt&&['failed','interrupted'].includes(j.status));
-        const missing=await step(dom(muse,missingBrowserPrompts,{jobs:candidates.map(j=>({id:j.id,prompt:j.lockedInput?.prompt||j.prompt}))}));
         const text='Bắt đầu công việc mới nhé';
         const composerDeadline=Date.now()+45000;
         while(!await step(dom(muse,prepareBrowserProbe,{composerSelector:settings.composer,text}))){check();if(Date.now()>composerDeadline)throw Error('Chưa thấy ô chat. Đăng nhập Muse rồi bấm Test tất cả trình duyệt lại.');entry.message='Chờ ô chat · đăng nhập Muse nếu cần';notify();await step(delay(600));}
@@ -359,7 +396,6 @@ async function testBrowsers(){
             const idle=await step(dom(muse,browserStop,{composerSelector:settings.composer,selector:settings.stopSelector||'',trackerId:entry.id}));
             if(idle?.state!=='generating'&&idle?.state!=='ambiguous'&&idle?.state!=='chat-changed'){
               await step(dom(muse,verifyBrowserTest,{token:entry.token,set:true}));
-              entry.missingJobs=await step(dom(muse,missingBrowserPrompts,{jobs:candidates.filter(j=>missing.includes(j.id)).map(j=>({id:j.id,prompt:j.lockedInput?.prompt||j.prompt}))}));
               entry.status='ready';entry.message='✓ Muse đã phản hồi · sẵn sàng';return;
             }
           }
@@ -488,7 +524,6 @@ app.whenReady().then(async () => {
         const unavailable=queue.jobs.find(j=>j.account>settings.accountCount&&(['failed','interrupted'].includes(j.status)||j.resumeMode));
         if(unavailable)throw Error('Cảnh đang dở gắn với tài khoản '+unavailable.account+'. Chọn đủ tài khoản trước khi Tiếp tục.');
         queue.prepareResume();
-        for(const test of browserTests.values()){for(const id of test.missingJobs||[]){const job=queue.jobs.find(j=>j.id===id);if(job&&!job.acknowledgedAt&&job.status==='pending')job.resumeMode='resubmit';}test.missingJobs=[];}
         queue.concurrency=settings.dispatchMode==='parallel'?settings.accountCount:1;
         queue.start().then(async()=>{
           if(!queue.paused && queue.jobs.length && queue.jobs.every(j=>j.status==='completed')) {

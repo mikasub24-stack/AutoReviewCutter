@@ -64,7 +64,7 @@ function renderDrafts(){
 }
 
 const jobCards=new Map();
-const stageLabels={preparing:'Chuẩn bị tác vụ',uploading:'Đang tải ảnh tham chiếu',submitting:'Đang gửi prompt',confirming:'Chưa xác nhận Muse nhận prompt',waiting:'Đang chờ Muse tạo video',downloading:'Đang tải video về máy',cooldown:'Nghỉ trước lượt tiếp theo'};
+const stageLabels={entering:'Đang nhập prompt',recovering:'Kiểm tra cảnh dở',preparing:'Chuẩn bị tác vụ',uploading:'Đang tải ảnh tham chiếu',submitting:'Đang gửi prompt',confirming:'Chưa xác nhận Muse nhận prompt',waiting:'Đã gửi · chờ Muse tạo video',downloading:'Đang tải video về máy',cooldown:'Nghỉ trước lượt tiếp theo'};
 function localFileUrl(file){
   if(typeof file!=='string'||!file)return '';
   const normalized=file.replace(/\\/g,'/');
@@ -140,7 +140,7 @@ function updateCard(row,job,index){
   }else if(job.status==='running'&&['waiting','confirming'].includes(job.stage)&&typeof job.progress==='number'&&Number.isFinite(job.progress)&&job.progress>=0&&job.progress<=100){observed=job.progress;label=`Muse: ${job.progress.toFixed(0)}%`;}
   row.observed.hidden=!label;row.progress.hidden=observed===null;if(observed!==null)row.progress.value=observed;text(row.progressText,label);
   row.activity.hidden=!active||observed!==null;
-  const phase=job.status==='completed'?4:({preparing:0,uploading:0,submitting:1,confirming:1,waiting:2,downloading:3,cooldown:0})[job.stage]??-1;
+  const phase=job.status==='completed'?4:({entering:0,recovering:-1,preparing:0,uploading:0,submitting:1,confirming:1,waiting:2,downloading:3,cooldown:0})[job.stage]??-1;
   [...row.steps.children].forEach((step,index)=>{step.className=index<phase?'done':active&&index===phase?'current':'';});
   text(row.fileLine,job.output?'✓ '+job.output.split(/[\\/]/).pop():'');row.fileLine.hidden=!job.output;
   updateElapsed(row);
