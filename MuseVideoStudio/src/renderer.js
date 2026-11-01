@@ -173,7 +173,9 @@ function renderJobs(jobs){
 setInterval(()=>{for(const row of jobCards.values())if(row.job?.status==='running')updateElapsed(row);},1000);
 
 function render(next){
-  if(!next)return;state=next;if(state.settings.language&&window.studioI18n.language!==state.settings.language)window.studioI18n.setLanguage(state.settings.language);if(firstSnapshot){restoredQueue=state.jobs.length>0;$('editorPanel').open=!restoredQueue;firstSnapshot=false;}const jobs=state.jobs,indexBefore=Number($('accountPicker').value||0);
+  if(!next)return;
+  $('appVersion').textContent='Phiên bản V1 · '+(next.version||'dev');
+  state=next;if(state.settings.language&&window.studioI18n.language!==state.settings.language)window.studioI18n.setLanguage(state.settings.language);if(firstSnapshot){restoredQueue=state.jobs.length>0;$('editorPanel').open=!restoredQueue;firstSnapshot=false;}const jobs=state.jobs,indexBefore=Number($('accountPicker').value||0);
   $('accountPicker').replaceChildren(...Array.from({length:state.settings.accountCount},(_,i)=>{const o=el('option','',`Tài khoản ${i+1}`);o.value=i;return o;}));
   $('accountPicker').value=Math.min(indexBefore,state.settings.accountCount-1);const index=Number($('accountPicker').value);
   const browserName=({builtin:'Trình duyệt tích hợp',chrome:'Google Chrome',edge:'Microsoft Edge',custom:'Chromium tùy chọn'})[state.settings.browserChoice||'builtin'];$('browserInfo').textContent=browserName;

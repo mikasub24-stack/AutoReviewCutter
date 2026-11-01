@@ -41,7 +41,7 @@ const defaults = { language:'en', accountSessionIds:{}, dispatchMode:'parallel',
 function ui(vi,en){return settings?.language==='vi'?vi:en;}
 async function atomic(file, data) { await fs.writeFile(file + '.tmp', JSON.stringify(data, null, 2)); await fs.rename(file + '.tmp', file); }
 function snapshot() {
-  return {jobs:queue.jobs,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,
+  return {version:app.getVersion?.()||require('../package.json').version,jobs:queue.jobs,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,
     accounts:Array.from({length:settings.accountCount},(_,index)=>{
       const browser=browsers.get(index),external=settings.browserChoice !== 'builtin';
       return {index,opened:Boolean(browser && !browser.isDestroyed()),rememberSession:external ? Boolean(browser?.external && browser.isSessionEnabled()) : profiles.get(index)?.store.isEnabled() || false,warning:external ? browserWarnings.get(index) || '' : profiles.get(index)?.warning || ''};
@@ -240,30 +240,19 @@ async function download(muse,job,signal) {
 }
 function transientDOM(error){return error?.code==='MUSE_DOM_TIMEOUT'||/Execution context was destroyed|context.*destroyed|Target closed|navigation|not respond|chưa phản hồi/i.test(error?.message||'');}
 async function runJob(job,worker,signal,{recover=false}={}) {
-  const continuing=job.resumeMode==='recover'&&!recover;
-  recover=recover||job.resumeMode==='recover';
   const pinned=recover||Boolean(job.resumeMode);
   const slot=pinned&&job.account?Number(job.account)-1:settings.dispatchMode==='parallel'?worker:nextAccount++%settings.accountCount;
   validAccount(slot);
   const muse=browsers.get(slot),check=()=>{if(signal.aborted)throw stoppedError();},step=p=>abortable(p,signal);
   check();job.account=slot+1;assertMuse(muse);muse.pinPage?.(job.id);
   const profileKey=accountProfileKey(slot),currentSession=sessionId(profileKey);
-  if(pinned&&((job.submissionProfileKey&&job.submissionProfileKey!==profileKey)||(job.submissionSessionId&&job.submissionSessionId!==currentSession)))throw Error('Mở lại đúng trình duyệt và phiên tài khoản đã gửi prompt.');
+  if(recover&&((job.submissionProfileKey&&job.submissionProfileKey!==profileKey)||(job.submissionSessionId&&job.submissionSessionId!==currentSession)))throw Error('Mở lại đúng trình duyệt và phiên tài khoản đã gửi prompt.');
   if(!recover)await step(licenseManager.ensureAllowed());
   if(!settings.output)throw Error('Chọn thư mục lưu video trước.');
   const stage=(value,message)=>{check();job.stage=value;job.stageMessage=message;notify();};
   const input=recover?(job.lockedInput||{prompt:job.prompt,references:[]}):await step(lockInput(job,path.join(app.getPath('userData'),'locked-references')));
   const prompt=input.prompt,references=input.references.map(r=>r.path);
-  const receipt=job.submissionReceipt,verifiedReceipt=Boolean(receipt?.version===1&&receipt.attemptId===(job.trackerId||job.id)&&receipt.promptHash===input.promptHash&&typeof input.promptHash==='string'&&JSON.stringify(receipt.referenceHashes)===JSON.stringify(input.references.map(r=>r.sha256)));
-  if(continuing&&!verifiedReceipt&&job.submissionProtocol!==1){
-    while(true){
-      const widget=await step(dom(muse,browserStop,{composerSelector:settings.composer,selector:settings.stopSelector||''}));
-      if(widget?.state==='generating'){stage('recovering','Muse còn xử lý · chờ hoàn tất trước khi gửi đúng cảnh cũ');await step(delay(1500));continue;}
-      if(widget?.state==='ambiguous'||widget?.state==='chat-changed')throw Error('Chưa xác định được trạng thái Muse để gửi cảnh này.');
-      job.resumeMode='resubmit';stage('preparing','Cảnh cũ chưa có bằng chứng gửi ảnh/prompt · bắt đầu gửi đúng cảnh');await step(save());
-      return await runJob(job,worker,signal);
-    }
-  }
+  const receipt=job.submissionReceipt;
   if(!recover){
     if(job.trackerId){void dom(muse,endTracking,{id:job.trackerId}).catch(()=>{});}
     job.trackerId=randomUUID();job.echoKey='';job.echoMarker='';job.echoAliases=[];job.acknowledgedAt=null;job.confirmedResponseAt=null;job.submissionReceipt=null;job.submissionProtocol=null;job.resultReadyAt=null;job.downloadStartedAt=null;job.downloadCompletedAt=null;job.late=false;job.mayHaveSubmitted=false;job.submittedAt=null;job.remoteStop=null;
@@ -318,11 +307,11 @@ async function runJob(job,worker,signal,{recover=false}={}) {
   }
   const trackerId=job.trackerId||job.id;
   try{
-    await step(dom(muse,beginTracking,{id:trackerId,prompt,videoSelector:settings.video,messageSelector:settings.messageSelector,recover,recoverRequireAnchor:continuing,echoKey:recover?job.echoKey||receipt?.echoKey:'',echoMarker:recover?job.echoMarker||receipt?.echoMarker:'',echoAliases:recover?[...new Set([...(job.echoAliases||[]),receipt?.echoKey].filter(Boolean))]:[]}));
+    await step(dom(muse,beginTracking,{id:trackerId,prompt,videoSelector:settings.video,messageSelector:settings.messageSelector,recover,echoKey:recover?job.echoKey||receipt?.echoKey:'',echoMarker:recover?job.echoMarker||receipt?.echoMarker:'',echoAliases:recover?[...new Set([...(job.echoAliases||[]),receipt?.echoKey].filter(Boolean))]:[]}));
     if(!recover){
       stage('submitting','Đang gửi đúng prompt và ảnh đã khóa');
-      job.submissionProfileKey=profileKey;job.submissionSessionId=currentSession;job.submissionProtocol=1;job.mayHaveSubmitted=true;job.submittedAt=new Date().toISOString();await step(save());check();
-      try{await step(dom(muse,submitPrompt,{id:trackerId,selector:settings.submit,composerSelector:settings.composer,attachmentTokens:job.preparedTokens}));}
+      job.submissionProfileKey=profileKey;job.submissionSessionId=currentSession;job.submissionProtocol=1;job.mayHaveSubmitted=true;job.submittedAt=null;await step(save());check();
+      try{const sent=await step(dom(muse,submitPrompt,{id:trackerId,selector:settings.submit,composerSelector:settings.composer,attachmentTokens:job.preparedTokens}));if(!sent?.clicked)throw Error('Chưa bấm được Gửi. Cảnh chưa gửi; bấm Tiếp tục để gửi lại.');job.submittedAt=new Date().toISOString();await step(save());}
       catch(e){if(signal.aborted)throw e;if(!transientDOM(e)){job.mayHaveSubmitted=false;await step(save());throw e;}stage('confirming','Muse đang lag · chờ xác nhận, không bấm Gửi lần nữa');}
     }
     const warnAt=Date.now()+settings.timeoutMinutes*60000;
@@ -334,9 +323,6 @@ async function runJob(job,worker,signal,{recover=false}={}) {
       catch(e){if(!transientDOM(e))throw e;stage(observedEcho?'waiting':recover?'recovering':'confirming',observedEcho?'Trang Muse đang lag · giữ đúng cảnh đã gửi, chưa có video để tải':'Trang Muse đang lag · chưa xác nhận tin nhắn prompt, chưa có video để tải');await step(delay(2000));continue;}
       if(result.error)throw Error(result.error);
       observedEcho=Boolean(result.echoMatched);
-      if(continuing&&result.recoveryUnbound){
-        stage('recovering','Chưa tìm được đúng tin nhắn của lượt gửi · giữ cảnh, không tải video lịch sử hay gửi trùng');await step(delay(1500));continue;
-      }
       if(result.echoMatched&&!recover&&!job.submissionReceipt){job.submissionReceipt={version:1,attemptId:trackerId,promptHash:input.promptHash,referenceHashes:input.references.map(r=>r.sha256),echoKey:result.echoKey||'',echoMarker:result.echoMarker||trackerId,observedAt:new Date().toISOString()};await step(save());}
 
       if(result.echoMatched&&(!job.acknowledgedAt||(result.echoKey&&job.echoKey!==result.echoKey))){job.acknowledgedAt=job.acknowledgedAt||new Date().toISOString();job.echoAliases=result.echoAliases||[];job.echoKey=result.echoKey||'';job.echoMarker=result.echoMarker||trackerId;await step(save());}
@@ -348,15 +334,6 @@ async function runJob(job,worker,signal,{recover=false}={}) {
         try{
           const output=await step(download(muse,job,signal));nextDispatchAt.set(slot,Date.now()+settings.cooldownSeconds*1000);return output;
         }catch(e){check();stage('downloading','Chưa lưu được video · giữ đúng kết quả và thử tải lại: '+e.message);await step(delay(5000));continue;}
-      }
-      if(continuing&&job.remoteStop){
-        try{
-          const observed=await step(dom(muse,browserStop,{composerSelector:settings.composer,selector:settings.stopSelector||'',trackerId,requestId:job.stopRequestId||''},2500));
-          if(['confirmed','ui-stopped'].includes(observed.state)){
-            job.remoteStop=observed;job.resumeMode='resubmit';stage('preparing','Muse đã xác nhận dừng · gửi lại đúng cảnh đã khóa');await step(save());
-            return await runJob(job,worker,signal);
-          }
-        }catch(e){check();if(!transientDOM(e))throw e;}
       }
       if(!warned&&Date.now()>warnAt){warned=true;job.late=true;}
       stage(!result.echoMatched?'confirming':'waiting',(job.late?'Muse chậm hơn thời gian dự kiến · vẫn giữ cảnh này. ':'')+(!result.echoMatched?'Chưa thấy đúng prompt trong chat Muse':!result.responseMatched?'Đã thấy tin nhắn · chờ Muse phản hồi':result.stage||'Chờ đúng video của prompt'));
@@ -520,10 +497,6 @@ app.whenReady().then(async () => {
         if(epoch!==runEpoch||flushingQuit)return snapshot();
         if(settings.autoMerge) await checkTools(settings.ffmpeg);
         if(epoch!==runEpoch || flushingQuit || queue.active || merging || packaging || resettingAccounts.size) return snapshot();
-        for(const job of queue.jobs.filter(j=>['failed','interrupted'].includes(j.status)&&j.remoteStop&&!['confirmed','ui-stopped','completed','not-sent'].includes(j.remoteStop.state))){
-          try{const observed=await dom(browsers.get(Number(job.account)-1),browserStop,{composerSelector:settings.composer,selector:settings.stopSelector||'',trackerId:job.trackerId||job.id,requestId:job.stopRequestId||''},1500);if(['confirmed','ui-stopped','completed'].includes(observed.state))job.remoteStop=observed;}catch{}
-          if(epoch!==runEpoch||flushingQuit)return snapshot();
-        }
         const unavailable=queue.jobs.find(j=>j.account>settings.accountCount&&(['failed','interrupted'].includes(j.status)||j.resumeMode));
         if(unavailable)throw Error('Cảnh đang dở gắn với tài khoản '+unavailable.account+'. Chọn đủ tài khoản trước khi Tiếp tục.');
         queue.prepareResume();

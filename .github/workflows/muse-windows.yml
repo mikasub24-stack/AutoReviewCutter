@@ -129,7 +129,7 @@ jobs:
         run: |
           gh release view "muse-studio-v$env:MUSE_VERSION" > $null 2>&1
           if ($LASTEXITCODE -ne 0) {
-            gh release create "muse-studio-v$env:MUSE_VERSION" --target $env:GITHUB_SHA --title "Muse Video Studio — $env:MUSE_VERSION Windows" --notes "Ten parallel sessions upload reference images and send exact scene prompts. Downloads use the matching clip's three-dot menu and its second Download row; completion requires a validated saved video. Test sends only the opening sentence and does not disable Run/Continue. Existing account profiles, projects and output files are preserved. Automated fixtures verified; live Muse account validation remains needed."
+            gh release create "muse-studio-v$env:MUSE_VERSION" --target $env:GITHUB_SHA --title "Muse Video Studio — $env:MUSE_VERSION Windows" --notes "Ten parallel sessions upload reference images and send exact scene prompts. Downloads use the matching clip's three-dot menu and its second Download row; completion requires a validated saved video. Continue resubmits unfinished scenes with fresh attempt IDs and locked references, ignoring tentative send flags and stale receipts. Recovering an old video remains a separate action. Test sends only the opening sentence and does not disable Run/Continue. The sidebar displays the actual installed version. Existing account profiles, projects and output files are preserved. Automated fixtures verified; live Muse account validation remains needed."
             if ($LASTEXITCODE -ne 0) {
               gh release view "muse-studio-v$env:MUSE_VERSION"
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

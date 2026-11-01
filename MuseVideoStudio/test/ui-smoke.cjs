@@ -8,7 +8,7 @@ const{importPrompts}=require('../src/prompt-import.js');
  try{
   const page=await browser.newPage({viewport:{width:1450,height:1100}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
   await page.addInitScript(()=>{localStorage.setItem('museStudio.language','vi');
-   const s={jobs:[],active:false,paused:true,network:{checking:[],reports:[],errors:[]},license:{status:'trial',device:'TESTDEVICE',expiresAt:Date.now()+86400000,message:'Dùng thử 24 giờ'},settings:{requireUSA:true,vpnProvider:'windscribe',vpnClientPath:'',browserChoice:'builtin',browserPath:'',output:'C:\\Videos',autoMerge:false,autoPackage:false,ffmpeg:'ffmpeg',accountCount:2,composer:'textarea',fileInput:'input[type=file]',submit:'',video:'video',attachmentReadySelector:'',timeoutMinutes:15}};window.calls=[];let listener,id=0;
+   const s={version:'1.1.4',jobs:[],active:false,paused:true,network:{checking:[],reports:[],errors:[]},license:{status:'trial',device:'TESTDEVICE',expiresAt:Date.now()+86400000,message:'Dùng thử 24 giờ'},settings:{requireUSA:true,vpnProvider:'windscribe',vpnClientPath:'',browserChoice:'builtin',browserPath:'',output:'C:\\Videos',autoMerge:false,autoPackage:false,ffmpeg:'ffmpeg',accountCount:2,composer:'textarea',fileInput:'input[type=file]',submit:'',video:'video',attachmentReadySelector:'',timeoutMinutes:15}};window.calls=[];let listener,id=0;
    window.fixtureUpdate=patch=>{Object.assign(s,patch);listener(structuredClone(s));};
    window.studio={onUpdate:fn=>listener=fn,invoke:async(name,data)=>{
     window.calls.push({name,data});
@@ -26,6 +26,7 @@ const{importPrompts}=require('../src/prompt-import.js');
    }};
   });
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
+  assert.match(await page.locator('#appVersion').textContent(),/1\.1\.4/);
   await page.locator('#prompts').fill(fixture);await page.locator('#images').click();await page.locator('#add').click();
   assert.equal(await page.locator('#draftRows textarea').count(),60);assert.match(await page.locator('#importInfo').textContent(),/8:00/);
   assert.equal(await page.locator('#draftRows textarea').first().inputValue(),importPrompts(fixture)[0].prompt);

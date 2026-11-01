@@ -15,6 +15,8 @@ async function until(check,message,ms=15000){const end=Date.now()+ms;while(!awai
   const image=path.join(dir,'reference.png'),png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');await fs.writeFile(image,png);
   const job={id:'restored-scene',number:1,order:1,prompt,references:[image],image,status:'interrupted',account:1,trackerId:'old-attempt',mayHaveSubmitted:true,submittedAt:'2026-10-30T01:00:00.000Z',acknowledgedAt:'2026-10-30T01:00:01.000Z',resultReadyAt:'2026-10-30T01:00:02.000Z',echoKey:'historical-user',echoMarker:'old-attempt',remoteStop:{state:'unavailable'}};
   await lockInput(job,path.join(dir,'locked-references'));
+  // Reproduce persisted protocol=1 and a receipt from an obsolete attempt.
+  job.submissionProtocol=1;job.submissionReceipt={version:1,attemptId:job.trackerId,promptHash:job.lockedInput.promptHash,referenceHashes:job.lockedInput.references.map(r=>r.sha256),echoKey:'historical-user',echoMarker:'old-attempt'};
   await fs.writeFile(image,Buffer.from('The source was edited after this scene was locked.'));
   await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,dispatchRevision:1,settings:{output:dir,accountCount:1,browserChoice:'chrome',cooldownSeconds:0,composer:'textarea',fileInput:'input[type=file]',video:'video'},jobs:[job]}));
   const media=await fs.readFile(path.join(__dirname,'fixtures/solid-blue.webm'));

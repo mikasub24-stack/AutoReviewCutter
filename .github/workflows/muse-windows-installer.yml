@@ -71,7 +71,7 @@ jobs:
           $version = (Get-Content package.json | ConvertFrom-Json).version
           gh release view "muse-studio-v$version" > $null 2>&1
           if ($LASTEXITCODE -ne 0) {
-            gh release create "muse-studio-v$version" --target $env:GITHUB_SHA --title "Muse Video Studio V1 — $version Windows" --notes "Windows setup installer. Run the Setup.exe to choose an installation folder and create desktop/Start menu shortcuts."
+            gh release create "muse-studio-v$version" --target $env:GITHUB_SHA --title "Muse Video Studio V1 — $version Windows" --notes "Windows setup installer. Continue resubmits unfinished scenes using locked prompts and references with fresh attempt IDs; tentative send flags and stale receipts cannot skip submission. Completed clips and existing account/project data are preserved. The sidebar shows the actual version. Ten parallel sessions and exact clip menu downloads verified with Edge fixtures; installation, launch and uninstall verified on Windows."
             if ($LASTEXITCODE -ne 0) {
               gh release view "muse-studio-v$version"
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

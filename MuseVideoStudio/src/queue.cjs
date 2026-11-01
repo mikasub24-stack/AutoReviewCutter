@@ -57,8 +57,10 @@ class Queue {
   }
   prepareResume(){
     if(this.active)throw Error('Hàng đợi vẫn đang chạy.');
-    for(const j of this.jobs)if(['failed','interrupted'].includes(j.status)){
-      j.resumeMode=j.mayHaveSubmitted&&!['confirmed','ui-stopped'].includes(j.remoteStop?.state)?'recover':'resubmit';
+    for(const j of this.jobs)if(['failed','interrupted'].includes(j.status)||(j.status==='pending'&&j.resumeMode)){
+      // Continue explicitly starts a new attempt for unfinished scenes. Only
+      // the separate Recover video action may reuse a previous result.
+      j.resumeMode='resubmit';
       j.status='pending';j.error='';
     }
   }

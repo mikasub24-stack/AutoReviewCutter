@@ -7,11 +7,11 @@ test('locked prompt and image bytes survive source edits; tampered cache is refu
  await fs.writeFile(locked.references[0].path,'tampered');await assert.rejects(lockInput(job,path.join(dir,'cache')),/bị thay đổi/);
 });
 test('bulk references cannot modify a locked paused task and resume keeps its account',async()=>{
- const q=new Queue({save:async()=>{},concurrency:2,jobs:[{id:'paused',status:'interrupted',prompt:'one',account:2,mayHaveSubmitted:true,lockedInput:{prompt:'one',references:[]},references:['old.png'],remoteStop:{state:'unavailable'}},{id:'new',status:'pending',prompt:'two',references:[]}],run:async(job,slot)=>{if(job.id==='paused'){assert.equal(slot,1);assert.equal(job.resumeMode,'recover');assert.equal(job.account,2);assert.deepEqual(job.references,['old.png']);}return job.id+'.mp4';}});
+ const q=new Queue({save:async()=>{},concurrency:2,jobs:[{id:'paused',status:'interrupted',prompt:'one',account:2,mayHaveSubmitted:true,lockedInput:{prompt:'one',references:[]},references:['old.png'],remoteStop:{state:'unavailable'}},{id:'new',status:'pending',prompt:'two',references:[]}],run:async(job,slot)=>{if(job.id==='paused'){assert.equal(slot,1);assert.equal(job.resumeMode,'resubmit');assert.equal(job.account,2);assert.deepEqual(job.references,['old.png']);}return job.id+'.mp4';}});
  q.prepareResume();await q.applyReferences(['replacement.png']);await q.start();assert.ok(q.jobs.every(j=>j.status==='completed'));
 });
-test('confirmed browser stop schedules resubmission; uncertain stop schedules recovery',()=>{
- const q=new Queue({save:async()=>{},run:async()=>'',jobs:[{id:'a',status:'interrupted',account:1,mayHaveSubmitted:true,remoteStop:{state:'confirmed'}},{id:'b',status:'interrupted',account:2,mayHaveSubmitted:true,remoteStop:{state:'requested'}}]});q.prepareResume();assert.deepEqual(q.jobs.map(j=>j.resumeMode),['resubmit','recover']);
+test('Continue resubmits unfinished scenes even when remote stop is uncertain',()=>{
+ const q=new Queue({save:async()=>{},run:async()=>'',jobs:[{id:'a',status:'interrupted',account:1,mayHaveSubmitted:true,remoteStop:{state:'confirmed'}},{id:'b',status:'interrupted',account:2,mayHaveSubmitted:true,remoteStop:{state:'requested'}}]});q.prepareResume();assert.deepEqual(q.jobs.map(j=>j.resumeMode),['resubmit','resubmit']);
 });
 
 test('ten parallel scenes safely share one complete locked reference file',async t=>{

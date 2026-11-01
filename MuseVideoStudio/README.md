@@ -1,8 +1,10 @@
-# Muse Video Studio V1 · 1.1.3 · Windows
+Continue in 1.1.4 resubmits unfinished scenes with new attempt IDs, ignoring tentative send flags and old receipts. Completed files are kept. The sidebar now displays the actual application version.
+
+# Muse Video Studio V1 · 1.1.4 · Windows
 
 ## Bản cài đặt Windows
 
-Tải `MuseVideoStudio-1.1.3-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
+Tải `MuseVideoStudio-1.1.4-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
 
 Build riêng: `node tools/build-installer.cjs` trên Windows. Workflow installer kiểm thử cài đặt, shortcut, mở app, một cửa sổ chính và gỡ cài đặt trước khi thêm Setup.exe vào release hiện tại.
 
@@ -41,7 +43,7 @@ Giao diện dùng bảng điều khiển gọn và chữ dễ đọc hơn; các 
 
 ## Gửi ảnh + prompt trước khi chờ và tải (0.8.1)
 
-Sửa cảnh cũ có cờ đã nhận nhưng chưa gửi thật bị đưa thẳng vào lấy video lịch sử. Cảnh dở từ bản cũ chưa có bằng chứng của luồng gửi ảnh/prompt sẽ quay về đính kèm ảnh và gửi mới trên đúng phiên khi Tiếp tục. Lượt gửi mới dùng bằng chứng riêng; nếu dừng mà chưa xác nhận tin nhắn, giữ lượt đó để kiểm tra tiếp, không gửi trùng. Khôi phục tự động phải khớp nguyên prompt và ID/marker của đúng lượt gửi. Câu Test và clip cũ trùng prompt không thay thế lượt gửi mới. Mỗi lần tải kiểm tra lại ranh giới tin nhắn để tránh DOM bị tái sử dụng.
+Từ 1.1.4, Tiếp tục luôn gửi lại các cảnh chưa hoàn tất: dùng prompt/ảnh đã khóa, đúng tài khoản và mã lượt gửi mới. Cờ đã gửi tạm, protocol, receipt, ID tin nhắn hay kết quả của lượt cũ không được dùng để tự chuyển sang chờ/tải. Chỉ nút Lấy video đã tạo mới khôi phục kết quả cũ.
 
 Nếu bản nháp đã có đúng prompt nhưng chưa có ảnh, vẫn tải ảnh tham chiếu đã khóa lên. Tự mở nút + / đính kèm và mục tải ảnh khi Muse chưa tạo input chọn tệp; hỗ trợ input ẩn và input tạm thời, cả trình duyệt tích hợp và Chrome/Edge. Tránh đính kèm hai lần và kiểm tra dừng trước khi gắn tệp.
 
@@ -53,7 +55,7 @@ Một nút **Test tất cả trình duyệt** tự mở 1–10 phiên đã chọ
 
 Tất cả cảnh nằm trong danh sách theo thứ tự gốc, không cần đổi tab Đang chạy. Từng ô hiển thị ảnh/gửi/tạo/tải, phần trăm thật khi có, thời gian chờ và tên tệp sau khi lưu thành công. Xong ô nào thì ô đó báo **Đã xong**, tài khoản đó tự nhận cảnh tiếp theo. Chọn 4 trình duyệt chạy được 4 cảnh cùng lúc. Danh sách cuộn riêng và tự theo cảnh mới, có thể tắt tự theo; phần prompt và xuất/ghép được thu gọn.
 
-**Dừng, Chạy/Tiếp tục, Mở thư mục video** nằm cạnh nhau ngay trên danh sách. Khi khởi động lại, hàng chờ được khôi phục, bấm Tiếp tục để chạy. Chưa thấy đúng prompt trong chat phải báo **Chưa xác nhận Muse nhận prompt**, không đánh dấu đã nhận dựa vào việc bấm Gửi. Tiếp tục giữ attempt có bằng chứng của luồng gửi mới; cảnh dở từ bản cũ chưa có bằng chứng quay về gửi ảnh/prompt trên chính tài khoản cũ.
+**Dừng, Chạy/Tiếp tục, Mở thư mục video** nằm cạnh nhau. Khi mở lại app, hàng chờ được giữ; Tiếp tục gửi lại cảnh chưa xong bằng lượt mới. Cảnh đã lưu thành công không chạy lại. Sau khi gửi, chỉ chờ tạo/tải khi quan sát đúng tin nhắn và phản hồi của lượt mới.
 
 ## Sửa nhận clip và đặt tên (0.7.1)
 
@@ -65,13 +67,13 @@ Thẻ video có nguồn HTTPS/blob có thể tải ngay trong đúng phản hồ
 
 Khi nhận cảnh, tool lưu nguyên prompt và bản sao ảnh theo SHA-256. Ảnh gốc sửa/xóa sau đó không đổi nội dung đã khóa; bản cache bị thay đổi sẽ bị từ chối. Đổi ảnh hàng loạt và đưa về sửa không áp dụng cho cảnh đã khóa. Trước khi bấm Gửi, tool so lại prompt trong ô chat, ảnh preview đã giải mã và đúng DOM token của các ảnh vừa đính kèm. Ảnh thừa/cũ trong vùng soạn thảo ngăn gửi.
 
-Mỗi lần gửi có mã attempt riêng; khi nhận tin nhắn echo, lưu ID/marker của tin nhắn đó. Tiếp tục chờ clip đã gửi dùng lại attempt/anchor cũ, kể cả lịch sử có prompt trùng. Gửi lại sau khi dừng dùng attempt mới và bỏ kết quả từ các lượt cũ theo vùng phản hồi/ID. Đây là ràng buộc theo phản hồi chat; không tự đánh giá nội dung hình ảnh có đáp ứng ý nghĩa prompt hay không.
+Mỗi lần gửi có mã attempt riêng. Tiếp tục tạo mã mới, không tin cờ trạng thái tạm từ lượt cũ. Lấy video đã tạo là thao tác riêng để khôi phục đúng kết quả cũ. Đây là ràng buộc theo phản hồi chat, không tự đánh giá nội dung hình ảnh.
 
 Mốc45 giây xác nhận đã bỏ. Thời gian cấu hình là ngưỡng cảnh báo Muse chậm, không tự hủy tác vụ đang tạo. Timeout tạm thời khi đọc trang được chờ và thử lại. Lỗi tải file giữ nguyên cảnh/kết quả, thử tải lại sau5 giây; không gửi lại prompt và không cấp cảnh kế tiếp cho tài khoản đó trước khi lưu video thành công. Cảnh không xác định được duy nhất vẫn dừng để kiểm tra, không đoán kết quả.
 
 **Dừng** ngắt phần chờ/tải trong tool và tìm nút Stop/Dừng ở vùng soạn thảo của từng tài khoản. Chỉ bấm nút nhận diện được duy nhất; có CSS selector nút dừng riêng. Tool ghi trạng thái: đã quan sát hủy, giao diện đã dừng, clip đã có, đã yêu cầu nhưng chưa xác nhận, hoặc không tìm được nút. Việc nút biến mất chỉ xác nhận giao diện dừng, không hứa máy chủ hủy tuyệt đối.
 
-**Tiếp tục hàng đợi** tự xử lý các cảnh bị gián đoạn trên đúng tài khoản. Nếu đã quan sát hủy/giao diện dừng, gửi lại prompt/ảnh đã khóa. Nếu clip đã có hoặc chưa xác nhận dừng, chờ/lấy kết quả attempt cũ thay vì gửi trùng. Những tài khoản khác vẫn chạy song song. Nếu Muse không có markup/nút được nhận diện, xuất thông tin lỗi chat để hiệu chỉnh; chưa xác minh bằng tài khoản Muse thực.
+**Tiếp tục hàng đợi** gửi lại prompt/ảnh đã khóa của tất cả cảnh chưa xong trên đúng tài khoản, kể cả khi lượt cũ chưa xác nhận dừng. Nếu Muse còn đang tạo, chờ ô chat sẵn sàng trước khi gửi. Cảnh đã lưu và các tài khoản, dữ liệu khác được giữ nguyên.
 
 ## Sửa luồng chờ và gửi của 0.6.2
 
@@ -104,7 +106,7 @@ Chỉ dùng chế độ **Kịch bản thô → prompt theo mẫu** khi muốn t
 
 ## Dừng, xóa và đóng app
 
-- **Dừng ngay** ngắt chờ/tải và thử bấm Stop/Dừng trong vùng chat của mỗi tài khoản; trạng thái xác nhận nằm trên thẻ. Cảnh đang chạy chuyển sang gián đoạn; Tiếp tục quyết định gửi lại hay chờ kết quả theo trạng thái dừng đã quan sát.
+- **Dừng ngay** ngắt chờ/tải và thử bấm Stop/Dừng của mỗi tài khoản. Tiếp tục gửi lại cảnh chưa xong bằng lượt mới; lấy lại kết quả cũ chỉ qua nút Lấy video đã tạo.
 - **Xóa tất cả đang chờ** chỉ xóa tác vụ chưa gửi. **Xóa toàn bộ danh sách** dừng rồi xóa metadata; giữ file video đã tải.
 - Đóng cửa sổ app sẽ dừng hàng đợi, lưu phiên và đóng các trình duyệt do app mở. Chỉ một instance được chạy; mở lần nữa đưa cửa sổ đang chạy lên trước.
 
@@ -140,7 +142,7 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
-## Update 1.1.3
+## Update 1.1.4
 
 - Ten account workers upload their locked reference images and submit exact scene prompts independently. External Chrome/Edge sessions keep processing when their windows are in the background.
 - Downloads open the three-dot menu belonging to the matched clip and require the second row to be Download / Tải xuống. Direct links and other clips' controls are never used as a fallback. A scene completes only after the downloaded video is validated and saved to its ordered output filename.

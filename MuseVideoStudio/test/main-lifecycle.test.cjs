@@ -434,7 +434,7 @@ test('a temporary DOM timeout while Muse creates does not fail, resend or dispat
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
 
-test('uncertain remote stop resumes the original attempt and retries downloading without resending',{timeout:30000},async()=>{
+test('Continue resends an uncertain original attempt; transfer retries do not send it again',{timeout:30000},async()=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-retry-transfer-'));let app,recovering=false,sent=0,downloads=0;const attempts=[];
  try{
   await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
@@ -442,13 +442,13 @@ test('uncertain remote stop resumes the original attempt and retries downloading
    if(fn.name==='beginTracking'){attempts.push(arg);if(arg.recover)recovering=true;return{};}
    if(fn.name==='submitPrompt'){sent++;return{clicked:true};}
    if(fn.name==='browserStop')return{state:'unavailable',clicked:false};
-   if(fn.name==='pollTracking')return recovering?{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null}:new Promise(()=>{});
+   if(fn.name==='pollTracking')return sent>=2?{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null}:new Promise(()=>{});
    if(fn.name==='downloadAction')return{action:'clicked',clicked:true};return null;
   },captureDownload:async(target,{trigger})=>{await trigger();downloads++;if(downloads===1)throw Error('Server transfer is not ready yet');await fs.writeFile(target,fixtureMp4());}})});
   await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Original pending result'},{prompt:'Later scene'}]);await app.invoke('start');await until(()=>sent===1);
   await app.invoke('stop');assert.equal(app.invoke('state').jobs[0].remoteStop.state,'unavailable');await app.invoke('start');await until(()=>downloads===1);
-  assert.equal(sent,1);assert.equal(app.invoke('state').jobs[0].status,'running');assert.equal(app.invoke('state').jobs[1].status,'pending');assert.equal(attempts[1].recover,true);assert.equal(attempts[1].id,attempts[0].id);
-  await until(()=>!app.invoke('state').active,10000);assert.equal(sent,2);assert.equal(downloads,3);assert.ok(app.invoke('state').jobs.every(j=>j.status==='completed'));await app.stop();
+  assert.equal(sent,2);assert.equal(app.invoke('state').jobs[0].status,'running');assert.equal(app.invoke('state').jobs[1].status,'pending');assert.equal(attempts[1].recover,false);assert.notEqual(attempts[1].id,attempts[0].id);
+  await until(()=>!app.invoke('state').active,10000);assert.equal(sent,3);assert.equal(downloads,3);assert.ok(app.invoke('state').jobs.every(j=>j.status==='completed'));await app.stop();
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
 
@@ -564,5 +564,29 @@ test('interface language defaults to English, persists Vietnamese and localizes 
   assert.deepEqual(Array.from(app.notices[0].buttons),['Exit completely','Stay']);assert.equal(app.lifecycle.includes('quit'),false);
   await assert.rejects(app.invoke('language','fr'),/Unsupported/);await app.invoke('language','vi');await app.stop();
   app=await boot(dir);assert.equal(app.invoke('state').settings.language,'vi');app.windows[0].emit('close',{preventDefault(){}});await new Promise(r=>setImmediate(r));assert.deepEqual(Array.from(app.notices[0].buttons),['Thoát hẳn','Ở lại']);await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
+for(const persisted of ['tentative-send','stale-receipt','pending-recovery'])test(`Continue sends a NEW attempt for ${persisted}; false Send cannot poll or download`,{timeout:8000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-continue-new-'));let app,clicked=false,sends=0,polls=0,downloads=0,draft='';const attempts=[];
+ const prompt='Keep the original scene prompt',oldAttempt='obsolete-attempt';
+ try{
+  const lockedInput={prompt,promptHash:crypto.createHash('sha256').update(prompt).digest('hex'),references:[]};
+  const job={id:'unfinished',prompt,lockedInput,status:persisted==='pending-recovery'?'pending':'interrupted',resumeMode:'recover',account:1,mayHaveSubmitted:true,submissionProtocol:1,trackerId:oldAttempt,echoKey:'old-user',echoMarker:oldAttempt,resultReadyAt:'2026-01-01T00:00:00Z'};
+  if(persisted==='stale-receipt')job.submissionReceipt={version:1,attemptId:oldAttempt,promptHash:lockedInput.promptHash,referenceHashes:[],echoKey:'old-user'};
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,dispatchRevision:1,settings:{output:dir,browserChoice:'chrome',accountCount:1,cooldownSeconds:0},jobs:[job,{id:'completed',prompt:'Keep saved scene',status:'completed',output:'existing.mp4'}]}));
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',openMuse:async()=>{},show:async()=>{},close:async()=>{},evaluate:async(fn,arg)=>{
+   if(fn.name==='browserStop')return{state:'unavailable',clicked:false};
+   if(fn.name==='beginTracking'){assert.equal(arg.recover,false);assert.notEqual(arg.id,oldAttempt);attempts.push(arg.id);return{};}
+   if(fn.name==='submitPrompt'){assert.equal(draft,prompt);sends++;return{clicked};}
+   if(fn.name==='pollTracking'){polls++;assert.equal(clicked,true);return{ready:true,echoMatched:true,responseMatched:true,echoKey:'new-user'};}
+   if(fn.name==='downloadAction')return{clicked:true};
+   if(arg?.prompt&&!arg?.id)draft=arg.prompt;
+   return null;
+  },captureDownload:async(target,{trigger})=>{downloads++;await trigger();await fs.writeFile(target,fixtureMp4());}})});
+  await app.invoke('start');await until(()=>!app.invoke('state').active);
+  assert.equal(sends,1);assert.equal(polls,0);assert.equal(downloads,0);assert.equal(app.invoke('state').jobs[0].status,'failed');assert.equal(app.invoke('state').jobs[0].mayHaveSubmitted,false);
+  clicked=true;await app.invoke('start');await until(()=>!app.invoke('state').active);
+  assert.equal(sends,2);assert.equal(downloads,1);assert.notEqual(attempts[0],attempts[1]);assert.equal(app.invoke('state').jobs[0].status,'completed');assert.equal(app.invoke('state').jobs[1].output,'existing.mp4');await app.stop();
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
