@@ -17,6 +17,7 @@ Tạo video|Create videos
 Trình duyệt tích hợp|Built-in browser
 Phiên tài khoản|Account session
 Liên hệ|Contact
+Số điện thoại:|Phone:
 Quét mã bằng Zalo để nhắn cho chủ phần mềm.|Scan with Zalo to message the software owner.
 Mở Muse / Đăng nhập|Open Muse / Sign in
 Đăng xuất tài khoản này|Sign out of this account

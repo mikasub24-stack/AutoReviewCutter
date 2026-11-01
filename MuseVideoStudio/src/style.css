@@ -201,6 +201,8 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .contactPanel { text-align: center; }
 .contactPanel img { display: block; width: 300px; max-width: 100%; height: auto; margin: 6px auto 12px; background: white; border-radius: 10px; }
 .contactPanel p { font-size: 12px; line-height: 1.7; }
+.contactPhone { margin-top: 4px; font-size: 14px; }
+.contactPhone b { color: #edf4ff; font-size: 17px; letter-spacing: .5px; user-select: all; }
 .paymentPanel { margin-top: 20px; padding-top: 18px; border-top: 1px solid #3c4b65; text-align: center; }
 .paymentPanel img { width: 250px; max-width: 100%; background: white; border-radius: 10px; margin: 12px 0; }
 .paymentPanel p { font-size: 11px; line-height: 1.8; }
