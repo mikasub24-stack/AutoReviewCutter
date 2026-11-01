@@ -164,7 +164,7 @@ test('main retains independent encrypted sessions on graceful quit and restores 
     await first.invoke('browser', 0); await first.invoke('browser', 1);
     assert.equal(first.sessions.size, 2); assert.equal(first.windows.length, 3);assert.equal(first.windows[1].options.webPreferences.backgroundThrottling,false);assert.equal(first.windows[2].options.webPreferences.backgroundThrottling,false);
     assert.notEqual(first.windows[1].webContents.session, first.windows[2].webContents.session);
-    assert.equal(first.invoke('state').accounts.every(account => account.rememberSession), true);
+    assert.equal(first.invoke('state').accounts.slice(0, 2).every(account => account.rememberSession), true);
     const publicState = JSON.stringify(first.invoke('state'));
     values.forEach(value => assert.equal(publicState.includes(value), false));
     await first.invoke('export');
@@ -283,6 +283,22 @@ test('opening again restores and focuses the sole main window; all native window
   assert.equal(app.windows.length,1);assert.equal(app.windows[0].restored,true);assert.equal(app.windows[0].focused,2);assert.equal(app.lifecycle.includes('menu-removed'),true);
   await app.invoke('browser',0);await app.invoke('browser',0);assert.equal(app.windows.length,2);
   for(const window of app.windows){assert.equal(window.menu,null);assert.equal(window.menuVisible,false);}await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
+test('login accounts 1–10 can be opened before parallel run count is raised',{timeout:8000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-login-ten-'));await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({settings:{output:dir,accountCount:2},configVersion:2}));const opened=[];let app;
+ try{
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async options=>{let closed=false;opened.push(options.profileDir);return{external:true,isDestroyed:()=>closed,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},openMuse:async()=>{},evaluate:async()=>null,close:async()=>{closed=true;}};}});
+  await app.invoke('settings',{...app.invoke('state').settings,accountCount:2,browserChoice:'chrome',output:dir,finishAction:'keep'});
+  assert.equal(app.invoke('state').accounts.length,10);
+  await app.invoke('browser',9);await app.invoke('browser',4);
+  assert.deepEqual(opened.map(p=>path.basename(p)),['account-10','account-5']);
+  await assert.rejects(app.invoke('browser',10),/Tài khoản không hợp lệ/);
+  await assert.rejects(app.invoke('browser',-1),/Tài khoản không hợp lệ/);
+  assert.equal(app.invoke('state').settings.accountCount,2);
+  assert.ok(app.invoke('state').accounts[9].opened);
+  await app.stop();
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
 

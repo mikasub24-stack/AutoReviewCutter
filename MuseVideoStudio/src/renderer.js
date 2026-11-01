@@ -179,10 +179,12 @@ function render(next){
   if(!next)return;
   $('appVersion').textContent='Phiên bản V1 · '+(next.version||'dev');
   state=next;if(state.settings.language&&window.studioI18n.language!==state.settings.language)window.studioI18n.setLanguage(state.settings.language);if(firstSnapshot){restoredQueue=state.jobs.length>0;$('editorPanel').open=!restoredQueue;firstSnapshot=false;}const jobs=state.jobs,indexBefore=Number($('accountPicker').value||0);
-  $('accountPicker').replaceChildren(...Array.from({length:state.settings.accountCount},(_,i)=>{const o=el('option','',`Tài khoản ${i+1}`);o.value=i;return o;}));
-  $('accountPicker').value=Math.min(indexBefore,state.settings.accountCount-1);const index=Number($('accountPicker').value);
+  // Ô đăng nhập luôn có đủ 10 tài khoản, không phụ thuộc "Chạy song song".
+  const loginSlots=Math.max(10,Number(state.settings.accountCount)||0);
+  $('accountPicker').replaceChildren(...Array.from({length:loginSlots},(_,i)=>{const o=el('option','',`Tài khoản ${i+1}`);o.value=i;return o;}));
+  $('accountPicker').value=Math.min(indexBefore,loginSlots-1);const index=Number($('accountPicker').value);
   const browserName=({builtin:'Trình duyệt tích hợp',chrome:'Google Chrome',edge:'Microsoft Edge',custom:'Chromium tùy chọn'})[state.settings.browserChoice||'builtin'];$('browserInfo').textContent=browserName;
-  const account=state.accounts?.find(a=>a.index===index);$('sessionStatus').textContent=account?.warning||(account?.rememberSession?'Cookie phiên lưu mã hóa riêng trên máy.':'Mỗi tài khoản giữ một phiên đăng nhập riêng.');
+  const account=state.accounts?.find(a=>a.index===index);$('sessionStatus').textContent=account?.warning||(index>=state.settings.accountCount?`Tài khoản này chỉ chạy khi chọn «Chạy song song» từ ${index+1} trình duyệt.`:account?.rememberSession?'Cookie phiên lưu mã hóa riêng trên máy.':'Mỗi tài khoản giữ một phiên đăng nhập riêng.');
   $('logoutAccount').textContent=`Đăng xuất TK ${index+1} · ${browserName}`;$('logoutAccount').disabled=state.active||state.starting||state.stopping||state.merging||state.packaging||state.resettingAccounts?.length>0;
   const license=state.license;
   if(license){const expires=license.expiresAt?new Date(license.expiresAt).toLocaleString(window.studioI18n.language==='vi'?'vi-VN':'en-US'):'';$('licenseSummary').textContent=license.status==='trial'?'Dùng thử đến '+expires:license.message;$('licenseStatus').textContent=license.message+(expires?' Hạn: '+expires:'');$('deviceCode').value=license.device;}

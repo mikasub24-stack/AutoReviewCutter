@@ -37,13 +37,14 @@ const probeMutations=new Set();
 async function probeMutation(promise){probeMutations.add(promise);try{return await promise;}finally{probeMutations.delete(promise);}}
 const browserTests=new Map();
 const nextDispatchAt=new Map();
+const MAX_ACCOUNTS = 10;
 const resettingAccounts = new Set(), accountResets = new Map();
 const defaults = { language:'en', accountSessionIds:{}, dispatchMode:'parallel', cooldownSeconds:3, messageSelector:'', stopSelector:'', attachmentReadySelector:'', browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', timeoutMinutes: 15 };
 function ui(vi,en){return settings?.language==='vi'?vi:en;}
 async function atomic(file, data) { await fs.writeFile(file + '.tmp', JSON.stringify(data, null, 2)); await fs.rename(file + '.tmp', file); }
 function snapshot() {
   return {version:app.getVersion?.()||require('../package.json').version,jobs:queue.jobs,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,
-    accounts:Array.from({length:settings.accountCount},(_,index)=>{
+    accounts:Array.from({length:Math.max(settings.accountCount,MAX_ACCOUNTS)},(_,index)=>{
       const browser=browsers.get(index),external=settings.browserChoice !== 'builtin';
       return {index,opened:Boolean(browser && !browser.isDestroyed()),rememberSession:external ? Boolean(browser?.external && browser.isSessionEnabled()) : profiles.get(index)?.store.isEnabled() || false,warning:external ? browserWarnings.get(index) || '' : profiles.get(index)?.warning || ''};
     })};
@@ -78,8 +79,13 @@ async function prepareNativeProfile(index) {
   }
   await profile.ready;return profile;
 }
+// Chạy hàng đợi chỉ dùng các tài khoản trong "Chạy song song" (accountCount);
+// đăng nhập / mở / đăng xuất thì được dùng cả 10 tài khoản để đăng nhập sẵn.
 function validAccount(index) {
   if(!Number.isInteger(index) || index<0 || index>=settings.accountCount) throw Error('Tài khoản không hợp lệ.');
+}
+function validLoginAccount(index) {
+  if(!Number.isInteger(index) || index<0 || index>=MAX_ACCOUNTS) throw Error('Tài khoản không hợp lệ.');
 }
 function accountProfileKey(index) {
   const type=settings.browserChoice==='custom'?'custom-'+createHash('sha256').update(resolveBrowser({choice:'custom',customPath:settings.browserPath})).digest('hex').slice(0,16):settings.browserChoice;
@@ -104,7 +110,7 @@ async function ensureExternalBrowser(index) {
   try{return await launch;}finally{externalLaunches.delete(index);}
 }
 async function openMuse(index = 0) {
-  validAccount(index);
+  validLoginAccount(index);
   if(resettingAccounts.size) throw Error('Chờ đăng xuất tài khoản hoàn tất trước khi mở Muse.');
   if(opening.has(index)) return opening.get(index);
   const task=(async()=>{
@@ -138,7 +144,7 @@ function accountOperationBusy() {
   return testing || queue.active || starting || stopping || merging || packaging || opening.size || externalLaunches.size;
 }
 function logoutAccount(index) {
-  validAccount(index);
+  validLoginAccount(index);
   if(flushingQuit || accountOperationBusy() || resettingAccounts.size) throw Error('Chờ hàng đợi và các thao tác trình duyệt hoàn tất trước khi đăng xuất.');
   resettingAccounts.add(index);notify();
   const task=(async()=>{
@@ -480,7 +486,7 @@ app.whenReady().then(async () => {
     remove: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); const removed=queue.jobs.find(j=>j.id===id);invalidateOutputs(); await queue.remove(id);browsers.get(Number(removed?.account)-1)?.releasePage?.(id);if(removed?.trackerId)void dom(browsers.get(Number(removed.account)-1),endTracking,{id:removed.trackerId}).catch(()=>{}); return snapshot(); },
     browser: async index => { await openMuse(Number(index ?? 0)); return true; },
     diagnostics: async index=>{
-      index=Number(index??0);validAccount(index);const muse=browsers.get(index);assertMuse(muse);
+      index=Number(index??0);validLoginAccount(index);const muse=browsers.get(index);assertMuse(muse);
       const jobs=queue.jobs.filter(j=>j.account===index+1).slice(-8);
       const structure=await dom(muse,chatDiagnostics,{jobs:jobs.map(j=>({id:j.id,prompt:j.lockedInput?.prompt||j.prompt,number:j.number})),composerSelector:settings.composer});
       const result=await dialog.showSaveDialog(main,{defaultPath:`Muse-chat-diagnostics-TK${index+1}.json`,filters:[{name:'Thông tin lỗi',extensions:['json']}]});
