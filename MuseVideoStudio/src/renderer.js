@@ -173,14 +173,14 @@ function renderJobs(jobs){
 setInterval(()=>{for(const row of jobCards.values())if(row.job?.status==='running')updateElapsed(row);},1000);
 
 function render(next){
-  if(!next)return;state=next;if(firstSnapshot){restoredQueue=state.jobs.length>0;$('editorPanel').open=!restoredQueue;firstSnapshot=false;}const jobs=state.jobs,indexBefore=Number($('accountPicker').value||0);
+  if(!next)return;state=next;if(state.settings.language&&window.studioI18n.language!==state.settings.language)window.studioI18n.setLanguage(state.settings.language);if(firstSnapshot){restoredQueue=state.jobs.length>0;$('editorPanel').open=!restoredQueue;firstSnapshot=false;}const jobs=state.jobs,indexBefore=Number($('accountPicker').value||0);
   $('accountPicker').replaceChildren(...Array.from({length:state.settings.accountCount},(_,i)=>{const o=el('option','',`Tài khoản ${i+1}`);o.value=i;return o;}));
   $('accountPicker').value=Math.min(indexBefore,state.settings.accountCount-1);const index=Number($('accountPicker').value);
   const browserName=({builtin:'Trình duyệt tích hợp',chrome:'Google Chrome',edge:'Microsoft Edge',custom:'Chromium tùy chọn'})[state.settings.browserChoice||'builtin'];$('browserInfo').textContent=browserName;
   const account=state.accounts?.find(a=>a.index===index);$('sessionStatus').textContent=account?.warning||(account?.rememberSession?'Cookie phiên lưu mã hóa riêng trên máy.':'Mỗi tài khoản giữ một phiên đăng nhập riêng.');
   $('logoutAccount').textContent=`Đăng xuất TK ${index+1} · ${browserName}`;$('logoutAccount').disabled=state.active||state.starting||state.stopping||state.merging||state.packaging||state.resettingAccounts?.length>0;
   const license=state.license;
-  if(license){const expires=license.expiresAt?new Date(license.expiresAt).toLocaleString('vi-VN'):'';$('licenseSummary').textContent=license.status==='trial'?'Dùng thử đến '+expires:license.message;$('licenseStatus').textContent=license.message+(expires?' Hạn: '+expires:'');$('deviceCode').value=license.device;}
+  if(license){const expires=license.expiresAt?new Date(license.expiresAt).toLocaleString(window.studioI18n.language==='vi'?'vi-VN':'en-US'):'';$('licenseSummary').textContent=license.status==='trial'?'Dùng thử đến '+expires:license.message;$('licenseStatus').textContent=license.message+(expires?' Hạn: '+expires:'');$('deviceCode').value=license.device;}
   if(state.payment){$('paymentQR').src=state.payment.qr;$('paymentContent').textContent='Nội dung chuyển khoản: '+state.payment.content;}
   $('parallelInfo').textContent=state.settings.dispatchMode==='parallel'?`Song song ${state.settings.accountCount} trình duyệt · mỗi trình duyệt 1 prompt`:'Lần lượt · tải xong từng video mới gửi tiếp';
   $('total').textContent=$('navCount').textContent=$('allCount').textContent=jobs.length;$('folderPath').textContent=state.settings.output||'Chưa chọn thư mục';
@@ -255,3 +255,5 @@ for(const event of ['wheel','touchstart','pointerdown','keydown'])$('jobs').addE
 function fitQueueViewport(){const grid=$('jobs'),top=grid.getBoundingClientRect().top;grid.style.maxHeight=Math.max(230,window.innerHeight-Math.max(0,top)-22)+'px';}
 window.addEventListener('resize',fitQueueViewport);
 new ResizeObserver(fitQueueViewport).observe($('queueControls'));
+
+$('languagePicker').onchange=async e=>{const language=e.target.value;window.studioI18n.setLanguage(language);const next=await call('language',language);if(next)render(next);};

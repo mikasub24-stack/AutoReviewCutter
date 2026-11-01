@@ -88,7 +88,7 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
 
   const dialog = {
     showErrorBox: (title, message) => { errors.push({ title, message }); loaded(); },
-    showMessageBox:async(_parent,options)=>{notices.push(options);if(options.title==='Thoát Muse Video Studio?'){if(closeGate)await closeGate;return{response:closeResponse};}return{response:logoutResponse};},
+    showMessageBox:async(_parent,options)=>{notices.push(options);if(['Thoát Muse Video Studio?','Exit Muse Video Studio?'].includes(options.title)){if(closeGate)await closeGate;return{response:closeResponse};}return{response:logoutResponse};},
     showMessageBoxSync: options => { notices.push(options); return 1; },
     showSaveDialog: async () => ({ canceled: false, filePath: path.join(userData, 'export.json') })
   };
@@ -269,7 +269,7 @@ test('cancel logout preserves the selected profile',async()=>{const dir=await fs
 test('closing main asks once; Stay preserves windows and queue, Exit requests app shutdown',async()=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-close-'));let app,release;
  try{
-  const gate=new Promise(r=>release=r);app=await boot(dir,{closeResponse:1,closeGate:gate});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Keep this pending scene'}]);
+  const gate=new Promise(r=>release=r);app=await boot(dir,{closeResponse:1,closeGate:gate});await app.invoke('language','vi');await app.invoke('browser',0);await app.invoke('add',[{prompt:'Keep this pending scene'}]);
   let prevented=0;app.windows[0].emit('close',{preventDefault(){prevented++;}});app.windows[0].emit('close',{preventDefault(){prevented++;}});
   assert.equal(prevented,2);assert.equal(app.notices.length,1);assert.deepEqual(Array.from(app.notices[0].buttons),['Thoát hẳn','Ở lại']);assert.equal(app.notices[0].defaultId,1);assert.equal(app.notices[0].cancelId,1);assert.equal(app.lifecycle.includes('quit'),false);
   release();await new Promise(r=>setImmediate(r));assert.equal(app.lifecycle.includes('quit'),false);assert.equal(app.windows[1].isDestroyed(),false);assert.equal(app.invoke('state').jobs.length,1);await app.stop();
@@ -553,4 +553,14 @@ test('Start ends warmup safely without waiting for reply or overlapping composer
   const warmup=app.invoke('testBrowsers');await until(()=>preparing);const start=app.invoke('start');await new Promise(r=>setTimeout(r,30));assert.equal(sends,0);
   release();await warmup;await start;await until(()=>sends===1);assert.equal(app.invoke('state').testing,false);await app.invoke('stop');await app.stop();
  }finally{release();if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
+test('interface language defaults to English, persists Vietnamese and localizes exit options',async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-languages-'));let app;
+ try{
+  app=await boot(dir);assert.equal(app.invoke('state').settings.language,'en');app.windows[0].emit('close',{preventDefault(){}});await new Promise(r=>setImmediate(r));
+  assert.deepEqual(Array.from(app.notices[0].buttons),['Exit completely','Stay']);assert.equal(app.lifecycle.includes('quit'),false);
+  await assert.rejects(app.invoke('language','fr'),/Unsupported/);await app.invoke('language','vi');await app.stop();
+  app=await boot(dir);assert.equal(app.invoke('state').settings.language,'vi');app.windows[0].emit('close',{preventDefault(){}});await new Promise(r=>setImmediate(r));assert.deepEqual(Array.from(app.notices[0].buttons),['Thoát hẳn','Ở lại']);await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });

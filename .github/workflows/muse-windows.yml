@@ -61,6 +61,8 @@ jobs:
           if errorlevel 1 (type test.log & exit /b 1)
           call node test/cards-smoke.cjs >> test.log 2>&1
           if errorlevel 1 (type test.log & exit /b 1)
+          call node test/language-smoke.cjs >> test.log 2>&1
+          if errorlevel 1 (type test.log & exit /b 1)
           call node test/ui-smoke.cjs >> test.log 2>&1
           set MUSE_BROWSER_EXIT=%ERRORLEVEL%
           type test.log
@@ -123,7 +125,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "muse-studio-v$env:MUSE_VERSION" "dist/$env:MUSE_ZIP" --target $env:GITHUB_SHA --title "Muse Video Studio V1 — $env:MUSE_VERSION Windows" --notes "V1 update1.0.2: new Vietnamese creative-workshop tagline and turquoise visual identity; includes window fixes: one main app instance; reopening restores and focuses the running window. Removes File/Edit/View/Window menus from main and built-in Muse windows. Main X asks Exit completely or Stay, defaults to Stay, prevents duplicate prompts; choosing Exit saves/stops the queue and closes app-managed browsers. Includes three-dot menu download fix and existing exact prompt/reference workflow. Download ZIP, extract and run EXE. Automated Windows/Edge fixtures verified; live Muse account validation remains needed."
+          gh release create "muse-studio-v$env:MUSE_VERSION" "dist/$env:MUSE_ZIP" --target $env:GITHUB_SHA --title "Muse Video Studio V1 — $env:MUSE_VERSION Windows" --notes "V1 update1.1.0: English and Vietnamese interface with a live language selector and saved preference. English by default. New English tagline FROM IDEAS TO MOTION and turquoise branding. Labels, settings, progress and exit confirmation localized while preserving user prompt/draft/title/source/path content. Includes one main app instance, removed desktop menus, Exit completely/Stay confirmation and three-dot menu video downloads. Download ZIP, extract and run EXE. Automated Windows/Edge fixtures verified; live Muse account validation remains needed."
       - name: Retain public test diagnostics on failure
         if: failure()
         shell: pwsh

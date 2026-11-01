@@ -37,7 +37,8 @@ async function probeMutation(promise){probeMutations.add(promise);try{return awa
 const browserTests=new Map();
 const nextDispatchAt=new Map();
 const resettingAccounts = new Set(), accountResets = new Map();
-const defaults = { accountSessionIds:{}, dispatchMode:'parallel', cooldownSeconds:3, messageSelector:'', stopSelector:'', attachmentReadySelector:'', browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', timeoutMinutes: 15 };
+const defaults = { language:'en', accountSessionIds:{}, dispatchMode:'parallel', cooldownSeconds:3, messageSelector:'', stopSelector:'', attachmentReadySelector:'', browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', timeoutMinutes: 15 };
+function ui(vi,en){return settings?.language==='vi'?vi:en;}
 async function atomic(file, data) { await fs.writeFile(file + '.tmp', JSON.stringify(data, null, 2)); await fs.rename(file + '.tmp', file); }
 function snapshot() {
   return {jobs:queue.jobs,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,
@@ -120,7 +121,7 @@ async function openMuse(index = 0) {
       const profile=await prepareNativeProfile(index);
       if(flushingQuit) return;
       if(flushingQuit) return;
-      const muse=new BrowserWindow({icon:path.join(__dirname,'assets','muse-studio.png'),width:1250,height:850,title:`Muse — Tài khoản ${index+1}`,webPreferences:{session:profile.session,backgroundThrottling:false,nodeIntegration:false,contextIsolation:true,sandbox:true}});
+      const muse=new BrowserWindow({icon:path.join(__dirname,'assets','muse-studio.png'),width:1250,height:850,title:ui(`Muse — Tài khoản ${index+1}`,`Muse — Account ${index+1}`),webPreferences:{session:profile.session,backgroundThrottling:false,nodeIntegration:false,contextIsolation:true,sandbox:true}});
       muse.setMenu(null);muse.setMenuBarVisibility(false);
       browsers.set(index,muse);muse.museStarted=true;
       muse.webContents.setWindowOpenHandler(()=>({action:'deny'}));
@@ -141,7 +142,7 @@ function logoutAccount(index) {
   resettingAccounts.add(index);notify();
   const task=(async()=>{
     const browserName=({builtin:'Trình duyệt tích hợp',chrome:'Google Chrome',edge:'Microsoft Edge',custom:'Trình duyệt tùy chọn'})[settings.browserChoice];
-    const choice=await dialog.showMessageBox(main,{type:'warning',buttons:['Hủy','Đăng xuất tài khoản này'],defaultId:0,cancelId:0,message:`Đăng xuất ${browserName} — Tài khoản ${index+1}?`,detail:'Chỉ xóa dữ liệu đăng nhập trong hồ sơ riêng của tài khoản này do Muse Studio quản lý. Các tài khoản khác, trình duyệt cá nhân và video đã tải vẫn được giữ nguyên.'});
+    const choice=await dialog.showMessageBox(main,{type:'warning',buttons:settings.language==='vi'?['Hủy','Đăng xuất tài khoản này']:['Cancel','Sign out of this account'],defaultId:0,cancelId:0,message:ui(`Đăng xuất ${browserName} — Tài khoản ${index+1}?`,`Sign out of ${browserName} — Account ${index+1}?`),detail:ui('Chỉ xóa dữ liệu đăng nhập trong hồ sơ riêng của tài khoản này do Muse Studio quản lý. Các tài khoản khác, trình duyệt cá nhân và video đã tải vẫn được giữ nguyên.','Only this app-managed account profile is cleared. Other accounts, personal browsers and saved videos are preserved.')});
     if(choice.response!==1) return snapshot();
     if(flushingQuit || accountOperationBusy()) throw Error('Ứng dụng đang bận. Hãy thử đăng xuất lại sau khi thao tác hiện tại hoàn tất.');
     if(settings.browserChoice!=='builtin') {
@@ -484,7 +485,7 @@ app.whenReady().then(async () => {
   main.on('close',event=>{
     if(quitAllowed)return;
     event.preventDefault();if(flushingQuit||closePrompt)return;
-    closePrompt=dialog.showMessageBox(main,{type:'question',title:'Thoát Muse Video Studio?',message:'Bạn muốn thoát hẳn ứng dụng?',detail:'Thoát hẳn sẽ dừng hàng đợi, lưu tiến trình và đóng các trình duyệt do ứng dụng mở.',buttons:['Thoát hẳn','Ở lại'],defaultId:1,cancelId:1,noLink:true})
+    closePrompt=dialog.showMessageBox(main,{type:'question',title:settings.language==='vi'?'Thoát Muse Video Studio?':'Exit Muse Video Studio?',message:settings.language==='vi'?'Bạn muốn thoát hẳn ứng dụng?':'Exit the application completely?',detail:settings.language==='vi'?'Thoát hẳn sẽ dừng hàng đợi, lưu tiến trình và đóng các trình duyệt do ứng dụng mở.':'This stops the queue, saves progress and closes app-managed browsers.',buttons:settings.language==='vi'?['Thoát hẳn','Ở lại']:['Exit completely','Stay'],defaultId:1,cancelId:1,noLink:true})
       .then(result=>{if(result.response===0&&!flushingQuit)app.quit();})
       .catch(()=>{if(!main.isDestroyed())main.focus();})
       .finally(()=>{closePrompt=null;});
@@ -493,13 +494,14 @@ app.whenReady().then(async () => {
   main.webContents.on('will-navigate', e => e.preventDefault());
   const handlers = {
     state: () => snapshot(),
+    language:async value=>{if(!['vi','en'].includes(value))throw Error('Unsupported language');settings.language=value;await save();notify();return snapshot();},
     testBrowsers,
     openOutput:async()=>{if(!settings.output)throw Error('Chọn thư mục lưu video trước.');await fs.mkdir(settings.output,{recursive:true});const error=await shell.openPath(settings.output);if(error)throw Error(error);},
     activateKey:async token=>{await licenseManager.activate(token);notify();return snapshot();},
     add: async data => { if (merging || packaging) throw Error('Chờ xử lý đầu ra xong trước khi thêm prompt.'); invalidateOutputs(); await queue.add(data); return snapshot(); },
     retryDownload: async id=>{
       if(stopping||queue.active||merging||packaging||starting||resettingAccounts.size)throw Error('Chờ xử lý hiện tại hoàn tất.');
-      invalidateOutputs();queue.recover(id,(job,signal)=>runJob(job,0,signal,{recover:true})).catch(e=>dialog.showErrorBox('Lấy video đã tạo',e.message)).finally(notify);return snapshot();
+      invalidateOutputs();queue.recover(id,(job,signal)=>runJob(job,0,signal,{recover:true})).catch(e=>dialog.showErrorBox(ui('Lấy video đã tạo','Recover existing video'),e.message)).finally(notify);return snapshot();
     },
     retry: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); const browser=browsers.get(Number(queue.jobs.find(j=>j.id===id)?.account)-1);invalidateOutputs(); await queue.retry(id);browser?.releasePage?.(id); return snapshot(); },
     remove: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); const removed=queue.jobs.find(j=>j.id===id);invalidateOutputs(); await queue.remove(id);browsers.get(Number(removed?.account)-1)?.releasePage?.(id);if(removed?.trackerId)void dom(browsers.get(Number(removed.account)-1),endTracking,{id:removed.trackerId}).catch(()=>{}); return snapshot(); },
@@ -545,7 +547,7 @@ app.whenReady().then(async () => {
           if(!queue.paused && queue.jobs.length && queue.jobs.every(j=>j.status==='completed')) {
             if(settings.autoMerge) await mergeProject();else if(settings.autoPackage) await packageProject();
           }
-        }).catch(e=>dialog.showErrorBox('Lỗi xử lý hàng đợi',e.message)).finally(notify);
+        }).catch(e=>dialog.showErrorBox(ui('Lỗi xử lý hàng đợi','Queue processing error'),e.message)).finally(notify);
         return snapshot();
       } catch(e){startError=e.message;throw e;} finally {if(epoch===runEpoch)starting=false;notify();}
     },
@@ -554,12 +556,12 @@ app.whenReady().then(async () => {
     openPackage: () => { if(editPackageDir) return shell.openPath(editPackageDir); },
     revealMerged: () => { if(mergedOutput) shell.showItemInFolder(mergedOutput); },
     chooseBrowser: async () => {
-      const result=await dialog.showOpenDialog(main,{properties:['openFile'],title:'Chọn Chrome, Edge hoặc trình duyệt Chromium (.exe)'});
+      const result=await dialog.showOpenDialog(main,{properties:['openFile'],title:ui('Chọn Chrome, Edge hoặc trình duyệt Chromium (.exe)','Choose Chrome, Edge or another Chromium executable')});
       return result.canceled ? '' : result.filePaths[0];
     },
     chooseFfmpeg: async () => {
       if(queue.active || merging || packaging) throw Error('Chờ xử lý hoàn tất trước khi đổi FFmpeg.');
-      const r=await dialog.showOpenDialog(main,{properties:['openFile'],title:'Chọn ffmpeg.exe (ffprobe.exe phải ở cùng thư mục)'});
+      const r=await dialog.showOpenDialog(main,{properties:['openFile'],title:ui('Chọn ffmpeg.exe (ffprobe.exe phải ở cùng thư mục)','Choose ffmpeg.exe (ffprobe.exe must be alongside it)')});
       if(!r.canceled){await checkTools(r.filePaths[0]);settings.ffmpeg=r.filePaths[0];await save();notify();}return snapshot();
     },
     pause: stopAll,
@@ -610,7 +612,7 @@ app.whenReady().then(async () => {
   for (const [name, handler] of Object.entries(handlers)) ipcMain.handle('studio:' + name, (event, data) => { if (event.sender !== main.webContents) throw Error('Unauthorized window'); return handler(data); });
   await main.loadFile(path.join(__dirname, 'index.html'));
   if(pendingFocus)focusMain();
-}).catch(e => { dialog.showErrorBox('Không thể mở ứng dụng', e.message); app.quit(); });
+}).catch(e => { dialog.showErrorBox(ui('Không thể mở ứng dụng','Unable to open application'), e.message); app.quit(); });
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', event => {
   if (!ownsInstance || quitAllowed) return;
@@ -631,7 +633,7 @@ app.on('before-quit', event => {
     }));
     results.push(...externalResults);
     if (queue && stateFile) { try { await save(); } catch { results.push({status:'rejected'}); } }
-    if (results.some(r=>r.status==='rejected')) dialog.showMessageBoxSync({type:'warning',message:'Một số dữ liệu hoặc phiên đăng nhập chưa lưu được. Có thể cần đăng nhập lại khi mở app.',buttons:['Đóng ứng dụng']});
+    if (results.some(r=>r.status==='rejected')) dialog.showMessageBoxSync({type:'warning',message:ui('Một số dữ liệu hoặc phiên đăng nhập chưa lưu được. Có thể cần đăng nhập lại khi mở app.','Some session data could not be saved. You may need to sign in again after restarting.'),buttons:[ui('Đóng ứng dụng','Close application')]});
     quitAllowed=true;app.quit();
   })().catch(()=>{quitAllowed=true;app.quit();});
 });

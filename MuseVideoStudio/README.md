@@ -1,4 +1,9 @@
-# Muse Video Studio V1 · 1.0.2 · Windows
+# Muse Video Studio V1 · 1.1.0 · Windows
+
+## English / Tiếng Việt (1.1.0)
+
+Slogan **FROM IDEAS TO MOTION** bằng tiếng Anh. Chọn English hoặc Tiếng Việt ở đầu cửa sổ; mặc định English, lưu lựa chọn trên máy và đổi trực tiếp. Dịch nhãn, nút, cài đặt, trạng thái tiến trình và hộp hỏi thoát. Prompt, nội dung gốc, tiêu đề cảnh do người dùng nhập, đường dẫn và giá trị trong ô nhập không bị dịch hoặc thay đổi khi chuyển ngôn ngữ. Giữ màu nhận diện xanh ngọc và các sửa vòng đời/tải video của V1.
+
 
 ## Nhận diện mới (1.0.2)
 
