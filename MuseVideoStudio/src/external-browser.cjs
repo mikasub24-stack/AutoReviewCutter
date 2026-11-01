@@ -255,6 +255,7 @@ async function launchExternalBrowser({ executablePath, profileDir, sessionFile, 
         if (await target.count() !== 1 || !await target.isVisible() || !await target.isEnabled()) throw Error('Không xác định được nút sẵn sàng duy nhất trên Muse.');
         await target.click();
       },
+      rightClick: async (x,y) => { await assertPage().mouse.click(x,y,{button:'right'}); },
       captureDownload:(target,options)=>capturePlaywrightDownload(assertPage(),target,options),
       download: async (url, target, {signal}={}) => {
         const page = assertPage();

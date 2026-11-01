@@ -12,6 +12,7 @@ const {ensureAttachmentInput,composerAttachmentSnapshot}=require('./attachment-i
 const {imageSources,attachmentState}=require('./attachment-ready.cjs');
 const {beginTracking,pollTracking,downloadAction,endTracking}=require('./muse-tracker.cjs');
 const {captureElectronDownload,validateVideo}=require('./download-capture.cjs');
+const {triggerDownload}=require('./download-trigger.cjs');
 const {createLicense,deviceCode}=require('./license.cjs');
 const {payment}=require('./payment.cjs');
 let licenseManager,paymentDetails;
@@ -208,17 +209,15 @@ async function upload(muse, files, signal) {
 }
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-async function triggerTrackedDownload(muse,id,signal) {
-  const check=()=>{if(signal.aborted)throw stoppedError();};
-  check();let action=await abortable(dom(muse,downloadAction,{id,phase:'auto'}),signal);
-  if(action.clicked && !action.needsMenu)return;
-  const deadline=Date.now()+6000;
-  while(action.needsMenu && Date.now()<deadline){
-    await abortable(delay(200),signal);check();
-    action=await abortable(dom(muse,downloadAction,{id,phase:'menu'}),signal);
-    if(action.clicked && !action.needsMenu)return;
-  }
-  throw Error('Chưa tìm thấy nút tải của đúng video. Mở phản hồi Muse, rồi bấm Lấy video đã tạo; không cần gửi lại prompt.');
+async function rightClickAt(muse,x,y) {
+  if(muse.external){await muse.rightClick?.(x,y);return;}
+  const contents=muse.webContents;contents.focus?.();
+  contents.sendInputEvent({type:'mouseMove',x,y});
+  contents.sendInputEvent({type:'mouseDown',x,y,button:'right',clickCount:1});
+  contents.sendInputEvent({type:'mouseUp',x,y,button:'right',clickCount:1});
+}
+function triggerTrackedDownload(muse,id,signal) {
+  return triggerDownload({id,signal,delay,stopped:stoppedError,abortable,call:arg=>dom(muse,downloadAction,arg),rightClick:(x,y)=>rightClickAt(muse,x,y)});
 }
 async function download(muse,job,signal) {
   const temporary=path.join(settings.output,`.muse-${job.id}-${randomUUID().slice(0,8)}.part`);

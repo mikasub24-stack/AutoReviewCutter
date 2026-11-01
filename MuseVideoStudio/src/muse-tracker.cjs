@@ -163,8 +163,13 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     s.ready=true;s.fingerprint=source(s.video);
     return result('ready','Video của prompt đã sẵn sàng tải');
   };
-  s.download=({phase='auto'}={})=>{
+  // Opening the clip's menu. Muse offers two routes: the "…" button beside the clip
+  // (Download = 2nd row) and a right-click on the clip (Download = 4th row, after the
+  // emoji row, Reply and Share). `soft` makes menu-specific problems return a note so
+  // the caller can try the other route; binding problems (poll above) always throw.
+  s.download=({phase='auto',soft=false}={})=>{
     s.poll();if(!s.ready||!s.responseRoot?.isConnected)throw Error('Video gắn với prompt chưa sẵn sàng tải.');
+    const menuFail=message=>{if(soft)return {action:'failed',clicked:false,needsMenu:false,failed:true,note:message};throw Error(message);};
     const text=e=>norm(e.getAttribute('aria-label')||e.getAttribute('title')||e.textContent);
     const exactDownload=e=>/^(?:download(?:\s+(?:video|file))?|tải\s*(?:xuống|video))$/i.test(text(e));
     const isDownload=e=>e.matches('a[download]')||exactDownload(e)||Boolean(e.querySelector('svg.lucide-download,.tabler-icon-download,[data-icon="download"],[data-lucide="download"]'));
@@ -178,41 +183,162 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       // bubbling reaches the handler, while retaining actual button ancestors.
       return normalized.filter(e=>e.matches('button,a,[role="button"],[role="menuitem"]')||!normalized.some(child=>child!==e&&e.contains(child)&&isDownload(child)));
     }
+    const box=e=>e.getBoundingClientRect();
+    const MOUSE_IN=['pointerover','pointerenter','mouseover','mouseenter','pointermove','mousemove'];
+    const fire=(el,type,init)=>{const C=type.startsWith('pointer')&&typeof PointerEvent==='function'?PointerEvent:MouseEvent;el.dispatchEvent(new C(type,{bubbles:true,cancelable:true,composed:true,view:window,...init}));};
+    // A person's click is pointerdown, mousedown, pointerup, mouseup, click; some menus
+    // (Radix, Fluent) open on pointerdown alone, so a bare element.click() is not enough.
+    function press(el,button=0) {
+      el.scrollIntoView?.({block:'nearest',inline:'nearest',behavior:'instant'});
+      const r=box(el),x=Math.round(r.left+r.width/2),y=Math.round(r.top+r.height/2),hit=document.elementFromPoint(x,y),t=hit&&(el.contains(hit)||hit.contains(el))?hit:el;
+      const base={clientX:x,clientY:y,screenX:x,screenY:y,button,pointerId:1,pointerType:'mouse',isPrimary:true,detail:1},held=button===2?2:1;
+      for(const type of MOUSE_IN)fire(t,type,{...base,buttons:0});
+      fire(t,'pointerdown',{...base,buttons:held});fire(t,'mousedown',{...base,buttons:held});
+      if(button===2)fire(t,'contextmenu',{...base,buttons:2});
+      fire(t,'pointerup',{...base,buttons:0});fire(t,'mouseup',{...base,buttons:0});
+      if(button===0)el.click();
+    }
+    // Toolbars that appear on hover: send the hover events a pointer would.
+    function hover() {
+      let depth=0;
+      for(let n=s.video;n&&n!==document.body&&depth<8;n=n.parentElement,depth++){
+        if(n.contains(s.echoRoot)||n.querySelector('textarea,input,[contenteditable="true"]'))break;
+        const r=box(n);if(!r.width||!r.height)continue;
+        for(const type of MOUSE_IN)fire(n,type,{clientX:Math.round(r.left+r.width/2),clientY:Math.round(r.top+r.height/2),pointerId:1,pointerType:'mouse',isPrimary:true,buttons:0});
+      }
+    }
+    const INTERACTIVE='button,a,[role="button"],[role="menuitem"],[tabindex]:not([tabindex="-1"]),[aria-haspopup]';
+    const sizeOk=r=>r.width>=8&&r.height>=8&&r.width<=96&&r.height<=96;
+    const DOT_TEXT=/^(?:\.{3}|…|⋯|···|•••|⋮|︙|more[_\s-]?(?:horiz|vert)(?:ontal|ical)?|ellipsis|more(?:\s.*)?|options?|menu|thêm|tùy\s*chọn|khác)$/i;
+    const DOT_NAME=/(?:^|[^a-z])(?:more|ellipsis|kebab|meatball|overflow|dots?|three[-_ ]?dots?)(?:$|[^a-z])|morehoriz|morevert|more-horizontal|more-vertical/i;
+    const nameOf=e=>[typeof e.className==='string'?e.className:e.className?.baseVal,e.getAttribute('data-icon'),e.getAttribute('data-lucide'),e.getAttribute('data-testid'),e.id].filter(Boolean).join(' ');
+    // Three small shapes in a line, or one path made of three sub-shapes, is a "…" glyph.
+    function dotGlyph(svg) {
+      const sr=box(svg),span=Math.max(sr.width,sr.height);if(!span)return false;
+      const parts=[...svg.querySelectorAll('circle,ellipse,rect,path,use')].map(n=>({n,r:box(n)})).filter(p=>p.r.width>0&&p.r.height>0);
+      if(parts.length===3&&parts.every(p=>p.r.width<=span*0.45&&p.r.height<=span*0.45)){
+        const cy=parts.map(p=>p.r.top+p.r.height/2),cx=parts.map(p=>p.r.left+p.r.width/2);
+        const flat=a=>Math.max(...a)-Math.min(...a)<=1.5,spread=a=>Math.max(...a)-Math.min(...a)>=2;
+        if((flat(cy)&&spread(cx))||(flat(cx)&&spread(cy)))return true;
+      }
+      if(parts.length===1&&parts[0].n.tagName.toLowerCase()==='path'&&((parts[0].n.getAttribute('d')||'').match(/[Mm]/g)||[]).length>=3){
+        const r=parts[0].r;if(r.width>=r.height*2.2||r.height>=r.width*2.2)return true;
+      }
+      return false;
+    }
+    function clickable(e) {
+      const n=e.closest(INTERACTIVE);if(n&&sizeOk(box(n)))return n;
+      for(let p=e,d=0;p&&p!==s.responseRoot&&d<4;p=p.parentElement,d++)if(sizeOk(box(p))&&getComputedStyle(p).cursor==='pointer')return p;
+      return e;
+    }
+    function moreButtons(scope) {
+      const found=new Set();
+      for(const e of scope.querySelectorAll('*')){
+        if(!visible(e)||e.closest('video')||s.video.contains(e)||e.closest('svg')&&e.tagName.toLowerCase()!=='svg')continue;
+        const r=box(e);if(!sizeOk(r))continue;
+        const haspopup=e.getAttribute('aria-haspopup');
+        const svgs=e.tagName.toLowerCase()==='svg'?[e]:[...e.querySelectorAll('svg')];
+        if((haspopup&&haspopup!=='false')||DOT_TEXT.test(text(e))||DOT_NAME.test(nameOf(e))||(svgs.length===1&&dotGlyph(svgs[0])))found.add(clickable(e));
+      }
+      const list=[...found].filter(e=>!(e.closest('svg')&&e.tagName.toLowerCase()!=='svg'));
+      return list.filter(e=>!list.some(o=>o!==e&&o.contains(e)));
+    }
+    // Rows of a popup as lines of text/icons (works for plain divs and for role="menuitem"
+    // alike). A timestamp header such as "Hôm nay lúc 15:18" is not a row.
+    const META=/^(?:hôm nay|hôm qua|today|yesterday)\b|\b\d{1,2}[:h.]\d{2}\b/i;
+    function menuRows(popup) {
+      // Explicit ARIA menu items are the rows, one each, however they are laid out.
+      const aria=[...popup.querySelectorAll('[role="menuitem"]')].filter(visible);
+      const ariaRows=aria.filter(e=>!aria.some(o=>o!==e&&o.contains(e)));
+      if(ariaRows.length>=2)return ariaRows.map(e=>({cy:box(e).top,h:box(e).height,items:[e],text:norm(e.textContent)}));
+      const leaves=[...popup.querySelectorAll('*')].filter(e=>visible(e)&&(!e.children.length||e.matches('button,a,[role="menuitem"],[role="button"]'))&&(norm(e.textContent)||e.matches('svg,img,canvas')||e.querySelector('svg,img,canvas')));
+      const items=leaves.filter(e=>!leaves.some(o=>o!==e&&e.contains(o)&&!e.matches('button,a,[role="menuitem"],[role="button"]'))).map(e=>({e,r:box(e)})).filter(p=>p.r.width>0&&p.r.height>0).sort((a,b)=>(a.r.top+a.r.height/2)-(b.r.top+b.r.height/2)||a.r.left-b.r.left);
+      const rows=[];
+      for(const p of items){
+        const cy=p.r.top+p.r.height/2,last=rows[rows.length-1];
+        if(last&&Math.abs(cy-last.cy)<=Math.max(8,Math.min(p.r.height,last.h)*0.6)){last.items.push(p.e);last.text+=' '+norm(p.e.textContent);}
+        else rows.push({cy,h:p.r.height,items:[p.e],text:norm(p.e.textContent)});
+      }
+      return rows.filter(row=>row.items.some(e=>e.closest('button,a,[role="menuitem"],[role="button"]'))||!(META.test(row.text.trim())&&row.text.length<48));
+    }
+    const popupLike='[role="menu"],[role="dialog"],[role="listbox"],[data-radix-popper-content-wrapper],[class*="popover" i],[class*="dropdown" i],[class*="context-menu" i],[class*="contextmenu" i]';
+    function popupOf(target) {
+      const named=target.closest(popupLike);
+      if(named&&!named.contains(s.video)&&!named.contains(s.echoRoot))return named;
+      let popup=null;
+      for(let p=target.parentElement;p&&p!==document.body;p=p.parentElement){
+        if(p.contains(s.video)||p.contains(s.echoRoot)||p.querySelector('textarea,input,video'))break;
+        if(box(p).height>640)break;
+        if(menuRows(p).length>=2)popup=p;
+      }
+      return popup;
+    }
+    function mediaHost() {
+      for(let n=s.video;n&&n!==document.body;n=n.parentElement){
+        const r=box(n);if(visible(n)&&r.width>=40&&r.height>=40)return n;
+        if(n===s.responseRoot)break;
+      }
+      return null;
+    }
+    function closeMenus() {
+      s.menuPending=false;s.menuBaseline=null;s.menuOpener=null;s.menuKind='';
+      for(const t of [document.activeElement||document.body,document])for(const type of ['keydown','keyup'])t.dispatchEvent(new KeyboardEvent(type,{key:'Escape',code:'Escape',keyCode:27,which:27,bubbles:true,cancelable:true}));
+    }
+    if(phase==='reset'){closeMenus();return {action:'reset',clicked:false,needsMenu:false};}
+    if(phase==='inspect'){
+      const near=[];
+      for(let scope=s.responseRoot,depth=0;scope&&scope!==document.body&&depth<3;scope=scope.parentElement,depth++){
+        if(scope!==s.responseRoot&&(scope.contains(s.echoRoot)||scope.querySelector('textarea,input,[contenteditable="true"],nav,aside')))break;
+        for(const e of scope.querySelectorAll('button,a,[role],[tabindex],svg,i')){
+          if(!visible(e)||!sizeOk(box(e)))continue;
+          const label=`${e.tagName.toLowerCase()}${nameOf(e)?'.'+nameOf(e).replace(/\s+/g,'.').slice(0,28):''}${text(e).length<=14&&text(e)?'['+text(e)+']':''}`;
+          if(!near.includes(label))near.push(label);
+        }
+        if(near.length)break;
+      }
+      return {action:'inspect',clicked:false,needsMenu:false,near:near.slice(0,10)};
+    }
+    if(phase==='context'||phase==='point') {
+      const host=mediaHost();if(!host)return menuFail('Chưa thấy vùng video để bấm chuột phải.');
+      host.scrollIntoView?.({block:'center',inline:'center',behavior:'instant'});
+      s.menuBaseline=new Set(controls());s.menuKind='context';s.menuOpener=null;s.menuPending=true;
+      if(phase==='point'){const r=box(host);return {action:'point',clicked:false,needsMenu:true,point:{x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)}};}
+      press(host,2);return {action:'waiting-menu',clicked:false,needsMenu:true,kind:'context'};
+    }
     if(phase==='menu'||s.menuPending) {
-      if(!s.menuPending||!s.menuBaseline)throw Error('Chưa mở menu của video này.');
+      if(!s.menuPending||!s.menuBaseline)return menuFail('Chưa mở menu của video này.');
       const menu=controls().filter(e=>isDownload(e)&&!s.menuBaseline.has(e));
-      if(menu.length>1)throw Error('Có nhiều lệnh tải mới xuất hiện. Không thể chọn an toàn.');
+      if(menu.length>1)return menuFail('Có nhiều lệnh tải mới xuất hiện. Không thể chọn an toàn.');
       if(!menu.length)return {action:'waiting-menu',clicked:false,needsMenu:true};
       // Require the menu opened by this clip, including portals/reused popups.
-      // Never use a direct download link or guess the second element globally.
-      const target=menu[0],controlled=s.menuOpener?.getAttribute('aria-controls');
-      if(controlled&&!controlled.split(/\s+/).some(id=>document.getElementById(id)?.contains(target)))throw Error('Lệnh tải không thuộc menu của clip này.');
-      const rowChildren=p=>[...p.children].filter(e=>visible(e)&&!e.matches('svg,[aria-hidden="true"],[role="separator"]')&&/[\p{L}\p{N}]/u.test(text(e)));
-      let popup=target.closest('[role="menu"]');
-      if(!popup){
-        for(let p=target.parentElement;p&&p!==document.body;p=p.parentElement){
-          if(p.contains(s.video)||p.contains(s.echoRoot)||p.querySelector('textarea,input,video'))break;
-          if(rowChildren(p).length>=2){popup=p;break;}
-        }
-      }
-      if(!popup)throw Error('Chưa xác định được dòng thứ hai trong menu của clip.');
-      const interactive=[...popup.querySelectorAll('[role="menuitem"],button,a,[role="button"]')].filter(visible);
-      const rows=interactive.length?interactive.filter(e=>!interactive.some(parent=>parent!==e&&parent.contains(e))):rowChildren(popup);
-      if(rows.length<2||!(rows[1]===target||rows[1].contains(target)))throw Error('Dòng thứ hai của menu chưa phải Tải xuống. Chưa bấm để tránh tải nhầm.');
-      if(rows[1].disabled||rows[1].getAttribute('aria-disabled')==='true')return {action:'waiting-menu',clicked:false,needsMenu:true};
-      menu[0].click();s.menuPending=false;return {action:'clicked',clicked:true,needsMenu:false};
+      // Never use a direct download link or guess the row globally.
+      const target=menu[0],controlled=s.menuOpener?.getAttribute('aria-controls'),context=s.menuKind==='context';
+      if(controlled&&!controlled.split(/\s+/).some(id=>document.getElementById(id)?.contains(target)))return menuFail('Lệnh tải không thuộc menu của clip này.');
+      const popup=popupOf(target);
+      if(!popup)return menuFail(context?'Chưa xác định được menu chuột phải của clip.':'Chưa xác định được dòng thứ hai trong menu của clip.');
+      const rows=menuRows(popup),index=rows.findIndex(row=>row.items.some(e=>e===target||e.contains(target)||target.contains(e)));
+      // "…" menu: Download is the 2nd row. Right-click menu: 4th row (after emoji row,
+      // Reply, Share), or the last row when Muse drops one of them.
+      const right=context?(index===3||(index>=2&&index===rows.length-1)):index===1;
+      if(!right)return menuFail(context?'Dòng thứ tư của menu chuột phải chưa phải Tải xuống. Chưa bấm để tránh tải nhầm.':'Dòng thứ hai của menu chưa phải Tải xuống. Chưa bấm để tránh tải nhầm.');
+      if(target.disabled||target.getAttribute('aria-disabled')==='true')return {action:'waiting-menu',clicked:false,needsMenu:true};
+      press(target);s.menuPending=false;return {action:'clicked',clicked:true,needsMenu:false};
     }
+    hover();
     let more=[];
     for(let scope=s.responseRoot,depth=0;scope&&scope!==document.body&&depth<4;scope=scope.parentElement,depth++){
       if(scope!==s.responseRoot&&(scope.contains(s.echoRoot)||scope.querySelector('textarea,input,[contenteditable="true"],nav,aside')))break;
       const media=mediaNodes(scope);if(media.length!==1||media[0]!==s.video)break;
-      more=[...scope.querySelectorAll('button,[role="button"],div[tabindex],span[tabindex]')].filter(e=>visible(e)&&(/^(?:\.{3}|…|⋯|more(?:\s.*)?|options|menu|thêm|tùy\s*chọn)$/i.test(text(e))||e.getAttribute('aria-haspopup')==='menu'||Boolean(e.querySelector('svg.lucide-ellipsis,svg.lucide-more-horizontal,[data-icon="more-horizontal"],[data-lucide="ellipsis"]'))||[...e.querySelectorAll('svg')].some(svg=>{const dots=[...svg.querySelectorAll('circle')];return dots.length===3&&dots.every(d=>d.getAttribute('cy')===dots[0].getAttribute('cy'));})));
-      more=more.filter(e=>!more.some(child=>child!==e&&e.contains(child)));
+      more=moreButtons(scope);
       if(more.length)break;
     }
-    if(more.length>1)throw Error('Có nhiều menu trong phản hồi. Không thể xác định menu tải video.');
-    if(more.length===1){s.menuBaseline=new Set(controls());s.menuOpener=more[0];s.menuPending=true;more[0].click();return {action:'waiting-menu',clicked:false,needsMenu:true};}
-    throw Error('Chưa thấy menu … của đúng clip. Chưa tải video.');
+    if(more.length>1){
+      const tops=[...new Set(more.map(e=>Math.round(box(e).top/12)))];
+      if(tops.length>1)return menuFail('Có nhiều menu trong phản hồi. Không thể xác định menu tải video.');
+      more=[more.sort((a,b)=>box(a).left-box(b).left).pop()];
+    }
+    if(more.length===1){s.menuBaseline=new Set(controls());s.menuOpener=more[0];s.menuKind='more';s.menuPending=true;press(more[0]);return {action:'waiting-menu',clicked:false,needsMenu:true,kind:'more'};}
+    return menuFail('Chưa thấy menu … của đúng clip. Chưa tải video.');
   };
   const prior=echoCandidates(true).length;s.hadPriorSame=recover?prior>1:prior>0;
   s.probe=()=>{
@@ -241,10 +367,10 @@ function pollTracking({id}) {
   if(!state)throw Error('Không có trạng thái theo dõi cho tác vụ này.');
   return state.poll();
 }
-function downloadAction({id,phase='auto'}) {
+function downloadAction({id,phase='auto',soft=false}) {
   const state=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]?.get(id);
   if(!state)throw Error('Không có video đã gắn với tác vụ này.');
-  return state.download({phase});
+  return state.download({phase,soft});
 }
 function endTracking({id}) {
   const map=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')],state=map?.get(id);
