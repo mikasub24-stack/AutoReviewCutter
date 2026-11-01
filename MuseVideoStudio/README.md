@@ -1,4 +1,9 @@
-# Muse Video Studio V1 · 1.1.0 · Windows
+# Muse Video Studio V1 · 1.1.1 · Windows
+
+## Tối đa 10 tài khoản / phiên trình duyệt (1.1.1)
+
+Chọn 1–10 ở mục Parallel browsers / Chạy song song. Mỗi tài khoản dùng phiên đăng nhập và hồ sơ riêng; có thể chạy10 cảnh đồng thời. Khi tài khoản nào lưu xong video, tài khoản đó nhận cảnh chờ tiếp theo. App chính vẫn chỉ có một instance. Ảnh tham chiếu chung được ghi cache một lần an toàn khi nhiều worker cùng nhận cảnh.
+
 
 ## English / Tiếng Việt (1.1.0)
 
@@ -37,7 +42,7 @@ Trạng thái đi theo bằng chứng: nhập prompt/đính kèm → gửi → x
 
 ## Một danh sách, Test chung mọi trình duyệt (0.8.0)
 
-Một nút **Test tất cả trình duyệt** tự mở 1–4 phiên đã chọn, chỉ gửi “Bắt đầu công việc mới nhé”. Từ 0.8.2, nút này chỉ gửi câu mở đầu và không phải điều kiện mở nút Chạy/Tiếp tục. Test không tạo, không bắt đầu và không tiêu thụ prompt trong hàng chờ. Test chờ ô chat tải xong; có bản nháp/ảnh khác sẽ giữ nguyên và báo rõ. Có thể chạy trực tiếp sau khi mở lại app, không cần Test. Đăng nhập lần đầu vẫn thực hiện trực tiếp trong cửa sổ Muse.
+Một nút **Test tất cả trình duyệt** tự mở 1–10 phiên đã chọn, chỉ gửi “Bắt đầu công việc mới nhé”. Từ 0.8.2, nút này chỉ gửi câu mở đầu và không phải điều kiện mở nút Chạy/Tiếp tục. Test không tạo, không bắt đầu và không tiêu thụ prompt trong hàng chờ. Test chờ ô chat tải xong; có bản nháp/ảnh khác sẽ giữ nguyên và báo rõ. Có thể chạy trực tiếp sau khi mở lại app, không cần Test. Đăng nhập lần đầu vẫn thực hiện trực tiếp trong cửa sổ Muse.
 
 Tất cả cảnh nằm trong danh sách theo thứ tự gốc, không cần đổi tab Đang chạy. Từng ô hiển thị ảnh/gửi/tạo/tải, phần trăm thật khi có, thời gian chờ và tên tệp sau khi lưu thành công. Xong ô nào thì ô đó báo **Đã xong**, tài khoản đó tự nhận cảnh tiếp theo. Chọn 4 trình duyệt chạy được 4 cảnh cùng lúc. Danh sách cuộn riêng và tự theo cảnh mới, có thể tắt tự theo; phần prompt và xuất/ghép được thu gọn.
 
@@ -98,7 +103,7 @@ Chỉ dùng chế độ **Kịch bản thô → prompt theo mẫu** khi muốn t
 
 ## Tài khoản và trình duyệt
 
-Cài đặt cho phép chọn trình duyệt tích hợp, Chrome, Edge hoặc Chromium khác. Mỗi loại trình duyệt và mỗi tài khoản dùng hồ sơ riêng do app tạo; không dùng hồ sơ Chrome/Edge cá nhân. Có thể mở tối đa4 tài khoản. Chế độ song song cho mỗi tài khoản chạy một prompt và nhận việc tiếp theo sau khi đã lưu video.
+Cài đặt cho phép chọn trình duyệt tích hợp, Chrome, Edge hoặc Chromium khác. Mỗi loại trình duyệt và mỗi tài khoản dùng hồ sơ riêng do app tạo; không dùng hồ sơ Chrome/Edge cá nhân. Có thể mở tối đa10 tài khoản. Chế độ song song cho mỗi tài khoản chạy một prompt và nhận việc tiếp theo sau khi đã lưu video.
 
 Nút **Đăng xuất tài khoản này** xác nhận rồi xóa dữ liệu đăng nhập của đúng hồ sơ đang chọn; các tài khoản khác và trình duyệt cá nhân giữ nguyên. Cookie phiên được lưu mã hóa với Electron safeStorage (Windows DPAPI); không đưa vào file xuất hoặc repo. Phiên vẫn có thể bị Muse thu hồi/hết hạn.
 

@@ -7,6 +7,7 @@ Máy chưa hỗ trợ lưu mã hóa dùng thử/key.|Encrypted license storage i
 Dữ liệu dùng thử không hợp lệ. Cần chủ phần mềm hỗ trợ.|Trial data is invalid. Contact the software owner.
 Giờ hệ thống lùi so với lần dùng trước. Kiểm tra lại ngày giờ.|System time moved backwards. Check your date and time.
 Key không hợp lệ, hết hạn hoặc không dành cho máy này.|The key is invalid, expired or belongs to another device.
+Chọn từ 1–10 tài khoản.|Choose between 1 and 10 accounts.
 Ngôn ngữ|Language
 Ngôn ngữ giao diện|Interface language
 QR chuyển khoản BIDV|BIDV payment QR
@@ -105,7 +106,7 @@ Cách chạy prompt|Prompt dispatch
 Song song — một prompt / tài khoản|Parallel — one prompt per account
 Lần lượt — chờ tải xong từng video|Sequential — wait until each video is saved
 Nghỉ giữa các lượt (giây)|Delay between scenes (seconds)
-Số tài khoản sử dụng (1–4)|Accounts to use (1–4)
+Số tài khoản sử dụng (1–10)|Accounts to use (1–10)
 CSS selector ô chat|Chat composer CSS selector
 CSS selector ô tải ảnh|File input CSS selector
 CSS selector ảnh đã sẵn sàng (để trống = tự nhận diện)|Image-ready CSS selector (blank = automatic)

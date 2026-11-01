@@ -13,3 +13,9 @@ test('bulk references cannot modify a locked paused task and resume keeps its ac
 test('confirmed browser stop schedules resubmission; uncertain stop schedules recovery',()=>{
  const q=new Queue({save:async()=>{},run:async()=>'',jobs:[{id:'a',status:'interrupted',account:1,mayHaveSubmitted:true,remoteStop:{state:'confirmed'}},{id:'b',status:'interrupted',account:2,mayHaveSubmitted:true,remoteStop:{state:'requested'}}]});q.prepareResume();assert.deepEqual(q.jobs.map(j=>j.resumeMode),['resubmit','recover']);
 });
+
+test('ten parallel scenes safely share one complete locked reference file',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-shared-cache-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));const source=path.join(dir,'shared.png'),bytes=Buffer.alloc(1024*1024,7),cache=path.join(dir,'cache');await fs.writeFile(source,bytes);
+ const inputs=await Promise.all(Array.from({length:10},(_,i)=>lockInput({prompt:'Scene '+i,references:[source]},cache)));
+ assert.equal((await fs.readdir(cache)).length,1);assert.equal(new Set(inputs.map(i=>i.references[0].path)).size,1);assert.deepEqual(await fs.readFile(inputs[0].references[0].path),bytes);assert.equal(new Set(inputs.map(i=>i.promptHash)).size,10);
+});

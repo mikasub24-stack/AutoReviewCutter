@@ -594,7 +594,7 @@ app.whenReady().then(async () => {
       const attachmentReadySelector=typeof data.attachmentReadySelector==='string'?data.attachmentReadySelector.trim():settings.attachmentReadySelector;
       if(attachmentReadySelector.length>2000)throw Error('Selector ảnh quá dài.');
       const minutes = Number(data.timeoutMinutes); if (!Number.isFinite(minutes) || minutes < 1 || minutes > 120) throw Error('Ngưỡng báo Muse chậm phải từ 1–120 phút.');
-      const accountCount = Number(data.accountCount); if (!Number.isInteger(accountCount) || accountCount < 1 || accountCount > 4) throw Error('Chọn từ 1–4 tài khoản.');
+      const accountCount = Number(data.accountCount); if (!Number.isInteger(accountCount) || accountCount < 1 || accountCount > 10) throw Error('Chọn từ 1–10 tài khoản.');
       if(typeof data.ffmpeg !== 'string' || !data.ffmpeg.trim()) throw Error('Nhập đường dẫn FFmpeg hoặc ffmpeg nếu đã thêm vào PATH.');
       if (!['keep','package','merge'].includes(data.finishAction)) throw Error('Chọn cách xử lý sau khi tạo video.');
       const browserChoice=data.browserChoice ?? settings.browserChoice,browserPath=typeof data.browserPath === 'string' ? data.browserPath.trim() : settings.browserPath;

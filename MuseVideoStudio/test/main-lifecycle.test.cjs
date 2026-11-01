@@ -453,7 +453,7 @@ test('uncertain remote stop resumes the original attempt and retries downloading
 });
 
 
-test('one warmup sends to four browsers and finishes without any reply; only Start sends video prompts',{timeout:12000},async()=>{
+test('one warmup sends to ten browsers and finishes without any reply; only Start sends video prompts',{timeout:12000},async()=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-test-handshake-'));let app,launched=0;const sent=[],begins=[];
  try{
   await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir}}));
@@ -470,14 +470,16 @@ test('one warmup sends to four browsers and finishes without any reply; only Sta
     return null;
    }};
   }});
-  await app.invoke('settings',{...app.invoke('state').settings,accountCount:4,browserChoice:'chrome',output:dir,cooldownSeconds:0,finishAction:'keep'});
-  await app.invoke('add',Array.from({length:6},(_,i)=>({prompt:'Video scene '+(i+1)})));
+  await app.invoke('settings',{...app.invoke('state').settings,accountCount:10,browserChoice:'chrome',output:dir,cooldownSeconds:0,finishAction:'keep'});
+  await assert.rejects(app.invoke('settings',{...app.invoke('state').settings,accountCount:11,finishAction:'keep'}),/1–10/);
+  await app.invoke('add',Array.from({length:12},(_,i)=>({prompt:'Video scene '+(i+1)})));
   await app.invoke('testBrowsers');
+  assert.equal(launched,10);assert.equal(app.invoke('state').accounts.length,10);
   assert.equal(app.invoke('state').active,false);assert.ok(app.invoke('state').jobs.every(j=>j.status==='pending'));
   assert.equal(app.invoke('state').testing,false);assert.ok(app.invoke('state').browserTests.every(t=>t.status==='sent'));
-  assert.equal(sent.length,4);assert.ok(begins.every(b=>b.prompt==='Bắt đầu công việc mới nhé'));
-  await app.invoke('start');await until(()=>sent.length===8);
-  assert.equal(app.invoke('state').jobs.filter(j=>j.status==='running').length,4);
+  assert.equal(sent.length,10);assert.ok(begins.every(b=>b.prompt==='Bắt đầu công việc mới nhé'));
+  await app.invoke('start');await until(()=>sent.length===20);
+  assert.equal(app.invoke('state').jobs.filter(j=>j.status==='running').length,10);
   assert.equal(app.invoke('state').jobs.filter(j=>j.status==='pending').length,2);
   assert.ok(app.invoke('state').jobs.filter(j=>j.status==='running').every(j=>!j.acknowledgedAt));
   await app.invoke('stop');await app.stop();
