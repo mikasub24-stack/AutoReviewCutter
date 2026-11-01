@@ -61,6 +61,8 @@ jobs:
           set "MUSE_TRACKER_VIDEO_FIXTURE=test\fixtures\solid-blue.webm"
           call node test/muse-tracker-smoke.cjs >> test.log 2>&1
           if errorlevel 1 (type test.log & exit /b 1)
+          call node test/download-menu-smoke.cjs >> test.log 2>&1
+          if errorlevel 1 (type test.log & exit /b 1)
           call node test/cards-smoke.cjs >> test.log 2>&1
           if errorlevel 1 (type test.log & exit /b 1)
           call node test/language-smoke.cjs >> test.log 2>&1
