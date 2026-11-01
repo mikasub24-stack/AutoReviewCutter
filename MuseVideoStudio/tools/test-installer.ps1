@@ -24,7 +24,7 @@ foreach ($shortcut in @($desktop, $startMenu)) {
 }
 Write-Host 'Verified reinstall restores deleted Desktop and Start menu shortcuts.'
 try {
-  # UIAutomationClient uses the Windows desktop .NET Framework assemblies.
+  # Exercise native installer controls in a Windows desktop process.
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/test-installer-ui.ps1" -Setup $setup -InstallRoot $installRoot
   if ($LASTEXITCODE -ne 0) { throw "Interactive Finish test exited with $LASTEXITCODE" }
   $deadline = (Get-Date).AddSeconds(40)
