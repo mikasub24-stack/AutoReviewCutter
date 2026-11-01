@@ -1,4 +1,9 @@
-# Muse Video Studio V1 · 1.0.1 · Windows
+# Muse Video Studio V1 · 1.0.2 · Windows
+
+## Nhận diện mới (1.0.2)
+
+Thay dòng tiếng Anh bằng **XƯỞNG VIDEO SÁNG TẠO**, màu chủ đạo xanh ngọc và nền thanh bên xanh rêu đậm. Bao gồm khóa một app chính, bỏ menu desktop và hỏi Thoát hẳn / Ở lại từ1.0.1.
+
 
 ## Cửa sổ và thoát ứng dụng (1.0.1)
 

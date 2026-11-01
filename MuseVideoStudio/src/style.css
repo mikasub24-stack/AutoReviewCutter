@@ -4,7 +4,7 @@
   font-size: 14px;
   color: #e9eef7;
   background: #0c121c;
-  --gold: #efbd62;
+  --accent: #49d8ca;
   --muted: #94a2b9;
   --line: #283447;
   --panel: #151f2e;
@@ -16,11 +16,11 @@ button, input, textarea, select { font: inherit; }
 button { border: 1px solid transparent; border-radius: 9px; padding: 10px 14px; color: inherit; background: transparent; cursor: pointer; transition: background .15s, border-color .15s; }
 button:hover { background: #253348; }
 button:disabled { opacity: .38; cursor: default; }
-button:focus-visible, summary:focus-visible, select:focus-visible { outline: 2px solid #efbd6280; outline-offset: 3px; }
+button:focus-visible, summary:focus-visible, select:focus-visible { outline: 2px solid #49d8ca80; outline-offset: 3px; }
 .secondary { border-color: #344259; background: #1b283a; font-size: 12px; font-weight: 500; }
 .secondary:hover { border-color: #52647f; background: #24344a; }
-.primary { border-color: #f6cd81; background: var(--gold); color: #211b11; font-size: 12px; font-weight: 700; box-shadow: 0 3px 12px #0003; }
-.primary:hover { background: #ffd48d; }
+.primary { border-color: #81eee1; background: var(--accent); color: #082c29; font-size: 12px; font-weight: 700; box-shadow: 0 3px 12px #0003; }
+.primary:hover { background: #88eee3; }
 p { margin: 5px 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
 small { display: block; color: var(--muted); font-size: 11px; font-weight: 400; line-height: 1.5; margin-top: 5px; }
 h1, h2, h3 { margin: 0; font-weight: 650; }
@@ -28,21 +28,21 @@ h2 { font-size: 20px; }
 h3 { font-size: 14px; }
 label { display: block; font-size: 12px; margin: 14px 0; }
 input, textarea, label select { display: block; width: 100%; border: 1px solid #34445e; border-radius: 8px; background: #0f1826; color: #e9eef7; padding: 10px 12px; margin-top: 7px; outline: none; font-size: 12px; }
-input:focus, textarea:focus { border-color: #ba975f; box-shadow: 0 0 0 3px #efbd620d; }
+input:focus, textarea:focus { border-color: #49cfc0; box-shadow: 0 0 0 3px #49d8ca14; }
 textarea { min-height: 96px; max-height: 280px; resize: vertical; margin: 14px 0 10px; line-height: 1.7; }
 textarea::placeholder { color: #697a94; }
-aside { position: fixed; inset: 0 auto 0 0; z-index: 10; width: var(--sidebar); padding: 24px 16px 18px; display: flex; flex-direction: column; overflow-y: auto; background: #101925; border-right: 1px solid #263247; }
+aside { position: fixed; inset: 0 auto 0 0; z-index: 10; width: var(--sidebar); padding: 24px 16px 18px; display: flex; flex-direction: column; overflow-y: auto; background: #102326; border-right: 1px solid #263247; }
 .brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; font-size: 17px; font-weight: 750; letter-spacing: .3px; }
-.brand b { color: var(--gold); }
-.brand small { font-size: 8px; letter-spacing: 1.3px; margin-top: 4px; }
+.brand b { color: var(--accent); }
+.brand small { font-size: 9px; letter-spacing: .55px; margin-top: 5px; color: #9dcfc8; }
 img.logo { width: 36px; height: 36px; flex-shrink: 0; border-radius: 9px; }
 .profile { display: flex; align-items: center; gap: 10px; padding: 14px 9px; margin: 20px 0 16px; border-top: 1px solid #253146; border-bottom: 1px solid #253146; font-size: 12px; flex-shrink: 0; }
 .profile small { font-size: 10px; line-height: 1.4; }
 .avatar { display: flex; align-items: center; justify-content: center; width: 32px; height: 34px; background: #2e405b; color: #d1def2; border-radius: 9px; font-size: 12px; font-weight: 700; flex-shrink: 0; }
 nav { flex-shrink: 0; }
 nav button { display: block; width: 100%; text-align: left; padding: 10px 10px; margin: 4px 0; font-size: 12px; line-height: 1.5; }
-nav .selected { border-color: #695334; background: #3a3021; color: #f6cc82; font-weight: 600; }
-nav span { float: right; padding: 1px 6px; background: #5d492c; border-radius: 5px; font-size: 10px; }
+nav .selected { border-color: #2f7770; background: #173b39; color: #9af3e7; font-weight: 600; }
+nav span { float: right; padding: 1px 6px; background: #245752; border-radius: 5px; font-size: 10px; }
 .browserInfo { margin: 20px 9px 0; color: #becce0; font-size: 10px; }
 .accountPicker { margin: 9px 0 12px; font-size: 10px; color: #8e9fb8; }
 .accountPicker select { width: 100%; margin-top: 6px; padding: 9px 10px; border-radius: 8px; background: #192536; color: #dbe5f4; border: 1px solid #334159; font-size: 11px; }
@@ -55,7 +55,7 @@ main { margin-left: var(--sidebar); width: calc(100% - var(--sidebar)); max-widt
 .workspaceHeading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
 .eyebrow { display: block; color: #8598b4; font-size: 9px; font-weight: 600; letter-spacing: 1.6px; margin-bottom: 7px; }
 .workspaceHeading h1 { font-size: 24px; letter-spacing: -.5px; line-height: 1.3; }
-.workspaceHeading h1 span { display: inline-block; padding: 3px 8px; margin-left: 5px; border: 1px solid #46516a; background: #1f2c40; border-radius: 7px; font-size: 12px; color: #e7c892; vertical-align: middle; letter-spacing: 0; }
+.workspaceHeading h1 span { display: inline-block; padding: 3px 8px; margin-left: 5px; border: 1px solid #46516a; background: #1f2c40; border-radius: 7px; font-size: 12px; color: #9beddf; vertical-align: middle; letter-spacing: 0; }
 #toggleEditor { padding: 10px 14px; }
 .workspacePanel { margin: 0 0 8px; background: #111c2a; border: 1px solid #29364c; border-radius: 10px; }
 .workspacePanel > summary { position: relative; padding: 11px 15px; font-size: 12px; font-weight: 550; color: #cbd7e9; cursor: pointer; list-style: none; }
