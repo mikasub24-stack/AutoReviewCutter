@@ -1,7 +1,9 @@
 $ErrorActionPreference = 'Stop'
 $version = (Get-Content package.json | ConvertFrom-Json).version
 $setup = (Resolve-Path "dist/MuseVideoStudio-$version-Setup.exe").Path
-$installRoot = Join-Path $env:RUNNER_TEMP 'MuseInstallerSmoke'
+# The wizard appends the app folder name to any chosen folder that does not
+# already end with it, so test with the folder the wizard would use anyway.
+$installRoot = Join-Path $env:RUNNER_TEMP 'MuseInstallerSmoke\Muse Video Studio'
 $exe = Join-Path $installRoot 'Muse Video Studio.exe'
 $installed = Start-Process -FilePath $setup -ArgumentList '/S', "/D=$installRoot" -Wait -PassThru
 if ($installed.ExitCode -ne 0) { throw "Installer exited with $($installed.ExitCode)" }
@@ -33,20 +35,6 @@ try {
     $running = @(Get-Process -Name 'Muse Video Studio' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe })
     $window = @($running | Where-Object { $_.MainWindowHandle -ne 0 })
   } while ($window.Count -eq 0 -and (Get-Date) -lt $deadline)
-  if ($window.Count -eq 0) {
-    # Diagnostics only: the test still fails below. Shows whether the app was
-    # started at all, and whether the installed app opens when started directly.
-    Write-Host "DIAG explorer processes: $(@(Get-Process explorer -ErrorAction SilentlyContinue).Count); installed exe exists: $(Test-Path $exe)"
-    Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match 'Muse|electron' } | ForEach-Object { Write-Host "DIAG process $($_.Id) $($_.ProcessName) path=$($_.Path) hwnd=$($_.MainWindowHandle) responding=$($_.Responding)" }
-    Start-Process -FilePath $exe | Out-Null
-    $direct = Get-Date; $directWindows = @()
-    do {
-      Start-Sleep -Milliseconds 500
-      $directWindows = @(Get-Process -Name 'Muse Video Studio' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe -and $_.MainWindowHandle -ne 0 })
-    } while ($directWindows.Count -eq 0 -and ((Get-Date) - $direct).TotalSeconds -lt 40)
-    Write-Host "DIAG direct launch windows after $([int]((Get-Date) - $direct).TotalSeconds)s: $($directWindows.Count)"
-    Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match 'Muse|electron' } | ForEach-Object { Write-Host "DIAG process $($_.Id) $($_.ProcessName) hwnd=$($_.MainWindowHandle)" }
-  }
   if ($window.Count -ne 1) { throw "Expected one installed application window, found $($window.Count)" }
   Start-Process -FilePath $exe | Out-Null
   Start-Sleep -Seconds 2
