@@ -119,6 +119,24 @@ const assert = require('node:assert/strict');
     await mkRow('mr-clip','<div><video preload="auto" src="/multi-row.webm"></video></div><div><button>…</button></div>');await mkRow('mr-note','<div><p>Check the length please</p></div>');await ready('mr-clip');
     multi=await page.evaluate(pollTracking,{id:'multi-row'});assert.equal(multi.ready,true);assert.equal(multi.responseMatched,true);assert.equal(multi.url,'https://muse.ai/multi-row.webm');
     await mkRow('mr-clip-2','<div><video preload="auto" src="/multi-row-2.webm"></video></div>');await assert.rejects(page.evaluate(pollTracking,{id:'multi-row'}),/nhiều video/);
+    // The reply row can exist before the user's text is finished rendering; the
+    // clip still belongs to the prompt that was sent.
+    await reset();await page.evaluate(()=>document.getElementById('thread').removeAttribute('data-chat-thread'));await page.evaluate(beginTracking,{id:'late-text',prompt:'Late text prompt'});
+    await page.evaluate(()=>{const t=document.getElementById('thread');const u=document.createElement('div');u.className='row';u.id='lt-user';u.innerHTML='<div><p></p></div><div><button>copy</button></div>';const r=document.createElement('div');r.className='row';r.id='lt-clip';r.innerHTML='<div><video preload="auto" src="/late-text.webm"></video></div><div><button>…</button></div>';t.append(u,r);});await ready('lt-clip');
+    assert.equal((await page.evaluate(pollTracking,{id:'late-text'})).phase,'waiting-prompt');
+    await page.evaluate(()=>{document.querySelector('#lt-user p').textContent='Late text prompt';});
+    const lateText=await page.evaluate(pollTracking,{id:'late-text'});assert.equal(lateText.ready,true);assert.equal(lateText.responseMatched,true);
+    // Unrecognised, deeply nested chat markup: the new clip after the echo inside the
+    // same chat area still binds; a clip outside the chat area or an old one does not,
+    // and two new clips fail closed.
+    await reset();await page.evaluate(()=>document.getElementById('thread').removeAttribute('data-chat-thread'));
+    await page.evaluate(()=>{const t=document.getElementById('thread');const old=document.createElement('div');old.id='deep-old';old.innerHTML='<div><video preload="auto" src="/deep-old.webm"></video></div>';t.append(old);});
+    await page.evaluate(beginTracking,{id:'deep',prompt:'Deep nested prompt'});
+    await page.evaluate(()=>{const t=document.getElementById('thread');const text=document.createElement('p');text.textContent='Deep nested prompt';const reaction=document.createElement('span');reaction.textContent='👍';let node=document.createElement('div');node.append(text,reaction);for(let i=0;i<8;i++){const w=document.createElement('div');w.append(node);node=w;}node.id='deep-user';t.append(node);const other=document.createElement('video');other.preload='auto';other.src='/deep-outside.webm';document.getElementById('unrelated').append(other);});
+    let deep=await page.evaluate(pollTracking,{id:'deep'});assert.equal(deep.ready,false);assert.equal(deep.responseMatched,false);assert.equal(deep.hint,'thấy 1 video mới nhưng chưa gắn được vào đúng prompt');
+    await page.evaluate(()=>{const r=document.createElement('div');r.id='deep-clip';r.innerHTML='<div><video preload="auto" src="/deep-clip.webm"></video></div>';document.getElementById('thread').append(r);});await ready('deep-clip');
+    deep=await page.evaluate(pollTracking,{id:'deep'});assert.equal(deep.ready,true);assert.equal(deep.responseMatched,true);assert.equal(deep.url,'https://muse.ai/deep-clip.webm');
+    await page.evaluate(()=>{const r=document.createElement('div');r.id='deep-clip-2';r.innerHTML='<div><video preload="auto" src="/deep-clip-2.webm"></video></div>';document.getElementById('thread').append(r);});await assert.rejects(page.evaluate(pollTracking,{id:'deep'}),/nhiều video/);
     // Recovery after a restart reads the same multi-row reply, but never past
     // another queued prompt's row.
     await reset();await page.evaluate(()=>document.getElementById('thread').removeAttribute('data-chat-thread'));

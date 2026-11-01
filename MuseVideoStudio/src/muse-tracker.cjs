@@ -110,7 +110,55 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   // stuck scene says what the tool can and cannot see in the chat.
   function hint(){
     const fresh=[...document.querySelectorAll('video')].filter(v=>s.echoRoot?.isConnected&&following(s.echoRoot,v)&&(recover||(!s.baseline.has(v)&&!s.baselineSources.has(source(v))))).length;
-    return fresh?`thấy ${fresh} video mới nhưng chưa gắn được vào đúng prompt`:'chưa thấy video mới trong chat';
+    const why=Object.entries(s.reject||{}).map(([k,n])=>k+' '+n).join(', ');
+    return fresh?`thấy ${fresh} video mới nhưng chưa gắn được vào đúng prompt${why?' ('+why+')':''}`:'chưa thấy video mới trong chat';
+  }
+  function lca(a,b){const up=new Set();for(let n=a;n;n=n.parentElement)up.add(n);for(let n=b;n;n=n.parentElement)if(up.has(n))return n;return null;}
+  // Markup-independent chat area: the nearest scrolling ancestor of the echo, limited
+  // to ancestors that hold no composer, nav or aside.
+  function chatBound(){
+    let bound=null;
+    for(let n=s.echoRoot.parentElement;n&&n!==document.body&&n!==document.documentElement;n=n.parentElement){
+      if(n.querySelector('textarea,input,[contenteditable="true"],[role="textbox"],nav,aside'))break;
+      bound=n;
+    }
+    if(!bound)return null;
+    for(let n=s.echoRoot.parentElement;n&&bound.contains(n);n=n.parentElement){
+      if(/auto|scroll|overlay/.test(getComputedStyle(n).overflowY)&&n.scrollHeight>n.clientHeight+2)return n;
+    }
+    return bound;
+  }
+  // Used when the row structure of the chat is not recognised: any new clip that
+  // follows this prompt's echo inside the same chat area belongs to it. Only one
+  // prompt is in flight per window; two clips stay ambiguous and fail closed.
+  function fallbackCandidates(note){
+    const found=[];
+    if(!s.echoRoot?.isConnected)return found;
+    const bound=chatBound();if(!bound)return found;
+    const users=[...bound.querySelectorAll('*')].filter(e=>e!==s.echoRoot&&following(s.echoRoot,e)&&author(e).kind==='user'&&author(e).root===e);
+    const ids=new Set([...s.echoAliases,s.echoRoot.id,s.echoRoot.getAttribute('data-message-id'),s.echoRoot.getAttribute('data-id')].filter(Boolean));
+    for(const video of mediaNodes(bound)){
+      if(!following(s.echoRoot,video)||s.echoRoot.contains(video)||composer(video))continue;
+      if(!recover&&(s.baseline.has(video)||s.baselineSources.has(source(video))))continue;
+      const common=lca(s.echoRoot,video);
+      if(!common||!bound.contains(common)){note('ngoài vùng chat');continue;}
+      let root=video,first=s.echoRoot;
+      while(root.parentElement&&root.parentElement!==common)root=root.parentElement;
+      while(first.parentElement&&first.parentElement!==common)first=first.parentElement;
+      if(root.parentElement!==common||first.parentElement!==common||root===first||root.contains(s.echo)){note('không rõ khối');continue;}
+      if(users.some(user=>following(user,video))){note('sau tin nhắn khác');continue;}
+      const owner=video.closest('[data-response-to],[data-parent-message-id],[data-prompt-id]'),ref=owner&&(owner.getAttribute('data-response-to')||owner.getAttribute('data-parent-message-id')||owner.getAttribute('data-prompt-id'));
+      if(ref&&!ids.has(ref.replace(/^#/,''))){note('khác ID prompt');continue;}
+      let blocked=false;
+      for(let n=first.nextElementSibling;n;n=n.nextElementSibling){
+        if(n.hasAttribute('data-muse-studio-attempt')||n.querySelector('[data-muse-studio-attempt]')){blocked=true;break;}
+        if(recover&&others.length&&others.some(p=>norm(n.textContent).includes(p))){blocked=true;break;}
+        if(n===root)break;
+      }
+      if(blocked){note('sau prompt khác');continue;}
+      found.push({video,root});
+    }
+    return found;
   }
 
   function responseRoot(video,thread) {
@@ -140,7 +188,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     if(!s.echo&&echoes.length>1)throw Error('Có nhiều tin nhắn trùng chính xác prompt. Không xác định được video của tác vụ; hãy dùng chat riêng hoặc xử lý thủ công.');
     if(!s.echo) {
       if(!echoes.length){if(recover&&recoverRequireAnchor)return {...result('recovery-unbound','Chưa xác nhận được tin nhắn của đúng lượt gửi cũ',null),recoveryUnbound:true,historicalEchoCount:echoCandidates(true).length};return result('waiting-prompt','Chờ Muse hiển thị đúng prompt đã gửi');}
-      s.echo=echoes[0].leaf;s.echoRoot=echoes[0].root;s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.echoNativeKey=s.echoRoot.id||s.echoRoot.getAttribute('data-message-id')||s.echoRoot.getAttribute('data-id')||'';if(s.echoNativeKey)s.echoAliases.add(s.echoNativeKey);s.echoContexts=rememberContext(s.echoRoot);s.echoEpoch=Math.max(s.added.get(s.echo)||0,s.added.get(s.echoRoot)||0,s.textChanged.get(s.echo)||0);
+      s.echo=echoes[0].leaf;s.echoRoot=echoes[0].root;s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.echoNativeKey=s.echoRoot.id||s.echoRoot.getAttribute('data-message-id')||s.echoRoot.getAttribute('data-id')||'';if(s.echoNativeKey)s.echoAliases.add(s.echoNativeKey);s.echoContexts=rememberContext(s.echoRoot);s.echoEpoch=Math.max(s.added.get(s.echo)||0,s.added.get(s.echoRoot)||0);
     }
     if(!s.echo.isConnected||!s.echoRoot.isConnected){
       const all=echoCandidates(true);
@@ -149,31 +197,33 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       if(anchored.length!==1)return result('waiting-response','Muse đang dựng lại tin nhắn · chờ khôi phục đúng cảnh gốc',null);
       s.echo=anchored[0].leaf;s.echoRoot=anchored[0].root;s.echoContexts=rememberContext(s.echoRoot);s.echoNativeKey=s.echoRoot.id||s.echoRoot.getAttribute('data-message-id')||s.echoRoot.getAttribute('data-id')||'';if(s.echoNativeKey)s.echoAliases.add(s.echoNativeKey);s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.ready=false;s.responseRoot=null;s.video=null;
     }
-    const thread=threadRoot(s.echoRoot);if(!thread)return {...result('waiting-response','Chưa xác định được vùng phản hồi cho prompt này'),hint:hint()};
+    const thread=threadRoot(s.echoRoot);
     if(s.ready&&(!s.video?.isConnected||!s.responseRoot?.isConnected)){s.ready=false;s.video=null;s.responseRoot=null;}
     if(s.ready&&s.video&&(source(s.video)!==s.fingerprint))throw Error('Kết quả đã thay đổi. Dừng tải để tránh lấy nhầm video.');
     // Every poll, including immediately before download, checks the prompt and
     // response boundaries again. A live DOM node can be recycled for Test or
     // another turn without being disconnected.
     s.ready=false;
-    const userRoots=[...thread.querySelectorAll('*')].filter(e=>e!==s.echoRoot&&following(s.echoRoot,e)&&((author(e).kind==='user'&&author(e).root===e)||e.hasAttribute('data-muse-studio-attempt')));
+    const userRoots=thread?[...thread.querySelectorAll('*')].filter(e=>e!==s.echoRoot&&following(s.echoRoot,e)&&((author(e).kind==='user'&&author(e).root===e)||e.hasAttribute('data-muse-studio-attempt'))):[];
     const echoIds=new Set([...s.echoAliases,s.echoRoot.id,s.echoRoot.getAttribute('data-message-id'),s.echoRoot.getAttribute('data-id')].filter(Boolean));
-    const candidates=[];
-    for(const video of mediaNodes(thread)) {
+    const candidates=[],reject={};const note=k=>{reject[k]=(reject[k]||0)+1;};s.reject=reject;
+    for(const video of (thread?mediaNodes(thread):[])) {
       if(!following(s.echoRoot,video))continue;
-      if(s.genericSpan&&!s.genericSpan.some(row=>row.contains(video)))continue;
+      if(s.genericSpan&&!s.genericSpan.some(row=>row.contains(video))){note('ngoài vùng trả lời');continue;}
       if(!recover&&(s.baseline.has(video)||s.baselineSources.has(source(video))))continue;
       const root=responseRoot(video,thread);
-      if(!root||root.contains(s.echo)||!following(s.echoRoot,root))continue;
-      if(userRoots.some(user=>following(user,video)))continue;
-      if(!recover&&(s.baseline.has(root)||(s.added.get(root)||0)<s.echoEpoch))continue;
+      if(!root||root.contains(s.echo)||!following(s.echoRoot,root)){note('không rõ khối');continue;}
+      if(userRoots.some(user=>following(user,video))){note('sau tin nhắn khác');continue;}
+      if(!recover&&(s.baseline.has(root)||(s.added.get(root)||0)<s.echoEpoch)){note('khối cũ');continue;}
       const ref=root.getAttribute('data-response-to')||root.getAttribute('data-parent-message-id')||root.getAttribute('data-prompt-id');
-      if(ref&&!echoIds.has(ref.replace(/^#/,'')))continue;
+      if(ref&&!echoIds.has(ref.replace(/^#/,''))){note('khác ID prompt');continue;}
       candidates.push({video,root});
     }
+    if(!candidates.length)candidates.push(...fallbackCandidates(note));
     if(candidates.length>1)throw Error('Có nhiều video sau prompt này. Dừng để tránh gán hoặc tải nhầm kết quả.');
     if(!candidates.length) {
       s.responseRoot=null;s.video=null;
+      if(!thread)return {...result('waiting-response','Chưa xác định được vùng phản hồi cho prompt này'),hint:hint()};
       if(s.genericResponseRoot && author(s.genericResponseRoot).kind!=='user' && (recover || (!s.baseline.has(s.genericResponseRoot)&&(s.added.get(s.genericResponseRoot)||0)>=s.echoEpoch))) {
         s.responseRoot=s.genericResponseRoot;return result('rendering','Muse đang xử lý prompt này',s.genericResponseRoot);
       }
