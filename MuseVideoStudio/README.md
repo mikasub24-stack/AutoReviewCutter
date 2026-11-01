@@ -1,5 +1,12 @@
 # Muse Video Studio V1 · 1.1.1 · Windows
 
+## Bản cài đặt Windows
+
+Tải `MuseVideoStudio-1.1.1-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
+
+Build riêng: `node tools/build-installer.cjs` trên Windows. Workflow installer kiểm thử cài đặt, shortcut, mở app, một cửa sổ chính và gỡ cài đặt trước khi thêm Setup.exe vào release hiện tại.
+
+
 ## Tối đa 10 tài khoản / phiên trình duyệt (1.1.1)
 
 Chọn 1–10 ở mục Parallel browsers / Chạy song song. Mỗi tài khoản dùng phiên đăng nhập và hồ sơ riêng; có thể chạy10 cảnh đồng thời. Khi tài khoản nào lưu xong video, tài khoản đó nhận cảnh chờ tiếp theo. App chính vẫn chỉ có một instance. Ảnh tham chiếu chung được ghi cache một lần an toàn khi nhiều worker cùng nhận cảnh.
