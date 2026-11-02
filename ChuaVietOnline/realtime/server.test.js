@@ -1,5 +1,5 @@
 "use strict";
-const { test } = require("node:test");
+const { test, after } = require("node:test");
 const assert = require("node:assert/strict");
 const { spawn } = require("node:child_process");
 const { WebSocket } = require("ws");
@@ -10,7 +10,7 @@ const server = spawn(process.execPath, ["server.js"], {
   env: {...process.env, PORT: String(port)},
   stdio: ["ignore", "pipe", "pipe"]
 });
-process.on("exit", () => server.kill());
+after(() => server.kill());
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function connect() {
   for (let attempt=0;attempt<30;attempt++) {
