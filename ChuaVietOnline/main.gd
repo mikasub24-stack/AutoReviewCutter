@@ -2,6 +2,7 @@ extends Control
 ## Playable portrait temple hall: 1,000 indexed cushions, aisle navigation and interactions.
 const SHOP_SCRIPT = preload("res://payment_shop.gd")
 const PRACTICE_SCRIPT = preload("res://practice_panel.gd")
+const MULTIPLAYER_SCRIPT = preload("res://multiplayer.gd")
 const ROWS := 50
 const COLS_PER_SIDE := 10
 const CAPACITY := ROWS * COLS_PER_SIDE * 2
@@ -35,11 +36,18 @@ var altar_glow := 0.0
 var occupied_seats: Dictionary = {}
 var occupant_count := 0
 var occupancy_notice := 0.0
+var multiplayer_client: Node
+var network_tick := 0.0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_load_progress()
 	_seed_occupants()
+	multiplayer_client = MULTIPLAYER_SCRIPT.new()
+	add_child(multiplayer_client)
+	multiplayer_client.occupancy_changed.connect(_sync_occupancy)
+	multiplayer_client.seat_rejected.connect(_seat_denied)
+	multiplayer_client.connection_changed.connect(_network_changed)
 	set_process(true)
 	queue_redraw()
 
@@ -58,6 +66,11 @@ func _camera() -> Vector2:
 func _process(delta: float) -> void:
 	elapsed += delta
 	occupancy_notice = maxf(0.0, occupancy_notice - delta)
+	network_tick += delta
+	if network_tick >= 0.15:
+		network_tick = 0.0
+		if multiplayer_client != null:
+			multiplayer_client.send_position(player,character_gender,0 if robe_brown else 1)
 	save_timer += delta
 	if save_timer > 15.0:
 		save_timer = 0.0
@@ -86,6 +99,7 @@ func _process(delta: float) -> void:
 					approach_seat = -1
 					sitting = true
 					status_text = "Đang ngồi tại bồ đoàn %d" % (selected_seat + 1)
+					_claim_seat(selected_seat)
 					_save_progress()
 		else:
 			movement_facing = remaining.normalized()
@@ -118,6 +132,7 @@ func _process(delta: float) -> void:
 				sitting = true
 				joystick = Vector2.ZERO
 				status_text = "Đã ngồi vào bồ đoàn %d" % (selected_seat + 1)
+				_claim_seat(selected_seat)
 		else:
 			status_text = "Đi theo lối giữa hoặc hành lang ngang"
 	for i in range(incense.size() - 1, -1, -1):
@@ -272,6 +287,10 @@ func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 			auto_path.clear()
 			approach_seat = -1
 			sitting = not sitting
+			if not sitting:
+				_claim_seat(-1)
+			elif selected_seat >= 0:
+				_claim_seat(selected_seat)
 			status_text = "Đang ngồi thiền" if sitting else "Đã đứng dậy"
 		else:
 			if character_gender == 0 and robe_brown:
@@ -313,6 +332,7 @@ func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 				approach_seat = -1
 				sitting = true
 				status_text = "Đang ngồi tại bồ đoàn số %d" % (best+1)
+				_claim_seat(best)
 			else:
 				_navigate_to_seat(best)
 				status_text += " (đang tự tìm đường)"
@@ -375,3 +395,37 @@ func _draw_seated_occupant(pos: Vector2, variant: int) -> void:
 	draw_circle(pos + Vector2(0,-41), 10, Color("#d6a37c"))
 	if variant == 1:
 		draw_arc(pos + Vector2(0,-43), 10, PI, TAU, 12, Color("#252323"), 3)
+
+func _claim_seat(index: int) -> void:
+	if multiplayer_client != null and multiplayer_client.connected:
+		multiplayer_client.request_seat(index)
+
+func _network_changed(is_connected: bool) -> void:
+	if is_connected:
+		_sync_occupancy()
+		if sitting and selected_seat >= 0:
+			_claim_seat(selected_seat)
+		status_text = "Đã kết nối chính điện trực tuyến"
+	else:
+		_seed_occupants()
+		status_text = "Chế độ ngoại tuyến - khách mô phỏng"
+
+func _sync_occupancy() -> void:
+	if multiplayer_client == null or not multiplayer_client.connected:
+		return
+	occupied_seats.clear()
+	for seat in multiplayer_client.occupants:
+		occupied_seats[int(seat)] = 1
+	occupant_count = occupied_seats.size()
+	queue_redraw()
+
+func _seat_denied(index: int) -> void:
+	if selected_seat == index:
+		selected_seat = -1
+	sitting = false
+	auto_walk = false
+	auto_path.clear()
+	approach_seat = -1
+	status_text = "Chỗ đã có người ngồi. Vui lòng chọn bồ đoàn khác!"
+	occupancy_notice = 3.0
+	queue_redraw()
