@@ -61,3 +61,31 @@ test("two players cannot reserve the same cushion; released seats can be reused"
     assert.equal((await nextA("seat_ok")).seat,999);
   } finally {a.close();b.close();}
 });
+
+test("disconnect releases cushion and informs remaining player",async()=>{
+  const a=await connect(),b=await connect();
+  const nextA=messages(a),nextB=messages(b);
+  try {
+    await nextA("welcome");
+    await nextB("welcome");
+    a.send(JSON.stringify({type:"seat",seat:317}));
+    assert.equal((await nextA("seat_ok")).seat,317);
+    a.close();
+    await nextB("leave");
+    b.send(JSON.stringify({type:"seat",seat:317}));
+    assert.equal((await nextB("seat_ok")).seat,317);
+  } finally {a.terminate();b.terminate();}
+});
+
+test("reject malformed and out-of-range seats without disconnecting player",async()=>{
+  const a=await connect(),next=messages(a);
+  try {
+    await next("welcome");
+    for (const invalid of [-2,1000,1000000,1.5,"oops",null]) {
+      a.send(JSON.stringify({type:"seat",seat:invalid}));
+      assert.equal((await next("seat_denied")).reason,"invalid_seat");
+    }
+    a.send(JSON.stringify({type:"seat",seat:999}));
+    assert.equal((await next("seat_ok")).seat,999);
+  } finally {a.terminate();}
+});
