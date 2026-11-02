@@ -1,10 +1,10 @@
 Continue in 1.1.6 resubmits unfinished scenes with new attempt IDs, ignoring tentative send flags and old receipts. Completed files are kept. The sidebar now displays the actual application version.
 
-# Muse Video Studio V1 · 1.1.10 · Windows
+# Muse Video Studio V1 · 1.1.11 · Windows
 
 ## Bản cài đặt Windows
 
-Tải `MuseVideoStudio-1.1.10-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
+Tải `MuseVideoStudio-1.1.11-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
 
 Build riêng: `node tools/build-installer.cjs` trên Windows. Workflow installer kiểm thử cài đặt, shortcut, mở app, một cửa sổ chính và gỡ cài đặt trước khi thêm Setup.exe vào release hiện tại.
 
@@ -141,6 +141,15 @@ Nối MP4 tùy chọn cần FFmpeg/ffprobe trên máy (chưa đóng kèm): chọ
 Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. Các kiểm tra `node test/submit-diagnostics-smoke.cjs`, `node test/cards-smoke.cjs`, `node test/muse-tracker-smoke.cjs`, `node test/download-capture-smoke.cjs` xác minh thẻ video, gắn kết quả theo prompt và tải/cancel tệp video thật từ máy chủ cục bộ; smoke tải cần FFmpeg hoặc MUSE_VIDEO_FIXTURE. Test UI và browser smoke cần Chromium; đặt CHROMIUM_PATH nếu khác /usr/bin/chromium. `node test/attachment-ready-smoke.cjs` kiểm tra readiness ảnh trên DOM fixture thật. FFmpeg smoke riêng: `npm run test:merge`.
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
+
+## Update 1.1.11
+
+- Thêm tab **Tạo ảnh** ở thanh bên, cạnh **Tạo video**. Hai tab dùng chung đăng nhập, danh sách tài khoản và hàng đợi; mỗi tab chỉ hiện và chỉ chạy việc của mình (nút Chạy/Tiếp tục ở tab ảnh không đụng tới cảnh video và ngược lại). Số thứ tự ảnh đánh riêng, không nối tiếp số video.
+- Cách chạy một việc ảnh: nhập đúng prompt vào ô chat Muse, gửi, chờ tin nhắn của prompt, rồi chỉ nhận ảnh nằm trong phản hồi của chính prompt đó. Bỏ qua ảnh có sẵn trước khi gửi, ảnh đại diện/biểu tượng, ảnh nhỏ hơn 150px và ảnh tham chiếu nằm trong tin nhắn của bạn. Phản hồi có nhiều ảnh (biến thể) thì lưu tất cả; ảnh nằm ở nhiều khối phản hồi khác nhau thì dừng thay vì đoán.
+- Chỉ lưu ảnh khi Muse đã ngừng tạo (không còn nút Dừng), ảnh đã tải xong và không đổi nguồn trong vài giây. Tool nhận dạng PNG/JPG/WEBP/GIF theo nội dung file; trang lỗi hay link hết hạn không bao giờ được lưu thành ảnh.
+- Ảnh lưu vào thư mục con **Anh** của thư mục lưu: `001.png`, `002.png`…; nhiều biến thể thì `001_1.png`, `001_2.png`. Không ghi đè file cũ. Nút «Mở thư mục» ở tab ảnh mở thư mục này. Tab ảnh không có phần nối video / xuất CapCut.
+- Ô tùy chọn «Thêm vào đầu mỗi prompt ảnh» (ví dụ `Tạo ảnh: `) để Muse hiểu cần ảnh; ô «CSS selector ảnh kết quả» trong Kết nối & cài đặt (mặc định `img`).
+- Đã thử trên trang chat giả dựng bằng Chromium thật và giao diện giả; chưa thử trên tài khoản Muse thật. Nếu Muse hiển thị ảnh theo cách khác (ví dụ ảnh nền CSS, hoặc ảnh tải qua lightbox), dùng «Xuất thông tin lỗi chat» để chỉnh bước tiếp theo.
 
 ## Update 1.1.10
 

@@ -153,3 +153,39 @@ test('a failed Regenerate preserves previous output and never dispatches other s
  const q=new Queue({save:async()=>{},jobs:[{id:'done',status:'completed',prompt:'One scene',output:'old.mp4'},{id:'other',status:'completed',prompt:'Other scene',output:'other.mp4'},{id:'pending',status:'pending',prompt:'Later'}],run:async job=>{assert.equal(job.id,'done');throw Error('Generation failed');}});
  await q.regenerate('done');assert.equal(q.jobs[0].status,'failed');assert.equal(q.jobs[0].output,'');assert.equal(q.jobs[0].previousOutput,'old.mp4');assert.deepEqual(q.jobs[0].previousOutputs,['old.mp4']);assert.equal(q.jobs[1].status,'completed');assert.equal(q.jobs[1].output,'other.mp4');assert.equal(q.jobs[2].status,'pending');
 });
+
+test('image and video tabs share one queue but each start only runs its own kind',async()=>{
+ const calls=[];
+ const q=new Queue({save:async()=>{},run:async j=>{calls.push(j.kind+':'+j.prompt);return j.kind==='image'?j.prompt+'.png':j.prompt+'.mp4';}});
+ await q.add([{prompt:'clip one'},{prompt:'clip two'}]);
+ await q.add([{kind:'image',prompt:'pic one'},{kind:'image',prompt:'pic two'}]);
+ assert.deepEqual(q.jobs.map(j=>j.kind),['video','video','image','image']);
+ assert.deepEqual(q.jobs.map(j=>j.order),[1,2,1,2],'ảnh đánh số riêng, không nối tiếp số video');
+ await q.start('image');
+ assert.deepEqual(calls,['image:pic one','image:pic two']);
+ assert.deepEqual(q.jobs.map(j=>j.status),['pending','pending','completed','completed']);
+ assert.equal(q.jobs[2].stageMessage,'Đã lưu ảnh về máy');
+ await q.start('video');
+ assert.deepEqual(q.jobs.map(j=>j.status),['completed','completed','completed','completed']);
+});
+test('Continue for one tab never revives or reruns failed jobs of the other tab',async()=>{
+ const calls=[];
+ const q=new Queue({save:async()=>{},run:async j=>{calls.push(j.prompt);return 'x.png';},jobs:[
+  {id:'v',kind:'video',status:'failed',prompt:'video failed',order:1,mayHaveSubmitted:true},
+  {id:'i',kind:'image',status:'failed',prompt:'image failed',order:1,mayHaveSubmitted:true},
+  {id:'old',status:'interrupted',prompt:'saved by an older version',order:2}]});
+ assert.deepEqual(q.jobs.map(j=>j.kind),['video','image','video'],'việc cũ không có loại được coi là video');
+ q.prepareResume('image');
+ assert.deepEqual(q.jobs.map(j=>j.status),['failed','pending','interrupted']);
+ await q.start('image');
+ assert.deepEqual(calls,['image failed']);
+ assert.deepEqual(q.jobs.map(j=>j.status),['failed','completed','interrupted']);
+});
+test('clearing one tab removes only that tab\'s pending scenes or list',async()=>{
+ const q=new Queue({save:async()=>{},run:async()=>'x'});
+ await q.add([{prompt:'video pending'}]);await q.add([{kind:'image',prompt:'image pending'},{kind:'image',prompt:'image two'}]);
+ await q.clearPending('image');assert.deepEqual(q.jobs.map(j=>j.prompt),['video pending']);
+ await q.add([{kind:'image',prompt:'image again'}]);
+ await q.clearAll('video');assert.deepEqual(q.jobs.map(j=>j.prompt),['image again']);
+ await q.clearAll();assert.equal(q.jobs.length,0);
+});

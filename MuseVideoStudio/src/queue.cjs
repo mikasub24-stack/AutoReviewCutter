@@ -16,20 +16,20 @@ function resetRunFields(job, stage='pending') {
 }
 class Queue {
   constructor({jobs=[],save,run,notify=()=>{},concurrency=1}){
-    this.jobs=jobs.map((j,index)=>({...j,order:Number.isSafeInteger(j.order)&&j.order>0?j.order:index+1,status:j.status==='running'?'interrupted':j.status}));
-    this.save=save;this.run=run;this.notify=notify;this.active=false;this.paused=true;this.concurrency=concurrency;this.writes=Promise.resolve();this.controllers=new Map();this.runningPromise=null;
+    this.jobs=jobs.map((j,index)=>({...j,kind:j.kind==='image'?'image':'video',order:Number.isSafeInteger(j.order)&&j.order>0?j.order:index+1,status:j.status==='running'?'interrupted':j.status}));
+    this.save=save;this.run=run;this.notify=notify;this.active=false;this.paused=true;this.kind=null;this.concurrency=concurrency;this.writes=Promise.resolve();this.controllers=new Map();this.runningPromise=null;
   }
   async publish(){const p=this.writes.then(()=>this.save(this.jobs));this.writes=p.catch(()=>{});await p;this.notify(this.jobs);}
   async add(items){
     if(!Array.isArray(items)||!items.length||items.some(j=>typeof j.prompt!=='string'||!j.prompt.trim()))throw Error('Mỗi tác vụ cần một prompt.');
-    const nextOrder=Math.max(0,...this.jobs.map(j=>j.order||0));
-    this.jobs.push(...items.map((j,index)=>({order:nextOrder+index+1,id:randomUUID(),prompt:j.prompt.trim(),source:typeof j.source==='string'?j.source:'',title:typeof j.title==='string'?j.title:'',number:Number.isInteger(j.number)?j.number:null,voiceover:typeof j.voiceover==='string'?j.voiceover:'',durationSeconds:Number.isFinite(j.durationSeconds)&&j.durationSeconds>0?j.durationSeconds:null,image:j.image||j.references?.[0]||'',references:Array.isArray(j.references)?[...j.references]:j.image?[j.image]:[],status:'pending',stage:'pending',stageMessage:'',progress:null,downloadProgress:null,submissionProtocol:null,submissionReceipt:null,acknowledgedAt:null,confirmedResponseAt:null,submittedAt:null,mayHaveSubmitted:false,submissionProfileKey:null,submissionSessionId:null,resultReadyAt:null,downloadStartedAt:null,downloadCompletedAt:null,startedAt:null,finishedAt:null,error:'',output:'',createdAt:Date.now()})));
+    const batchKind=items[0]?.kind==='image'?'image':'video',nextOrder=Math.max(0,...this.jobs.filter(j=>j.kind===batchKind).map(j=>j.order||0));
+    this.jobs.push(...items.map((j,index)=>({order:nextOrder+index+1,id:randomUUID(),kind:j.kind==='image'?'image':'video',prompt:j.prompt.trim(),source:typeof j.source==='string'?j.source:'',title:typeof j.title==='string'?j.title:'',number:Number.isInteger(j.number)?j.number:null,voiceover:typeof j.voiceover==='string'?j.voiceover:'',durationSeconds:Number.isFinite(j.durationSeconds)&&j.durationSeconds>0?j.durationSeconds:null,image:j.image||j.references?.[0]||'',references:Array.isArray(j.references)?[...j.references]:j.image?[j.image]:[],status:'pending',stage:'pending',stageMessage:'',progress:null,downloadProgress:null,submissionProtocol:null,submissionReceipt:null,acknowledgedAt:null,confirmedResponseAt:null,submittedAt:null,mayHaveSubmitted:false,submissionProfileKey:null,submissionSessionId:null,resultReadyAt:null,downloadStartedAt:null,downloadCompletedAt:null,startedAt:null,finishedAt:null,error:'',output:'',createdAt:Date.now()})));
     await this.publish();
   }
   async retry(id){const j=this.jobs.find(x=>x.id===id);if(!j||!['failed','interrupted'].includes(j.status))throw Error('Chỉ chạy lại tác vụ lỗi hoặc bị gián đoạn.');delete j.resumeMode;resetRunFields(j);j.status='pending';await this.publish();}
   async remove(id){if(this.jobs.find(j=>j.id===id)?.status==='running')throw Error('Dừng tác vụ trước khi xóa.');this.jobs=this.jobs.filter(j=>j.id!==id);await this.publish();}
-  async clearPending(){this.jobs=this.jobs.filter(j=>j.status!=='pending'||j.mayHaveSubmitted);await this.publish();}
-  async clearAll(){await this.stop();this.jobs=[];await this.publish();}
+  async clearPending(kind){this.jobs=this.jobs.filter(j=>(kind&&j.kind!==kind)||j.status!=='pending'||j.mayHaveSubmitted);await this.publish();}
+  async clearAll(kind){await this.stop();this.jobs=kind?this.jobs.filter(j=>j.kind!==kind):[];await this.publish();}
   async applyReferences(files){
     if(!Array.isArray(files)||files.some(x=>typeof x!=='string'||!x))throw Error('Ảnh tham chiếu không hợp lệ.');
     for(const j of this.jobs)if(j.status==='pending'&&!j.lockedInput){j.references=[...files];j.image=files[0]||'';}
@@ -47,31 +47,32 @@ class Queue {
       if(controller.signal.aborted)throw stoppedError();
       const output=await abortable(runner(job,controller.signal),controller.signal);
       if(controller.signal.aborted)throw stoppedError();
-      if(typeof output!=='string'||!output.trim())throw Error('Chưa xác nhận được tệp video tải xuống.');
-      job.output=output;job.status='completed';job.stage='completed';job.stageMessage='Đã tải và lưu video về máy';job.progress=100;
+      if(typeof output!=='string'||!output.trim())throw Error(job.kind==='image'?'Chưa xác nhận được tệp ảnh đã lưu.':'Chưa xác nhận được tệp video tải xuống.');
+      job.output=output;job.status='completed';job.stage='completed';job.stageMessage=job.kind==='image'?'Đã lưu ảnh về máy':'Đã tải và lưu video về máy';job.progress=100;
     } catch(error) {
       job.status=controller.signal.aborted||error?.name==='AbortError'?'interrupted':'failed';
-      job.stage=job.status;job.error=error?.message||'Không xử lý được tác vụ video.';job.stageMessage=job.error;this.paused=true;
+      job.stage=job.status;job.error=error?.message||(job.kind==='image'?'Không xử lý được tác vụ ảnh.':'Không xử lý được tác vụ video.');job.stageMessage=job.error;this.paused=true;
     } finally {job.finishedAt=new Date().toISOString();this.controllers.delete(job.id);}
     await this.publish();
   }
-  prepareResume(){
+  prepareResume(kind){
     if(this.active)throw Error('Hàng đợi vẫn đang chạy.');
-    for(const j of this.jobs)if(['failed','interrupted'].includes(j.status)||(j.status==='pending'&&j.resumeMode)){
+    for(const j of this.jobs)if((!kind||j.kind===kind)&&(['failed','interrupted'].includes(j.status)||(j.status==='pending'&&j.resumeMode))){
       // Continue explicitly starts a new attempt for unfinished scenes. Only
       // the separate Recover video action may reuse a previous result.
       j.resumeMode='resubmit';
       j.status='pending';j.error='';
     }
   }
-  start(){
+  start(kind){
     if(this.active)return Promise.resolve();
+    this.kind=kind==='image'||kind==='video'?kind:null;
     if(!Number.isInteger(this.concurrency)||this.concurrency<1)throw Error('Số tác vụ chạy đồng thời phải là số nguyên dương.');
     this.paused=false;this.active=true;
     this.runningPromise=(async()=>{
       const worker=async slot=>{
         while(!this.paused){
-          const job=this.jobs.find(x=>x.status==='pending'&&(!x.resumeMode||this.concurrency===1||x.account===slot+1||!x.account));if(!job)break;
+          const job=this.jobs.find(x=>x.status==='pending'&&(!this.kind||x.kind===this.kind)&&(!x.resumeMode||this.concurrency===1||x.account===slot+1||!x.account));if(!job)break;
           const resume=job.resumeMode;await this.executeJob(job,(item,signal)=>this.run(item,slot,signal),!resume);
           if(job.status==='completed')delete job.resumeMode;
         }

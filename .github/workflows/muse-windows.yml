@@ -67,6 +67,10 @@ jobs:
           if errorlevel 1 (type test.log & exit /b 1)
           call node test/language-smoke.cjs >> test.log 2>&1
           if errorlevel 1 (type test.log & exit /b 1)
+          call node test/muse-image-smoke.cjs >> test.log 2>&1
+          if errorlevel 1 (type test.log & exit /b 1)
+          call node test/image-tab-smoke.cjs >> test.log 2>&1
+          if errorlevel 1 (type test.log & exit /b 1)
           call node test/ui-smoke.cjs >> test.log 2>&1
           set MUSE_BROWSER_EXIT=%ERRORLEVEL%
           type test.log

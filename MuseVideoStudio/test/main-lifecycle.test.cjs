@@ -625,3 +625,69 @@ test('Regenerate IPC submits only the selected completed scene and saves a new f
   assert.equal(jobs[1].output,'keep.mp4');assert.equal(jobs[1].status,'completed');assert.equal(jobs[2].status,'pending');await app.stop();
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
+
+test('image tab saves the replied pictures under Anh by scene number, waits for Muse to stop generating, and leaves video scenes alone',{timeout:12000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-image-run-'));
+  const picture=seed=>Buffer.concat([Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]),Buffer.alloc(3000,seed)]);
+  const dataUrl=seed=>'data:image/png;base64,'+picture(seed).toString('base64');
+  let app,generating=false,downloads=0,reads=[];const sent=[],trackers=[];
+  try{
+    await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+    app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>{
+      let closed=false,draft='';return{external:true,isDestroyed:()=>closed,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},openMuse:async()=>{},
+      evaluate:async(fn,arg)=>{
+        if(fn.name==='submitPrompt'){sent.push(draft);generating=sent.length===1;return{clicked:true};}
+        if(fn.name==='beginTracking'){trackers.push({...arg});return{phase:'waiting-prompt'};}
+        if(fn.name==='pollTracking')return{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null,count:sent.length===1?2:1};
+        if(fn.name==='browserStop')return{state:generating?'generating':'idle'};
+        if(fn.name==='readTrackedImage'){reads.push(arg.index);return{count:sent.length===1?2:1,url:'https://muse.ai/'+arg.index+'.png',dataUrl:dataUrl(arg.index+(sent.length===1?1:9)),via:'fetch'};}
+        if(arg?.prompt && !arg?.id)draft=arg.prompt;return null;
+      },pressEnter:async()=>{sent.push(draft);},
+      captureDownload:async()=>{downloads++;throw Error('ảnh không được đi qua đường tải video');},
+      close:async()=>{closed=true;}};
+    }});
+    await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);
+    await app.invoke('add',[{prompt:'Video scene stays pending.',number:1}]);
+    await app.invoke('add',[{kind:'image',prompt:'Picture one: a blue cat.',number:1},{kind:'image',prompt:'Picture two: a red dog.',number:2}]);
+    assert.deepEqual([...app.invoke('state').jobs.map(j=>j.kind)],['video','image','image']);
+    await app.invoke('start',{kind:'image'});
+    await until(()=>sent.length===1).catch(e=>{throw Error(e.message+' '+JSON.stringify(app.invoke('state').jobs.map(j=>[j.kind,j.status,j.stage,j.stageMessage,j.error])))});await new Promise(r=>setTimeout(r,250));
+    assert.deepEqual(reads,[],'chưa lưu ảnh khi Muse còn đang tạo');assert.equal(app.invoke('state').jobs[1].status,'running');
+    generating=false;await until(()=>!app.invoke('state').active);
+    const result=app.invoke('state');
+    assert.deepEqual(sent,['Picture one: a blue cat.','Picture two: a red dog.']);
+    assert.deepEqual([...result.jobs.map(j=>j.status)],['pending','completed','completed']);
+    assert.equal(downloads,0);assert.equal(trackers.length,2);
+    assert.ok(trackers.every(t=>t.mediaKind==='image'&&t.imageSelector==='img'));
+    assert.deepEqual((await fs.readdir(path.join(dir,'Anh'))).sort(),['001_1.png','001_2.png','002.png']);
+    assert.equal(path.basename(result.jobs[1].output),'001_1.png');assert.deepEqual([...result.jobs[1].outputs.map(f=>path.basename(f))],['001_1.png','001_2.png']);
+    assert.deepEqual(await fs.readFile(result.jobs[1].outputs[1]),picture(2));assert.deepEqual(await fs.readFile(result.jobs[2].output),picture(9));
+    assert.equal(result.jobs[1].stageMessage,'Đã lưu ảnh về máy');
+    assert.equal((await fs.readdir(dir)).some(f=>/\.(mp4|webm|part)$/.test(f)),false,'không có file video/tạm ở thư mục video');
+    assert.equal((await fs.readdir(path.join(dir,'Anh'))).some(f=>f.endsWith('.part')),false);
+    await app.stop();
+  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+test('image result that cannot be read is retried, never saved as a broken file',{timeout:12000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-image-bad-'));
+  let app,attempts=0;const sent=[];
+  try{
+    await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+    app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>{
+      let closed=false,draft='';return{external:true,isDestroyed:()=>closed,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},openMuse:async()=>{},
+      evaluate:async(fn,arg)=>{
+        if(fn.name==='submitPrompt'){sent.push(draft);return{clicked:true};}
+        if(fn.name==='beginTracking')return{phase:'waiting-prompt'};
+        if(fn.name==='pollTracking')return{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null,count:1};
+        if(fn.name==='readTrackedImage'){attempts++;return attempts===1?{count:1,url:'https://muse.ai/expired.png',dataUrl:'data:text/html;base64,'+Buffer.from('<html>expired link'+' '.repeat(2000)).toString('base64'),via:'fetch'}:{count:1,url:'https://muse.ai/ok.png',failed:true,errors:['HTTP 403']};}
+        if(arg?.prompt && !arg?.id)draft=arg.prompt;return null;
+      },pressEnter:async()=>{sent.push(draft);},close:async()=>{closed=true;}};
+    }});
+    await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);
+    await app.invoke('add',[{kind:'image',prompt:'Picture that cannot be read.',number:1}]);await app.invoke('start',{kind:'image'});
+    await until(()=>attempts>=2,9000);
+    const job=app.invoke('state').jobs[0];assert.equal(job.status,'running');assert.match(job.stageMessage,/Chưa lưu được ảnh/);assert.equal(sent.length,1,'không gửi lại prompt');
+    assert.deepEqual(await fs.readdir(path.join(dir,'Anh')).catch(()=>[]),[]);
+    await app.invoke('stop');
+  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});

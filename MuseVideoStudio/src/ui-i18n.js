@@ -14,6 +14,37 @@ QR chuyển khoản BIDV|BIDV payment QR
 Không gian cá nhân|Personal workspace
 Lưu hàng đợi & phiên riêng trên máy|Queue and sessions stored on this device
 Tạo video|Create videos
+Tạo ảnh|Create images
+Danh sách tạo ảnh|Image workspace
+▶ Tạo ảnh|▶ Create images
+Thêm vào đầu mỗi prompt ảnh (tuỳ chọn)|Add to the start of every image prompt (optional)
+Ví dụ: Tạo ảnh:|Example: Generate an image:
+Ảnh lưu vào thư mục «Anh» theo số prompt: 001, 002, 003…|Images are saved to the “Anh” folder by prompt number: 001, 002, 003…
+Sẵn sàng cho ảnh mới|Ready for your next image
+CSS selector ảnh kết quả (tab Tạo ảnh)|Result image CSS selector (Create images tab)
+Ảnh đã lưu|Saved image
+Ảnh trước|Previous image
+Chưa có ảnh|No image yet
+Không mở được ảnh này. Dùng “Mở vị trí ảnh” để kiểm tra file.|Cannot open this image. Use Show image in folder to inspect the saved file.
+Mở vị trí ảnh|Show image in folder
+Tìm / lưu ảnh đã tạo|Find / save existing image
+✓ Đã lưu xong ảnh|✓ Image saved
+Đang lưu ảnh về máy|Saving image
+Đã gửi · chờ Muse tạo ảnh|Sent · Waiting for image generation
+Đính kèm|Attach
+Lưu|Save
+Số ảnh đã lưu|Images saved
+Đã lưu ảnh về máy|Image saved to this device
+Chưa xác nhận được tệp ảnh đã lưu.|Could not confirm the saved image file.
+Không xử lý được tác vụ ảnh.|The image task could not be processed.
+chưa thấy ảnh mới trong chat|no new image in the chat yet
+Đúng phản hồi của cảnh này · đang lưu ảnh về máy|Matched scene result · Saving image
+Muse đang tạo hoặc tải ảnh|Muse is generating or loading the image
+Ảnh đã hiện · chờ ổn định trước khi lưu|Image visible · Waiting for it to settle before saving
+Ảnh đã hiện · chờ Muse tạo xong rồi mới lưu|Image visible · Waiting for Muse to finish before saving
+Ảnh của prompt đã sẵn sàng lưu|Prompt image is ready to save
+Chờ đúng ảnh của prompt|Waiting for the prompt's image
+Trang Muse đang lag · giữ đúng cảnh đã gửi, chưa có ảnh để lưu|Muse is slow · Keeping the submitted scene; no image to save yet
 Trình duyệt tích hợp|Built-in browser
 Phiên tài khoản|Account session
 Liên hệ|Contact
@@ -234,8 +265,9 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
   function t(value){
     const raw=String(value??'');if(language==='vi')return raw;
     const key=norm(raw);if(dictionary[key])return raw.replace(key,dictionary[key]);
-    const decorated=key.match(/^([▶■▱▦↗⚙✓＋+\s]*)(.*?)([＋▾\s]*)$/u);
+    const decorated=key.match(/^([▶■▱▦▧↗⚙✓＋+\s]*)(.*?)([＋▾\s]*)$/u);
     if(decorated&&dictionary[decorated[2]])return decorated[1]+dictionary[decorated[2]]+decorated[3];
+    const photoRetry=key.match(/^Chưa lưu được ảnh · giữ đúng kết quả và thử lại: (.+)$/);if(photoRetry)return 'Image not saved yet · Retrying the same result: '+t(photoRetry[1]);
     const retry=key.match(/^Chưa lưu được video · giữ đúng kết quả và thử tải lại: (.+)$/);if(retry)return 'Video not saved yet · Retrying the same result: '+t(retry[1]);
     const expiry=key.match(/^(.*?) Hạn: (.+)$/);if(expiry)return t(expiry[1])+' Expires: '+expiry[2];
     const patterns=[
@@ -246,6 +278,10 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
       [/^Tài khoản này chỉ chạy khi chọn «Chạy song song» từ (\d+) trình duyệt\.$/,m=>'This account only runs when "Parallel browsers" is set to '+m[1]+' or more.'],
       [/^Đăng xuất TK (\d+) · (.+)$/,m=>'Sign out · Account '+m[1]+' · '+t(m[2])],
       [/^(\d+) \/ (\d+) video đã lưu$/,m=>m[1]+' / '+m[2]+' videos saved'],
+      [/^(\d+) \/ (\d+) ảnh đã lưu$/,m=>m[1]+' / '+m[2]+' images saved'],
+      [/^thấy (\d+) ảnh mới nhưng chưa gắn được vào đúng prompt$/,m=>'found '+m[1]+' new image(s) not yet bound to this prompt'],
+      [/^Muse đang tạo ảnh · (\d+)%$/,m=>'Muse is generating the image · '+m[1]+'%'],
+      [/^Thêm (\d+) prompt ảnh và chạy toàn bộ tác vụ ảnh đang chờ\?.*$/,m=>'Add '+m[1]+' image prompts and run all pending image tasks? This may use Muse credits. Exact reviewed prompts and scene references will be sent.'],
       [/^(\d+) đang làm$/,m=>m[1]+' processing'],[/^(\d+) đang chờ$/,m=>m[1]+' pending'],[/^(\d+) cảnh dở(?: \/ lỗi)?$/,m=>m[1]+' interrupted / failed'],
       [/^(\d+) trình duyệt · (\d+) ô$/,m=>m[1]+' browsers · '+m[2]+' slots'],
       [/^Mở (\d+) trình duyệt$/,m=>'Open '+m[1]+' browsers'],
@@ -255,7 +291,7 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
       [/^(🔒 Đã khóa · )?(\d+) ảnh tham chiếu(.*)$/,m=>(m[1]?'🔒 Locked · ':'')+m[2]+' reference image(s)'+m[3].replace('TK ','Account ')],
       [/^(\d+) ảnh chung cho toàn bộ prompt\.$/,m=>m[1]+' shared reference image(s) for every prompt.'],
       [/^(\d+) ảnh theo số thứ tự\.$/,m=>m[1]+' numbered reference image(s).'],
-      [/^Đã nhận (\d+) prompt hoàn chỉnh(.*?)\. Xem\/sửa hoặc bấm Tạo video\.$/,m=>m[1]+' complete prompts loaded'+m[2].replace('mục tiêu','target')+'. Review or click Create videos.'],
+      [/^Đã nhận (\d+) prompt hoàn chỉnh(.*?)\. Xem\/sửa hoặc bấm (Tạo video|Tạo ảnh)\.$/,m=>m[1]+' complete prompts loaded'+m[2].replace('mục tiêu','target')+'. Review or click '+(m[3]==='Tạo ảnh'?'Create images':'Create videos')+'.'],
       [/^Đã khôi phục (\d+) cảnh: (\d+) chờ, (\d+) dở\. .*$/,m=>'Restored '+m[1]+' scenes: '+m[2]+' pending, '+m[3]+' interrupted. Press Continue to resume. The opening message is optional.'],
       [/^✓ Vừa xong: (.+)$/,m=>'✓ Recently saved: '+m[1]],
       [/^Dùng thử đến (.+)$/,m=>'Trial until '+m[1]],[/^Nội dung chuyển khoản: (.+)$/,m=>'Payment reference: '+m[1]],

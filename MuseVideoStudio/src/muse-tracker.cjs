@@ -1,7 +1,7 @@
 // These functions execute inside the Muse document through either browser
 // adapter. Keep every browser helper inside beginTracking's closure so the
 // exported function can be serialized without Node imports or outer variables.
-function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = '', recover = false, recoverRequireAnchor = false, echoMarker='',echoKey='',echoAliases=[],otherPrompts=[] }) {
+function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = '', recover = false, recoverRequireAnchor = false, echoMarker='',echoKey='',echoAliases=[],otherPrompts=[],mediaKind='video',imageSelector='',settleMs=3000 }) {
   const key = Symbol.for('MuseVideoStudio.promptTrackers.v1');
   const map = globalThis[key] || (globalThis[key] = new Map());
   if (!id || typeof prompt !== 'string' || !prompt.trim()) throw Error('Tác vụ cần mã và prompt đầy đủ.');
@@ -34,13 +34,30 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     }
     return {kind:'unknown',root:null};
   }
-  const source=v=>{if(v.tagName==='A')return v.href;const declared=v.getAttribute('src');if(declared)return new URL(declared,document.baseURI).href;return v.currentSrc||v.querySelector('source[src]')?.src||'';};
+  const imageMode=mediaKind==='image',imageSel=imageSelector||'img';
+  const source=v=>{if(v.tagName==='IMG')return v.currentSrc||v.src||'';if(v.tagName==='A')return v.href;const declared=v.getAttribute('src');if(declared)return new URL(declared,document.baseURI).href;return v.currentSrc||v.querySelector('source[src]')?.src||'';};
   const videoLink=a=>a.tagName==='A'&&(/^video\//i.test(a.type||'')||/\.(mp4|webm)(?:$|[?#])/i.test(a.href)||/\.(mp4|webm)$/i.test(a.getAttribute('download')||''))&&/^(https:|blob:)/i.test(a.href);
-  function mediaNodes(root){return [...new Set([...(root.matches?.(videoSelector)?[root]:[]),...root.querySelectorAll(videoSelector),...(videoLink(root)?[root]:[]),...root.querySelectorAll('a[href]')])].filter(v=>v.tagName==='VIDEO'||videoLink(v));}
+  // Generated pictures are large; avatars, icons, emoji and the small reference
+  // thumbnails inside the user's own bubble are not results of a prompt.
+  const IMG_MIN=150;
+  const imageSource=src=>/^(https:|blob:|data:image\/(?:png|jpe?g|webp|gif);)/i.test(src)&&!/\.svg(?:$|[?#])/i.test(src)&&!/(?:^|[\/_.-])(?:avatar|emoji|sprite|favicon|logo)(?:[\/_.-]|$)/i.test(src);
+  function imageUsable(v){
+    if(v.tagName!=='IMG'||!imageSource(source(v))||/avatar|emoji|icon|logo/i.test(v.getAttribute('alt')||''))return false;
+    if(!visible(v)||composer(v))return false;
+    const r=v.getBoundingClientRect();
+    if(r.width<IMG_MIN||r.height<IMG_MIN)return false;
+    return !(v.complete&&v.naturalWidth>0&&(v.naturalWidth<128||v.naturalHeight<128));
+  }
+  function imageNodes(root){return [...new Set([...(root.matches?.(imageSel)?[root]:[]),...root.querySelectorAll(imageSel)])].filter(imageUsable);}
+  function mediaNodes(root){
+    if(imageMode)return imageNodes(root);
+    return [...new Set([...(root.matches?.(videoSelector)?[root]:[]),...root.querySelectorAll(videoSelector),...(videoLink(root)?[root]:[]),...root.querySelectorAll('a[href]')])].filter(v=>v.tagName==='VIDEO'||videoLink(v));
+  }
   // Validate selectors now rather than partially submitting then discovering a
   // malformed configuration. A selector must resolve to actual video elements.
-  document.querySelectorAll(videoSelector); if(messageSelector)document.querySelectorAll(messageSelector);
-  const s={documentBody:document.body,echoAliases:new Set(savedAliases),id,prompt:wanted,recover,recoverRequireAnchor,videoSelector,messageSelector,baseline:new Set(document.querySelectorAll('*')),baselineSources:new Set(mediaNodes(document).map(source).filter(Boolean)),added:new WeakMap(),textChanged:new WeakMap(),sequence:0,echo:null,echoRoot:null,responseRoot:null,video:null,fingerprint:'',ready:false,menuPending:false,menuBaseline:null};
+  document.querySelectorAll(imageMode?imageSel:videoSelector); if(messageSelector)document.querySelectorAll(messageSelector);
+  const baselineMedia=imageMode?[...document.querySelectorAll('img')].map(source):mediaNodes(document).map(source);
+  const s={documentBody:document.body,echoAliases:new Set(savedAliases),id,prompt:wanted,recover,recoverRequireAnchor,videoSelector,messageSelector,mediaKind,baseline:new Set(document.querySelectorAll('*')),baselineSources:new Set(baselineMedia.filter(Boolean)),added:new WeakMap(),textChanged:new WeakMap(),sequence:0,echo:null,echoRoot:null,responseRoot:null,video:null,images:[],imageSig:'',imageSince:0,fingerprint:'',ready:false,menuPending:false,menuBaseline:null};
   s.observer=new MutationObserver(records=>{
     for(const record of records) {
       const seq=++s.sequence;
@@ -59,7 +76,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       const known=author(leaf);
       let root=(messageSelector?leaf.closest(messageSelector):null)||(known.kind==='user'?known.root:leaf);
       if(!root)continue;
-      if(!(messageSelector&&root.matches(messageSelector)) && known.kind==='unknown')while(root.parentElement && root.parentElement!==document.body && norm(root.parentElement.innerText ?? root.parentElement.textContent)===wanted && !root.parentElement.querySelector('video,textarea,[contenteditable="true"]'))root=root.parentElement;
+      if(!(messageSelector&&root.matches(messageSelector)) && known.kind==='unknown')while(root.parentElement && root.parentElement!==document.body && norm(root.parentElement.innerText ?? root.parentElement.textContent)===wanted && !root.parentElement.querySelector('video,textarea,[contenteditable="true"]') && !(imageMode&&imageNodes(root.parentElement).length))root=root.parentElement;
       if(!all&&!recover && s.baseline.has(root))continue;
       roots.set(root,{leaf,root});
     }
@@ -109,9 +126,9 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   // Short reason shown on the card while no reply is bound to this prompt, so a
   // stuck scene says what the tool can and cannot see in the chat.
   function hint(){
-    const fresh=[...document.querySelectorAll('video')].filter(v=>s.echoRoot?.isConnected&&following(s.echoRoot,v)&&(recover||(!s.baseline.has(v)&&!s.baselineSources.has(source(v))))).length;
-    const why=Object.entries(s.reject||{}).map(([k,n])=>k+' '+n).join(', ');
-    return fresh?`thấy ${fresh} video mới nhưng chưa gắn được vào đúng prompt${why?' ('+why+')':''}`:'chưa thấy video mới trong chat';
+    const fresh=(imageMode?imageNodes(document):[...document.querySelectorAll('video')]).filter(v=>s.echoRoot?.isConnected&&following(s.echoRoot,v)&&(!imageMode||!s.echoRoot.contains(v))&&(recover||(!s.baseline.has(v)&&!s.baselineSources.has(source(v))))).length;
+    const why=Object.entries(s.reject||{}).map(([k,n])=>k+' '+n).join(', '),noun=imageMode?'ảnh':'video';
+    return fresh?`thấy ${fresh} ${noun} mới nhưng chưa gắn được vào đúng prompt${why?' ('+why+')':''}`:`chưa thấy ${noun} mới trong chat`;
   }
   function lca(a,b){const up=new Set();for(let n=a;n;n=n.parentElement)up.add(n);for(let n=b;n;n=n.parentElement)if(up.has(n))return n;return null;}
   // Markup-independent chat area: the nearest scrolling ancestor of the echo, limited
@@ -168,19 +185,20 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     let branch=video;while(branch.parentElement&&branch.parentElement!==thread)branch=branch.parentElement;
     return branch.parentElement===thread?branch:null;
   }
-  function progress(root) {
+  function progress(root,textual=true) {
     if(!root)return null;
     for(const e of root.querySelectorAll('progress,[role="progressbar"],[aria-valuenow]'))if(visible(e)){
       const raw=e.tagName==='PROGRESS'?(e.hasAttribute('value')?e.value:NaN):Number(e.getAttribute('aria-valuenow'));
       const max=e.tagName==='PROGRESS'?e.max:Number(e.getAttribute('aria-valuemax')||100),min=e.tagName==='PROGRESS'?0:Number(e.getAttribute('aria-valuemin')||0);
       if(Number.isFinite(raw)&&Number.isFinite(max)&&max>min&&raw>=min&&raw<=max)return Math.round((raw-min)/(max-min)*100);
     }
+    if(!textual)return null;
     const values=[...root.querySelectorAll('*')].filter(e=>visible(e)&&e.children.length===0).map(e=>norm(e.textContent)).filter(t=>t.length<=80).map(t=>t.match(/(?:^|\s)(\d{1,3}(?:[.,]\d+)?)\s*%/)).filter(Boolean).map(m=>Number(m[1].replace(',','.'))).filter(v=>v>=0&&v<=100);
     return new Set(values).size===1?values[0]:null;
   }
-  const playable=v=>videoLink(v)||(v.tagName==='VIDEO'&&/^(https:|blob:)/i.test(source(v)));
+  const playable=v=>imageMode?(v.tagName==='IMG'&&v.complete&&v.naturalWidth>=128&&v.naturalHeight>=128&&imageSource(source(v))):videoLink(v)||(v.tagName==='VIDEO'&&/^(https:|blob:)/i.test(source(v)));
   function rememberContext(root){const parents=[];for(let p=root.parentElement,depth=0;p&&p!==document.body&&depth<8;p=p.parentElement,depth++)if(!p.querySelector('textarea,input,[contenteditable="true"],[role="textbox"],nav,aside'))parents.push(p);return parents;}
-  function result(phase,stage,root=s.responseRoot) {return {id,phase,stage,responseMatched:Boolean(root?.isConnected&&s.echoRoot&&following(s.echoRoot,root)),echoAliases:[...s.echoAliases],echoMatched:Boolean(s.echo),echoKey:s.echoRoot?.id||s.echoRoot?.getAttribute('data-message-id')||s.echoRoot?.getAttribute('data-id')||'',echoMarker:s.echoRoot?.getAttribute('data-muse-studio-attempt')||'',ready:phase==='ready',progress:progress(root),...(phase==='ready'?{url:source(s.video),fingerprint:s.fingerprint}:{})};}
+  function result(phase,stage,root=s.responseRoot) {return {id,phase,stage,responseMatched:Boolean(root?.isConnected&&s.echoRoot&&following(s.echoRoot,root)),echoAliases:[...s.echoAliases],echoMatched:Boolean(s.echo),echoKey:s.echoRoot?.id||s.echoRoot?.getAttribute('data-message-id')||s.echoRoot?.getAttribute('data-id')||'',echoMarker:s.echoRoot?.getAttribute('data-muse-studio-attempt')||'',ready:phase==='ready',progress:progress(root),...(phase==='ready'?{url:source(s.video),fingerprint:s.fingerprint,...(imageMode?{count:s.images.length}:{})}:{})};}
   s.poll=()=>{
     if(s.echo?.isConnected&&s.echoRoot?.isConnected&&(!s.echoRoot.contains(s.echo)||norm(s.echo.innerText??s.echo.textContent)!==wanted||author(s.echo).kind==='assistant'))throw Error('Tin nhắn của cảnh đã thay đổi. Không lấy video từ câu Test hay cảnh khác.');
     let echoes=echoCandidates();
@@ -199,7 +217,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     }
     const thread=threadRoot(s.echoRoot);
     if(s.ready&&(!s.video?.isConnected||!s.responseRoot?.isConnected)){s.ready=false;s.video=null;s.responseRoot=null;}
-    if(s.ready&&s.video&&(source(s.video)!==s.fingerprint))throw Error('Kết quả đã thay đổi. Dừng tải để tránh lấy nhầm video.');
+    if(s.ready&&s.video&&!imageMode&&(source(s.video)!==s.fingerprint))throw Error('Kết quả đã thay đổi. Dừng tải để tránh lấy nhầm video.');
     // Every poll, including immediately before download, checks the prompt and
     // response boundaries again. A live DOM node can be recycled for Test or
     // another turn without being disconnected.
@@ -209,6 +227,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     const candidates=[],reject={};const note=k=>{reject[k]=(reject[k]||0)+1;};s.reject=reject;
     for(const video of (thread?mediaNodes(thread):[])) {
       if(!following(s.echoRoot,video))continue;
+      if(imageMode&&s.echoRoot.contains(video))continue;
       if(s.genericSpan&&!s.genericSpan.some(row=>row.contains(video))){note('ngoài vùng trả lời');continue;}
       if(!recover&&(s.baseline.has(video)||s.baselineSources.has(source(video))))continue;
       const root=responseRoot(video,thread);
@@ -220,7 +239,12 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       candidates.push({video,root});
     }
     if(!candidates.length)candidates.push(...fallbackCandidates(note));
-    if(candidates.length>1)throw Error('Có nhiều video sau prompt này. Dừng để tránh gán hoặc tải nhầm kết quả.');
+    if(imageMode){
+      // A reply may hold several pictures (variants), but they must all sit in one
+      // response block; pictures spread over several blocks fail closed.
+      if(new Set(candidates.map(c=>c.root)).size>1)throw Error('Có ảnh nằm ở nhiều khối phản hồi sau prompt này. Dừng để tránh gán hoặc lưu nhầm ảnh.');
+      const seen=new Set(),unique=candidates.filter(c=>{const key=source(c.video);if(seen.has(key))return false;seen.add(key);return true;});candidates.splice(0,candidates.length,...unique);
+    }else if(candidates.length>1)throw Error('Có nhiều video sau prompt này. Dừng để tránh gán hoặc tải nhầm kết quả.');
     if(!candidates.length) {
       s.responseRoot=null;s.video=null;
       if(!thread)return {...result('waiting-response','Chưa xác định được vùng phản hồi cho prompt này'),hint:hint()};
@@ -235,6 +259,18 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       return {...result('waiting-response','Đang chờ video phản hồi cho đúng prompt này'),hint:hint()};
     }
     s.video=candidates[0].video;s.responseRoot=candidates[0].root;
+    if(imageMode){
+      const images=candidates.map(c=>c.video);s.images=images;s.video=images[0];
+      for(const image of images)if(!image.complete&&image.loading==='lazy')image.loading='eager';
+      if(!images.every(playable))return result('rendering','Muse đang tạo hoặc tải ảnh');
+      const percent=progress(s.responseRoot,false);
+      if(percent!==null&&percent<100)return result('rendering','Muse đang tạo ảnh · '+percent+'%');
+      const signature=images.map(source).join('|');
+      if(signature!==s.imageSig){s.imageSig=signature;s.imageSince=Date.now();}
+      if(Date.now()-s.imageSince<settleMs)return result('rendering','Ảnh đã hiện · chờ ổn định trước khi lưu');
+      s.ready=true;s.fingerprint=signature;
+      return result('ready','Ảnh của prompt đã sẵn sàng lưu');
+    }
     if(!playable(s.video))return result('rendering','Muse đang tạo hoặc tải dữ liệu video');
     s.ready=true;s.fingerprint=source(s.video);
     return result('ready','Video của prompt đã sẵn sàng tải');
@@ -244,6 +280,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   // emoji row, Reply and Share). `soft` makes menu-specific problems return a note so
   // the caller can try the other route; binding problems (poll above) always throw.
   s.download=({phase='auto',soft=false}={})=>{
+    if(imageMode)throw Error('Cảnh tạo ảnh lưu ảnh trực tiếp, không dùng menu tải video.');
     s.poll();if(!s.ready||!s.responseRoot?.isConnected)throw Error('Video gắn với prompt chưa sẵn sàng tải.');
     const menuFail=message=>{if(soft)return {action:'failed',clicked:false,needsMenu:false,failed:true,note:message};throw Error(message);};
     const text=e=>norm(e.getAttribute('aria-label')||e.getAttribute('title')||e.textContent);
@@ -448,9 +485,40 @@ function downloadAction({id,phase='auto',soft=false}) {
   if(!state)throw Error('Không có video đã gắn với tác vụ này.');
   return state.download({phase,soft});
 }
+// Reads the bytes of one picture that poll() bound to this prompt. The binding is
+// checked again first, so a picture that changed meanwhile is never saved.
+async function readTrackedImage({id,index=0,maxBytes=62914560}) {
+  const s=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]?.get(id);
+  if(!s||s.mediaKind!=='image')throw Error('Không có ảnh đã gắn với tác vụ này.');
+  const now=s.poll();
+  if(!now.ready)return {changed:true,count:0,message:now.stage};
+  const count=s.images.length,img=s.images[index];
+  if(!img||!img.isConnected)return {changed:true,count};
+  const shown=img.currentSrc||img.src||'';
+  const link=img.closest('a[href]')?.href||'';
+  const full=/^(https:|blob:)/i.test(link)&&/\.(png|jpe?g|webp|gif)(?:$|[?#])/i.test(link)?link:'';
+  const errors=[];
+  const asData=blob=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error||Error('Không đọc được ảnh'));reader.readAsDataURL(blob);});
+  for(const url of [...new Set([full,shown].filter(Boolean))]) {
+    try{
+      if(/^data:image\//i.test(url))return {count,url:url.slice(0,80),dataUrl:url,via:'data'};
+      const response=await fetch(url,{credentials:'include'});
+      if(!response.ok)throw Error('HTTP '+response.status);
+      const blob=await response.blob();
+      if(blob.size>maxBytes)throw Error('Ảnh lớn hơn giới hạn');
+      return {count,url,dataUrl:await asData(blob),via:'fetch'};
+    }catch(e){errors.push(String(e?.message||e).slice(0,120));}
+  }
+  try{
+    const canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
+    canvas.getContext('2d').drawImage(img,0,0);
+    return {count,url:shown,dataUrl:canvas.toDataURL('image/png'),via:'canvas'};
+  }catch(e){errors.push('canvas: '+String(e?.message||e).slice(0,80));}
+  return {count,url:full||shown,failed:true,errors};
+}
 function endTracking({id}) {
   const map=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')],state=map?.get(id);
   state?.observer?.disconnect();state?.downloadController?.abort();const stops=globalThis[Symbol.for('MuseVideoStudio.stopRequests.v1')];if(stops)for(const key of stops)if(key.startsWith(id+':'))stops.delete(key);return map?.delete(id)||false;
 }
 function pollBrowserProbe({id}){const s=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]?.get(id);if(!s)throw Error('Test không còn gắn với tab này.');return s.probe();}
-module.exports={pollBrowserProbe,beginTracking,pollTracking,downloadAction,endTracking};
+module.exports={pollBrowserProbe,beginTracking,pollTracking,downloadAction,endTracking,readTrackedImage};
