@@ -56,6 +56,9 @@ func _draw() -> void:
 	draw_string(ThemeDB.fallback_font, Vector2(18, h - 60), "Niệm: %d/108 | Thiền: %ds" % [beads, int(meditation_seconds)], HORIZONTAL_ALIGNMENT_LEFT, w - 36, 18, Color.WHITE)
 	draw_string(ThemeDB.fallback_font, Vector2(18, h - 28), "Chạm: bồ đoàn | góc trái: hương | góc phải: niệm", HORIZONTAL_ALIGNMENT_LEFT, w - 36, 15, Color.WHITE)
 
+	draw_rect(Rect2(12, h * 0.80, w - 24, h * 0.07), Color("#7a4525"))
+	draw_string(ThemeDB.fallback_font, Vector2(25, h * 0.84), "LAY - GO MO - TUNG KINH - NIEM HAT", HORIZONTAL_ALIGNMENT_LEFT, w - 40, 17, Color.WHITE)
+
 func draw_ellipse_approx(center: Vector2, radius: Vector2, color: Color) -> void:
 	var pts := PackedVector2Array()
 	for j in range(33):
