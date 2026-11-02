@@ -6,11 +6,11 @@ on:
       run_id:
         description: Successful Chua Viet Online Android build run
         required: true
-        default: '41504091351'
+        default: '41546344456'
       version:
         description: APK version
         required: true
-        default: '0.2.1'
+        default: '0.3.0'
   push:
     branches: [chua-viet-online]
     paths: ['.github/workflows/chua-viet-online-release.yml']
@@ -25,8 +25,8 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      BUILD_RUN: ${{ inputs.run_id || '41504091351' }}
-      APK_VERSION: ${{ inputs.version || '0.2.1' }}
+      BUILD_RUN: ${{ inputs.run_id || '41546344456' }}
+      APK_VERSION: ${{ inputs.version || '0.3.0' }}
     steps:
       - name: Validate source build
         shell: bash
@@ -43,6 +43,13 @@ jobs:
           path: apk
           run-id: ${{ env.BUILD_RUN }}
           github-token: ${{ github.token }}
+      - name: Download real game recording
+        uses: actions/download-artifact@v4
+        with:
+          name: ChuaVietOnline-ritual-review
+          path: review
+          run-id: ${{ env.BUILD_RUN }}
+          github-token: ${{ github.token }}
       - name: Publish direct APK download
         shell: bash
         run: |
@@ -53,8 +60,31 @@ jobs:
           cp "$source_apk" "$asset"
           tag="chua-viet-online-v$APK_VERSION"
           cat > notes.md <<'NOTES'
-          Bản cài thử Android (debug, arm64). Mỗi người tự nhập tên hoặc pháp danh, có thể đổi tên trong Cài đặt. Tên được lưu trên thiết bị và đồng bộ với người chơi trực tuyến.
+          Bản cài thử Android 0.3.0 (debug, arm64).
+
+          - Quỳ / Đứng, Lạy Phật, Chắp tay, Ngồi thiền, Niệm Phật và Thắp hương thực hiện trực tiếp bằng nhân vật trong chính điện.
+          - Chuỗi lạy: chắp tay, hạ gối, quỳ, cúi, phủ phục rồi về quỳ. Chỉ hoàn thành đủ chuỗi mới tăng số lạy; di chuyển hoặc Dừng sẽ ngắt nghi thức.
+          - Cảnh và giao diện cố định khi đi; joystick cảm ứng không còn bị sự kiện chuột mô phỏng chiếm điều khiển.
+          - Tên/pháp danh do từng người tự đặt, được lưu và đồng bộ.
+
+          Video ritual-preview.mp4 và các ảnh JPG được quay/chụp từ viewport của chính game bằng các nút hành động thật.
+
+          Lưu ý cài đặt: bản 0.2.x dùng khóa ký debug cũ. Nếu Android báo xung đột chữ ký, cần gỡ bản cũ trước khi cài; gỡ ứng dụng sẽ xóa tiến trình đang lưu trên thiết bị.
 
           APK lấy từ build GitHub Actions đã kiểm thử thành công. Chưa kiểm thử trên điện thoại vật lý; chưa cấu hình máy chủ Internet công khai; cửa hàng vẫn là sandbox.
           NOTES
-          gh release create "$tag" "$asset" --target "$SOURCE_SHA" --title "Chùa Việt Online $APK_VERSION — Android thử nghiệm" --notes-file notes.md --prerelease --latest=false
+          gh release create "$tag" "$asset" review/ritual-preview.mp4 review/temple-preview.jpg review/ritual-kneel.jpg review/ritual-bow.jpg review/ritual-incense.jpg --target "$SOURCE_SHA" --title "Chùa Việt Online $APK_VERSION — Android thử nghiệm" --notes-file notes.md --prerelease --latest=false
+      - uses: actions/checkout@v4
+        with:
+          ref: chua-viet-online
+      - name: Package source history for handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --unshallow origin chua-viet-online
+          git bundle create ChuaVietOnline-source.bundle HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChuaVietOnline-source-bundle
+          path: ChuaVietOnline-source.bundle
+          if-no-files-found: error
