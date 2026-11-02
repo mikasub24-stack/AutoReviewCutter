@@ -279,15 +279,20 @@ func _draw() -> void:
 			draw_colored_polygon(PackedVector2Array([remote_pos+Vector2(-20,-12),remote_pos+Vector2(20,-12),remote_pos+Vector2(23,20),remote_pos+Vector2(-23,20)]),remote_robe)
 			draw_circle(remote_pos+Vector2(0,-27),15,Color("#d9a47a"))
 	# Character: bald head, Vietnamese brown or gray robe.
-	var avatar := player - camera
+	var walking := not sitting and (auto_walk or joystick.length() > 0.05)
+	var gait := sin(footstep_time) * 4.0 if walking else 0.0
+	var avatar := player - camera + Vector2(0, absf(gait) * -0.4)
 	if sitting:
 		_ellipse(avatar + Vector2(0, 20), Vector2(29, 12), Color("#38241b"))
 	else:
-		draw_rect(Rect2(avatar + Vector2(-14, 13), Vector2(11, 24)), Color("#302521"))
-		draw_rect(Rect2(avatar + Vector2(4, 13), Vector2(11, 24)), Color("#302521"))
+		draw_rect(Rect2(avatar + Vector2(-14, 13 + gait), Vector2(11, 24)), Color("#302521"))
+		draw_rect(Rect2(avatar + Vector2(4, 13 - gait), Vector2(11, 24)), Color("#302521"))
 	var robe := Color("#90969a") if character_gender == 1 else (Color("#79533b") if robe_brown else Color("#90969a"))
 	draw_colored_polygon(PackedVector2Array([avatar + Vector2(-23,-12),avatar + Vector2(23,-12),avatar + Vector2(27,22),avatar + Vector2(-27,22)]), robe)
 	draw_circle(avatar + Vector2(0,-27), 15, Color("#d9a47a"))
+	# Small hands make the walking silhouette readable on a phone.
+	draw_circle(avatar + Vector2(-24, 4 - gait), 6, Color("#d9a47a"))
+	draw_circle(avatar + Vector2(24, 4 + gait), 6, Color("#d9a47a"))
 	if character_gender == 1:
 		draw_arc(avatar + Vector2(0,-29), 16, PI, TAU, 16, Color("#282324"), 5)
 	draw_arc(avatar + Vector2(0,-27), 15, PI, TAU, 16, Color("#966547"), 2)
@@ -431,6 +436,10 @@ func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 				status_text += " (đang tự tìm đường)"
 		else:
 			incense.append({"pos":world,"age":0.0})
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
+		_save_progress()
 
 func _save_progress() -> void:
 	var file := FileAccess.open("user://temple_progress.json", FileAccess.WRITE)
