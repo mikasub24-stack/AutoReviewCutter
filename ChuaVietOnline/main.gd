@@ -143,10 +143,8 @@ func _process(delta: float) -> void:
 					return
 				selected_seat = approach_seat
 				approach_seat = -1
-				sitting = true
 				joystick = Vector2.ZERO
-				status_text = "Đã ngồi vào bồ đoàn %d" % (selected_seat + 1)
-				_claim_seat(selected_seat)
+				_begin_sitting(selected_seat)
 		else:
 			status_text = "Đi theo lối giữa hoặc hành lang ngang"
 	for i in range(incense.size() - 1, -1, -1):
