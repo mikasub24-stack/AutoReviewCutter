@@ -59,6 +59,15 @@ jobs:
           PY
           test -f "$ANDROID_HOME/build-tools/33.0.2/aapt"
           test -f "$HOME/.android/debug.keystore"
+      - name: Validate Godot scripts and scene loading
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path ChuaVietOnline --editor --quit 2>&1 | tee godot-validation.log
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Parser Error" godot-validation.log; then
+            echo "Godot script validation failed" >&2
+            exit 1
+          fi
       - name: Export APK
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /home/runner/.android/debug.keystore
