@@ -25,6 +25,8 @@ var buttons: Array[Button] = []
 var voice_note: Label
 var avatar_area: Control
 var practice_save_elapsed := 0.0
+var server_address: LineEdit
+var network_status: Label
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -70,6 +72,23 @@ func _ready() -> void:
 		button.pressed.connect(_act.bind(entry[1]))
 		grid.add_child(button)
 		buttons.append(button)
+	var network_heading := Label.new()
+	network_heading.text = "KẾT NỐI CHÍNH ĐIỆN TRỰC TUYẾN"
+	column.add_child(network_heading)
+	server_address = LineEdit.new()
+	server_address.placeholder_text = "wss://your-temple-server.example"
+	server_address.text = "ws://127.0.0.1:8788"
+	if get_parent() != null and get_parent().multiplayer_client != null:
+		server_address.text = get_parent().multiplayer_client.server_url
+	column.add_child(server_address)
+	var connect_button := Button.new()
+	connect_button.text = "Kết nối máy chủ nhiều người chơi"
+	connect_button.pressed.connect(_connect_multiplayer)
+	column.add_child(connect_button)
+	network_status = Label.new()
+	network_status.text = "Chưa kết nối máy chủ"
+	network_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(network_status)
 	var stop := Button.new()
 	stop.text = "Dừng nghi thức"
 	stop.pressed.connect(_act.bind("stop"))
@@ -286,3 +305,15 @@ func _load_practice() -> void:
 	altar_incense = maxi(0,int(data.get("altar_incense",0)))
 	altar_flowers = maxi(0,int(data.get("altar_flowers",0)))
 	altar_fruits = maxi(0,int(data.get("altar_fruits",0)))
+
+func _connect_multiplayer() -> void:
+	var root = get_parent()
+	if root == null or root.multiplayer_client == null:
+		network_status.text = "Không tìm thấy kết nối nhiều người chơi."
+		return
+	var url := server_address.text.strip_edges()
+	if not (url.begins_with("ws://") or url.begins_with("wss://")):
+		network_status.text = "Địa chỉ phải bắt đầu bằng ws:// hoặc wss://"
+		return
+	root.multiplayer_client.configure(url)
+	network_status.text = "Đang kết nối: " + url
