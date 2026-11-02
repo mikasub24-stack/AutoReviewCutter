@@ -280,7 +280,7 @@ func _draw() -> void:
 	if occupancy_notice > 0.0:
 		draw_rect(Rect2(22,h*0.40,w-44,88),Color(0.39,0.11,0.08,0.94))
 		draw_string(ThemeDB.fallback_font,Vector2(35,h*0.40+35),"BỒ ĐOÀN ĐÃ CÓ NGƯỜI NGỒI",HORIZONTAL_ALIGNMENT_LEFT,w-70,20,Color("#ffe0a6"))
-		draw_string(ThemeDB.fallback_font,Vector2(35,h*0.40+64),"Vui lòng chọn chỗ khác",HORIZONTAL_ALIGNMENT_LEFT,w-70,17,Color.WHITE)
+		draw_string(ThemeDB.fallback_font,Vector2(35,h*0.40+64),"Vui lòng chọn bồ đoàn khác",HORIZONTAL_ALIGNMENT_LEFT,w-70,17,Color.WHITE)
 	draw_rect(Rect2(8, 104, 145, 48), Color("#70442b"))
 	draw_string(ThemeDB.fallback_font, Vector2(17,136), "TU TẬP", HORIZONTAL_ALIGNMENT_LEFT, 130, 19, Color.WHITE)
 	draw_rect(Rect2(w - 155, 104, 147, 48), Color("#70442b"))
@@ -343,6 +343,10 @@ func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 			auto_walk = false
 			auto_path.clear()
 			approach_seat = -1
+			if not sitting and selected_seat >= 0 and occupied_seats.has(selected_seat):
+				status_text = "Chỗ đã có người ngồi, vui lòng chọn bồ đoàn khác."
+				occupancy_notice = 3.0
+				return
 			sitting = not sitting
 			if not sitting:
 				_claim_seat(-1)
@@ -500,6 +504,6 @@ func _seat_denied(index: int) -> void:
 	auto_walk = false
 	auto_path.clear()
 	approach_seat = -1
-	status_text = "Chỗ đã có người ngồi. Vui lòng chọn bồ đoàn khác!"
+	status_text = "Chỗ đã có người ngồi, vui lòng chọn bồ đoàn khác."
 	occupancy_notice = 3.0
 	queue_redraw()
