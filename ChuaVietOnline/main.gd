@@ -308,6 +308,11 @@ func _draw() -> void:
 		draw_circle(pos, 7.0 + a * 3.0, Color(0.95,0.92,0.83, (3.0-a) * 0.13))
 	# HUD with accessible touch regions.
 	draw_rect(Rect2(0,0,w,100), Color(0.11,0.07,0.05,0.92))
+	var is_online := multiplayer_client != null and multiplayer_client.connected
+	var net_label := "TRỰC TUYẾN" if is_online else "NGOẠI TUYẾN"
+	var net_color := Color("#9ad99a") if is_online else Color("#ffcf8c")
+	draw_circle(Vector2(w - 28.0, 22.0), 6.0, net_color)
+	draw_string(ThemeDB.fallback_font, Vector2(w - 145.0, 28.0), net_label, HORIZONTAL_ALIGNMENT_LEFT, 110, 13, net_color)
 	draw_string(ThemeDB.fallback_font, Vector2(18,31), "CHÙA VIỆT ONLINE  |  1.000 BỒ ĐOÀN", HORIZONTAL_ALIGNMENT_LEFT, w-24, 20, Color("#f6d18a"))
 	draw_string(ThemeDB.fallback_font, Vector2(18,62), status_text, HORIZONTAL_ALIGNMENT_LEFT, w-24, 15, Color.WHITE)
 	if multiplayer_client != null and multiplayer_client.connected:
