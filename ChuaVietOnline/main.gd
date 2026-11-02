@@ -93,7 +93,7 @@ func _process(delta: float) -> void:
 				if approach_seat >= 0:
 					if occupied_seats.has(approach_seat):
 						status_text = "Bồ đoàn đã có người ngồi, vui lòng chọn chỗ khác"
-					occupancy_notice = 3.0
+						occupancy_notice = 3.0
 						approach_seat = -1
 						queue_redraw()
 						return
