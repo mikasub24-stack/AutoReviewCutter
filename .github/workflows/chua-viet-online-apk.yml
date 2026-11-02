@@ -1,0 +1,38 @@
+name: Chua Viet Online - Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [chua-viet-online]
+    paths:
+      - 'ChuaVietOnline/**'
+      - '.github/workflows/chua-viet-online-apk.yml'
+
+jobs:
+  android-apk:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate temporary Android debug signing key
+        run: |
+          mkdir -p /root/.android
+          keytool -genkeypair -v -keystore /root/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+      - name: Import project
+        run: godot --headless --path ChuaVietOnline --editor --quit
+      - name: Export Android debug APK
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /root/.android/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          mkdir -p ChuaVietOnline/build
+          godot --headless --path ChuaVietOnline --export-debug Android build/ChuaVietOnline-debug.apk
+          test -s ChuaVietOnline/build/ChuaVietOnline-debug.apk
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChuaVietOnline-debug-APK
+          path: ChuaVietOnline/build/ChuaVietOnline-debug.apk
+          if-no-files-found: error
