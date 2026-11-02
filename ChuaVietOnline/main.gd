@@ -185,6 +185,32 @@ func _draw() -> void:
 	for r in range(5):
 		var cross_y := 380.0 + float(r) * STEP_Y * 10.0
 		draw_rect(Rect2(Vector2(0, cross_y) - camera, Vector2(WORLD_W, 100)), Color("#b28c61"))
+	# Vietnamese temple columns, gilded bases and carved crossbeams.
+	var pillar_start := maxi(0, int(camera.y / 500.0) - 1)
+	var pillar_end := mini(int(WORLD_H / 500.0), int((camera.y + h) / 500.0) + 1)
+	for pillar_row in range(pillar_start, pillar_end + 1):
+		var py := 335.0 + float(pillar_row) * 500.0 - camera.y
+		for px_world in [48.0, WORLD_W - 48.0, WORLD_W * 0.5 - AISLE * 0.5 - 22.0, WORLD_W * 0.5 + AISLE * 0.5 + 22.0]:
+			var px := px_world - camera.x
+			draw_rect(Rect2(px - 15.0, py - 120.0, 30.0, 240.0), Color("#50291e"))
+			draw_rect(Rect2(px - 20.0, py - 122.0, 40.0, 18.0), Color("#d9a64d"))
+			draw_rect(Rect2(px - 21.0, py + 106.0, 42.0, 16.0), Color("#d9a64d"))
+			draw_line(Vector2(px - 7.0, py - 98.0), Vector2(px - 7.0, py + 99.0), Color("#9d6036"), 3.0)
+		# Red-and-gold horizontal carved timber beam.
+		draw_rect(Rect2(-camera.x, py - 143.0, WORLD_W, 19.0), Color("#602f23"))
+		draw_line(Vector2(-camera.x, py - 144.0), Vector2(WORLD_W-camera.x, py - 144.0), Color("#d9ac5b"), 3.0)
+		for ornament in range(12):
+			var ox := float(ornament) * 145.0 + 28.0 - camera.x
+			draw_circle(Vector2(ox, py - 133.0), 5.0, Color("#e3b861"))
+	# Lotus motifs along the red central carpet.
+	var lotus_start := maxi(0, int(camera.y / 210.0) - 1)
+	var lotus_end := mini(int(WORLD_H / 210.0), int((camera.y + h) / 210.0) + 1)
+	for lotus_row in range(lotus_start, lotus_end + 1):
+		var lotus_center := Vector2(WORLD_W * 0.5 - camera.x, float(lotus_row) * 210.0 + 120.0 - camera.y)
+		for petal in range(8):
+			var angle := TAU * float(petal) / 8.0
+			_ellipse(lotus_center + Vector2(cos(angle)*18.0, sin(angle)*18.0), Vector2(7.0, 12.0), Color("#e2a45e"))
+		draw_circle(lotus_center, 9.0, Color("#f3d58b"))
 	# Sanctuary altar at far end.
 	draw_rect(Rect2(Vector2(WORLD_W * 0.5 - 300, 45) - camera, Vector2(600, 235)), Color("#542b1d"))
 	draw_rect(Rect2(Vector2(WORLD_W * 0.5 - 265, 62) - camera, Vector2(530, 198)), Color("#bb842c"))
