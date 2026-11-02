@@ -34,6 +34,7 @@ var altar_glow := 0.0
 # Local occupancy registry; server synchronization is required for real multiplayer.
 var occupied_seats: Dictionary = {}
 var occupant_count := 0
+var occupancy_notice := 0.0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -56,6 +57,7 @@ func _camera() -> Vector2:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	occupancy_notice = maxf(0.0, occupancy_notice - delta)
 	save_timer += delta
 	if save_timer > 15.0:
 		save_timer = 0.0
@@ -76,6 +78,7 @@ func _process(delta: float) -> void:
 				if approach_seat >= 0:
 					if occupied_seats.has(approach_seat):
 						status_text = "Bồ đoàn đã có người ngồi, vui lòng chọn chỗ khác"
+					occupancy_notice = 3.0
 						approach_seat = -1
 						queue_redraw()
 						return
@@ -202,6 +205,10 @@ func _draw() -> void:
 	draw_rect(Rect2(0,0,w,100), Color(0.11,0.07,0.05,0.92))
 	draw_string(ThemeDB.fallback_font, Vector2(18,31), "CHÙA VIỆT ONLINE  |  1.000 BỒ ĐOÀN", HORIZONTAL_ALIGNMENT_LEFT, w-24, 20, Color("#f6d18a"))
 	draw_string(ThemeDB.fallback_font, Vector2(18,62), status_text, HORIZONTAL_ALIGNMENT_LEFT, w-24, 15, Color.WHITE)
+	if occupancy_notice > 0.0:
+		draw_rect(Rect2(22,h*0.40,w-44,88),Color(0.39,0.11,0.08,0.94))
+		draw_string(ThemeDB.fallback_font,Vector2(35,h*0.40+35),"BỒ ĐOÀN ĐÃ CÓ NGƯỜI NGỒI",HORIZONTAL_ALIGNMENT_LEFT,w-70,20,Color("#ffe0a6"))
+		draw_string(ThemeDB.fallback_font,Vector2(35,h*0.40+64),"Vui lòng chọn chỗ khác",HORIZONTAL_ALIGNMENT_LEFT,w-70,17,Color.WHITE)
 	draw_rect(Rect2(8, 104, 145, 48), Color("#70442b"))
 	draw_string(ThemeDB.fallback_font, Vector2(17,136), "TU TẬP", HORIZONTAL_ALIGNMENT_LEFT, 130, 19, Color.WHITE)
 	draw_rect(Rect2(w - 155, 104, 147, 48), Color("#70442b"))
@@ -291,8 +298,12 @@ func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 					distance = d
 					best = idx
 		if best >= 0:
+			if best == selected_seat and sitting:
+				status_text = "Bạn đang ngồi tại bồ đoàn này"
+				return
 			if occupied_seats.has(best):
 				status_text = "Chỗ này đã có người ngồi! Hãy chọn bồ đoàn khác."
+				occupancy_notice = 3.0
 				return
 			selected_seat = best
 			approach_seat = best
