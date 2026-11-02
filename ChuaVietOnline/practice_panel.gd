@@ -1,6 +1,12 @@
 extends Control
 ## Interactive Buddhist practice panel: procedural avatar animation and counters.
 ## No external audio or image assets required.
+const TEMPLE_AUDIO = preload("res://temple_audio.gd")
+var temple_audio: Node
+var wheel_turns := 0
+var flowers := 0
+var bells := 0
+var mantra_count := 0
 var practice := ""
 var elapsed := 0.0
 var chant_seconds := 0.0
@@ -49,7 +55,7 @@ func _ready() -> void:
 	var grid := GridContainer.new()
 	grid.columns = 2
 	column.add_child(grid)
-	for entry in [["Lạy Phật","bow"],["Gõ mõ","wood"],["Tụng kinh","chant"],["Niệm hạt","beads"],["Ngồi thiền","meditate"],["Thắp hương","incense"]]:
+	for entry in [["Lạy Phật","bow"],["Gõ mõ","wood"],["Tụng kinh","chant"],["Niệm hạt","beads"],["Ngồi thiền","meditate"],["Thắp hương","incense"],["Gõ chuông","bell"],["Dâng hoa","flower"],["Chuyển kinh luân","wheel"],["Om Mani Padme Hum","mantra"],["Nhạc thiền bật/tắt","music"]]:
 		var button := Button.new()
 		button.text = entry[0]
 		button.custom_minimum_size = Vector2(150, 58)
@@ -73,10 +79,15 @@ func _ready() -> void:
 	add_child(sound_player)
 	sound_player.play()
 	sound_playback = sound_player.get_stream_playback()
+	temple_audio = TEMPLE_AUDIO.new()
+	add_child(temple_audio)
 	set_process(true)
 
 func _act(action: String) -> void:
-	if action == "stop":
+	if action == "music":
+		temple_audio.set_ambient(not temple_audio.ambient)
+		message = "Nhạc thiền " + ("đang phát" if temple_audio.ambient else "đã tắt")
+	elif action == "stop":
 		practice = ""
 		message = "Đã dừng nghi thức"
 	else:
@@ -85,11 +96,11 @@ func _act(action: String) -> void:
 		match action:
 			"bow":
 				bows += 1
+				temple_audio.trigger("bow")
 				message = "Lạy Phật lần %d" % bows
 			"wood":
 				knocks += 1
-				sound_remaining = 6500
-				sound_phase = 0.0
+				temple_audio.trigger("wood")
 				message = "Gõ mõ lần %d" % knocks
 			"chant":
 				message = "Đang tụng: Nam mô A Di Đà Phật"
@@ -100,7 +111,23 @@ func _act(action: String) -> void:
 				message = "Đang ngồi thiền"
 			"incense":
 				incense += 1
+				temple_audio.trigger("incense")
 				message = "Thắp hương lần %d" % incense
+			"bell":
+				bells += 1
+				temple_audio.trigger("bell")
+				message = "Thỉnh chuông lần %d" % bells
+			"flower":
+				flowers += 1
+				temple_audio.trigger("flower")
+				message = "Dâng hoa sen lần %d" % flowers
+			"wheel":
+				wheel_turns += 1
+				temple_audio.trigger("wheel")
+				message = "Chuyển kinh luân lần %d" % wheel_turns
+			"mantra":
+				mantra_count += 1
+				message = "Om Mani Padme Hum - lần %d" % mantra_count
 	voice_note.text = message
 	avatar_area.queue_redraw()
 
@@ -117,6 +144,8 @@ func _process(delta: float) -> void:
 	if practice == "wood" and elapsed >= 0.4:
 		practice = ""
 	if practice == "beads" and elapsed >= 0.5:
+		practice = ""
+	if practice in ["bell", "flower", "wheel", "mantra"] and elapsed >= 3.0:
 		practice = ""
 	if practice == "incense" and elapsed >= 2.5:
 		practice = ""
@@ -165,6 +194,13 @@ func _draw_avatar() -> void:
 	else:
 		avatar_area.draw_line(c + Vector2(-30,0+offset), c + Vector2(-10,35+offset), skin, 9)
 		avatar_area.draw_line(c + Vector2(30,0+offset), c + Vector2(10,35+offset), skin, 9)
+	if practice == "wheel":
+		avatar_area.draw_circle(c + Vector2(72, 20), 28, gold)
+		avatar_area.draw_arc(c + Vector2(72,20), 20, elapsed * 5, elapsed * 5 + PI * 1.5, 24, robe, 6)
+	if practice == "flower":
+		for k in range(7):
+			var a := float(k) * TAU / 7.0
+			avatar_area.draw_circle(c + Vector2(sin(a)*15,30+cos(a)*15), 9, Color("#e7a5bb"))
 	if practice == "beads":
 		for i in range(12):
 			var a := float(i) * TAU / 12.0 + elapsed * 3.0
