@@ -31,10 +31,14 @@ var save_timer := 0.0
 var auto_path: Array[Vector2] = []
 var auto_walk := false
 var altar_glow := 0.0
+# Local occupancy registry; server synchronization is required for real multiplayer.
+var occupied_seats: Dictionary = {}
+var occupant_count := 0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_load_progress()
+	_seed_occupants()
 	set_process(true)
 	queue_redraw()
 
@@ -70,6 +74,11 @@ func _process(delta: float) -> void:
 			if auto_path.is_empty():
 				auto_walk = false
 				if approach_seat >= 0:
+					if occupied_seats.has(approach_seat):
+						status_text = "Bồ đoàn đã có người ngồi, vui lòng chọn chỗ khác"
+						approach_seat = -1
+						queue_redraw()
+						return
 					selected_seat = approach_seat
 					approach_seat = -1
 					sitting = true
@@ -97,6 +106,10 @@ func _process(delta: float) -> void:
 			player = next
 			sitting = false
 			if approach_seat >= 0 and player.distance_to(_seat_position(approach_seat)) < 30.0:
+				if occupied_seats.has(approach_seat):
+					status_text = "Bồ đoàn đã có người ngồi, vui lòng chọn chỗ khác"
+					approach_seat = -1
+					return
 				selected_seat = approach_seat
 				approach_seat = -1
 				sitting = true
@@ -160,10 +173,12 @@ func _draw() -> void:
 		for col in range(COLS_PER_SIDE * 2):
 			var idx := row * COLS_PER_SIDE * 2 + col
 			var pos := _seat_position(idx) - camera
-			var color := Color("#63bca4") if idx == selected_seat else Color("#c5a45b")
+			var color := Color("#63bca4") if idx == selected_seat else (Color("#8b6555") if occupied_seats.has(idx) else Color("#c5a45b") )
 			_ellipse(pos + Vector2(0,4), Vector2(29, 13), Color("#3b241a"))
 			_ellipse(pos, Vector2(27, 11), Color("#7d492b"))
 			_ellipse(pos + Vector2(0,-2), Vector2(24, 9), color)
+			if occupied_seats.has(idx):
+				_draw_seated_occupant(pos, int(occupied_seats[idx]))
 			if idx == selected_seat:
 				draw_arc(pos, 30, 0, TAU, 20, Color.WHITE, 2)
 	# Character: bald head, Vietnamese brown or gray robe.
@@ -276,6 +291,9 @@ func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 					distance = d
 					best = idx
 		if best >= 0:
+			if occupied_seats.has(best):
+				status_text = "Chỗ này đã có người ngồi! Hãy chọn bồ đoàn khác."
+				return
 			selected_seat = best
 			approach_seat = best
 			status_text = "Bồ đoàn %d/1000 - chọn chỗ ngồi" % (best+1)
@@ -326,3 +344,23 @@ func _navigate_to_seat(index: int) -> void:
 	auto_path.append(target)
 	auto_walk = true
 	joystick = Vector2.ZERO
+
+func _seed_occupants() -> void:
+	# Stable simulated visitors for offline play; never claim these are online players.
+	var rng_local := RandomNumberGenerator.new()
+	rng_local.seed = 20261102
+	occupied_seats.clear()
+	for n in range(85):
+		var idx := rng_local.randi_range(0, CAPACITY - 1)
+		if idx == selected_seat:
+			continue
+		occupied_seats[idx] = n % 3
+	occupant_count = occupied_seats.size()
+
+func _draw_seated_occupant(pos: Vector2, variant: int) -> void:
+	var cloth := Color("#7b533d") if variant == 0 else (Color("#929a9c") if variant == 1 else Color("#626e77"))
+	_ellipse(pos + Vector2(0,-7), Vector2(18,11), cloth)
+	draw_colored_polygon(PackedVector2Array([pos+Vector2(-15,-10),pos+Vector2(15,-10),pos+Vector2(12,-32),pos+Vector2(-12,-32)]), cloth)
+	draw_circle(pos + Vector2(0,-41), 10, Color("#d6a37c"))
+	if variant == 1:
+		draw_arc(pos + Vector2(0,-43), 10, PI, TAU, 12, Color("#252323"), 3)
