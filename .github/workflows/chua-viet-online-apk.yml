@@ -75,6 +75,15 @@ jobs:
             echo "Godot script validation failed" >&2
             exit 1
           fi
+      - name: Smoke test actual game startup
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 35s godot --headless --path ChuaVietOnline --quit-after 20 2>&1 | tee godot-runtime.log
+          if grep -Ei "SCRIPT ERROR|Parse Error|Failed to load script|Parser Error|Invalid call|Invalid get index|ERROR:" godot-runtime.log; then
+            echo "Godot runtime smoke test failed" >&2
+            exit 1
+          fi
       - name: Export APK
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /home/runner/.android/debug.keystore
