@@ -6,6 +6,7 @@ const MULTIPLAYER_SCRIPT = preload("res://multiplayer.gd")
 const MONK_AVATAR = preload("res://art/monk_avatar.svg")
 const NUN_AVATAR = preload("res://art/nun_avatar.svg")
 const CUSHION_ART = preload("res://art/bo_doan.svg")
+const ALTAR_ART = preload("res://art/chinh_dien_altar.svg")
 const ROWS := 50
 const COLS_PER_SIDE := 10
 const CAPACITY := ROWS * COLS_PER_SIDE * 2
@@ -250,6 +251,9 @@ func _draw() -> void:
 		for y in range(260, int(WORLD_H), 470):
 			draw_rect(Rect2(Vector2(x - 24, float(y)) - camera, Vector2(48, 240)), Color("#6e241a"))
 			draw_rect(Rect2(Vector2(x - 28, float(y)) - camera, Vector2(56, 14)), Color("#dfb65e"))
+	# Layered illustrated shrine replaces the placeholder circles and blocks at the altar.
+	if camera.y < 510.0:
+		draw_texture_rect(ALTAR_ART, Rect2(-camera, Vector2(WORLD_W, 510.0)), false)
 	# Only render visible rows: stable performance with 1,000 cushions.
 	var first_row := maxi(0, int((camera.y - 460.0) / STEP_Y))
 	var last_row := mini(ROWS - 1, int((camera.y + h - 360.0) / STEP_Y) + 2)
