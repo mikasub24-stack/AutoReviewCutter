@@ -129,6 +129,10 @@ func _process(delta: float) -> void:
 		queue_redraw()
 		return
 	elapsed += delta
+	# Movement interrupts the ritual before its completion can be credited.
+	if (joystick.length() > .05 or auto_walk) and body_action != "walk":
+		ritual = ""
+		_set_body_action("walk")
 	body_action_elapsed += delta
 	if body_action == "bow" and body_action_elapsed >= RITUAL_ANIMATION.BOW_DURATION:
 		practice_stats["bows"] = int(practice_stats["bows"])+1
@@ -694,10 +698,11 @@ func stand_up() -> void:
 	status_text = "Đã đứng dậy"
 
 func _set_body_action(value: String) -> void:
+	var starting_phase := .35 if value == "kneel" and body_action in ["bow","incense"] else 0.0
 	body_action = value
-	body_action_elapsed = 0.0
+	body_action_elapsed = starting_phase
 	if multiplayer_client != null:
-		multiplayer_client.send_action(value,0.0)
+		multiplayer_client.send_action(value,starting_phase)
 
 func goto_section(index: int) -> void:
 	stop_walking()

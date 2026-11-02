@@ -114,6 +114,12 @@ func _run() -> void:
 	hall.action("pause")
 	hall._process(4.0)
 	assert(hall.practice_stats.bows == old_bows+1)
+	hall.action("bow")
+	hall.body_action_elapsed = 2.99
+	hall.joystick = Vector2.RIGHT
+	hall._process(.05)
+	assert(hall.practice_stats.bows == old_bows+1)
+	hall.stop_walking()
 	# Joystick movement cannot move the HUD or camera; emulated mouse is ignored.
 	hall.view_section = 0
 	hall.player = Vector2(860,900)

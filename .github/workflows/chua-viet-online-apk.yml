@@ -115,6 +115,10 @@ jobs:
             exit 1
           fi
           grep -q "PASS: Godot clients handshake" godot-network.log
+      - name: Install video encoder
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
       - name: Record actual game rituals under Xvfb
         shell: bash
         run: |
@@ -125,6 +129,7 @@ jobs:
           grep -q "PASS: real viewport recorded" godot-render.log
           ffmpeg -v error -y -framerate 20 -i ChuaVietOnline/build/review_frames/frame_%04d.png -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p ChuaVietOnline/build/ritual-preview.mp4
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: ChuaVietOnline-ritual-review
           path: |
