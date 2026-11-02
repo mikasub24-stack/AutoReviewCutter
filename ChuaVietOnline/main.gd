@@ -30,6 +30,7 @@ var footstep_time := 0.0
 var save_timer := 0.0
 var auto_path: Array[Vector2] = []
 var auto_walk := false
+var altar_glow := 0.0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -58,7 +59,9 @@ func _process(delta: float) -> void:
 	if joystick.length() > 0.05 and auto_walk:
 		auto_walk = false
 		auto_path.clear()
+		approach_seat = -1
 	if auto_walk and auto_path.size() > 0:
+		sitting = false
 		var waypoint := auto_path[0]
 		var remaining := waypoint - player
 		if remaining.length() < SPEED * delta + 3.0:
@@ -152,7 +155,7 @@ func _draw() -> void:
 			draw_rect(Rect2(Vector2(x - 28, float(y)) - camera, Vector2(56, 14)), Color("#dfb65e"))
 	# Only render visible rows: stable performance with 1,000 cushions.
 	var first_row := maxi(0, int((camera.y - 460.0) / STEP_Y))
-	var last_row := mini(ROWS - 1, int((camera.y + h - 360.0) / STEP_Y) + 1)
+	var last_row := mini(ROWS - 1, int((camera.y + h - 360.0) / STEP_Y) + 2)
 	for row in range(first_row, last_row + 1):
 		for col in range(COLS_PER_SIDE * 2):
 			var idx := row * COLS_PER_SIDE * 2 + col
@@ -243,6 +246,9 @@ func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 		return
 	if pos.y > h-170 and pos.x > w-190:
 		if pos.y < h-86:
+			auto_walk = false
+			auto_path.clear()
+			approach_seat = -1
 			sitting = not sitting
 			status_text = "Đang ngồi thiền" if sitting else "Đã đứng dậy"
 		else:
@@ -307,7 +313,7 @@ func _navigate_to_seat(index: int) -> void:
 	var central_x := WORLD_W * 0.5
 	var row_lane_y := target.y + 34.0
 	var near_cross := 380.0 + roundf((player.y - 380.0) / (STEP_Y * 10.0)) * STEP_Y * 10.0 + 48.0
-	near_cross = clampf(near_cross, 400.0, WORLD_H - 100.0)
+	near_cross = clampf(near_cross, 428.0, 3548.0)
 	auto_path.clear()
 	# Follow a clear horizontal passage, central carpet, then the selected cushion row.
 	if absf(player.x - central_x) > AISLE * 0.47:
