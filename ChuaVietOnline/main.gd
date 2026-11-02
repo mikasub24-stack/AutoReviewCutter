@@ -22,6 +22,8 @@ var sitting := false
 var robe_brown := true
 var incense: Array[Dictionary] = []
 var last_touch := Vector2.ZERO
+var approach_seat := -1
+var movement_facing := Vector2(0, -1)
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -43,6 +45,7 @@ func _camera() -> Vector2:
 func _process(delta: float) -> void:
 	elapsed += delta
 	if joystick.length() > 0.05:
+		movement_facing = joystick.normalized()
 		var next := player + joystick.normalized() * SPEED * delta
 		next.x = clampf(next.x, 30.0, WORLD_W - 30.0)
 		next.y = clampf(next.y, 340.0, WORLD_H - 80.0)
@@ -50,9 +53,16 @@ func _process(delta: float) -> void:
 		var on_main := absf(next.x - WORLD_W * 0.5) < AISLE * 0.47
 		var cross_offset := fposmod(next.y - 380.0, STEP_Y * 10.0)
 		var on_cross := cross_offset < 105.0
-		if on_main or on_cross:
+		var entering_seat := approach_seat >= 0 and next.distance_to(_seat_position(approach_seat)) < 125.0
+		if on_main or on_cross or entering_seat:
 			player = next
 			sitting = false
+			if approach_seat >= 0 and player.distance_to(_seat_position(approach_seat)) < 30.0:
+				selected_seat = approach_seat
+				approach_seat = -1
+				sitting = true
+				joystick = Vector2.ZERO
+				status_text = "Đã ngồi vào bồ đoàn %d" % (selected_seat + 1)
 		else:
 			status_text = "Đi theo lối giữa hoặc hành lang ngang"
 	for i in range(incense.size() - 1, -1, -1):
@@ -188,12 +198,14 @@ func _touch_down(pos: Vector2) -> void:
 					best = idx
 		if best >= 0:
 			selected_seat = best
+			approach_seat = best
 			status_text = "Bồ đoàn %d/1000 - chọn chỗ ngồi" % (best+1)
 			if player.distance_to(_seat_position(best)) < 125.0:
 				player = _seat_position(best)
+				approach_seat = -1
 				sitting = true
 				status_text = "Đang ngồi tại bồ đoàn số %d" % (best+1)
 			else:
-				status_text += " (cần đến gần)"
+				status_text += " (đi đến chỗ đã chọn)"
 		else:
 			incense.append({"pos":world,"age":0.0})
