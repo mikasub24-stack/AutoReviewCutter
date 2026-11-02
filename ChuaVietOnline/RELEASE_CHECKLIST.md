@@ -38,3 +38,22 @@ File `render.yaml` ở gốc repository chứa cấu hình Render. Kết nối r
 - [ ] Kiểm tra hiệu năng, kích thước APK, âm thanh, quyền Android và lỗi trên thiết bị thật.
 
 **Lưu ý:** bản hiện tại chưa hoàn thành toàn bộ các mục trên; đặc biệt chưa có ghi âm tụng kinh thật, chưa triển khai dịch vụ Render và chưa xác minh APK trên thiết bị.
+
+## Kiểm chứng bản giao diện Thiện Tâm 0.2.0
+
+Đã chạy trong môi trường phát triển bằng **Godot 4.3 stable**:
+- Kiểm thử tương tác: 1.000 tọa độ bồ đoàn đổi qua lại đúng giữa thế giới và màn hình; ngồi/đứng, rời ghế, bỏ qua xác nhận ghế đến muộn; các nghi thức, đổi trang phục, menu và bảng phụ.
+- Kiểm thử Node.js: 4/4 đạt, gồm ghế độc quyền, giải phóng khi ngắt kết nối, từ chối ghế không hợp lệ, snapshot vị trí ngồi và trang phục.
+- Hai trình khách Godot kết nối WebSocket thật với máy chủ cục bộ: handshake, đồng bộ ghế, từ chối tranh ghế, ngắt/kết nối lại đều đạt.
+- Chạy giao diện bằng renderer OpenGL Compatibility và chụp màn hình từ game.
+- Xuất và ký APK debug arm64 bằng Android build-tools 34.0.0; đây là bản cài thử, chưa xác minh trên điện thoại vật lý.
+
+Các kết quả trên không thay thế kiểm thử thiết bị, tải 1.000 người, máy chủ Internet, tài khoản, thanh toán thật hay đánh giá bản quyền nội dung kinh/ghi âm. Những mục chưa đánh dấu ở trên vẫn cần thực hiện trước phát hành thương mại.
+
+### Lặp lại kiểm thử tích hợp
+
+Chạy `npm start` trong `ChuaVietOnline/realtime`, sau đó ở gốc repo:
+
+```sh
+godot --headless --path ChuaVietOnline --script res://tests/network_test.gd
+```

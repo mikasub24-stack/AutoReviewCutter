@@ -11,6 +11,9 @@ var effects: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
+	if DisplayServer.get_name() == "headless":
+		set_process(false)
+		return
 	rng.randomize()
 	player = AudioStreamPlayer.new()
 	var generator := AudioStreamGenerator.new()
@@ -80,3 +83,11 @@ func _process(_delta: float) -> void:
 				effects.remove_at(j)
 		sample = clampf(sample, -0.85, 0.85)
 		playback.push_frame(Vector2(sample, sample))
+
+func _exit_tree() -> void:
+	set_process(false)
+	if player != null:
+		player.stop()
+		player.stream = null
+	playback = null
+	effects.clear()

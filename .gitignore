@@ -1,0 +1,6 @@
+.godot/
+**/node_modules/
+ChuaVietOnline/build/
+*.tmp
+*.import
+*.uid

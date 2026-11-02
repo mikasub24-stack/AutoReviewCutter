@@ -3,11 +3,8 @@ extends Control
 const SHOP_SCRIPT = preload("res://payment_shop.gd")
 const PRACTICE_SCRIPT = preload("res://practice_panel.gd")
 const MULTIPLAYER_SCRIPT = preload("res://multiplayer.gd")
-const MONK_AVATAR = preload("res://art/monk_avatar.svg")
-const NUN_AVATAR = preload("res://art/nun_avatar.svg")
 const CUSHION_ART = preload("res://art/bo_doan.svg")
 const ALTAR_ART = preload("res://art/chinh_dien_altar.svg")
-const TIMBER_TILE = preload("res://art/san_go_cham_khac.svg")
 const ROWS := 50
 const COLS_PER_SIDE := 10
 const CAPACITY := ROWS * COLS_PER_SIDE * 2
@@ -17,7 +14,7 @@ const AISLE := 175.0
 const WORLD_W := 1720.0
 const WORLD_H := 4600.0
 const SPEED := 240.0
-var player := Vector2(WORLD_W * 0.5, WORLD_H - 330.0)
+var player := Vector2(WORLD_W * 0.5, 900.0)
 var selected_seat := -1
 var joystick := Vector2.ZERO
 var joystick_active := false
@@ -45,9 +42,44 @@ var multiplayer_client
 var network_tick := 0.0
 var waiting_for_seat := false
 var seat_request_timeout := 0.0
+var shrine_texture: Texture2D
+var floor_texture: Texture2D
+var character_art: Dictionary = {}
+var hud
+var ritual := ""
+var ritual_time := 0.0
+var meditation_seconds := 0.0
+var beads_count := 0
+var merit := 0
+var hall_audio
+var hall_voice := ""
+var overlay: Control
+
 
 func _ready() -> void:
+	get_tree().quit_on_go_back = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	var voices := DisplayServer.tts_get_voices_for_language("vi")
+	if not voices.is_empty():
+		hall_voice = voices[0]
+	for gender in ["monk","nun"]:
+		for robe in ["brown","grey"]:
+			for pose in ["standing","seated"]:
+				var key: String = gender+"_"+robe+"_"+pose
+				character_art[key] = load("res://art/"+key+".svg")
+	if ResourceLoader.exists("res://art/characters.png"):
+		var sheet: Texture2D = load("res://art/characters.png")
+		for key in character_art:
+			var column := 2 if key.begins_with("nun") else (0 if "brown" in key else 1)
+			var atlas := AtlasTexture.new()
+			atlas.atlas = sheet
+			atlas.region = Rect2(column*418,760,418,460) if "seated" in key else Rect2(column*418,0,418,735)
+			atlas.filter_clip = true
+			character_art[key] = atlas
+	if ResourceLoader.exists("res://art/stone_floor.png"):
+		floor_texture = load("res://art/stone_floor.png")
+	if ResourceLoader.exists("res://art/temple_sanctuary.png"):
+		shrine_texture = load("res://art/temple_sanctuary.png")
 	_load_progress()
 	_seed_occupants()
 	multiplayer_client = MULTIPLAYER_SCRIPT.new()
@@ -56,6 +88,10 @@ func _ready() -> void:
 	multiplayer_client.seat_rejected.connect(_seat_denied)
 	multiplayer_client.seat_confirmed.connect(_seat_confirmed)
 	multiplayer_client.connection_changed.connect(_network_changed)
+	hall_audio = preload("res://temple_audio.gd").new()
+	add_child(hall_audio)
+	hud = preload("res://temple_hud.gd").new()
+	add_child(hud)
 	set_process(true)
 	queue_redraw()
 
@@ -68,11 +104,20 @@ func _seat_position(index: int) -> Vector2:
 	var x := edge - (COLS_PER_SIDE - col) * STEP_X if left else WORLD_W * 0.5 + AISLE * 0.5 + (col + 1) * STEP_X
 	return Vector2(x, 420.0 + row * STEP_Y)
 
-func _camera() -> Vector2:
-	return Vector2(clampf(player.x - size.x * 0.5, 0.0, maxf(0.0, WORLD_W - size.x)), clampf(player.y - size.y * 0.55, 0.0, maxf(0.0, WORLD_H - size.y)))
-
 func _process(delta: float) -> void:
 	elapsed += delta
+	if ritual == "meditate" and sitting:
+		meditation_seconds += delta
+	if ritual == "chant":
+		ritual_time += delta
+		if ritual_time >= 3.5:
+			ritual_time = 0.0
+			beads_count = beads_count % 108 + 1
+			merit += 1
+			_speak_chant()
+	if joystick.length() > 0.05 or auto_walk:
+		ritual = ""
+
 	occupancy_notice = maxf(0.0, occupancy_notice - delta)
 	if waiting_for_seat:
 		seat_request_timeout -= delta
@@ -91,6 +136,10 @@ func _process(delta: float) -> void:
 	if save_timer > 15.0:
 		save_timer = 0.0
 		_save_progress()
+	if joystick.length() > 0.05 and waiting_for_seat:
+		waiting_for_seat = false
+		selected_seat = -1
+		_claim_seat(-1)
 	if joystick.length() > 0.05 and auto_walk:
 		auto_walk = false
 		auto_path.clear()
@@ -138,7 +187,8 @@ func _process(delta: float) -> void:
 		var seat_lane := fposmod(next.y - 420.0, STEP_Y)
 		var between_rows := seat_lane > 24.0 and seat_lane < STEP_Y - 24.0
 		var entering_seat := approach_seat >= 0 and next.distance_to(_seat_position(approach_seat)) < 125.0
-		if on_main or on_cross or between_rows or entering_seat:
+		var leaving_seat := selected_seat >= 0 and player.distance_to(_seat_position(selected_seat)) < 65.0
+		if on_main or on_cross or between_rows or entering_seat or leaving_seat:
 			player = next
 			sitting = false
 			if approach_seat >= 0 and player.distance_to(_seat_position(approach_seat)) < 30.0:
@@ -159,173 +209,120 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
+	_draw_hall()
+
+func _view_start() -> float:
+	return clampf(player.y - 470.0, 340.0, WORLD_H - 940.0)
+
+func _view_center() -> float:
+	return clampf(player.x,400.0,WORLD_W-400.0)
+
+func _project(world: Vector2) -> Vector2:
+	var depth := (world.y - _view_start()) / 940.0
+	var spread := lerpf(0.42, 0.78, depth) * size.x / 540.0
+	return Vector2(size.x * 0.5 + (world.x - _view_center()) * spread, size.y * 0.43 + depth * size.y * 0.42)
+
+func _unproject(screen: Vector2) -> Vector2:
+	var depth := (screen.y - size.y * 0.43) / (size.y * 0.42)
+	var spread := lerpf(0.42, 0.78, depth) * size.x / 540.0
+	return Vector2((screen.x-size.x*0.5)/spread+_view_center(), _view_start()+depth*940.0)
+
+func _draw_hall() -> void:
 	var w := size.x
 	var h := size.y
-	var camera := _camera()
-	draw_rect(Rect2(Vector2.ZERO, size), Color("#2a1a14"))
-	draw_rect(Rect2(-camera, Vector2(WORLD_W, WORLD_H)), Color("#75513b"))
-	# Illustrated carved timber floor is tiled in world coordinates, camera-correct.
-	var floor_x_start := maxi(0, int(camera.x / 320.0))
-	var floor_x_end := mini(int(WORLD_W / 320.0), int((camera.x + w) / 320.0) + 1)
-	var floor_y_start := maxi(0, int(camera.y / 320.0))
-	var floor_y_end := mini(int(WORLD_H / 320.0), int((camera.y + h) / 320.0) + 1)
-	for tile_y in range(floor_y_start, floor_y_end + 1):
-		for tile_x in range(floor_x_start, floor_x_end + 1):
-			draw_texture_rect(TIMBER_TILE, Rect2(Vector2(float(tile_x) * 320.0, float(tile_y) * 320.0) - camera, Vector2(320.0, 320.0)), false)
-	# Symmetrical hanging lanterns and gilded lotus ornaments.
-	var lamp_start := maxi(0,int(camera.y/390.0)-1)
-	var lamp_end := mini(int(WORLD_H/390.0),int((camera.y+h)/390.0)+1)
-	for lamp_row in range(lamp_start,lamp_end+1):
-		var ly := 210.0+float(lamp_row)*390.0-camera.y
-		for lx in [WORLD_W*0.5-310.0,WORLD_W*0.5+310.0]:
-			var center := Vector2(lx-camera.x,ly)
-			draw_line(center+Vector2(0,-53),center+Vector2(0,-24),Color("#d8ae55"),3)
-			draw_circle(center,30,Color(1.0,0.75,0.31,0.11))
-			draw_colored_polygon(PackedVector2Array([center+Vector2(-18,-23),center+Vector2(18,-23),center+Vector2(24,0),center+Vector2(12,24),center+Vector2(-12,24),center+Vector2(-24,0)]),Color("#bf4b32"))
-			draw_line(center+Vector2(-16,-15),center+Vector2(16,-15),Color("#f2ce76"),3)
-			draw_line(center+Vector2(-14,13),center+Vector2(14,13),Color("#f2ce76"),3)
-			draw_circle(center,9,Color("#ffe8a1"))
-			draw_line(center+Vector2(0,24),center+Vector2(0,39),Color("#e5ae4b"),2)
-	# Central carpet and horizontal walkways.
-	draw_rect(Rect2(Vector2(WORLD_W * 0.5 - AISLE * 0.5, 0) - camera, Vector2(AISLE, WORLD_H)), Color("#a62f2b"))
-	draw_rect(Rect2(Vector2(WORLD_W * 0.5 - 6, 0) - camera, Vector2(12, WORLD_H)), Color("#dfae4e"))
-	for r in range(5):
-		var cross_y := 380.0 + float(r) * STEP_Y * 10.0
-		draw_rect(Rect2(Vector2(0, cross_y) - camera, Vector2(WORLD_W, 100)), Color("#b28c61"))
-	# Vietnamese temple columns, gilded bases and carved crossbeams.
-	var pillar_start := maxi(0, int(camera.y / 500.0) - 1)
-	var pillar_end := mini(int(WORLD_H / 500.0), int((camera.y + h) / 500.0) + 1)
-	for pillar_row in range(pillar_start, pillar_end + 1):
-		var py := 335.0 + float(pillar_row) * 500.0 - camera.y
-		for px_world in [48.0, WORLD_W - 48.0, WORLD_W * 0.5 - AISLE * 0.5 - 22.0, WORLD_W * 0.5 + AISLE * 0.5 + 22.0]:
-			var px: float = float(px_world) - camera.x
-			draw_rect(Rect2(px - 15.0, py - 120.0, 30.0, 240.0), Color("#50291e"))
-			draw_rect(Rect2(px - 20.0, py - 122.0, 40.0, 18.0), Color("#d9a64d"))
-			draw_rect(Rect2(px - 21.0, py + 106.0, 42.0, 16.0), Color("#d9a64d"))
-			draw_line(Vector2(px - 7.0, py - 98.0), Vector2(px - 7.0, py + 99.0), Color("#9d6036"), 3.0)
-		# Red-and-gold horizontal carved timber beam.
-		draw_rect(Rect2(-camera.x, py - 143.0, WORLD_W, 19.0), Color("#602f23"))
-		draw_line(Vector2(-camera.x, py - 144.0), Vector2(WORLD_W-camera.x, py - 144.0), Color("#d9ac5b"), 3.0)
-		for ornament in range(12):
-			var ox := float(ornament) * 145.0 + 28.0 - camera.x
-			draw_circle(Vector2(ox, py - 133.0), 5.0, Color("#e3b861"))
-	# Lotus motifs along the red central carpet.
-	var lotus_start := maxi(0, int(camera.y / 210.0) - 1)
-	var lotus_end := mini(int(WORLD_H / 210.0), int((camera.y + h) / 210.0) + 1)
-	for lotus_row in range(lotus_start, lotus_end + 1):
-		var lotus_center := Vector2(WORLD_W * 0.5 - camera.x, float(lotus_row) * 210.0 + 120.0 - camera.y)
-		for petal in range(8):
-			var angle := TAU * float(petal) / 8.0
-			_ellipse(lotus_center + Vector2(cos(angle)*18.0, sin(angle)*18.0), Vector2(7.0, 12.0), Color("#e2a45e"))
-		draw_circle(lotus_center, 9.0, Color("#f3d58b"))
-	# Sanctuary altar at far end.
-	draw_rect(Rect2(Vector2(WORLD_W * 0.5 - 300, 45) - camera, Vector2(600, 235)), Color("#542b1d"))
-	draw_rect(Rect2(Vector2(WORLD_W * 0.5 - 265, 62) - camera, Vector2(530, 198)), Color("#bb842c"))
-	draw_circle(Vector2(WORLD_W * 0.5, 150) - camera, 77, Color("#f1c56a"))
-	draw_circle(Vector2(WORLD_W * 0.5, 145) - camera, 44, Color("#a36a26"))
-	# Carved timber beams, lotus halo and a bronze incense urn.
-	for beam in range(5):
-		var by := 12.0 + float(beam) * 12.0
-		draw_rect(Rect2(Vector2(WORLD_W * 0.5 - 330 + beam * 12, by) - camera, Vector2(660 - beam * 24, 8)), Color("#402018"))
-	for petal in range(12):
-		var angle := float(petal) * TAU / 12.0
-		var halo := Vector2(WORLD_W * 0.5, 150) + Vector2(cos(angle), sin(angle)) * 94.0 - camera
-		_ellipse(halo, Vector2(15, 24), Color("#f2ca68"))
-	var altar_base := Vector2(WORLD_W * 0.5, 252) - camera
-	draw_rect(Rect2(altar_base + Vector2(-220, -5), Vector2(440, 17)), Color("#4a241a"))
-	draw_rect(Rect2(altar_base + Vector2(-212, -13), Vector2(424, 8)), Color("#d9a34b"))
-	for dx in [-158.0, 158.0]:
-		var vase := altar_base + Vector2(dx, -26)
-		draw_circle(vase, 16, Color("#d9bb70"))
-		for p in range(5):
-			var a := float(p) * TAU / 5.0
-			_ellipse(vase + Vector2(sin(a)*16, -26+cos(a)*9), Vector2(10, 16), Color("#eaa4b8"))
-	draw_circle(altar_base + Vector2(0,-16), 25, Color("#8b6a42"))
-	for stick in range(5):
-		var sx := float(stick-2)*7.0
-		draw_line(altar_base + Vector2(sx,-16), altar_base + Vector2(sx,-59), Color("#a65a3b"), 2)
-		draw_circle(altar_base + Vector2(sx+sin(elapsed*1.4+stick)*9,-72), 7, Color(0.94,0.91,0.79,0.25))
-	for x in [130.0, WORLD_W - 130.0]:
-		for y in range(260, int(WORLD_H), 470):
-			draw_rect(Rect2(Vector2(x - 24, float(y)) - camera, Vector2(48, 240)), Color("#6e241a"))
-			draw_rect(Rect2(Vector2(x - 28, float(y)) - camera, Vector2(56, 14)), Color("#dfb65e"))
-	# Layered illustrated shrine replaces the placeholder circles and blocks at the altar.
-	if camera.y < 510.0:
-		draw_texture_rect(ALTAR_ART, Rect2(-camera, Vector2(WORLD_W, 510.0)), false)
-	# Only render visible rows: stable performance with 1,000 cushions.
-	var first_row := maxi(0, int((camera.y - 460.0) / STEP_Y))
-	var last_row := mini(ROWS - 1, int((camera.y + h - 360.0) / STEP_Y) + 2)
-	for row in range(first_row, last_row + 1):
-		for col in range(COLS_PER_SIDE * 2):
-			var idx := row * COLS_PER_SIDE * 2 + col
-			var pos := _seat_position(idx) - camera
-			var color := Color("#63bca4") if idx == selected_seat and sitting else (Color("#8b6555") if occupied_seats.has(idx) else Color("#c5a45b") )
-			_ellipse(pos + Vector2(0,4), Vector2(29, 13), Color("#3b241a"))
-			_ellipse(pos, Vector2(27, 11), Color("#7d492b"))
-			_ellipse(pos + Vector2(0,-2), Vector2(24, 9), color)
-			draw_texture_rect(CUSHION_ART, Rect2(pos + Vector2(-30.0, -15.0), Vector2(60.0, 30.0)), false)
-			if occupied_seats.has(idx):
-				var visitor_style := int(occupied_seats[idx])
-				if multiplayer_client != null and multiplayer_client.connected:
-					var peer_id := int(occupied_seats[idx])
-					var remote_peer: Dictionary = multiplayer_client.remote_players.get(peer_id,{})
-					visitor_style = int(remote_peer.get("gender",0))
-				_draw_seated_occupant(pos, visitor_style)
+	draw_rect(Rect2(Vector2.ZERO,size),Color("#493126"))
+	if shrine_texture != null:
+		# Artwork remains scenery; every avatar, seat and control is interactive.
+		draw_texture_rect_region(shrine_texture,Rect2(0,65,w,h*0.40),Rect2(0,0,shrine_texture.get_width(),shrine_texture.get_height()*0.48))
+	else:
+		draw_texture_rect(ALTAR_ART,Rect2(0,75,w,h*0.36),false)
+	var horizon := h*0.43
+	if floor_texture != null:
+		draw_texture_rect(floor_texture,Rect2(0,horizon,w,h-horizon),false,Color("#b5a493"))
+	else:
+		draw_rect(Rect2(0,horizon,w,h-horizon),Color("#9e876a"))
+	var near_y := _view_start()+940.0*(1.0-.43)/.42
+	var carpet := PackedVector2Array([_project(Vector2(772.5,_view_start())),_project(Vector2(947.5,_view_start())),_project(Vector2(947.5,near_y)),_project(Vector2(772.5,near_y))])
+	draw_colored_polygon(carpet,Color("#8f292b"))
+	for side in [-1.0,1.0]:
+		var edge: float = WORLD_W*.5+float(side)*AISLE*.5
+		draw_line(_project(Vector2(edge,_view_start())),_project(Vector2(edge,near_y)),Color("#e2b963"),3,true)
+		draw_line(_project(Vector2(edge+side*9,_view_start())),_project(Vector2(edge+side*9,near_y)),Color("#bc8650"),2,true)
+		for trim in range(30):
+			var world_y := _view_start()+float(trim)*45.0
+			var ornament := _project(Vector2(edge-side*10,world_y))
+			draw_arc(ornament,3,0,TAU,12,Color("#d5a15c"),1,true)
+	for i in range(5):
+		var center := _project(Vector2(860,_view_start()+130+float(i)*275))
+		draw_texture_rect(preload("res://art/ui_lotus.svg"),Rect2(center-Vector2(20,20),Vector2(40,40)),false,Color(1.0,.85,.6,.65))
+	var first := maxi(0,int((_view_start()-420.0)/STEP_Y))
+	var last := mini(ROWS-1,first+13)
+	var actors: Array[Dictionary] = []
+	for row in range(first,last+1):
+		for col in range(20):
+			var idx := row*20+col
+			var world := _seat_position(idx)
+			var pos := _project(world)
+			if pos.y < horizon or pos.y > h*.87:
+				continue
+			var scale_value := clampf((pos.y-horizon)/(h*.42),0.0,1.0)
+			var cushion_size := Vector2(23,12).lerp(Vector2(49,25),scale_value)*w/540.0
+			draw_texture_rect(CUSHION_ART,Rect2(pos-cushion_size*.5,cushion_size),false)
 			if idx == selected_seat:
-				draw_arc(pos, 30, 0, TAU, 20, Color.WHITE, 2)
-
-	# Visible remote avatars are drawn only while connected to a real server.
-	if multiplayer_client != null and multiplayer_client.connected:
-		for remote_id in multiplayer_client.remote_players:
-			var peer: Dictionary = multiplayer_client.remote_players[remote_id]
-			if int(peer.get("seat",-1)) >= 0:
-				continue
-			var remote_pos := Vector2(float(peer.get("x",860.0)),float(peer.get("y",4270.0))) - camera
-			if remote_pos.x < -50.0 or remote_pos.x > w+50.0 or remote_pos.y < 100.0 or remote_pos.y > h-140.0:
-				continue
-			var remote_robe := Color("#90969a") if int(peer.get("gender",0)) == 1 else Color("#79533b")
-			_ellipse(remote_pos+Vector2(0,28),Vector2(18,7),Color(0.1,0.07,0.05,0.35))
-			draw_rect(Rect2(remote_pos+Vector2(-12,12),Vector2(9,20)),Color("#302521"))
-			draw_rect(Rect2(remote_pos+Vector2(3,12),Vector2(9,20)),Color("#302521"))
-			draw_colored_polygon(PackedVector2Array([remote_pos+Vector2(-20,-12),remote_pos+Vector2(20,-12),remote_pos+Vector2(23,20),remote_pos+Vector2(-23,20)]),remote_robe)
-			draw_circle(remote_pos+Vector2(0,-27),15,Color("#d9a47a"))
-	# Illustrated character sprites: no placeholder polygon is drawn beneath them.
-	var walking := not sitting and (auto_walk or joystick.length() > 0.05)
-	var gait := sin(footstep_time) * 4.0 if walking else 0.0
-	var avatar := player - camera + Vector2(0, absf(gait) * -0.4)
-	var avatar_rect := Rect2(avatar + Vector2(-35.0, -64.0), Vector2(70.0, 100.0))
-	draw_texture_rect(NUN_AVATAR if character_gender == 1 else MONK_AVATAR, avatar_rect, false)
+				_ellipse(pos, cushion_size*.55,Color(1.0,.85,.35,.25))
+			if occupied_seats.has(idx):
+				var style := int(occupied_seats[idx])
+				var gender := 1 if style == 1 else 0
+				var robe := 0 if style == 0 else 1
+				if multiplayer_client.connected:
+					var peer: Dictionary = multiplayer_client.remote_players.get(style,{})
+					gender = int(peer.get("gender",0))
+					robe = int(peer.get("robe",0))
+				actors.append({"pos":world,"gender":gender,"robe":robe,"sit":true,"self":false})
+	if multiplayer_client.connected:
+		for id in multiplayer_client.remote_players:
+			var peer: Dictionary = multiplayer_client.remote_players[id]
+			if int(peer.get("seat",-1)) < 0:
+				actors.append({"pos":Vector2(float(peer.get("x",860)),float(peer.get("y",900))),"gender":int(peer.get("gender",0)),"robe":int(peer.get("robe",0)),"sit":false,"self":false})
+	actors.append({"pos":player,"gender":character_gender,"robe":0 if robe_brown else 1,"sit":sitting,"self":true})
+	actors.sort_custom(func(a: Dictionary,b: Dictionary) -> bool: return a.pos.y < b.pos.y)
+	for actor in actors:
+		_draw_actor(actor)
 	for particle in incense:
-		var a: float = float(particle["age"])
-		var pos: Vector2 = (particle["pos"] as Vector2) - camera + Vector2(sin(a * 4.0) * 13.0, -a * 42.0)
-		draw_circle(pos, 7.0 + a * 3.0, Color(0.95,0.92,0.83, (3.0-a) * 0.13))
-	# HUD with accessible touch regions.
-	draw_rect(Rect2(0,0,w,100), Color(0.11,0.07,0.05,0.92))
-	var is_online: bool = multiplayer_client != null and multiplayer_client.connected
-	var net_label := "TRỰC TUYẾN" if is_online else "NGOẠI TUYẾN"
-	var net_color := Color("#9ad99a") if is_online else Color("#ffcf8c")
-	draw_circle(Vector2(w - 28.0, 22.0), 6.0, net_color)
-	draw_string(ThemeDB.fallback_font, Vector2(w - 145.0, 28.0), net_label, HORIZONTAL_ALIGNMENT_LEFT, 110, 13, net_color)
-	draw_string(ThemeDB.fallback_font, Vector2(18,31), "CHÙA VIỆT ONLINE", HORIZONTAL_ALIGNMENT_LEFT, w-170, 20, Color("#f6d18a"))
-	draw_string(ThemeDB.fallback_font, Vector2(18,86), "1.000 bồ đoàn • %d khách" % occupant_count, HORIZONTAL_ALIGNMENT_LEFT, w-24, 14, Color("#f1d4a2"))
-	draw_string(ThemeDB.fallback_font, Vector2(18,62), status_text, HORIZONTAL_ALIGNMENT_LEFT, w-24, 15, Color.WHITE)
-	if occupancy_notice > 0.0:
-		draw_rect(Rect2(22,h*0.40,w-44,88),Color(0.39,0.11,0.08,0.94))
-		draw_string(ThemeDB.fallback_font,Vector2(35,h*0.40+35),"BỒ ĐOÀN ĐÃ CÓ NGƯỜI NGỒI",HORIZONTAL_ALIGNMENT_LEFT,w-70,20,Color("#ffe0a6"))
-		draw_string(ThemeDB.fallback_font,Vector2(35,h*0.40+64),"Vui lòng chọn bồ đoàn khác",HORIZONTAL_ALIGNMENT_LEFT,w-70,17,Color.WHITE)
-	draw_rect(Rect2(8, 104, 145, 48), Color("#70442b"))
-	draw_string(ThemeDB.fallback_font, Vector2(17,136), "TU TẬP", HORIZONTAL_ALIGNMENT_LEFT, 130, 19, Color.WHITE)
-	draw_rect(Rect2(w - 155, 104, 147, 48), Color("#70442b"))
-	draw_string(ThemeDB.fallback_font, Vector2(w-145,136), "CỬA HÀNG", HORIZONTAL_ALIGNMENT_LEFT, 135, 19, Color.WHITE)
-	draw_rect(Rect2(0,h-170,w,170), Color(0.12,0.08,0.06,0.85))
-	var joy_center := Vector2(105,h-84)
-	draw_circle(joy_center, 69, Color("#5b4435"))
-	draw_arc(joy_center, 69, 0, TAU, 48, Color("#b99962"), 3)
-	draw_circle(joy_center + joystick * 40.0, 26, Color("#d8bd8a"))
-	draw_rect(Rect2(w-180,h-150,170,55), Color("#75513a"))
-	draw_string(ThemeDB.fallback_font, Vector2(w-171,h-115), "NGỒI / ĐỨNG", HORIZONTAL_ALIGNMENT_LEFT, 160, 17, Color.WHITE)
-	draw_rect(Rect2(w-180,h-78,170,55), Color("#75513a"))
-	draw_string(ThemeDB.fallback_font, Vector2(w-170,h-44), "ĐỔI NHÂN VẬT", HORIZONTAL_ALIGNMENT_LEFT, 160, 17, Color.WHITE)
+		var age := float(particle.age)
+		var point := _project(particle.pos) + Vector2(sin(age*3)*8,-age*32)
+		draw_circle(point,4+age*4,Color(.97,.93,.82,(3-age)*.15))
+
+func _draw_actor(actor: Dictionary) -> void:
+	var point := _project(actor.pos)
+	if point.y < size.y*.42 or point.y > size.y*.90 or point.x < -40 or point.x > size.x+40:
+		return
+	var depth := clampf((point.y-size.y*.43)/(size.y*.42),0.0,1.0)
+	var height := lerpf(40,85,depth)*size.x/540.0
+	var own: bool = actor.self
+	if own:
+		height *= 1.3
+	if own:
+		_ellipse(point+Vector2(0,3),Vector2(height*.36,height*.10),Color(1.0,.72,.2,.23))
+		var ring := PackedVector2Array()
+		for step in range(49):
+			var a := float(step)*TAU/48.0
+			ring.append(point+Vector2(cos(a)*height*.35,sin(a)*height*.10+3))
+		draw_polyline(ring,Color("#f4d38a"),2,true)
+	var pose := "seated" if actor.sit else "standing"
+	var key := ("nun" if actor.gender == 1 else "monk")+"_"+("brown" if actor.robe == 0 else "grey")+"_"+pose
+	var texture: Texture2D = character_art[key]
+	var sprite_height := height * (0.62 if actor.sit else 1.0)
+	var sprite_width := sprite_height * texture.get_width()/texture.get_height()
+	var bob := sin(footstep_time)*1.4 if own and not sitting and (auto_walk or joystick.length()>.05) else 0.0
+	draw_texture_rect(texture,Rect2(point+Vector2(-sprite_width*.5,-sprite_height+bob),Vector2(sprite_width,sprite_height)),false)
+	if own:
+		var label_y := point.y-sprite_height-27
+		for entry in [["Thiện Tâm",Color("#fff1c9")],["‹ Đệ Tử ›",Color("#a8d785")]]:
+			var text_width := ThemeDB.fallback_font.get_string_size(entry[0],HORIZONTAL_ALIGNMENT_LEFT,-1,15).x
+			draw_string_outline(ThemeDB.fallback_font,Vector2(point.x-text_width*.5,label_y),entry[0],HORIZONTAL_ALIGNMENT_LEFT,-1,15,4,Color("#21170f"))
+			draw_string(ThemeDB.fallback_font,Vector2(point.x-text_width*.5,label_y),entry[0],HORIZONTAL_ALIGNMENT_LEFT,-1,15,entry[1])
+			label_y += 19
 
 func _ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
 	var points := PackedVector2Array()
@@ -335,75 +332,20 @@ func _ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
 	draw_colored_polygon(points, color)
 
 func _gui_input(event: InputEvent) -> void:
-	if event is InputEventScreenTouch:
-		if event.pressed:
-			_touch_down(event.position, event.index)
-		elif event.index == joystick_touch_id:
-			joystick_active = false
-			joystick_touch_id = -1
-			joystick = Vector2.ZERO
-	elif event is InputEventScreenDrag and joystick_active and event.index == joystick_touch_id:
-		joystick = ((event.position - joystick_origin) / 60.0).limit_length(1.0)
-	elif event is InputEventMouseButton:
-		if event.pressed:
-			_touch_down(event.position)
-		else:
-			joystick_active = false
-			joystick = Vector2.ZERO
-	elif event is InputEventMouseMotion and joystick_active and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		joystick = ((event.position - joystick_origin) / 60.0).limit_length(1.0)
+	if event is InputEventScreenTouch and event.pressed:
+		_touch_down(event.position,event.index)
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_touch_down(event.position)
 
 func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
-	var w := size.x
-	var h := size.y
-	if pos.y > h - 170 and pos.x < 205:
-		joystick_active = true
-		joystick_touch_id = touch_id
-		joystick_origin = Vector2(105,h-84)
-		joystick = ((pos - joystick_origin) / 60.0).limit_length(1.0)
+	if overlay != null and is_instance_valid(overlay):
 		return
-	if pos.y < 155 and pos.y > 100:
-		var overlay := Control.new()
-		if pos.x < w * 0.5:
-			overlay.set_script(PRACTICE_SCRIPT)
-		else:
-			overlay.set_script(SHOP_SCRIPT)
-		add_child(overlay)
+	if pos.y < size.y*.43 or pos.y > size.y*.85:
 		return
-	if pos.y > h-170 and pos.x > w-190:
-		if pos.y < h-86:
-			auto_walk = false
-			auto_path.clear()
-			approach_seat = -1
-			if not sitting and selected_seat >= 0 and occupied_seats.has(selected_seat):
-				status_text = "Chỗ đã có người ngồi, vui lòng chọn bồ đoàn khác."
-				occupancy_notice = 3.0
-				return
-			if sitting:
-				sitting = false
-				_claim_seat(-1)
-				status_text = "Đã đứng dậy"
-			elif selected_seat >= 0:
-				_begin_sitting(selected_seat)
-			else:
-				status_text = "Hãy chọn một bồ đoàn trước khi ngồi"
-		else:
-			if character_gender == 0 and robe_brown:
-				robe_brown = false
-				status_text = "Nam cư sĩ - áo xám"
-			elif character_gender == 0:
-				character_gender = 1
-				status_text = "Nữ Phật tử - áo lam"
-			else:
-				character_gender = 0
-				robe_brown = true
-				status_text = "Nam cư sĩ - áo nâu"
-			_save_progress()
-		return
-	if pos.y > 160 and pos.y < h-180:
-		var world := pos + _camera()
+	var world := _unproject(pos)
+	if true:
 		var best := -1
-		var distance := 40.0
+		var distance := 58.0
 		for row in range(maxi(0,int((world.y-460)/STEP_Y)), mini(ROWS-1,int((world.y-370)/STEP_Y)+1)+1):
 			for col in range(COLS_PER_SIDE*2):
 				var idx := row*COLS_PER_SIDE*2+col
@@ -440,13 +382,19 @@ func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
+		stop_walking()
 		_save_progress()
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if overlay != null and is_instance_valid(overlay):
+			overlay.queue_free()
+		else:
+			action("pause")
 
 func _save_progress() -> void:
 	var file := FileAccess.open("user://temple_progress.json", FileAccess.WRITE)
 	if file == null:
 		return
-	file.store_string(JSON.stringify({"x":player.x,"y":player.y,"seat":selected_seat,"robe_brown":robe_brown,"gender":character_gender}))
+	file.store_string(JSON.stringify({"x":player.x,"y":player.y,"seat":selected_seat,"robe_brown":robe_brown,"gender":character_gender,"beads":beads_count,"meditation_seconds":meditation_seconds,"merit":merit}))
 
 func _load_progress() -> void:
 	if not FileAccess.file_exists("user://temple_progress.json"):
@@ -459,6 +407,9 @@ func _load_progress() -> void:
 	selected_seat = clampi(int(data.get("seat",-1)),-1,CAPACITY-1)
 	robe_brown = bool(data.get("robe_brown",true))
 	character_gender = clampi(int(data.get("gender",0)),0,1)
+	beads_count = clampi(int(data.get("beads",0)),0,108)
+	meditation_seconds = maxf(0,float(data.get("meditation_seconds",0)))
+	merit = maxi(0,int(data.get("merit",0)))
 
 func _navigate_to_seat(index: int) -> void:
 	var target := _seat_position(index)
@@ -491,14 +442,6 @@ func _seed_occupants() -> void:
 		occupied_seats[idx] = n % 3
 	occupant_count = occupied_seats.size()
 
-func _draw_seated_occupant(pos: Vector2, variant: int) -> void:
-	var cloth := Color("#7b533d") if variant == 0 else (Color("#929a9c") if variant == 1 else Color("#626e77"))
-	_ellipse(pos + Vector2(0,-7), Vector2(18,11), cloth)
-	draw_colored_polygon(PackedVector2Array([pos+Vector2(-15,-10),pos+Vector2(15,-10),pos+Vector2(12,-32),pos+Vector2(-12,-32)]), cloth)
-	draw_circle(pos + Vector2(0,-41), 10, Color("#d6a37c"))
-	if variant == 1:
-		draw_arc(pos + Vector2(0,-43), 10, PI, TAU, 12, Color("#252323"), 3)
-
 func _begin_sitting(index: int) -> void:
 	if index < 0 or index >= CAPACITY:
 		return
@@ -513,7 +456,9 @@ func _begin_sitting(index: int) -> void:
 		status_text = "Đang xin phép ngồi tại bồ đoàn %d..." % (index + 1)
 		_claim_seat(index)
 	else:
+		player = _seat_position(index)
 		sitting = true
+		ritual = "meditate"
 		status_text = "Đang ngồi tại bồ đoàn %d" % (index + 1)
 
 func _claim_seat(index: int) -> void:
@@ -535,6 +480,8 @@ func _network_changed(is_connected: bool) -> void:
 			status_text = "Đã kết nối chính điện trực tuyến"
 	else:
 		waiting_for_seat = false
+		sitting = false
+		ritual = ""
 		_seed_occupants()
 		status_text = "Chế độ ngoại tuyến - khách mô phỏng"
 
@@ -543,7 +490,7 @@ func _sync_occupancy() -> void:
 		return
 	occupied_seats.clear()
 	for seat in multiplayer_client.occupants:
-		occupied_seats[int(seat)] = 1
+		occupied_seats[int(seat)] = multiplayer_client.occupants[seat]
 	occupant_count = occupied_seats.size()
 	queue_redraw()
 
@@ -554,7 +501,9 @@ func _seat_confirmed(index: int) -> void:
 		_claim_seat(-1)
 		return
 	if index >= 0:
+		player = _seat_position(index)
 		sitting = true
+		ritual = "meditate"
 		status_text = "Máy chủ xác nhận bồ đoàn số %d" % (index+1)
 	else:
 		status_text = "Đã trả lại bồ đoàn"
@@ -570,3 +519,76 @@ func _seat_denied(index: int) -> void:
 	status_text = "Chỗ đã có người ngồi, vui lòng chọn bồ đoàn khác."
 	occupancy_notice = 3.0
 	queue_redraw()
+
+
+func stop_walking() -> void:
+	joystick = Vector2.ZERO
+	joystick_active = false
+	joystick_touch_id = -1
+	auto_walk = false
+	auto_path.clear()
+	approach_seat = -1
+
+func open_panel(script: Script) -> void:
+	DisplayServer.tts_stop()
+	stop_walking()
+	ritual = ""
+	if overlay != null and is_instance_valid(overlay):
+		overlay.queue_free()
+	overlay = Control.new()
+	overlay.set_script(script)
+	add_child(overlay)
+
+func action(kind: String) -> void:
+	if kind != "chant":
+		DisplayServer.tts_stop()
+	stop_walking()
+	match kind:
+		"practice": open_panel(PRACTICE_SCRIPT)
+		"shop": open_panel(SHOP_SCRIPT)
+		"character":
+			if character_gender == 0 and robe_brown:
+				robe_brown = false
+			elif character_gender == 0:
+				character_gender = 1
+			else:
+				character_gender = 0
+				robe_brown = true
+			status_text = "Đã đổi trang phục nhân vật"
+		"meditate":
+			if sitting:
+				sitting = false
+				_claim_seat(-1)
+				ritual = ""
+				status_text = "Đã đứng dậy"
+			elif selected_seat >= 0 and player.distance_to(_seat_position(selected_seat)) < 125:
+				_begin_sitting(selected_seat)
+				ritual = "meditate"
+			else:
+				status_text = "Chạm một bồ đoàn trống để đến ngồi thiền"
+		"chant":
+			ritual = "chant"
+			ritual_time = 0.0
+			beads_count = beads_count % 108 + 1
+			merit += 1
+			_speak_chant()
+			hall_audio.trigger("wood")
+			status_text = "Nam mô A Di Đà Phật"
+		"incense":
+			hall_audio.trigger("incense")
+			for i in range(8):
+				incense.append({"pos":player+Vector2(float(i-4)*4,-45),"age":float(i)*.1})
+			merit += 1
+			status_text = "Đã dâng hương • Nguyện tâm an lành"
+		"pause":
+			ritual = ""
+			hall_audio.set_ambient(false)
+			status_text = "Đã tạm dừng tu tập"
+	_save_progress()
+
+func _speak_chant() -> void:
+	if not hall_voice.is_empty():
+		DisplayServer.tts_speak("Nam mô A Di Đà Phật",hall_voice,60,1.0,0.78,0,true)
+
+func _exit_tree() -> void:
+	DisplayServer.tts_stop()

@@ -45,7 +45,7 @@ wss.on("connection", ws => {
   if (players.size >= MAX_CLIENTS) {
     send(ws,{type:"error",reason:"room_full"}); ws.close(); return;
   }
-  const player = {id:nextId++,seat:-1,x:860,y:4270,gender:0,robe:0,lastMove:0,windowStart:Date.now(),messageCount:0};
+  const player = {id:nextId++,seat:-1,x:860,y:900,gender:0,robe:0,lastMove:0,windowStart:Date.now(),messageCount:0};
   players.set(ws,player);
   send(ws,{type:"welcome",id:player.id,players:snapshot(),capacity:MAX_SEATS});
   broadcast({type:"join",player},ws);
@@ -66,6 +66,11 @@ wss.on("connection", ws => {
         send(ws,{type:"seat_denied",seat,reason:"occupied"}); return;
       }
       player.seat = seat;
+      if (seat >= 0) {
+        const column = seat % 20;
+        player.x = column < 10 ? 772.5 - (10-column)*72 : 947.5 + (column-9)*72;
+        player.y = 420 + Math.floor(seat/20)*78;
+      }
       broadcast({type:"seat_update",id:player.id,seat});
       send(ws,{type:"seat_ok",seat});
     } else if (msg.type === "move") {
@@ -73,10 +78,11 @@ wss.on("connection", ws => {
       if (now - player.lastMove < 80) return;
       const x=Number(msg.x), y=Number(msg.y);
       if (!Number.isFinite(x) || !Number.isFinite(y) || x<0 || x>1720 || y<0 || y>4600) return;
-      player.x=x; player.y=y; player.lastMove=now;
+      if (player.seat < 0) { player.x=x; player.y=y; }
+      player.lastMove=now;
       player.gender=msg.gender===1?1:0;
       player.robe=msg.robe===1?1:0;
-      broadcast({type:"move",id:player.id,x,y,gender:player.gender,robe:player.robe},ws);
+      broadcast({type:"move",id:player.id,x:player.x,y:player.y,gender:player.gender,robe:player.robe},ws);
     }
   });
   ws.on("close",()=>{players.delete(ws);broadcast({type:"leave",id:player.id});});

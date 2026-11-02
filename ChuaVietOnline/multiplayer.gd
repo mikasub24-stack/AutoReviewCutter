@@ -14,7 +14,7 @@ var reconnect_timer := 0.0
 var server_url := "ws://127.0.0.1:8788"
 var own_seat := -1
 var pending_seat := -1
-var last_position := Vector2(860, 4270)
+var last_position := Vector2(860, 900)
 var last_gender := 0
 var last_robe := 0
 
@@ -57,10 +57,6 @@ func _process(delta: float) -> void:
 	socket.poll()
 	var state := socket.get_ready_state()
 	if state == WebSocketPeer.STATE_OPEN:
-		if not connected:
-			connected = true
-			reconnect_timer = 0.0
-			connection_changed.emit(true)
 		while socket.get_available_packet_count() > 0:
 			var packet := socket.get_packet().get_string_from_utf8()
 			var parsed: Variant = JSON.parse_string(packet)
@@ -93,6 +89,9 @@ func _receive(msg: Dictionary) -> void:
 			for p in peers:
 				if typeof(p) == TYPE_DICTIONARY:
 					_add_player(p)
+			connected = true
+			reconnect_timer = 0.0
+			connection_changed.emit(true)
 			occupancy_changed.emit()
 		"join":
 			var p: Dictionary = msg.get("player",{})

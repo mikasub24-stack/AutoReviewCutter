@@ -18,7 +18,7 @@ jobs:
         run: |
           set -euo pipefail
           cd ChuaVietOnline/realtime
-          npm install --omit=dev
+          npm ci --omit=dev
           npm test
       - name: Install Godot 4.3 and Android export templates
         shell: bash
@@ -49,7 +49,7 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           import os, pathlib
-          path = pathlib.Path.home() / ".config/godot/editor_settings-4.tres"
+          path = pathlib.Path.home() / ".config/godot/editor_settings-4.3.tres"
           path.parent.mkdir(parents=True, exist_ok=True)
           sdk = os.environ["ANDROID_HOME"]
           java = os.environ["JAVA_HOME"]
@@ -84,6 +84,27 @@ jobs:
             echo "Godot runtime smoke test failed" >&2
             exit 1
           fi
+      - name: Test game interactions
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 60s godot --headless --path ChuaVietOnline --script res://tests/interaction_test.gd 2>&1 | tee godot-interactions.log
+          if grep -Ei "SCRIPT ERROR|Parse Error|Assertion failed|Invalid call|ERROR:" godot-interactions.log; then
+            exit 1
+          fi
+          grep -q "PASS: 1000 seat projections" godot-interactions.log
+      - name: Test Godot clients against realtime server
+        shell: bash
+        run: |
+          set -euo pipefail
+          node ChuaVietOnline/realtime/server.js > realtime.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          timeout 30s godot --headless --path ChuaVietOnline --script res://tests/network_test.gd 2>&1 | tee godot-network.log
+          if grep -Ei "SCRIPT ERROR|Assertion failed|ERROR:" godot-network.log; then
+            exit 1
+          fi
+          grep -q "PASS: Godot clients handshake" godot-network.log
       - name: Export APK
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /home/runner/.android/debug.keystore

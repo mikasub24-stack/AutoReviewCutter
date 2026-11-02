@@ -89,3 +89,23 @@ test("reject malformed and out-of-range seats without disconnecting player",asyn
     assert.equal((await next("seat_ok")).seat,999);
   } finally {a.terminate();}
 });
+test("welcome includes authoritative seated position and clothing",async()=>{
+  const a=await connect(),next=messages(a);
+  let b;
+  try {
+    const first=await next("welcome");
+    a.send(JSON.stringify({type:"seat",seat:128}));
+    await next("seat_ok");
+    // A seated client cannot move its authoritative position until releasing its seat.
+    a.send(JSON.stringify({type:"move",x:10,y:400,gender:1,robe:1}));
+    await delay(110);
+    b=await connect();
+    const welcome=await messages(b)("welcome");
+    const peer=welcome.players.find(p=>p.id===first.id);
+    assert.equal(peer.seat,128);
+    assert.equal(peer.x,628.5);
+    assert.equal(peer.y,888);
+    assert.equal(peer.gender,1);
+    assert.equal(peer.robe,1);
+  } finally {a.terminate();if(b)b.terminate();}
+});

@@ -113,10 +113,16 @@ func _ready() -> void:
 		voice_notice = "Máy chưa cài giọng đọc tiếng Việt"
 	temple_audio = TEMPLE_AUDIO.new()
 	add_child(temple_audio)
+	var net = get_parent().get("multiplayer_client")
+	if net != null:
+		net.connection_changed.connect(_network_state)
+		_network_state(net.connected)
 	set_process(true)
 
 func _act(action: String) -> void:
 	if action == "dai_bi" or action == "lang_nghiem":
+		practice = ""
+		DisplayServer.tts_stop()
 		var reader := Control.new()
 		reader.set_script(MANTRA_READER)
 		add_child(reader)
@@ -246,25 +252,17 @@ func _draw_avatar() -> void:
 		var dx := float(stick - 3) * 4.0
 		avatar_area.draw_line(altar + Vector2(dx,-15), altar + Vector2(dx,-47), Color("#a04f35"), 2)
 		avatar_area.draw_circle(altar + Vector2(dx+sin(elapsed+stick)*5,-57), 5, Color(0.9,0.9,0.85,0.28))
-	var bowing := practice == "bow"
-	var kneeling := practice in ["meditate", "chant", "beads", "mantra"]
-	var offset := 0.0
-	if bowing:
-		offset = 50.0 * sin(minf(elapsed / 1.8, 1.0) * PI)
-	var robe := Color("#785239")
+	var root = get_parent()
+	var gender: int = int(root.get("character_gender")) if root != null else 0
+	var brown: bool = bool(root.get("robe_brown")) if root != null else true
+	var pose := "seated" if practice in ["meditate","chant","beads","mantra"] else "standing"
+	var key := ("nun" if gender == 1 else "monk")+"_"+("brown" if brown else "grey")+"_"+pose
+	var texture: Texture2D = root.character_art[key]
+	var bow_offset := sin(minf(elapsed/1.8,1.0)*PI)*20 if practice == "bow" else 0.0
+	avatar_area.draw_texture_rect(texture,Rect2(c+Vector2(-50,-75+bow_offset),Vector2(100,140-bow_offset)),false)
 	var skin := Color("#d9a47a")
 	var gold := Color("#e4b852")
-	avatar_area.draw_circle(c + Vector2(0, 92), 84, Color("#3e2b23"))
-	avatar_area.draw_arc(c + Vector2(0, 92), 79, 0, TAU, 72, gold, 3)
-	if kneeling:
-		avatar_area.draw_rect(Rect2(c.x - 43, c.y + 49, 86, 24), robe)
-	else:
-		avatar_area.draw_rect(Rect2(c.x - 27, c.y + 40, 21, 67), robe)
-		avatar_area.draw_rect(Rect2(c.x + 6, c.y + 40, 21, 67), robe)
-	var torso := PackedVector2Array([c + Vector2(-40,-20+offset),c + Vector2(40,-20+offset),c + Vector2(47,56),c + Vector2(-47,56)])
-	avatar_area.draw_colored_polygon(torso, robe)
-	avatar_area.draw_circle(c + Vector2(0,-54+offset), 29, skin)
-	avatar_area.draw_arc(c + Vector2(0,-54+offset), 29, PI, TAU, 24, Color("#9a6348"), 2)
+	var robe := Color("#785239")
 	if practice == "wood":
 		var swing := sin(elapsed * 24.0) * 20.0
 		avatar_area.draw_line(c + Vector2(30,4), c + Vector2(70+swing,35), skin, 10)
@@ -282,9 +280,6 @@ func _draw_avatar() -> void:
 			for i in range(3):
 				var drift: float = sin(elapsed*2.0+i+j) * 5.0
 				avatar_area.draw_circle(hand + Vector2(dx+drift,-57-i*11), 4, Color(0.85,0.84,0.8,0.34))
-	else:
-		avatar_area.draw_line(c + Vector2(-30,0+offset), c + Vector2(-10,35+offset), skin, 9)
-		avatar_area.draw_line(c + Vector2(30,0+offset), c + Vector2(10,35+offset), skin, 9)
 	if practice == "wheel":
 		avatar_area.draw_circle(c + Vector2(72, 20), 28, gold)
 		avatar_area.draw_arc(c + Vector2(72,20), 20, elapsed * 5, elapsed * 5 + PI * 1.5, 24, robe, 6)
@@ -354,3 +349,7 @@ func _connect_multiplayer() -> void:
 		return
 	net.configure(url)
 	network_status.text = "Đang kết nối: " + url
+
+
+func _network_state(is_connected: bool) -> void:
+	network_status.text = "Đã kết nối chính điện trực tuyến" if is_connected else "Ngoại tuyến • đang chờ máy chủ"
