@@ -4,6 +4,7 @@ const { WebSocketServer, WebSocket } = require("ws");
 const PORT = Number(process.env.PORT || 8788);
 const MAX_SEATS = 1000;
 const MAX_CLIENTS = 1000;
+const MAX_MESSAGES_PER_SECOND = 35;
 const players = new Map();
 let nextId = 1;
 const httpServer = http.createServer((req, res) => {
@@ -44,7 +45,7 @@ wss.on("connection", ws => {
   if (players.size >= MAX_CLIENTS) {
     send(ws,{type:"error",reason:"room_full"}); ws.close(); return;
   }
-  const player = {id:nextId++,seat:-1,x:860,y:4270,gender:0,robe:0,lastMove:0};
+  const player = {id:nextId++,seat:-1,x:860,y:4270,gender:0,robe:0,lastMove:0,windowStart:Date.now(),messageCount:0};
   players.set(ws,player);
   send(ws,{type:"welcome",id:player.id,players:snapshot(),capacity:MAX_SEATS});
   broadcast({type:"join",player},ws);
@@ -52,6 +53,9 @@ wss.on("connection", ws => {
     let msg;
     try {msg = JSON.parse(String(raw));} catch {return;}
     if (!msg || typeof msg !== "object" || Array.isArray(msg)) return;
+    const tick=Date.now();
+    if(tick-player.windowStart>=1000){player.windowStart=tick;player.messageCount=0;}
+    if(++player.messageCount>MAX_MESSAGES_PER_SECOND){ws.close(1008,"rate_limit");return;}
     if (msg.type === "seat") {
       const seat = Number(msg.seat);
       if (!Number.isInteger(seat) || seat < -1 || seat >= MAX_SEATS) {
