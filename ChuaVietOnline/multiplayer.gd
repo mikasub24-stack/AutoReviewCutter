@@ -14,6 +14,9 @@ var reconnect_timer := 0.0
 var server_url := "ws://127.0.0.1:8788"
 var own_seat := -1
 var pending_seat := -1
+var last_position := Vector2(860, 4270)
+var last_gender := 0
+var last_robe := 0
 
 func _ready() -> void:
 	var saved := ConfigFile.new()
@@ -33,6 +36,14 @@ func configure(url: String) -> void:
 	config.save("user://multiplayer.cfg")
 	socket.close()
 	connected = false
+	client_id = -1
+	own_seat = -1
+	pending_seat = -1
+	occupants.clear()
+	remote_players.clear()
+	connection_changed.emit(false)
+	occupancy_changed.emit()
+	reconnect_timer = 0.0
 	connect_server()
 	set_process(true)
 
@@ -48,6 +59,7 @@ func _process(delta: float) -> void:
 	if state == WebSocketPeer.STATE_OPEN:
 		if not connected:
 			connected = true
+			reconnect_timer = 0.0
 			connection_changed.emit(true)
 		while socket.get_available_packet_count() > 0:
 			var packet := socket.get_packet().get_string_from_utf8()
@@ -58,6 +70,8 @@ func _process(delta: float) -> void:
 		if connected:
 			connected = false
 			pending_seat = -1
+			own_seat = -1
+			client_id = -1
 			occupants.clear()
 			remote_players.clear()
 			connection_changed.emit(false)
@@ -72,6 +86,7 @@ func _receive(msg: Dictionary) -> void:
 	match kind:
 		"welcome":
 			client_id = int(msg.get("id",-1))
+			_send({"type":"move","x":last_position.x,"y":last_position.y,"gender":last_gender,"robe":last_robe})
 			remote_players.clear()
 			occupants.clear()
 			var peers: Array = msg.get("players",[])
@@ -136,6 +151,9 @@ func request_seat(index: int) -> void:
 	_send({"type":"seat","seat":index})
 
 func send_position(position: Vector2, gender: int, robe: int) -> void:
+	last_position = position
+	last_gender = gender
+	last_robe = robe
 	if not connected:
 		return
 	_send({"type":"move","x":position.x,"y":position.y,"gender":gender,"robe":robe})
