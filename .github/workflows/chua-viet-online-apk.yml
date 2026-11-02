@@ -36,6 +36,27 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-34" "build-tools;33.0.2" "build-tools;34.0.0"
       - name: Import Godot project
         run: godot --headless --path ChuaVietOnline --editor --quit
+      - name: Set Godot Android editor paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          SETTINGS="$HOME/.config/godot/editor_settings-4.tres"
+          test -f "$SETTINGS"
+          python3 - <<'PY'
+          import os, pathlib, re
+          p = pathlib.Path.home() / ".config/godot/editor_settings-4.tres"
+          s = p.read_text()
+          sdk = os.environ["ANDROID_HOME"]
+          java = os.environ["JAVA_HOME"]
+          for key, value in [("export/android/android_sdk_path", sdk), ("export/android/java_sdk_path", java)]:
+              line = key + ' = "' + value + '"'
+              if re.search(r"^" + re.escape(key) + r"\\s*=", s, re.M):
+                  s = re.sub(r"^" + re.escape(key) + r"\\s*=.*$", line, s, flags=re.M)
+              else:
+                  s += "\\n" + line + "\\n"
+          p.write_text(s)
+          print("Configured SDK paths:", sdk, java)
+          PY
       - name: Export APK
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /home/runner/.android/debug.keystore
