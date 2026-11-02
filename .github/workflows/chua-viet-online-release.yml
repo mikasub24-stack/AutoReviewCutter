@@ -1,0 +1,60 @@
+name: Publish Chua Viet Online APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Chua Viet Online Android build run
+        required: true
+        default: '41504091351'
+      version:
+        description: APK version
+        required: true
+        default: '0.2.1'
+  push:
+    branches: [chua-viet-online]
+    paths: ['.github/workflows/chua-viet-online-release.yml']
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      BUILD_RUN: ${{ inputs.run_id || '41504091351' }}
+      APK_VERSION: ${{ inputs.version || '0.2.1' }}
+    steps:
+      - name: Validate source build
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$BUILD_RUN" =~ ^[0-9]+$ ]]
+          [[ "$APK_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN" > run.json
+          jq -e '.conclusion == "success" and .head_branch == "chua-viet-online" and .name == "Chua Viet Online - Android APK"' run.json
+          echo "SOURCE_SHA=$(jq -r .head_sha run.json)" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ChuaVietOnline-debug-APK
+          path: apk
+          run-id: ${{ env.BUILD_RUN }}
+          github-token: ${{ github.token }}
+      - name: Publish direct APK download
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_apk=$(find apk -name '*.apk' -type f -print -quit)
+          test -s "$source_apk"
+          asset="ChuaVietOnline-$APK_VERSION-debug.apk"
+          cp "$source_apk" "$asset"
+          tag="chua-viet-online-v$APK_VERSION"
+          cat > notes.md <<'NOTES'
+          Bản cài thử Android (debug, arm64). Mỗi người tự nhập tên hoặc pháp danh, có thể đổi tên trong Cài đặt. Tên được lưu trên thiết bị và đồng bộ với người chơi trực tuyến.
+
+          APK lấy từ build GitHub Actions đã kiểm thử thành công. Chưa kiểm thử trên điện thoại vật lý; chưa cấu hình máy chủ Internet công khai; cửa hàng vẫn là sandbox.
+          NOTES
+          gh release create "$tag" "$asset" --target "$SOURCE_SHA" --title "Chùa Việt Online $APK_VERSION — Android thử nghiệm" --notes-file notes.md --prerelease --latest=false
