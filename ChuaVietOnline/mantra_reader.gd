@@ -70,7 +70,7 @@ func _ready() -> void:
 	var voices := DisplayServer.tts_get_voices_for_language("vi")
 	if voices.size() > 0:
 		voice = voices[0]
-	DisplayServer.tts_utterance_callback(DisplayServer.TTS_UTTERANCE_ENDED, _on_utterance_end)
+	DisplayServer.tts_set_utterance_callback(DisplayServer.TTS_UTTERANCE_ENDED, _on_utterance_end)
 	_select("dai_bi")
 
 func _add_button(parent: Node, title: String, callback: Callable) -> void:
