@@ -18,10 +18,6 @@ var message := "Chọn một nghi thức"
 var buttons: Array[Button] = []
 var voice_note: Label
 var avatar_area: Control
-var sound_player: AudioStreamPlayer
-var sound_playback: AudioStreamGeneratorPlayback
-var sound_remaining := 0
-var sound_phase := 0.0
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -30,21 +26,25 @@ func _ready() -> void:
 	background.color = Color(0.09, 0.055, 0.035, 0.96)
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.offset_left = 12
+	scroll.offset_top = 30
+	scroll.offset_right = -12
+	scroll.offset_bottom = -20
+	add_child(scroll)
 	var column := VBoxContainer.new()
-	column.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	column.offset_left = 14
-	column.offset_top = 38
-	column.offset_right = -14
-	column.offset_bottom = -24
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.custom_minimum_size.x = 320
+	scroll.add_child(column)
 	column.add_theme_constant_override("separation", 8)
-	add_child(column)
 	var heading := Label.new()
 	heading.text = "TU TẬP - CHÙA VIỆT ONLINE"
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	heading.add_theme_font_size_override("font_size", 22)
 	column.add_child(heading)
 	avatar_area = Control.new()
-	avatar_area.custom_minimum_size.y = 275
+	avatar_area.custom_minimum_size.y = 240
 	avatar_area.draw.connect(_draw_avatar)
 	column.add_child(avatar_area)
 	voice_note = Label.new()
@@ -58,7 +58,7 @@ func _ready() -> void:
 	for entry in [["Lạy Phật","bow"],["Gõ mõ","wood"],["Tụng kinh","chant"],["Niệm hạt","beads"],["Ngồi thiền","meditate"],["Thắp hương","incense"],["Gõ chuông","bell"],["Dâng hoa","flower"],["Chuyển kinh luân","wheel"],["Om Mani Padme Hum","mantra"],["Nhạc thiền bật/tắt","music"]]:
 		var button := Button.new()
 		button.text = entry[0]
-		button.custom_minimum_size = Vector2(150, 58)
+		button.custom_minimum_size = Vector2(140, 54)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.pressed.connect(_act.bind(entry[1]))
 		grid.add_child(button)
@@ -71,14 +71,6 @@ func _ready() -> void:
 	close.text = "Trở lại chính điện"
 	close.pressed.connect(queue_free)
 	column.add_child(close)
-	sound_player = AudioStreamPlayer.new()
-	var stream := AudioStreamGenerator.new()
-	stream.mix_rate = 22050
-	stream.buffer_length = 0.2
-	sound_player.stream = stream
-	add_child(sound_player)
-	sound_player.play()
-	sound_playback = sound_player.get_stream_playback()
 	temple_audio = TEMPLE_AUDIO.new()
 	add_child(temple_audio)
 	set_process(true)
@@ -149,21 +141,12 @@ func _process(delta: float) -> void:
 		practice = ""
 	if practice == "incense" and elapsed >= 2.5:
 		practice = ""
-	if sound_remaining > 0 and sound_playback != null:
-		var count := mini(sound_playback.get_frames_available(), sound_remaining)
-		for i in range(count):
-			var t := float(6500 - sound_remaining) / 22050.0
-			var envelope := exp(-t * 23.0)
-			var sample := sin(sound_phase) * envelope * 0.26
-			sound_phase += TAU * (240.0 + 80.0 * exp(-t * 30.0)) / 22050.0
-			sound_playback.push_frame(Vector2(sample, sample))
-			sound_remaining -= 1
 	avatar_area.queue_redraw()
 
 func _draw_avatar() -> void:
 	var c := Vector2(avatar_area.size.x * 0.5, 140)
 	var bowing := practice == "bow"
-	var kneeling := practice == "meditate" or practice == "chant" or practice == "beads"
+	var kneeling := practice in ["meditate", "chant", "beads", "mantra"]
 	var offset := 0.0
 	if bowing:
 		offset = 50.0 * sin(minf(elapsed / 1.8, 1.0) * PI)
