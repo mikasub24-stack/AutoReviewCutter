@@ -53,7 +53,7 @@ function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async
       let voices = [];
       if (engine !== 'none') {
         say('Đang làm giọng đọc…');
-        voices = await voice.synth({ engine, voice: voiceId, tempo, dir, signal, onProgress: say, items: jobs.map(j => ({ id: j.id, text: j.voiceover || '' })) });
+        voices = await voice.synth({ engine, voice: voiceId, tempo, dir, signal, onProgress: say, items: jobs.filter(j => String(j.voiceover || '').trim()).map(j => ({ id: j.id, text: j.voiceover })) });
       }
       const byId = new Map(voices.map(v => [v.id, v.file]));
       const scenes = jobs.map(j => ({ id: j.id, number: j.order, clip: j.output, voice: byId.get(j.id) || null, text: j.voiceover || '' }));
@@ -61,7 +61,7 @@ function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async
       const lengths = await measureScenes({ scenes, ffmpeg: settings.ffmpeg });
       prepared = { runId: path.basename(dir), dir, storyId, scenes };
       say(`Đã chuẩn bị ${scenes.length} cảnh`);
-      return { runId: prepared.runId, scenes: scenes.map((s, i) => ({ id: s.id, number: s.number, text: s.text, seconds: lengths[i].seconds, clipSeconds: lengths[i].clipSeconds, voiceSeconds: lengths[i].voiceSeconds })) };
+      return { runId: prepared.runId, scenes: scenes.map((s, i) => ({ id: s.id, number: s.number, text: s.text, seconds: lengths[i].seconds, clipSeconds: lengths[i].clipSeconds, voiceSeconds: lengths[i].voiceSeconds, pauses: lengths[i].pauses })) };
     });
   }
 
@@ -86,7 +86,8 @@ function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async
             png = path.join(prepared.dir, `sub-${scene.number}-${k}.png`);
             await fs.writeFile(png, bytes);
           }
-          chunks.push({ text: chunk.text, start: chunk.start, end: chunk.end, png });
+          const place = v => (Number.isInteger(v) && v >= 0 && v <= 8192 ? v : 0);
+          chunks.push({ text: chunk.text, start: chunk.start, end: chunk.end, png, x: place(chunk.x), y: place(chunk.y) });
         }
         parts.push({ clip: scene.clip, voice: scene.voice, chunks });
       }

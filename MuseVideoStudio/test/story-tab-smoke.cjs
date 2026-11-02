@@ -23,7 +23,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
           job('story', 2, { storyId: 'Truyen-1', voiceover: 'Lời cảnh hai.', output: 'C:\\Videos\\KeChuyen\\Truyen-1\\002.mp4' }),
           job('story', 3, { storyId: 'Truyen-1', voiceover: 'Lời cảnh ba.', output: 'C:\\Videos\\KeChuyen\\Truyen-1\\003.mp4' })],
         license: { status: 'trial', device: 'TESTDEVICE', expiresAt: Date.now() + 86400000, message: 'Dùng thử 24 giờ' },
-        story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: false, clone: false }, platform: 'win32', edgeVoices: [{ id: 'vi-VN-HoaiMyNeural', name: 'Hoài My (nữ, tiếng Việt)' }, { id: 'vi-VN-NamMinhNeural', name: 'Nam Minh (nam, tiếng Việt)' }], windowsVoices: [{ name: 'Microsoft An', culture: 'vi-VN', gender: 'Male' }], clones: [] } },
+        story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: false, clone: false }, platform: 'win32', edgeVoices: [{ id: 'vi-VN-HoaiMyNeural', lang: 'vi', language: 'Tiếng Việt', name: 'Hoài My (nữ)' }, { id: 'vi-VN-NamMinhNeural', lang: 'vi', language: 'Tiếng Việt', name: 'Nam Minh (nam)' }, { id: 'en-US-AriaNeural', lang: 'en', language: 'Tiếng Anh', name: 'Aria (nữ)' }], windowsVoices: [{ name: 'Microsoft An', culture: 'vi-VN', gender: 'Male' }], clones: [] } },
         settings: { browserChoice: 'builtin', browserPath: '', output: 'C:\\Videos', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 2, composer: 'textarea', fileInput: 'input[type=file]', submit: '', video: 'video', image: 'img', attachmentReadySelector: '', timeoutMinutes: 15 }
       };
       window.calls = []; window.s = s; let listener, id = 100;
@@ -31,14 +31,14 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       window.studio = {
         onUpdate: fn => listener = fn,
         invoke: async (name, data) => {
-          window.calls.push({ name, data: name === 'storyBuild' ? { ...data, scenes: data.scenes.map(sc => ({ id: sc.id, chunks: sc.chunks.map(c => ({ text: c.text, start: c.start, end: c.end, png: c.png ? [...c.png.slice(0, 4)] : null })) })) } : data });
+          window.calls.push({ name, data: name === 'storyBuild' ? { ...data, scenes: data.scenes.map(sc => ({ id: sc.id, chunks: sc.chunks.map(c => ({ text: c.text, start: c.start, end: c.end, x: c.x, y: c.y, png: c.png ? [...c.png.slice(0, 4)] : null })) })) } : data });
           if (name === 'images') return ['C:\\Refs\\mai.png'];
           if (name === 'add') s.jobs.push(...data.map(j => ({ ...j, id: String(++id), status: 'pending', stage: 'pending', order: s.jobs.filter(x => x.kind === 'story').length + 1 })));
           if (name === 'start') { s.active = true; s.paused = false; }
           if (name === 'storySetupVoice') { s.story.voice.setupBusy = true; s.story.voice.setupMessage = 'Đang tìm Python…'; }
           if (name === 'storyAddVoice') s.story.voice.clones.push({ key: 'Giong-cua-toi', name: data.name });
           if (name === 'storyListen') return 'C:\\Data\\preview\\nghe.mp3';
-          if (name === 'storyPrepare') return { runId: 'r1', scenes: s.jobs.filter(j => j.kind === 'story' && j.storyId === data.storyId).map(j => ({ id: j.id, number: j.order, text: j.voiceover, seconds: 4.4, clipSeconds: 10, voiceSeconds: 4 })) };
+          if (name === 'storyPrepare') return { runId: 'r1', scenes: s.jobs.filter(j => j.kind === 'story' && j.storyId === data.storyId).map(j => ({ id: j.id, number: j.order, text: j.voiceover, seconds: 4.4, clipSeconds: 10, voiceSeconds: 4, pauses: [] })) };
           if (name === 'storyBuild') { s.story.output = 'C:\\Videos\\KeChuyen\\Truyen-1\\Truyen-1.mp4'; s.story.srt = data.srt ? 'C:\\Videos\\KeChuyen\\Truyen-1\\Truyen-1.srt' : ''; s.story.notes = [{ scene: 1, cut: 5.6, hold: 0 }, { scene: 2, cut: 0, hold: 2 }]; }
           return structuredClone(s);
         }
@@ -96,11 +96,51 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.deepEqual((await called('start')).at(-1).data, { kind: 'story' });
     assert.equal(await page.locator('#storyScenes .draftRow').count(), 0);
 
+    // Hiểu kịch bản: đối chiếu lời với kịch bản gốc, sửa một chạm, soát từng cảnh, giới hạn 10 giây, đa ngôn ngữ.
+    await page.evaluate(() => { document.getElementById('storyPanel').open = true; document.getElementById('storyMuse').open = true; });
+    await page.locator('#storyScript').fill('Mai ra bến sông lúc bình minh. Cá vàng nhảy lên thuyền. Mai thả cá về sông.');
+    await page.locator('#storySplit').click();
+    await page.waitForFunction(() => /khớp 100% kịch bản gốc/.test(document.getElementById('storyCheck').textContent));
+    assert.equal(await page.locator('#storyCheck').evaluate(e => e.classList.contains('bad')), false);
+    await page.locator('#storyReply').fill('CẢNH 1\nLỜI: Mai ra bến sông lúc bình minh.\nPROMPT: Cô bé Mai đứng trên bến sông lúc bình minh, sương mỏng, mặt mỉm cười nhìn mặt nước.\n\nCẢNH 2\nLỜI: Mai thả cá về sông.\nPROMPT: Mai cúi xuống thả cá vàng xuống nước, nét mặt dịu dàng, mặt nước gợn sóng.');
+    await page.locator('#storyParse').click();
+    await page.waitForFunction(() => /Chưa khớp kịch bản gốc/.test(document.getElementById('storyCheck').textContent));
+    assert.match(await page.locator('#storyCheck').textContent(), /Thiếu 1 câu của kịch bản: «Cá vàng nhảy lên thuyền\.»/);
+    assert.equal(await page.locator('#storyCheck').evaluate(e => e.classList.contains('bad')), true);
+    await page.locator('#storyCheck button:has-text("Sửa lời theo kịch bản gốc")').click();
+    await page.waitForFunction(() => document.querySelectorAll('#storyScenes .draftRow').length === 3);
+    assert.deepEqual(await page.locator('#storyScenes .draftRow textarea:nth-of-type(1)').evaluateAll(list => list.map(t => t.value)), ['Mai ra bến sông lúc bình minh.', 'Cá vàng nhảy lên thuyền.', 'Mai thả cá về sông.']);
+    await page.waitForFunction(() => /khớp 100% kịch bản gốc/.test(document.getElementById('storyCheck').textContent));
+    // Soát từng cảnh: sửa prompt thành quá ngắn → có cảnh báo ngay trên cảnh đó.
+    const prompts = page.locator('#storyScenes .draftRow').nth(0).locator('textarea').nth(1);
+    await prompts.fill('Mai ra bến.');
+    await page.waitForFunction(() => /Prompt quá ngắn/.test(document.querySelector('#storyScenes .draftRow .storyWarn').textContent));
+    assert.match(await page.locator('#storyCheck').textContent(), /1 cảnh cần xem lại trước khi tạo/);
+    // Muse chỉ tạo clip 10 giây.
+    await page.locator('#storySeconds').fill('12'); await page.locator('#storySplit').click();
+    assert.match(await page.locator('#toast').textContent(), /Muse chỉ tạo clip tối đa 10 giây/);
+    await page.locator('#storySeconds').fill('10');
+    // Đa ngôn ngữ: kịch bản tiếng Anh chọn giọng tiếng Anh trước; kịch bản tiếng Trung chia theo chữ Hán.
+    await page.locator('#storyScript').fill('Scene 1\nVisual: A fisherman rows across a calm lake at dawn.\nNarrator: Every morning, Tom rowed out to the middle of the lake.\nScene 2\nVisual: A golden fish leaps into the boat.\nNarrator: One day, a golden fish jumped into his boat.');
+    await page.locator('#storySplit').click();
+    assert.deepEqual(await page.locator('#storyScenes .draftRow textarea:nth-of-type(1)').evaluateAll(list => list.map(t => t.value)), ['Every morning, Tom rowed out to the middle of the lake.', 'One day, a golden fish jumped into his boat.']);
+    assert.match(await page.locator('#storyScenes .draftRow').nth(1).locator('textarea').nth(1).inputValue(), /HÌNH ẢNH THEO KỊCH BẢN[^\n]*\nA golden fish leaps into the boat\./);
+    await page.locator('#storyEngine').selectOption('edge');
+    await page.locator('#storyVoice').evaluate(e => { e.dispatchEvent(new Event('change')); });
+    assert.match(await page.locator('#storyVoice option').first().textContent(), /Aria.*Tiếng Anh ✓/, 'kịch bản tiếng Anh: giọng tiếng Anh đứng đầu');
+    await page.locator('#storyScript').fill('小明划船到湖中央等待日出。有一天，一条金鱼跳进了他的船里，请求他放它回去。小明轻轻地把金鱼放回水中。金鱼绕着小船转了三圈才消失。');
+    await page.locator('#storySplit').click();
+    assert.ok(await page.locator('#storyScenes .draftRow').count() >= 1);
+    assert.equal((await page.locator('#storyScenes .draftRow textarea:nth-of-type(1)').evaluateAll(list => list.map(t => t.value))).join(''), '小明划船到湖中央等待日出。有一天，一条金鱼跳进了他的船里，请求他放它回去。小明轻轻地把金鱼放回水中。金鱼绕着小船转了三圈才消失。');
+    await page.locator('#storyScript').fill('');
+    while (await page.locator('#storyScenes .draftRow').count()) await page.locator('#storyScenes .draftRow button:has-text("Xóa cảnh")').first().click();
+
     // Voices: free setup, listen, clone with consent.
     await page.locator('#storyEngine').selectOption('edge');
     assert.match(await page.locator('#storyVoiceInfo').textContent(), /Chưa cài giọng Microsoft/);
     assert.equal(await page.locator('#storyListen').isDisabled(), false);
-    assert.equal(await page.locator('#storyVoice option').count(), 2);
+    assert.equal(await page.locator('#storyVoice option').count(), 3);
+    assert.match(await page.locator('#storyVoice option').first().textContent(), /Hoài My.*✓/, 'giọng hợp ngôn ngữ kịch bản (tiếng Việt) đứng đầu');
     await page.locator('#storySetup').click();
     await page.waitForFunction(() => document.querySelector('#storySetupStop') && !document.querySelector('#storySetupStop').hidden);
     assert.match(await page.locator('#storyVoiceInfo').textContent(), /Đang tìm Python/);
@@ -143,6 +183,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(build.scenes.length, 3);
     assert.ok(build.scenes.every(sc => sc.chunks.length >= 1 && sc.chunks.every(c => c.end > c.start && Array.isArray(c.png) && c.png.join() === '137,80,78,71')), 'mỗi đoạn phụ đề là PNG');
     assert.equal(build.scenes[0].chunks[0].text, 'Lời cảnh một.'); assert.equal(build.scenes[0].chunks.at(-1).end, 4.4);
+    assert.ok(build.scenes.every(sc => sc.chunks.every(c => Number.isInteger(c.x) && Number.isInteger(c.y) && c.x % 2 === 0 && c.y % 2 === 0 && c.y > 600)), 'phụ đề dưới đáy chỉ gửi vùng chữ, kèm vị trí (x, y)');
     await page.waitForFunction(() => /✓ Truyen-1\.mp4/.test(document.getElementById('storyStatus').textContent));
     assert.match(await page.locator('#storyStatus').textContent(), /Tự edit: cắt 5\.6 giây thừa; 1 cảnh lời dài hơn clip nên giữ khung cuối \(cảnh 2\)/);
     assert.equal(await page.locator('#storyOpen').isVisible(), true);
@@ -183,6 +224,18 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.locator('#storyListen').textContent(), '▶ Listen to voice');
     assert.equal(await page.locator('#subOn').locator('xpath=..').textContent().then(t => t.trim()), 'Show subtitles in the video');
     assert.equal(await page.locator('#storySfx option[value=low]').textContent(), 'Low (background under narration)');
+    // Phần kiểm tra kịch bản cũng được dịch sang tiếng Anh.
+    await page.evaluate(() => { document.getElementById('storyPanel').open = true; document.getElementById('storyMuse').open = true; });
+    await page.locator('#storyScript').fill('Mai ra bến sông lúc bình minh. Cá vàng nhảy lên thuyền.');
+    await page.locator('#storyReply').fill('CẢNH 1\nLỜI: Mai ra bến sông lúc bình minh.\nPROMPT: Ngắn.');
+    await page.locator('#storyParse').click();
+    await page.waitForFunction(() => /Does not match the original script/.test(document.getElementById('storyCheck').textContent));
+    const englishCheck = await page.locator('#storyCheck').textContent();
+    assert.match(englishCheck, /1 sentence\(s\) of the script are missing/);
+    assert.match(englishCheck, /1 scene\(s\) need a look before creating/);
+    assert.equal(await page.locator('#storyCheck button').textContent(), 'Fix narration to match the original script');
+    assert.match(await page.locator('#storyScenes .storyWarn').first().textContent(), /Prompt too short/);
+    assert.match(await page.locator('#storyInfo').textContent(), /Muse split the story into 1 scenes/);
     assert.deepEqual(errors, []);
     console.log('PASS: story tab — own jobs/counts/folder, quick split + Muse reply parsing (no-speech rule kept), character image on every scene, free voice setup/listen/clone with consent, subtitles on/off + .srt + PNG captions, auto-edit report, export errors, persistence, English labels.');
   } finally { await browser.close(); server.close(); }

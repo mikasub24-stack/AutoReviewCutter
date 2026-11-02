@@ -30,28 +30,62 @@
   const baseName = file => String(file || '').split(/[\\/]/).pop();
 
   /* ---------- 1. kịch bản → cảnh ---------- */
+  let warnBoxes = [], checkTimer = 0;
+  // Soát lại ngay khi sửa: cảnh báo từng cảnh (lời quá dài, thoại, nhảy thời gian…) và độ khớp với kịch bản gốc.
+  function refreshChecks() {
+    clearTimeout(checkTimer);
+    checkTimer = setTimeout(() => {
+      let warnings = [];
+      try { warnings = plan().lintScenes(scenes, options()); } catch { warnings = []; }
+      let flagged = 0;
+      warnBoxes.forEach((box, i) => {
+        const list = warnings[i] || [];
+        box.hidden = !list.length; box.replaceChildren(...list.map(w => el('div', '', '⚠ ' + w)));
+        if (list.length) flagged++;
+      });
+      const check = $('storyCheck'), script = $('storyScript').value;
+      let result = null;
+      if (scenes.length && script.trim()) { try { result = plan().checkAgainstScript(script, scenes); } catch { result = null; } }
+      const lines = [];
+      if (result && result.checked) lines.push(result.ok ? `✓ Lời các cảnh khớp ${Math.round(result.coverage * 100)}% kịch bản gốc, đủ và đúng thứ tự.` : '⚠ Chưa khớp kịch bản gốc:');
+      if (result && !result.ok) lines.push(...result.issues.map(x => '• ' + x));
+      if (flagged) lines.push(`⚠ ${flagged} cảnh cần xem lại trước khi tạo (mỗi lượt tạo tốn credit Muse).`);
+      check.hidden = !lines.length; check.replaceChildren(...lines.map(line => el('div', '', line)));
+      check.classList.toggle('bad', Boolean((result && !result.ok) || flagged));
+      if (result && !result.ok) { const fix = el('button', 'secondary', 'Sửa lời theo kịch bản gốc'); fix.onclick = alignScript; check.append(fix); }
+    }, 250);
+  }
+  function alignScript() {
+    try {
+      scenes = plan().alignToScript($('storyScript').value, scenes, options());
+      renderScenes();
+      toast('Đã sửa lời các cảnh về đúng nguyên văn kịch bản. Câu bị bỏ sót thành cảnh mới.');
+    } catch (e) { toast(e.message); }
+  }
   function renderScenes() {
     const box = $('storyScenes');
-    box.replaceChildren();
+    box.replaceChildren(); warnBoxes = [];
     scenes.forEach((scene, index) => {
       const row = el('div', 'draftRow'), body = el('div', 'draftContent');
       body.append(el('strong', '', `${scene.title || 'Cảnh ' + (index + 1)} · ${scene.durationSeconds || ''} giây`));
-      const voice = el('textarea'); voice.value = scene.voiceover || ''; voice.placeholder = 'Lời đọc của cảnh này'; voice.oninput = () => { scene.voiceover = voice.value; scene.source = voice.value; };
-      const prompt = el('textarea'); prompt.value = scene.prompt || ''; prompt.placeholder = 'Prompt gửi Muse'; prompt.oninput = () => { scene.prompt = prompt.value; };
+      const warn = el('div', 'storyWarn'); warn.hidden = true; warnBoxes[index] = warn;
+      const voice = el('textarea'); voice.value = scene.voiceover || ''; voice.placeholder = 'Lời đọc của cảnh này'; voice.oninput = () => { scene.voiceover = voice.value; scene.source = voice.value; refreshChecks(); };
+      const prompt = el('textarea'); prompt.value = scene.prompt || ''; prompt.placeholder = 'Prompt gửi Muse'; prompt.oninput = () => { scene.prompt = prompt.value; refreshChecks(); };
       const tools = el('div', 'draftTools'), remove = el('button', 'secondary', 'Xóa cảnh');
       remove.onclick = () => { scenes.splice(index, 1); scenes.forEach((s, i) => { s.title = 'Cảnh ' + (i + 1); }); renderScenes(); };
       tools.append(remove);
-      body.append(el('label', 'storyLabel', 'Lời đọc'), voice, el('label', 'storyLabel', 'Prompt gửi Muse'), prompt, tools);
+      body.append(el('label', 'storyLabel', 'Lời đọc'), voice, el('label', 'storyLabel', 'Prompt gửi Muse'), prompt, warn, tools);
       row.append(body); box.append(row);
     });
     $('storySceneCount').textContent = scenes.length ? `${scenes.length} cảnh` : '';
     $('storyCommit').disabled = $('storyCreate').disabled = !scenes.length;
+    refreshChecks();
   }
   function split() {
     try {
       scenes = plan().planStory($('storyScript').value, options());
       renderScenes();
-      $('storyInfo').textContent = `Đã chia ${scenes.length} cảnh khoảng ${$('storySeconds').value} giây. Xem lại lời đọc và prompt, rồi bấm Tạo clip.`;
+      $('storyInfo').textContent = `Đã chia ${scenes.length} cảnh, mỗi cảnh tối đa ${$('storySeconds').value} giây. Xem lại lời đọc và prompt, rồi bấm Tạo clip.`;
     } catch (e) { toast(e.message); }
   }
   async function copyInstruction() {
@@ -69,7 +103,7 @@
     try {
       scenes = plan().parseMuseReply($('storyReply').value, options());
       renderScenes();
-      $('storyInfo').textContent = `Muse đã chia ${scenes.length} cảnh. Xem lại rồi bấm Tạo clip.`;
+      $('storyInfo').textContent = `Muse đã chia ${scenes.length} cảnh. Xem phần đối chiếu với kịch bản bên dưới rồi bấm Tạo clip.`;
     } catch (e) { toast(e.message); }
   }
 
@@ -110,9 +144,18 @@
 
   /* ---------- giọng ---------- */
   const engine = () => $('storyEngine').value;
+  // Ngôn ngữ của kịch bản đang làm (để chọn giọng đúng ngôn ngữ).
+  function storyLanguage() {
+    const text = scenes.map(s => s.voiceover).filter(Boolean).slice(0, 4).join(' ') || sampleText() || $('storyScript').value;
+    try { return plan().detectLanguage(text); } catch { return 'vi'; }
+  }
   function voiceChoices(v) {
     const e = engine();
-    if (e === 'edge') return (v.edgeVoices || []).map(x => [x.id, x.name]);
+    if (e === 'edge') {
+      const lang = storyLanguage();
+      const list = [...(v.edgeVoices || [])].sort((a, b) => (b.lang === lang) - (a.lang === lang));
+      return list.map(x => [x.id, `${x.name} · ${x.language}${x.lang === lang ? ' ✓' : ''}`, x.lang]);
+    }
     if (e === 'clone') return (v.clones || []).map(x => [x.key, x.name]);
     if (e === 'windows') return (v.windowsVoices || []).map(x => [x.name, `${x.name}${x.culture ? ' · ' + x.culture : ''}`]);
     return [];
@@ -128,8 +171,11 @@
       voiceSignature = signature;
       const remembered = (saved.voices || {})[e];
       select.replaceChildren(...(choices.length ? choices : [[ '', e === 'none' ? '—' : e === 'clone' ? 'Chưa có giọng clone' : e === 'windows' ? 'Không thấy giọng Windows' : 'Chưa có giọng' ]]).map(([value, label]) => { const o = el('option', '', label); o.value = value; return o; }));
-      if (remembered && choices.some(([value]) => value === remembered)) select.value = remembered;
+      const remembered_ = choices.find(([value]) => value === remembered);
+      // Nhớ giọng đã chọn, trừ khi nó khác ngôn ngữ kịch bản mà đã có giọng hợp ngôn ngữ.
+      if (remembered_ && (e !== 'edge' || remembered_[2] === storyLanguage() || !choices.some(c => c[2] === storyLanguage()))) select.value = remembered;
       else if (e === 'clone' && choices.length) select.value = choices[choices.length - 1][0];
+      else if (e === 'edge' && choices.length) select.value = choices[0][0];
     }
     select.disabled = !choices.length;
     $('storyListen').disabled = listening || e === 'none' || !choices.length || Boolean(v.setupBusy);
@@ -147,8 +193,8 @@
     else if (e === 'clone' && !choices.length) info = 'Chưa có giọng clone. Mở mục «Clone giọng của bạn» và thêm file ghi âm mẫu.';
     else if (e === 'windows' && v.platform !== 'win32') info = 'Giọng có sẵn chỉ có trên Windows.';
     else if (e === 'windows' && !choices.length) info = 'Windows chưa có giọng đọc nào. Thêm giọng tiếng Việt trong Cài đặt Windows → Ngôn ngữ, hoặc dùng giọng Microsoft.';
-    else if (e === 'clone') info = 'Giọng clone chạy ngay trên máy, miễn phí. Lần nghe/xuất đầu tiên phải tải mô hình nên lâu.';
-    else if (e === 'edge') info = 'Giọng Microsoft miễn phí, cần có mạng khi đọc.';
+    else if (e === 'clone') info = 'Giọng clone chạy ngay trên máy, miễn phí, dành cho tiếng Việt (ngôn ngữ khác dùng giọng Microsoft hoặc giọng Windows). Lần nghe/xuất đầu tiên phải tải mô hình nên lâu.';
+    else if (e === 'edge') info = 'Giọng Microsoft miễn phí, nhiều ngôn ngữ (✓ = hợp ngôn ngữ kịch bản), cần có mạng khi đọc.';
     else info = 'Giọng Windows có sẵn, chạy offline. Chất lượng tiếng Việt tùy giọng bạn đã cài.';
     $('storyVoiceInfo').textContent = info;
     const box = $('storyClones');
@@ -199,8 +245,17 @@
   function wrap(ctx, value, maxWidth) {
     const words = String(value).split(/\s+/).filter(Boolean), lines = [];
     let line = '';
+    // Chữ Hán/Nhật không có khoảng trắng: một «từ» rất dài thì ngắt theo từng ký tự.
+    const pieces = [];
     for (const word of words) {
-      const next = line ? line + ' ' + word : word;
+      if (ctx.measureText(word).width <= maxWidth) { pieces.push(word); continue; }
+      let part = '';
+      for (const ch of Array.from(word)) { if (part && ctx.measureText(part + ch).width > maxWidth) { pieces.push(part); part = ch; } else part += ch; }
+      if (part) pieces.push(part);
+    }
+    for (const word of pieces) {
+      const joiner = /[\u3000-\u9fff\uff00-\uffef]$/.test(line) ? '' : ' ';
+      const next = line ? line + joiner + word : word;
       if (line && ctx.measureText(next).width > maxWidth) { lines.push(line); line = word; } else line = next;
     }
     if (line) lines.push(line);
@@ -226,6 +281,11 @@
       ctx.lineWidth = Math.max(2, size * 0.16); ctx.strokeStyle = o.outline; ctx.strokeText(line, w / 2, y);
       ctx.fillStyle = o.color; ctx.fillText(line, w / 2, y);
     });
+    // Vùng chứa chữ (số chẵn, trong khung hình): chỉ vùng này được gửi đi và phủ lên video, nên dựng nhanh hơn nhiều.
+    const widest = lines.length ? Math.max(...lines.map(l => ctx.measureText(l).width)) : 0, pad = size * 0.6;
+    const x0 = Math.max(0, Math.floor((w - widest) / 2 - pad) & ~1), y0 = Math.max(0, Math.floor(top - pad) & ~1);
+    const x1 = Math.min(w, Math.ceil((w + widest) / 2 + pad)), y1 = Math.min(h, Math.ceil(top + block + pad));
+    return { x: x0, y: y0, w: Math.max(2, (x1 - x0 + 1) & ~1), h: Math.max(2, (y1 - y0 + 1) & ~1) };
   }
   function drawPreview() {
     const canvas = $('subPreview'), [w, h] = dims($('storyAspect').value);
@@ -263,10 +323,21 @@
       const o = captionOptions(), out = [];
       for (const scene of prep.scenes) {
         const chunks = [];
-        if (subtitles || srt) for (const chunk of plan().subtitleChunks(scene.text, scene.seconds, { maxChars: aspect === '9:16' ? 48 : 80 })) {
+        // Phụ đề chạy theo độ dài GIỌNG ĐỌC (không tính nhịp lặng cuối) và dịch về đúng chỗ người đọc nghỉ; đoạn cuối giữ đến hết cảnh.
+        const spoken = scene.voiceSeconds > 0 ? scene.voiceSeconds : scene.seconds;
+        const parts = (subtitles || srt) ? plan().subtitleChunks(scene.text, spoken, { maxChars: aspect === '9:16' ? 48 : 80, pauses: scene.pauses || [] }) : [];
+        if (parts.length) parts[parts.length - 1].end = Math.max(parts[parts.length - 1].end, scene.seconds);
+        if (parts.length) for (const chunk of parts) {
           let png = null;
-          if (subtitles) { drawCaption(canvas, chunk.text, o, false); png = await pngOf(canvas); }
-          chunks.push({ text: chunk.text, start: chunk.start, end: chunk.end, png });
+          let x = 0, y = 0;
+          if (subtitles) {
+            const box = drawCaption(canvas, chunk.text, o, false), part = document.createElement('canvas');
+            box.w = Math.min(box.w, w - box.x); box.h = Math.min(box.h, h - box.y);
+            part.width = box.w; part.height = box.h;
+            part.getContext('2d').drawImage(canvas, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+            png = await pngOf(part); x = box.x; y = box.y;
+          }
+          chunks.push({ text: chunk.text, start: chunk.start, end: chunk.end, png, x, y });
         }
         out.push({ id: scene.id, chunks });
       }

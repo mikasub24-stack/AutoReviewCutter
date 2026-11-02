@@ -67,9 +67,15 @@ def run_edge(job):
         raise RuntimeError("Microsoft không trả giọng đọc (%s). Kiểm tra mạng và đồng hồ Windows rồi thử lại." % last)
 
     async def main():
-        for item in job["items"]:
-            await one(item)
-            emit({"done": item["id"]})
+        # Đọc nhiều cảnh cùng lúc (tối đa 4) cho nhanh; mỗi cảnh vẫn ghi vào đúng file của nó.
+        gate = asyncio.Semaphore(4)
+
+        async def guarded(item):
+            async with gate:
+                await one(item)
+                emit({"done": item["id"]})
+
+        await asyncio.gather(*(guarded(item) for item in job["items"]))
 
     asyncio.run(main())
 

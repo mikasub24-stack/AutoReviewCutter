@@ -9,11 +9,41 @@ const { randomUUID } = require('node:crypto');
 const { command } = require('./merge.cjs');
 
 const ENGINES = ['none', 'windows', 'edge', 'clone'];
+// Giọng Microsoft Edge miễn phí (edge-tts), theo ngôn ngữ. Giọng nào hợp ngôn ngữ kịch bản sẽ được chọn trước.
 const EDGE_VOICES = [
-  { id: 'vi-VN-HoaiMyNeural', name: 'Hoài My (nữ, tiếng Việt)' },
-  { id: 'vi-VN-NamMinhNeural', name: 'Nam Minh (nam, tiếng Việt)' },
-  { id: 'en-US-AriaNeural', name: 'Aria (nữ, tiếng Anh)' },
-  { id: 'en-US-GuyNeural', name: 'Guy (nam, tiếng Anh)' }
+  { id: 'vi-VN-HoaiMyNeural', lang: 'vi', language: 'Tiếng Việt', name: 'Hoài My (nữ)' },
+  { id: 'vi-VN-NamMinhNeural', lang: 'vi', language: 'Tiếng Việt', name: 'Nam Minh (nam)' },
+  { id: 'en-US-AriaNeural', lang: 'en', language: 'Tiếng Anh', name: 'Aria (nữ)' },
+  { id: 'en-US-GuyNeural', lang: 'en', language: 'Tiếng Anh', name: 'Guy (nam)' },
+  { id: 'en-US-JennyNeural', lang: 'en', language: 'Tiếng Anh', name: 'Jenny (nữ)' },
+  { id: 'en-GB-SoniaNeural', lang: 'en', language: 'Tiếng Anh', name: 'Sonia (Anh) (nữ)' },
+  { id: 'en-GB-RyanNeural', lang: 'en', language: 'Tiếng Anh', name: 'Ryan (Anh) (nam)' },
+  { id: 'zh-CN-XiaoxiaoNeural', lang: 'zh', language: 'Tiếng Trung', name: 'Xiaoxiao (nữ)' },
+  { id: 'zh-CN-YunxiNeural', lang: 'zh', language: 'Tiếng Trung', name: 'Yunxi (nam)' },
+  { id: 'ja-JP-NanamiNeural', lang: 'ja', language: 'Tiếng Nhật', name: 'Nanami (nữ)' },
+  { id: 'ja-JP-KeitaNeural', lang: 'ja', language: 'Tiếng Nhật', name: 'Keita (nam)' },
+  { id: 'ko-KR-SunHiNeural', lang: 'ko', language: 'Tiếng Hàn', name: 'SunHi (nữ)' },
+  { id: 'ko-KR-InJoonNeural', lang: 'ko', language: 'Tiếng Hàn', name: 'InJoon (nam)' },
+  { id: 'es-ES-ElviraNeural', lang: 'es', language: 'Tiếng Tây Ban Nha', name: 'Elvira (nữ)' },
+  { id: 'es-ES-AlvaroNeural', lang: 'es', language: 'Tiếng Tây Ban Nha', name: 'Alvaro (nam)' },
+  { id: 'fr-FR-DeniseNeural', lang: 'fr', language: 'Tiếng Pháp', name: 'Denise (nữ)' },
+  { id: 'fr-FR-HenriNeural', lang: 'fr', language: 'Tiếng Pháp', name: 'Henri (nam)' },
+  { id: 'de-DE-KatjaNeural', lang: 'de', language: 'Tiếng Đức', name: 'Katja (nữ)' },
+  { id: 'de-DE-ConradNeural', lang: 'de', language: 'Tiếng Đức', name: 'Conrad (nam)' },
+  { id: 'pt-BR-FranciscaNeural', lang: 'pt', language: 'Tiếng Bồ Đào Nha', name: 'Francisca (nữ)' },
+  { id: 'pt-BR-AntonioNeural', lang: 'pt', language: 'Tiếng Bồ Đào Nha', name: 'Antonio (nam)' },
+  { id: 'it-IT-ElsaNeural', lang: 'it', language: 'Tiếng Ý', name: 'Elsa (nữ)' },
+  { id: 'it-IT-DiegoNeural', lang: 'it', language: 'Tiếng Ý', name: 'Diego (nam)' },
+  { id: 'ru-RU-SvetlanaNeural', lang: 'ru', language: 'Tiếng Nga', name: 'Svetlana (nữ)' },
+  { id: 'ru-RU-DmitryNeural', lang: 'ru', language: 'Tiếng Nga', name: 'Dmitry (nam)' },
+  { id: 'th-TH-PremwadeeNeural', lang: 'th', language: 'Tiếng Thái', name: 'Premwadee (nữ)' },
+  { id: 'th-TH-NiwatNeural', lang: 'th', language: 'Tiếng Thái', name: 'Niwat (nam)' },
+  { id: 'id-ID-GadisNeural', lang: 'id', language: 'Tiếng Indonesia', name: 'Gadis (nữ)' },
+  { id: 'id-ID-ArdiNeural', lang: 'id', language: 'Tiếng Indonesia', name: 'Ardi (nam)' },
+  { id: 'hi-IN-SwaraNeural', lang: 'hi', language: 'Tiếng Hindi', name: 'Swara (nữ)' },
+  { id: 'hi-IN-MadhurNeural', lang: 'hi', language: 'Tiếng Hindi', name: 'Madhur (nam)' },
+  { id: 'ar-SA-ZariyahNeural', lang: 'ar', language: 'Tiếng Ả Rập', name: 'Zariyah (nữ)' },
+  { id: 'ar-SA-HamedNeural', lang: 'ar', language: 'Tiếng Ả Rập', name: 'Hamed (nam)' }
 ];
 const TEMPOS = [0.9, 1, 1.15, 1.3];
 const CLONE_SECONDS = { min: 3, max: 15 };

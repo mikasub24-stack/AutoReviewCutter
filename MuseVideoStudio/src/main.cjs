@@ -568,7 +568,7 @@ app.whenReady().then(async () => {
           if(epoch!==runEpoch||flushingQuit)return;assertMuse(browsers.get(index));
         }));
         if(epoch!==runEpoch||flushingQuit)return snapshot();
-        if(settings.autoMerge) await checkTools(settings.ffmpeg);
+        if(settings.autoMerge&&kind==='video') await checkTools(settings.ffmpeg);
         if(epoch!==runEpoch || flushingQuit || queue.active || merging || packaging || resettingAccounts.size) return snapshot();
         const unavailable=queue.jobs.find(j=>j.kind===kind&&j.account>settings.accountCount&&(['failed','interrupted'].includes(j.status)||j.resumeMode));
         if(unavailable)throw Error('Cảnh đang dở gắn với tài khoản '+unavailable.account+'. Chọn đủ tài khoản trước khi Tiếp tục.');

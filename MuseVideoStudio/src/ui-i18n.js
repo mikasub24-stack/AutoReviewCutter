@@ -96,8 +96,16 @@ Chưa cài giọng clone. Bấm «Cài giọng miễn phí» (cần Python 3.10�
 Chưa có giọng clone. Mở mục «Clone giọng của bạn» và thêm file ghi âm mẫu.|No cloned voice yet. Open “Clone your voice” and add a voice sample.
 Giọng có sẵn chỉ có trên Windows.|Built-in voices are available on Windows only.
 Windows chưa có giọng đọc nào. Thêm giọng tiếng Việt trong Cài đặt Windows → Ngôn ngữ, hoặc dùng giọng Microsoft.|Windows has no speech voices. Add a Vietnamese voice in Windows Settings → Language, or use a Microsoft voice.
-Giọng clone chạy ngay trên máy, miễn phí. Lần nghe/xuất đầu tiên phải tải mô hình nên lâu.|The cloned voice runs on this computer for free. The first listen/export downloads a model, so it takes a while.
-Giọng Microsoft miễn phí, cần có mạng khi đọc.|Microsoft voices are free and need an internet connection while reading.
+Giọng clone chạy ngay trên máy, miễn phí, dành cho tiếng Việt (ngôn ngữ khác dùng giọng Microsoft hoặc giọng Windows). Lần nghe/xuất đầu tiên phải tải mô hình nên lâu.|The cloned voice runs on this computer for free and is meant for Vietnamese (use Microsoft or Windows voices for other languages). The first listen/export downloads a model, so it takes a while.
+Giọng Microsoft miễn phí, nhiều ngôn ngữ (✓ = hợp ngôn ngữ kịch bản), cần có mạng khi đọc.|Free Microsoft voices in many languages (✓ = matches the script's language); they need an internet connection while reading.
+⚠ Chưa khớp kịch bản gốc:|⚠ Does not match the original script yet:
+Sửa lời theo kịch bản gốc|Fix narration to match the original script
+Đã sửa lời các cảnh về đúng nguyên văn kịch bản. Câu bị bỏ sót thành cảnh mới.|Narration restored to the script's exact wording. Missing sentences became new scenes.
+⚠ Chưa có prompt: cảnh này sẽ không tạo được.|⚠ No prompt: this scene cannot be created.
+⚠ Prompt quá ngắn, dễ ra hình sai. Mô tả rõ ai, ở đâu, làm gì, nét mặt.|⚠ Prompt too short; the picture may come out wrong. Say who, where, what they do and their expression.
+⚠ Prompt thiếu câu «no speech» — nhân vật có thể bị nói.|⚠ The prompt lacks the “no speech” line — characters may talk.
+⚠ Có lời thoại trong ngoặc kép — nhân vật sẽ không nói, chỉ thể hiện bằng cử chỉ và nét mặt.|⚠ Quoted dialogue found — characters will not speak; it is shown through gestures and expressions.
+Đang đọc thông tin các cảnh…|Reading scene information…
 Giọng Windows có sẵn, chạy offline. Chất lượng tiếng Việt tùy giọng bạn đã cài.|Built-in Windows voices run offline. Vietnamese quality depends on the voices you installed.
 Chưa có clip kể chuyện. Chia cảnh và bấm Tạo clip trước.|No story clips yet. Split the script and click Create clips first.
 Chưa có giọng|No voice yet
@@ -414,8 +422,19 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
       [/^Thêm (\d+) prompt và chạy toàn bộ tác vụ đang chờ\?.*$/,m=>'Add '+m[1]+' prompts and run all pending scenes? This may use Muse credits. Exact reviewed prompts and scene references will be sent.'],
       [/^Dán ảnh tại đây cho (.+)$/,m=>'Paste references here for '+m[1]],
       [/^(\d+) cảnh$/,m=>m[1]+' scenes'],
-      [/^Đã chia (\d+) cảnh khoảng (\d+) giây\. Xem lại lời đọc và prompt, rồi bấm Tạo clip\.$/,m=>'Split into '+m[1]+' scenes of about '+m[2]+' seconds. Review the narration and prompts, then click Create clips.'],
-      [/^Muse đã chia (\d+) cảnh\. Xem lại rồi bấm Tạo clip\.$/,m=>'Muse split the story into '+m[1]+' scenes. Review them, then click Create clips.'],
+[/^Đã chia (\d+) cảnh, mỗi cảnh tối đa (\d+) giây\. Xem lại lời đọc và prompt, rồi bấm Tạo clip\.$/,m=>'Split into '+m[1]+' scenes of up to '+m[2]+' seconds. Review the narration and prompts, then click Create clips.'],
+      [/^Muse đã chia (\d+) cảnh\. Xem phần đối chiếu với kịch bản bên dưới rồi bấm Tạo clip\.$/,m=>'Muse split the story into '+m[1]+' scenes. Check the comparison with the script below, then click Create clips.'],
+      [/^Muse chỉ tạo clip tối đa (\d+) giây: chọn mỗi cảnh từ 3 đến (\d+) giây\.$/,m=>'Muse only makes clips up to '+m[1]+' seconds: choose 3 to '+m[2]+' seconds per scene.'],
+      [/^✓ Lời các cảnh khớp (\d+)% kịch bản gốc, đủ và đúng thứ tự\.$/,m=>'✓ The scenes match '+m[1]+'% of the original script, complete and in order.'],
+      [/^⚠ (\d+) cảnh cần xem lại trước khi tạo \(mỗi lượt tạo tốn credit Muse\)\.$/,m=>'⚠ '+m[1]+' scene(s) need a look before creating (every creation uses Muse credits).'],
+      [/^• Thiếu (\d+) câu của kịch bản: (.+)$/,m=>'• '+m[1]+' sentence(s) of the script are missing: '+m[2]],
+      [/^• Cảnh (\d+) có lời không nằm trong kịch bản: (.+)$/,m=>'• Scene '+m[1]+' has narration that is not in the script: '+m[2]],
+      [/^• Lời các cảnh chỉ khớp (\d+)% kịch bản\.$/,m=>'• The scenes only match '+m[1]+'% of the script.'],
+      [/^⚠ Lời đọc dài khoảng ([\d.]+) giây, hơn clip (\d+) giây — sẽ phải giữ khung cuối\. Nên tách cảnh\.$/,m=>'⚠ The narration takes about '+m[1]+' s, longer than the '+m[2]+' s clip, so the last frame would be held. Split the scene.'],
+      [/^⚠ Có chuyển mốc thời gian — (\d+) giây khó chứa nhiều khoảnh khắc\. Nên tách thành cảnh riêng\.$/,m=>'⚠ A time jump is mentioned; '+m[1]+' seconds can hardly hold several moments. Split it into separate scenes.'],
+      [/^⚠ Quá nhiều câu cho (\d+) giây; hành động dễ bị bỏ sót hoặc dồn lại\.$/,m=>'⚠ Too many sentences for '+m[1]+' seconds; actions may be skipped or squeezed.'],
+      [/^Đang dựng (\d+)\/(\d+) cảnh…$/,m=>'Building scene '+m[1]+'/'+m[2]+'…'],
+      [/^(.+) \((nữ|nam)\) · (.+?)( ✓)?$/,m=>{const L={'Tiếng Việt':'Vietnamese','Tiếng Anh':'English','Tiếng Trung':'Chinese','Tiếng Nhật':'Japanese','Tiếng Hàn':'Korean','Tiếng Tây Ban Nha':'Spanish','Tiếng Pháp':'French','Tiếng Đức':'German','Tiếng Bồ Đào Nha':'Portuguese','Tiếng Ý':'Italian','Tiếng Nga':'Russian','Tiếng Thái':'Thai','Tiếng Indonesia':'Indonesian','Tiếng Hindi':'Hindi','Tiếng Ả Rập':'Arabic'};return m[1]+' ('+(m[2]==='nữ'?'female':'male')+') · '+(L[m[3]]||m[3])+(m[4]||'');}],
       [/^Ảnh nhân vật: (.+) — gắn vào mọi cảnh\.$/,m=>'Character image: '+m[1]+' — attached to every scene.'],
       [/^Thêm (\d+) cảnh và chạy toàn bộ clip kể chuyện đang chờ\?.*$/,m=>'Add '+m[1]+' scenes and run all pending story clips? This may use Muse credits. The reviewed prompts are sent exactly as shown, with the character image.'],
       [/^Còn (\d+) cảnh chưa xong\. Chạy hàng đợi cho xong rồi xuất\.$/,m=>m[1]+' scene(s) are not finished. Finish the queue, then export.'],
