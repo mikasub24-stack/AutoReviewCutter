@@ -30,7 +30,7 @@ function qrUrl(order){
   return `https://img.vietqr.io/image/${BANK_ID}-${encodeURIComponent(ACCOUNT)}-compact2.png?amount=${order.amount}&addInfo=${description}`;
 }
 function complete(order, transactionId){
-  if(order.status==='paid') return {alreadyPaid:true};
+  if(order.status==='paid') { if(order.transactionId!==transactionId) throw new Error('Order already settled by another transaction'); return {alreadyPaid:true}; }
   if(order.status!=='pending') throw new Error('Order not pending');
   if(state.processedTransactions[transactionId]) throw new Error('Transaction already used');
   order.status='paid';order.paidAt=now();order.transactionId=transactionId;
