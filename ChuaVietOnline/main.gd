@@ -108,6 +108,9 @@ func _process(delta: float) -> void:
 			player += movement_facing * SPEED * delta
 			footstep_time += delta * 12.0
 	if joystick.length() > 0.05:
+		if sitting:
+			_claim_seat(-1)
+			sitting = false
 		movement_facing = joystick.normalized()
 		footstep_time += delta * 12.0
 		var next := player + joystick.normalized() * SPEED * delta
