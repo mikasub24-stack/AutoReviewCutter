@@ -4,6 +4,7 @@ const SHOP_SCRIPT = preload("res://payment_shop.gd")
 const PRACTICE_SCRIPT = preload("res://practice_panel.gd")
 const MULTIPLAYER_SCRIPT = preload("res://multiplayer.gd")
 const MONK_AVATAR = preload("res://art/monk_avatar.svg")
+const NUN_AVATAR = preload("res://art/nun_avatar.svg")
 const CUSHION_ART = preload("res://art/bo_doan.svg")
 const ROWS := 50
 const COLS_PER_SIDE := 10
@@ -300,9 +301,8 @@ func _draw() -> void:
 	draw_circle(avatar + Vector2(0,-27), 15, Color("#d9a47a"))
 	# Detailed approved-style character art overlays the temporary geometry.
 	# Rendered as a proper texture, not a screenshot of the whole UI.
-	if character_gender == 0:
-		var avatar_rect := Rect2(avatar + Vector2(-35.0, -64.0), Vector2(70.0, 100.0))
-		draw_texture_rect(MONK_AVATAR, avatar_rect, false)
+	var avatar_rect := Rect2(avatar + Vector2(-35.0, -64.0), Vector2(70.0, 100.0))
+	draw_texture_rect(NUN_AVATAR if character_gender == 1 else MONK_AVATAR, avatar_rect, false)
 	# Small hands make the walking silhouette readable on a phone.
 	draw_circle(avatar + Vector2(-24, 4 - gait), 6, Color("#d9a47a"))
 	draw_circle(avatar + Vector2(24, 4 + gait), 6, Color("#d9a47a"))
