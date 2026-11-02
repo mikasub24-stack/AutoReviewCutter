@@ -526,6 +526,10 @@ func _sync_occupancy() -> void:
 
 func _seat_confirmed(index: int) -> void:
 	waiting_for_seat = false
+	if index >= 0 and selected_seat != index:
+		# A late acknowledgement must not put the avatar in an abandoned seat.
+		_claim_seat(-1)
+		return
 	if index >= 0:
 		status_text = "Máy chủ xác nhận bồ đoàn số %d" % (index+1)
 	else:
