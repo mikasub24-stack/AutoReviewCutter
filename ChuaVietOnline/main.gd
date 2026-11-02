@@ -28,6 +28,8 @@ var joystick_touch_id := -1
 var character_gender := 0
 var footstep_time := 0.0
 var save_timer := 0.0
+var auto_path: Array[Vector2] = []
+var auto_walk := false
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -53,6 +55,27 @@ func _process(delta: float) -> void:
 	if save_timer > 15.0:
 		save_timer = 0.0
 		_save_progress()
+	if joystick.length() > 0.05 and auto_walk:
+		auto_walk = false
+		auto_path.clear()
+	if auto_walk and auto_path.size() > 0:
+		var waypoint := auto_path[0]
+		var remaining := waypoint - player
+		if remaining.length() < SPEED * delta + 3.0:
+			player = waypoint
+			auto_path.remove_at(0)
+			if auto_path.is_empty():
+				auto_walk = false
+				if approach_seat >= 0:
+					selected_seat = approach_seat
+					approach_seat = -1
+					sitting = true
+					status_text = "Đang ngồi tại bồ đoàn %d" % (selected_seat + 1)
+					_save_progress()
+		else:
+			movement_facing = remaining.normalized()
+			player += movement_facing * SPEED * delta
+			footstep_time += delta * 12.0
 	if joystick.length() > 0.05:
 		movement_facing = joystick.normalized()
 		footstep_time += delta * 12.0
@@ -256,7 +279,8 @@ func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 				sitting = true
 				status_text = "Đang ngồi tại bồ đoàn số %d" % (best+1)
 			else:
-				status_text += " (đi đến chỗ đã chọn)"
+				_navigate_to_seat(best)
+				status_text += " (đang tự tìm đường)"
 		else:
 			incense.append({"pos":world,"age":0.0})
 
@@ -277,3 +301,22 @@ func _load_progress() -> void:
 	selected_seat = clampi(int(data.get("seat",-1)),-1,CAPACITY-1)
 	robe_brown = bool(data.get("robe_brown",true))
 	character_gender = clampi(int(data.get("gender",0)),0,1)
+
+func _navigate_to_seat(index: int) -> void:
+	var target := _seat_position(index)
+	var central_x := WORLD_W * 0.5
+	var row_lane_y := target.y + 34.0
+	var near_cross := 380.0 + roundf((player.y - 380.0) / (STEP_Y * 10.0)) * STEP_Y * 10.0 + 48.0
+	near_cross = clampf(near_cross, 400.0, WORLD_H - 100.0)
+	auto_path.clear()
+	# Follow a clear horizontal passage, central carpet, then the selected cushion row.
+	if absf(player.x - central_x) > AISLE * 0.47:
+		auto_path.append(Vector2(player.x, near_cross))
+		auto_path.append(Vector2(central_x, near_cross))
+	else:
+		auto_path.append(Vector2(central_x, player.y))
+	auto_path.append(Vector2(central_x, row_lane_y))
+	auto_path.append(Vector2(target.x, row_lane_y))
+	auto_path.append(target)
+	auto_walk = true
+	joystick = Vector2.ZERO
