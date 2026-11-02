@@ -4,6 +4,7 @@ const SHOP_SCRIPT = preload("res://payment_shop.gd")
 const PRACTICE_SCRIPT = preload("res://practice_panel.gd")
 const MULTIPLAYER_SCRIPT = preload("res://multiplayer.gd")
 const MONK_AVATAR = preload("res://art/monk_avatar.svg")
+const CUSHION_ART = preload("res://art/bo_doan.svg")
 const ROWS := 50
 const COLS_PER_SIDE := 10
 const CAPACITY := ROWS * COLS_PER_SIDE * 2
@@ -259,6 +260,7 @@ func _draw() -> void:
 			_ellipse(pos + Vector2(0,4), Vector2(29, 13), Color("#3b241a"))
 			_ellipse(pos, Vector2(27, 11), Color("#7d492b"))
 			_ellipse(pos + Vector2(0,-2), Vector2(24, 9), color)
+			draw_texture_rect(CUSHION_ART, Rect2(pos + Vector2(-30.0, -15.0), Vector2(60.0, 30.0)), false)
 			if occupied_seats.has(idx):
 				var visitor_style := int(occupied_seats[idx])
 				if multiplayer_client != null and multiplayer_client.connected:
