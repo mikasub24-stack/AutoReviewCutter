@@ -199,6 +199,22 @@ func _draw() -> void:
 				_draw_seated_occupant(pos, int(occupied_seats[idx]))
 			if idx == selected_seat:
 				draw_arc(pos, 30, 0, TAU, 20, Color.WHITE, 2)
+
+	# Visible remote avatars are drawn only while connected to a real server.
+	if multiplayer_client != null and multiplayer_client.connected:
+		for remote_id in multiplayer_client.remote_players:
+			var peer: Dictionary = multiplayer_client.remote_players[remote_id]
+			if int(peer.get("seat",-1)) >= 0:
+				continue
+			var remote_pos := Vector2(float(peer.get("x",860.0)),float(peer.get("y",4270.0))) - camera
+			if remote_pos.x < -50.0 or remote_pos.x > w+50.0 or remote_pos.y < 100.0 or remote_pos.y > h-140.0:
+				continue
+			var remote_robe := Color("#90969a") if int(peer.get("gender",0)) == 1 else Color("#79533b")
+			_ellipse(remote_pos+Vector2(0,28),Vector2(18,7),Color(0.1,0.07,0.05,0.35))
+			draw_rect(Rect2(remote_pos+Vector2(-12,12),Vector2(9,20)),Color("#302521"))
+			draw_rect(Rect2(remote_pos+Vector2(3,12),Vector2(9,20)),Color("#302521"))
+			draw_colored_polygon(PackedVector2Array([remote_pos+Vector2(-20,-12),remote_pos+Vector2(20,-12),remote_pos+Vector2(23,20),remote_pos+Vector2(-23,20)]),remote_robe)
+			draw_circle(remote_pos+Vector2(0,-27),15,Color("#d9a47a"))
 	# Character: bald head, Vietnamese brown or gray robe.
 	var avatar := player - camera
 	if sitting:
