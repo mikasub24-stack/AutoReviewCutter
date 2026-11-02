@@ -7,6 +7,10 @@ var wheel_turns := 0
 var flowers := 0
 var fruits := 0
 var offering_stage := 0
+var incense_stage := 0
+var altar_incense := 0
+var altar_flowers := 0
+var altar_fruits := 0
 var bells := 0
 var mantra_count := 0
 var practice := ""
@@ -105,8 +109,9 @@ func _act(action: String) -> void:
 				message = "Đang ngồi thiền"
 			"incense":
 				incense += 1
+				incense_stage = 1
 				temple_audio.trigger("incense")
-				message = "Thắp hương lần %d" % incense
+				message = "Châm hương và chắp tay khấn nguyện"
 			"bell":
 				bells += 1
 				temple_audio.trigger("bell")
@@ -147,12 +152,24 @@ func _process(delta: float) -> void:
 	if practice in ["bell", "wheel", "mantra"] and elapsed >= 3.0:
 		practice = ""
 	if practice in ["flower", "fruit"] and elapsed >= 4.0:
+		if practice == "flower":
+			altar_flowers += 1
+		else:
+			altar_fruits += 1
 		practice = ""
 		offering_stage = 2
 		message = "Đã an vị lễ vật trên bàn thờ"
 		voice_note.text = message
-	if practice == "incense" and elapsed >= 2.5:
+	if practice == "incense" and elapsed >= 2.5 and incense_stage == 1:
+		incense_stage = 2
+		message = "Đang tiến đến bát hương"
+		voice_note.text = message
+	if practice == "incense" and elapsed >= 5.0:
+		incense_stage = 3
+		altar_incense += 1
 		practice = ""
+		message = "Đã cắm hương vào bát hương"
+		voice_note.text = message
 	avatar_area.queue_redraw()
 
 func _draw_avatar() -> void:
@@ -160,8 +177,16 @@ func _draw_avatar() -> void:
 	var altar := Vector2(c.x, 20)
 	avatar_area.draw_rect(Rect2(altar.x - 100, altar.y - 18, 200, 14), Color("#ad782f"))
 	avatar_area.draw_rect(Rect2(altar.x - 94, altar.y - 4, 188, 12), Color("#572d1c"))
-	if offering_stage == 2:
-		_draw_offering(altar + Vector2(0,-30), "fruit" if fruits > flowers else "flower")
+	if altar_flowers > 0:
+		_draw_offering(altar + Vector2(-56,-30), "flower")
+	if altar_fruits > 0:
+		_draw_offering(altar + Vector2(56,-30), "fruit")
+	avatar_area.draw_circle(altar + Vector2(0,-13), 16, Color("#8b704e"))
+	avatar_area.draw_rect(Rect2(altar + Vector2(-20,-14), Vector2(40,9)), Color("#b89460"))
+	for stick in range(mini(altar_incense, 7)):
+		var dx := float(stick - 3) * 4.0
+		avatar_area.draw_line(altar + Vector2(dx,-15), altar + Vector2(dx,-47), Color("#a04f35"), 2)
+		avatar_area.draw_circle(altar + Vector2(dx+sin(elapsed+stick)*5,-57), 5, Color(0.9,0.9,0.85,0.28))
 	var bowing := practice == "bow"
 	var kneeling := practice in ["meditate", "chant", "beads", "mantra"]
 	var offset := 0.0
@@ -187,10 +212,17 @@ func _draw_avatar() -> void:
 		avatar_area.draw_circle(c + Vector2(77,57), 23, Color("#a06b30"))
 		avatar_area.draw_arc(c + Vector2(77,57), 18, 0, TAU, 24, gold, 3)
 	elif practice == "incense":
-		avatar_area.draw_line(c + Vector2(0,15), c + Vector2(0,-110), gold, 3)
-		for i in range(5):
-			var drift: float = sin(elapsed * 2.0 + i) * 8.0
-			avatar_area.draw_circle(c + Vector2(drift,-120-i*12), 5, Color(0.85,0.84,0.8,0.5))
+		var hand := c + Vector2(0,-30)
+		if incense_stage == 2:
+			var p := clampf((elapsed-2.5)/2.5,0.0,1.0)
+			hand = hand.lerp(altar + Vector2(0,-45), p*p*(3.0-2.0*p))
+		for j in range(3):
+			var dx := float(j-1)*5.0
+			avatar_area.draw_line(hand + Vector2(dx,20), hand + Vector2(dx,-42), Color("#a05437"), 2)
+			avatar_area.draw_circle(hand + Vector2(dx,-44), 2, Color("#ed713d"))
+			for i in range(3):
+				var drift: float = sin(elapsed*2.0+i+j) * 5.0
+				avatar_area.draw_circle(hand + Vector2(dx+drift,-57-i*11), 4, Color(0.85,0.84,0.8,0.34))
 	else:
 		avatar_area.draw_line(c + Vector2(-30,0+offset), c + Vector2(-10,35+offset), skin, 9)
 		avatar_area.draw_line(c + Vector2(30,0+offset), c + Vector2(10,35+offset), skin, 9)
