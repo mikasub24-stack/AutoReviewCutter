@@ -7,6 +7,29 @@ func _run() -> void:
 	hall = load("res://main.tscn").instantiate()
 	root.add_child(hall)
 	await process_frame
+	# Existing installs without a name must choose one before entering.
+	hall.player_name = ""
+	hall.hud.show_name_editor(true)
+	var field: LineEdit = hall.hud.modal.find_children("*","LineEdit",true,false)[0]
+	field.text = ""
+	field.text_submitted.emit(field.text)
+	assert(hall.player_name.is_empty())
+	assert(not hall.set_player_name("x"))
+	assert(not hall.set_player_name("[b]Fake[/b]"))
+	assert(not hall.set_player_name("a".repeat(21)))
+	field.text = "  Minh An  "
+	field.text_submitted.emit(field.text)
+	await process_frame
+	assert(hall.player_name == "Minh An")
+	assert(hall.set_player_name("Diệu   Hạnh"))
+	assert(hall.player_name == "Diệu Hạnh")
+	hall.player_name = ""
+	hall._load_progress()
+	assert(hall.player_name == "Diệu Hạnh")
+	hall.hud.show_name_editor(false)
+	await process_frame
+	hall.hud.modal.queue_free()
+	await process_frame
 	hall.multiplayer_client.set_process(false)
 	hall.multiplayer_client.socket.close()
 	hall.player = Vector2(860,900)

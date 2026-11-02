@@ -22,7 +22,7 @@ function broadcast(obj, except=null) {
   }
 }
 function snapshot() {
-  return [...players.values()].map(p=>({id:p.id,seat:p.seat,x:p.x,y:p.y,gender:p.gender,robe:p.robe}));
+  return [...players.values()].map(p=>({id:p.id,name:p.name,seat:p.seat,x:p.x,y:p.y,gender:p.gender,robe:p.robe}));
 }
 function occupied(seat, except) {
   for (const [ws,p] of players) if (ws !== except && p.seat === seat) return true;
@@ -45,7 +45,7 @@ wss.on("connection", ws => {
   if (players.size >= MAX_CLIENTS) {
     send(ws,{type:"error",reason:"room_full"}); ws.close(); return;
   }
-  const player = {id:nextId++,seat:-1,x:860,y:900,gender:0,robe:0,lastMove:0,windowStart:Date.now(),messageCount:0};
+  const player = {id:nextId++,name:"Khách",seat:-1,x:860,y:900,gender:0,robe:0,lastMove:0,windowStart:Date.now(),messageCount:0};
   players.set(ws,player);
   send(ws,{type:"welcome",id:player.id,players:snapshot(),capacity:MAX_SEATS});
   broadcast({type:"join",player},ws);
@@ -56,7 +56,13 @@ wss.on("connection", ws => {
     const tick=Date.now();
     if(tick-player.windowStart>=1000){player.windowStart=tick;player.messageCount=0;}
     if(++player.messageCount>MAX_MESSAGES_PER_SECOND){ws.close(1008,"rate_limit");return;}
-    if (msg.type === "seat") {
+    if (msg.type === "profile") {
+      if (typeof msg.name !== "string") return;
+      const name = msg.name.trim().replace(/ +/g," ");
+      if ([...name].length < 2 || [...name].length > 20 || !/^[\p{L}\p{M}\p{N} ._'’-]+$/u.test(name)) return;
+      player.name = name;
+      broadcast({type:"profile",id:player.id,name});
+    } else if (msg.type === "seat") {
       const seat = msg.seat;
       if (typeof seat !== "number" || !Number.isInteger(seat) || seat < -1 || seat >= MAX_SEATS) {
         send(ws,{type:"seat_denied",seat:Number.isFinite(seat)?seat:-1,reason:"invalid_seat"});

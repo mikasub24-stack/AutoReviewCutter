@@ -1,4 +1,4 @@
-# Chùa Việt Online – Thiện Tâm
+# Chùa Việt Online
 
 Dự án tiếp tục trong `ChuaVietOnline/` của AutoReviewCutter, nhánh `chua-viet-online`. Godot **4.3**, Android dọc 540×960, renderer Compatibility. Không cần dự án mới.
 
@@ -12,6 +12,10 @@ Mở `project.godot` bằng Godot 4.3 hoặc chạy:
 godot --headless --path ChuaVietOnline --editor --quit
 godot --path ChuaVietOnline
 ```
+
+## Tên người chơi
+
+Lần đầu vào game, mỗi người tự nhập tên hoặc pháp danh (2–20 ký tự, hỗ trợ tiếng Việt). Tên được lưu trên thiết bị, xuất hiện trên nhân vật, hồ sơ và nhật ký; người chơi trực tuyến thấy tên của nhau. Đổi tên trong Cài đặt. Bản cũ chưa có tên sẽ được yêu cầu nhập tên và vẫn giữ tiến trình đã lưu. Thiện Tâm trong ảnh tham chiếu chỉ là tên ví dụ.
 
 ## Điều khiển và giao diện
 

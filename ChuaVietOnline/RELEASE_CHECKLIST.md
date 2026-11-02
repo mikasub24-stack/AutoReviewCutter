@@ -57,3 +57,10 @@ Chạy `npm start` trong `ChuaVietOnline/realtime`, sau đó ở gốc repo:
 ```sh
 godot --headless --path ChuaVietOnline --script res://tests/network_test.gd
 ```
+
+## Bản 0.2.1 — mỗi người tự đặt tên
+
+- Bắt buộc nhập tên khi chưa có tên lưu; đổi tên trong Cài đặt.
+- Tên tiếng Việt 2–20 ký tự; lưu và khôi phục cùng tiến trình cũ.
+- Đồng bộ tên khi tham gia phòng, đổi tên, nhận snapshot và kết nối lại.
+- Kiểm thử giao diện/tiến trình Godot đạt; kiểm thử máy chủ 5/5 đạt; hai trình khách Godot xác nhận đổi tên và kết nối lại.

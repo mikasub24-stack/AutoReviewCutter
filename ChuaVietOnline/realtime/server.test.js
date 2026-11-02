@@ -109,3 +109,24 @@ test("welcome includes authoritative seated position and clothing",async()=>{
     assert.equal(peer.robe,1);
   } finally {a.terminate();if(b)b.terminate();}
 });
+
+test("chosen Vietnamese names broadcast, survive snapshots and reject invalid names",async()=>{
+  const a=await connect(),nextA=messages(a);
+  let b;
+  try {
+    const welcome=await nextA("welcome");
+    a.send(JSON.stringify({type:"profile",name:"  Diệu   Hạnh  "}));
+    assert.equal((await nextA("profile")).name,"Diệu Hạnh");
+    b=await connect();
+    const nextB=messages(b);
+    const snapshot=await nextB("welcome");
+    assert.equal(snapshot.players.find(p=>p.id===welcome.id).name,"Diệu Hạnh");
+    for (const name of ["", "x", "a".repeat(21), "[b]Fake[/b]", "Tên\nGiả", null]) {
+      a.send(JSON.stringify({type:"profile",name}));
+    }
+    a.send(JSON.stringify({type:"profile",name:"An Nhiên"}));
+    assert.equal((await nextB("profile")).name,"An Nhiên");
+    await delay(60);
+    assert.equal(b._testQueue.filter(m=>m.type==="profile").length,0);
+  } finally {a.terminate();if(b)b.terminate();}
+});

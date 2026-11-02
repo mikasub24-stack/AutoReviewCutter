@@ -14,6 +14,7 @@ const AISLE := 175.0
 const WORLD_W := 1720.0
 const WORLD_H := 4600.0
 const SPEED := 240.0
+var player_name := ""
 var player := Vector2(WORLD_W * 0.5, 900.0)
 var selected_seat := -1
 var joystick := Vector2.ZERO
@@ -83,6 +84,7 @@ func _ready() -> void:
 	_load_progress()
 	_seed_occupants()
 	multiplayer_client = MULTIPLAYER_SCRIPT.new()
+	multiplayer_client.display_name = player_name
 	add_child(multiplayer_client)
 	multiplayer_client.occupancy_changed.connect(_sync_occupancy)
 	multiplayer_client.seat_rejected.connect(_seat_denied)
@@ -105,6 +107,10 @@ func _seat_position(index: int) -> Vector2:
 	return Vector2(x, 420.0 + row * STEP_Y)
 
 func _process(delta: float) -> void:
+	if player_name.is_empty():
+		stop_walking()
+		queue_redraw()
+		return
 	elapsed += delta
 	if ritual == "meditate" and sitting:
 		meditation_seconds += delta
@@ -274,17 +280,19 @@ func _draw_hall() -> void:
 				var style := int(occupied_seats[idx])
 				var gender := 1 if style == 1 else 0
 				var robe := 0 if style == 0 else 1
+				var peer_name := ""
 				if multiplayer_client.connected:
 					var peer: Dictionary = multiplayer_client.remote_players.get(style,{})
 					gender = int(peer.get("gender",0))
 					robe = int(peer.get("robe",0))
-				actors.append({"pos":world,"gender":gender,"robe":robe,"sit":true,"self":false})
+					peer_name = str(peer.get("name","Khách"))
+				actors.append({"pos":world,"gender":gender,"robe":robe,"name":peer_name,"sit":true,"self":false})
 	if multiplayer_client.connected:
 		for id in multiplayer_client.remote_players:
 			var peer: Dictionary = multiplayer_client.remote_players[id]
 			if int(peer.get("seat",-1)) < 0:
-				actors.append({"pos":Vector2(float(peer.get("x",860)),float(peer.get("y",900))),"gender":int(peer.get("gender",0)),"robe":int(peer.get("robe",0)),"sit":false,"self":false})
-	actors.append({"pos":player,"gender":character_gender,"robe":0 if robe_brown else 1,"sit":sitting,"self":true})
+				actors.append({"pos":Vector2(float(peer.get("x",860)),float(peer.get("y",900))),"gender":int(peer.get("gender",0)),"robe":int(peer.get("robe",0)),"name":str(peer.get("name","Khách")),"sit":false,"self":false})
+	actors.append({"pos":player,"gender":character_gender,"robe":0 if robe_brown else 1,"name":player_name,"sit":sitting,"self":true})
 	actors.sort_custom(func(a: Dictionary,b: Dictionary) -> bool: return a.pos.y < b.pos.y)
 	for actor in actors:
 		_draw_actor(actor)
@@ -316,9 +324,9 @@ func _draw_actor(actor: Dictionary) -> void:
 	var sprite_width := sprite_height * texture.get_width()/texture.get_height()
 	var bob := sin(footstep_time)*1.4 if own and not sitting and (auto_walk or joystick.length()>.05) else 0.0
 	draw_texture_rect(texture,Rect2(point+Vector2(-sprite_width*.5,-sprite_height+bob),Vector2(sprite_width,sprite_height)),false)
-	if own:
+	if own or not str(actor.get("name","")).is_empty():
 		var label_y := point.y-sprite_height-27
-		for entry in [["Thiện Tâm",Color("#fff1c9")],["‹ Đệ Tử ›",Color("#a8d785")]]:
+		for entry in [[str(actor.get("name","Đạo hữu")),Color("#fff1c9")]] + ([["‹ Đệ Tử ›",Color("#a8d785")]] if own else []):
 			var text_width := ThemeDB.fallback_font.get_string_size(entry[0],HORIZONTAL_ALIGNMENT_LEFT,-1,15).x
 			draw_string_outline(ThemeDB.fallback_font,Vector2(point.x-text_width*.5,label_y),entry[0],HORIZONTAL_ALIGNMENT_LEFT,-1,15,4,Color("#21170f"))
 			draw_string(ThemeDB.fallback_font,Vector2(point.x-text_width*.5,label_y),entry[0],HORIZONTAL_ALIGNMENT_LEFT,-1,15,entry[1])
@@ -394,7 +402,7 @@ func _save_progress() -> void:
 	var file := FileAccess.open("user://temple_progress.json", FileAccess.WRITE)
 	if file == null:
 		return
-	file.store_string(JSON.stringify({"x":player.x,"y":player.y,"seat":selected_seat,"robe_brown":robe_brown,"gender":character_gender,"beads":beads_count,"meditation_seconds":meditation_seconds,"merit":merit}))
+	file.store_string(JSON.stringify({"name":player_name,"x":player.x,"y":player.y,"seat":selected_seat,"robe_brown":robe_brown,"gender":character_gender,"beads":beads_count,"meditation_seconds":meditation_seconds,"merit":merit}))
 
 func _load_progress() -> void:
 	if not FileAccess.file_exists("user://temple_progress.json"):
@@ -403,6 +411,7 @@ func _load_progress() -> void:
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return
 	var data: Dictionary = parsed
+	player_name = clean_player_name(str(data.get("name","")))
 	player = Vector2(clampf(float(data.get("x",player.x)),30.0,WORLD_W-30.0),clampf(float(data.get("y",player.y)),340.0,WORLD_H-80.0))
 	selected_seat = clampi(int(data.get("seat",-1)),-1,CAPACITY-1)
 	robe_brown = bool(data.get("robe_brown",true))
@@ -592,3 +601,22 @@ func _speak_chant() -> void:
 
 func _exit_tree() -> void:
 	DisplayServer.tts_stop()
+
+func clean_player_name(value: String) -> String:
+	var clean := " ".join(value.strip_edges().split(" ",false))
+	if clean.length() < 2 or clean.length() > 20:
+		return ""
+	var allowed := RegEx.new()
+	allowed.compile("^[\\p{L}\\p{M}\\p{N} ._'’-]+$")
+	return clean if allowed.search(clean) != null else ""
+
+func set_player_name(value: String) -> bool:
+	var clean := clean_player_name(value)
+	if clean.is_empty():
+		return false
+	player_name = clean
+	_save_progress()
+	multiplayer_client.set_display_name(clean)
+	status_text = "Chào mừng " + player_name + " đến chính điện!"
+	queue_redraw()
+	return true

@@ -6,6 +6,7 @@ signal seat_confirmed(seat: int)
 signal connection_changed(connected: bool)
 var socket := WebSocketPeer.new()
 var connected := false
+var display_name := ""
 var client_id := -1
 var occupants: Dictionary = {}
 var remote_players: Dictionary = {}
@@ -82,6 +83,7 @@ func _receive(msg: Dictionary) -> void:
 	match kind:
 		"welcome":
 			client_id = int(msg.get("id",-1))
+			set_display_name(display_name)
 			_send({"type":"move","x":last_position.x,"y":last_position.y,"gender":last_gender,"robe":last_robe})
 			remote_players.clear()
 			occupants.clear()
@@ -101,6 +103,10 @@ func _receive(msg: Dictionary) -> void:
 			var id := int(msg.get("id",-1))
 			remote_players.erase(id)
 			_rebuild_occupancy()
+		"profile":
+			var id := int(msg.get("id",-1))
+			if id != client_id and remote_players.has(id):
+				remote_players[id]["name"] = str(msg.get("name","Khách"))
 		"move":
 			var id := int(msg.get("id",-1))
 			if id != client_id:
@@ -160,3 +166,8 @@ func send_position(position: Vector2, gender: int, robe: int) -> void:
 func _send(msg: Dictionary) -> void:
 	if socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
 		socket.send_text(JSON.stringify(msg))
+
+func set_display_name(value: String) -> void:
+	display_name = value
+	if not value.is_empty():
+		_send({"type":"profile","name":value})

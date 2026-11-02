@@ -63,8 +63,9 @@ func _ready() -> void:
 	info.size_flags_horizontal = SIZE_EXPAND_FILL
 	top_row.add_child(info)
 	profile = Label.new()
-	profile.text = "Thiện Tâm  ·  Đệ Tử"
+	profile.text = root.player_name + "  ·  Đệ Tử"
 	profile.add_theme_font_size_override("font_size",20)
+	profile.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	info.add_child(profile)
 	connection = Label.new()
 	connection.add_theme_font_size_override("font_size",11)
@@ -148,6 +149,8 @@ func _ready() -> void:
 	if saved.load("user://preferences.cfg") == OK:
 		muted = bool(saved.get_value("audio","muted",false))
 		AudioServer.set_bus_mute(0,muted)
+	if root.player_name.is_empty():
+		call_deferred("show_name_editor",true)
 	var journal := ConfigFile.new()
 	if journal.load("user://daily.cfg") == OK:
 		mission_claimed = str(journal.get_value("daily","date","")) == Time.get_date_string_from_system()
@@ -181,6 +184,7 @@ func _menu_item(parent: Control, entry: Array) -> void:
 func _process(_delta: float) -> void:
 	if root == null:
 		return
+	profile.text = (root.player_name if not root.player_name.is_empty() else "Đạo hữu") + "  ·  Đệ Tử"
 	status.text = "[Hệ thống] " + root.status_text
 	var net = root.multiplayer_client
 	connection.text = ("Trực tuyến · " if net.connected else "Ngoại tuyến · khách mô phỏng · ")+str(root.occupant_count)+" người"
@@ -276,7 +280,7 @@ func _show_info(kind: String) -> void:
 	match kind:
 		"bell":
 			title.text = "An lành mỗi ngày"
-			body.text = "Chào mừng đến Chùa Việt Online – Thiện Tâm.\n\nChạm bồ đoàn trống để đi đến chỗ ngồi. Dùng joystick để di chuyển.\n\nBản ngoại tuyến có khách mô phỏng. Để gặp người thật, vào Tu hành và kết nối máy chủ WebSocket."
+			body.text = "Chào mừng đến Chùa Việt Online.\n\nChạm bồ đoàn trống để đi đến chỗ ngồi. Dùng joystick để di chuyển.\n\nBản ngoại tuyến có khách mô phỏng. Để gặp người thật, vào Tu hành và kết nối máy chủ WebSocket."
 		"gear":
 			title.text = "Cài đặt"
 			body.text = "Âm thanh và kết nối được lưu trên thiết bị."
@@ -291,6 +295,7 @@ func _show_info(kind: String) -> void:
 				prefs.save("user://preferences.cfg"))
 			column.add_child(sound)
 			_add_text_button(column,"Kết nối chính điện",func(): modal.queue_free(); root.action("practice"))
+			_add_text_button(column,"Đổi tên nhân vật",func(): show_name_editor(false))
 			_add_text_button(column,"Đổi nhân vật / áo nâu / áo xám",func(): root.action("character"))
 			_add_text_button(column,"Nhạc thiền bật / tắt",func(): root.hall_audio.set_ambient(not root.hall_audio.ambient))
 		"missions":
@@ -303,7 +308,7 @@ func _show_info(kind: String) -> void:
 			_add_text_button(column,"Mở kho thử nghiệm",func(): modal.queue_free(); root.action("shop"))
 		"journal":
 			title.text = "Nhật ký tu tập"
-			body.text = "Thiện Tâm\n\nCông đức tu tập: %d\nChuỗi hiện tại: %d/108\nThời gian thiền: %d giây\n\nTiến trình tự lưu trên thiết bị, chưa đồng bộ tài khoản." % [root.merit,root.beads_count,int(root.meditation_seconds)]
+			body.text = "%s\n\nCông đức tu tập: %d\nChuỗi hiện tại: %d/108\nThời gian thiền: %d giây\n\nTiến trình tự lưu trên thiết bị, chưa đồng bộ tài khoản." % [root.player_name,root.merit,root.beads_count,int(root.meditation_seconds)]
 		"peers":
 			title.text = "Đồng tu"
 			body.text = "%d người đang kết nối chính điện.\n\nChỗ ngồi được máy chủ xác nhận độc quyền." % (root.multiplayer_client.remote_players.size()+1) if root.multiplayer_client.connected else "Bạn đang ở chế độ ngoại tuyến. Các nhân vật xung quanh là khách mô phỏng.\n\nVào Tu hành để nhập địa chỉ máy chủ và gặp người thật."
@@ -332,3 +337,50 @@ func _add_text_button(parent: Control, caption: String, callback: Callable) -> v
 	b.custom_minimum_size.y = 48
 	b.pressed.connect(callback)
 	parent.add_child(b)
+
+func show_name_editor(first_visit: bool = false) -> void:
+	root.stop_walking()
+	_release_stick()
+	if modal != null and is_instance_valid(modal):
+		modal.queue_free()
+	modal = ColorRect.new()
+	modal.color = Color("#130e0df2")
+	modal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(modal)
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.position = Vector2(-220,-190)
+	panel.size = Vector2(440,320)
+	modal.add_child(panel)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation",18)
+	panel.add_child(column)
+	var title := Label.new()
+	title.text = "Chào mừng đến Chùa Việt Online" if first_visit else "Đổi tên nhân vật"
+	title.add_theme_font_size_override("font_size",20)
+	column.add_child(title)
+	var help := Label.new()
+	help.text = "Bạn muốn mọi người gọi mình là gì?\nTên dài 2–20 ký tự, có thể dùng tiếng Việt."
+	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(help)
+	var field := LineEdit.new()
+	field.placeholder_text = "Nhập tên hoặc pháp danh của bạn"
+	field.text = root.player_name
+	field.max_length = 20
+	field.custom_minimum_size.y = 50
+	column.add_child(field)
+	var error := Label.new()
+	error.modulate = Color("#f7aa88")
+	error.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(error)
+	var dialog := modal
+	var submit := func():
+		if root.set_player_name(field.text):
+			dialog.queue_free()
+		else:
+			error.text = "Nhập 2–20 ký tự: chữ, số, dấu cách, chấm, gạch nối hoặc gạch dưới."
+	_add_text_button(column,"Vào chính điện" if first_visit else "Lưu tên",submit)
+	field.text_submitted.connect(func(_text: String): submit.call())
+	if not first_visit:
+		_add_text_button(column,"Hủy",func(): dialog.queue_free())
+	field.call_deferred("grab_focus")
