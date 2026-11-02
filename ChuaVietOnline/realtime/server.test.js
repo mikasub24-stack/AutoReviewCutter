@@ -54,8 +54,10 @@ test("two players cannot reserve the same cushion; released seats can be reused"
     b.send(JSON.stringify({type:"seat",seat:42}));
     assert.equal((await nextB("seat_ok")).seat,42);
     b.send(JSON.stringify({type:"seat",seat:1000}));
-    await delay(100);
+    assert.equal((await nextB("seat_denied")).reason,"invalid_seat");
     b.send(JSON.stringify({type:"seat",seat:-1}));
     assert.equal((await nextB("seat_ok")).seat,-1);
+    a.send(JSON.stringify({type:"seat",seat:999}));
+    assert.equal((await nextA("seat_ok")).seat,999);
   } finally {a.close();b.close();}
 });
