@@ -2,6 +2,7 @@ extends Control
 ## Interactive Buddhist practice panel: procedural avatar animation and counters.
 ## No external audio or image assets required.
 const TEMPLE_AUDIO = preload("res://temple_audio.gd")
+const MANTRA_READER = preload("res://mantra_reader.gd")
 var temple_audio
 var wheel_turns := 0
 var flowers := 0
@@ -67,7 +68,7 @@ func _ready() -> void:
 	var grid := GridContainer.new()
 	grid.columns = 2
 	column.add_child(grid)
-	for entry in [["Lạy Phật","bow"],["Gõ mõ","wood"],["Tụng kinh","chant"],["Niệm hạt","beads"],["Ngồi thiền","meditate"],["Thắp hương","incense"],["Gõ chuông","bell"],["Dâng hoa","flower"],["Dâng mâm quả","fruit"],["Chuyển kinh luân","wheel"],["Om Mani Padme Hum","mantra"],["Nhạc thiền bật/tắt","music"]]:
+	for entry in [["Lạy Phật","bow"],["Gõ mõ","wood"],["Tụng kinh","chant"],["Niệm hạt","beads"],["Ngồi thiền","meditate"],["Thắp hương","incense"],["Gõ chuông","bell"],["Dâng hoa","flower"],["Dâng mâm quả","fruit"],["Chuyển kinh luân","wheel"],["Om Mani Padme Hum","mantra"],["Nhạc thiền bật/tắt","music"],["Chú Đại Bi (84 câu)","dai_bi"],["Chú Lăng Nghiêm (5 đệ)","lang_nghiem"]]:
 		var button := Button.new()
 		button.text = entry[0]
 		button.custom_minimum_size = Vector2(140, 54)
@@ -115,6 +116,13 @@ func _ready() -> void:
 	set_process(true)
 
 func _act(action: String) -> void:
+	if action == "dai_bi" or action == "lang_nghiem":
+		var reader := Control.new()
+		reader.set_script(MANTRA_READER)
+		add_child(reader)
+		reader.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		reader.call("_select", action)
+		return
 	if action != "chant" and action != "mantra":
 		DisplayServer.tts_stop()
 	if action == "music":
