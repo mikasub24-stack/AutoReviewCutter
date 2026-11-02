@@ -10,28 +10,44 @@ on:
 
 jobs:
   android-apk:
-    runs-on: ubuntu-latest
-    container:
-      image: barichello/godot-ci:4.3
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Generate temporary Android debug signing key
+      - name: Install Godot 4.3 and Android export templates
+        shell: bash
         run: |
-          mkdir -p /root/.android
-          keytool -genkeypair -v -keystore /root/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-      - name: Import project
+          set -euo pipefail
+          wget -q https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
+          unzip -q Godot_v4.3-stable_linux.x86_64.zip
+          sudo install -m 755 Godot_v4.3-stable_linux.x86_64 /usr/local/bin/godot
+          wget -q https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.3.stable"
+          unzip -q Godot_v4.3-stable_export_templates.tpz
+          cp -a templates/. "$HOME/.local/share/godot/export_templates/4.3.stable/"
+          test -f "$HOME/.local/share/godot/export_templates/4.3.stable/android_debug.apk"
+      - name: Configure Android SDK and debug signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "GODOT_ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.android"
+          keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-34" "build-tools;33.0.2" "build-tools;34.0.0"
+      - name: Import Godot project
         run: godot --headless --path ChuaVietOnline --editor --quit
-      - name: Export Android debug APK
+      - name: Export APK
         env:
-          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /root/.android/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /home/runner/.android/debug.keystore
           GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
           GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p ChuaVietOnline/build
           godot --headless --path ChuaVietOnline --export-debug Android build/ChuaVietOnline-debug.apk
           test -s ChuaVietOnline/build/ChuaVietOnline-debug.apk
-      - name: Upload installable APK
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: ChuaVietOnline-debug-APK
           path: ChuaVietOnline/build/ChuaVietOnline-debug.apk
