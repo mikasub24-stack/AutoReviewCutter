@@ -51,10 +51,13 @@ wss.on("connection", ws => {
   ws.on("message", raw => {
     let msg;
     try {msg = JSON.parse(String(raw));} catch {return;}
-    if (!msg || typeof msg !== "object") return;
+    if (!msg || typeof msg !== "object" || Array.isArray(msg)) return;
     if (msg.type === "seat") {
       const seat = Number(msg.seat);
-      if (!Number.isInteger(seat) || seat < -1 || seat >= MAX_SEATS) return;
+      if (!Number.isInteger(seat) || seat < -1 || seat >= MAX_SEATS) {
+        send(ws,{type:"seat_denied",seat:Number.isFinite(seat)?seat:-1,reason:"invalid_seat"});
+        return;
+      }
       if (seat !== -1 && occupied(seat,ws)) {
         send(ws,{type:"seat_denied",seat,reason:"occupied"}); return;
       }
