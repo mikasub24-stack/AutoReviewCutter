@@ -36,7 +36,7 @@ var altar_glow := 0.0
 var occupied_seats: Dictionary = {}
 var occupant_count := 0
 var occupancy_notice := 0.0
-var multiplayer_client: Node
+var multiplayer_client
 var network_tick := 0.0
 
 func _ready() -> void:
