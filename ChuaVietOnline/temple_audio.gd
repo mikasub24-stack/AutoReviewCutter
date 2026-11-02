@@ -47,26 +47,26 @@ func _process(_delta: float) -> void:
 	for i in range(frames):
 		var dt := 1.0 / RATE
 		elapsed += dt
-		var sample := 0.0
+		var sample: float = 0.0
 		if ambient:
 			# Gentle original drone and a sparse pentatonic melody.
-			var root := sin(TAU * 110.0 * elapsed) * 0.05
-			var fifth := sin(TAU * 164.81 * elapsed) * 0.025
-			var pulse := 0.5 + 0.5 * sin(TAU * 0.11 * elapsed)
+			var root: float = sin(TAU * 110.0 * elapsed) * 0.05
+			var fifth: float = sin(TAU * 164.81 * elapsed) * 0.025
+			var pulse: float = 0.5 + 0.5 * sin(TAU * 0.11 * elapsed)
 			var melody_notes := [220.0, 246.94, 293.66, 329.63, 392.0]
-			var note_index := int(elapsed / 3.0) % melody_notes.size()
-			var note_t := fmod(elapsed, 3.0)
-			var note_env := exp(-note_t * 1.7)
-			var note := sin(TAU * melody_notes[note_index] * elapsed) * note_env * 0.035
+			var note_index: int = int(elapsed / 3.0) % melody_notes.size()
+			var note_t: float = fmod(elapsed, 3.0)
+			var note_env: float = exp(-note_t * 1.7)
+			var note: float = sin(TAU * melody_notes[note_index] * elapsed) * note_env * 0.035
 			sample += (root + fifth) * pulse + note
 		for j in range(effects.size() - 1, -1, -1):
 			var effect: Dictionary = effects[j]
-			var t: float = effect["time"]
-			var kind: String = effect["kind"]
-			var v := 0.0
+			var t: float = float(effect["time"])
+			var kind: String = str(effect["kind"])
+			var v: float = 0.0
 			match kind:
 				"bell":
-					var env := exp(-t * 0.95)
+					var env: float = exp(-t * 0.95)
 					v = env * (sin(TAU * 392.0 * t) * 0.14 + sin(TAU * 784.0 * t) * 0.075 + sin(TAU * 1019.2 * t) * 0.04)
 				"wood":
 					v = exp(-t * 20.0) * (sin(TAU * (230.0 + 70.0 * exp(-t * 22.0)) * t) * 0.35 + rng.randf_range(-0.08, 0.08))
