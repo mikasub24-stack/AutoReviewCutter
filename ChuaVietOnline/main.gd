@@ -1,6 +1,7 @@
 extends Control
 
 const CAPACITY := 1000
+const SHOP_SCRIPT = preload("res://payment_shop.gd")
 var selected_seat := -1
 var beads := 0
 var incense_particles: Array[Dictionary] = []
@@ -46,6 +47,8 @@ func _draw() -> void:
 		var y := h * (0.62 + float(i / 4) * 0.056)
 		var c := Color("#d6b34c") if i != selected_seat else Color("#5ac0a1")
 		draw_ellipse_approx(Vector2(x,y), Vector2(30,11), c)
+	draw_rect(Rect2(w * 0.27, h * 0.47, w * 0.46, 52), Color("#6b4220"))
+	draw_string(ThemeDB.fallback_font, Vector2(w * 0.32, h * 0.47 + 33), "CUA HANG", HORIZONTAL_ALIGNMENT_LEFT, w * 0.4, 19, Color.WHITE)
 	for p in incense_particles:
 		draw_circle(Vector2(p.x, p.y), 5.0, Color(0.9,0.9,0.9,0.25))
 	draw_string(ThemeDB.fallback_font, Vector2(18, h - 95), status_text, HORIZONTAL_ALIGNMENT_LEFT, w - 36, 18, Color.WHITE)
@@ -66,6 +69,11 @@ func _gui_input(event: InputEvent) -> void:
 		_handle_touch(event.position)
 
 func _handle_touch(p: Vector2) -> void:
+	if p.y >= size.y * 0.47 and p.y <= size.y * 0.47 + 52 and p.x >= size.x * 0.27 and p.x <= size.x * 0.73:
+		var shop := Control.new()
+		shop.set_script(SHOP_SCRIPT)
+		add_child(shop)
+		return
 	if p.y < size.y * 0.16:
 		if p.x < size.x * 0.5:
 			for i in range(12):
