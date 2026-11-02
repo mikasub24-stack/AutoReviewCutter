@@ -191,12 +191,17 @@ func _draw() -> void:
 		for col in range(COLS_PER_SIDE * 2):
 			var idx := row * COLS_PER_SIDE * 2 + col
 			var pos := _seat_position(idx) - camera
-			var color := Color("#63bca4") if idx == selected_seat else (Color("#8b6555") if occupied_seats.has(idx) else Color("#c5a45b") )
+			var color := Color("#63bca4") if idx == selected_seat and sitting else (Color("#8b6555") if occupied_seats.has(idx) else Color("#c5a45b") )
 			_ellipse(pos + Vector2(0,4), Vector2(29, 13), Color("#3b241a"))
 			_ellipse(pos, Vector2(27, 11), Color("#7d492b"))
 			_ellipse(pos + Vector2(0,-2), Vector2(24, 9), color)
 			if occupied_seats.has(idx):
-				_draw_seated_occupant(pos, int(occupied_seats[idx]))
+				var visitor_style := int(occupied_seats[idx])
+				if multiplayer_client != null and multiplayer_client.connected:
+					var peer_id := int(occupied_seats[idx])
+					var remote_peer: Dictionary = multiplayer_client.remote_players.get(peer_id,{})
+					visitor_style = int(remote_peer.get("gender",0))
+				_draw_seated_occupant(pos, visitor_style)
 			if idx == selected_seat:
 				draw_arc(pos, 30, 0, TAU, 20, Color.WHITE, 2)
 
@@ -236,6 +241,10 @@ func _draw() -> void:
 	draw_rect(Rect2(0,0,w,100), Color(0.11,0.07,0.05,0.92))
 	draw_string(ThemeDB.fallback_font, Vector2(18,31), "CHÙA VIỆT ONLINE  |  1.000 BỒ ĐOÀN", HORIZONTAL_ALIGNMENT_LEFT, w-24, 20, Color("#f6d18a"))
 	draw_string(ThemeDB.fallback_font, Vector2(18,62), status_text, HORIZONTAL_ALIGNMENT_LEFT, w-24, 15, Color.WHITE)
+	if multiplayer_client != null and multiplayer_client.connected:
+		draw_circle(Vector2(w-20,22),7,Color("#4cc886"))
+	else:
+		draw_circle(Vector2(w-20,22),7,Color("#ae9280"))
 	if occupancy_notice > 0.0:
 		draw_rect(Rect2(22,h*0.40,w-44,88),Color(0.39,0.11,0.08,0.94))
 		draw_string(ThemeDB.fallback_font,Vector2(35,h*0.40+35),"BỒ ĐOÀN ĐÃ CÓ NGƯỜI NGỒI",HORIZONTAL_ALIGNMENT_LEFT,w-70,20,Color("#ffe0a6"))
@@ -418,6 +427,7 @@ func _claim_seat(index: int) -> void:
 
 func _network_changed(is_connected: bool) -> void:
 	if is_connected:
+		occupied_seats.clear()
 		_sync_occupancy()
 		if sitting and selected_seat >= 0:
 			_claim_seat(selected_seat)
