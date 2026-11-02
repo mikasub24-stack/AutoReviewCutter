@@ -5,6 +5,8 @@ const TEMPLE_AUDIO = preload("res://temple_audio.gd")
 var temple_audio: Node
 var wheel_turns := 0
 var flowers := 0
+var fruits := 0
+var offering_stage := 0
 var bells := 0
 var mantra_count := 0
 var practice := ""
@@ -55,7 +57,7 @@ func _ready() -> void:
 	var grid := GridContainer.new()
 	grid.columns = 2
 	column.add_child(grid)
-	for entry in [["Lạy Phật","bow"],["Gõ mõ","wood"],["Tụng kinh","chant"],["Niệm hạt","beads"],["Ngồi thiền","meditate"],["Thắp hương","incense"],["Gõ chuông","bell"],["Dâng hoa","flower"],["Chuyển kinh luân","wheel"],["Om Mani Padme Hum","mantra"],["Nhạc thiền bật/tắt","music"]]:
+	for entry in [["Lạy Phật","bow"],["Gõ mõ","wood"],["Tụng kinh","chant"],["Niệm hạt","beads"],["Ngồi thiền","meditate"],["Thắp hương","incense"],["Gõ chuông","bell"],["Dâng hoa","flower"],["Dâng mâm quả","fruit"],["Chuyển kinh luân","wheel"],["Om Mani Padme Hum","mantra"],["Nhạc thiền bật/tắt","music"]]:
 		var button := Button.new()
 		button.text = entry[0]
 		button.custom_minimum_size = Vector2(140, 54)
@@ -112,7 +114,12 @@ func _act(action: String) -> void:
 			"flower":
 				flowers += 1
 				temple_audio.trigger("flower")
-				message = "Dâng hoa sen lần %d" % flowers
+				offering_stage = 1
+				message = "Đang dâng hoa sen lên bàn thờ"
+			"fruit":
+				fruits += 1
+				offering_stage = 1
+				message = "Đang dâng mâm ngũ quả lên bàn thờ"
 			"wheel":
 				wheel_turns += 1
 				temple_audio.trigger("wheel")
@@ -137,14 +144,24 @@ func _process(delta: float) -> void:
 		practice = ""
 	if practice == "beads" and elapsed >= 0.5:
 		practice = ""
-	if practice in ["bell", "flower", "wheel", "mantra"] and elapsed >= 3.0:
+	if practice in ["bell", "wheel", "mantra"] and elapsed >= 3.0:
 		practice = ""
+	if practice in ["flower", "fruit"] and elapsed >= 4.0:
+		practice = ""
+		offering_stage = 2
+		message = "Đã an vị lễ vật trên bàn thờ"
+		voice_note.text = message
 	if practice == "incense" and elapsed >= 2.5:
 		practice = ""
 	avatar_area.queue_redraw()
 
 func _draw_avatar() -> void:
 	var c := Vector2(avatar_area.size.x * 0.5, 140)
+	var altar := Vector2(c.x, 20)
+	avatar_area.draw_rect(Rect2(altar.x - 100, altar.y - 18, 200, 14), Color("#ad782f"))
+	avatar_area.draw_rect(Rect2(altar.x - 94, altar.y - 4, 188, 12), Color("#572d1c"))
+	if offering_stage == 2:
+		_draw_offering(altar + Vector2(0,-30), "fruit" if fruits > flowers else "flower")
 	var bowing := practice == "bow"
 	var kneeling := practice in ["meditate", "chant", "beads", "mantra"]
 	var offset := 0.0
@@ -180,11 +197,26 @@ func _draw_avatar() -> void:
 	if practice == "wheel":
 		avatar_area.draw_circle(c + Vector2(72, 20), 28, gold)
 		avatar_area.draw_arc(c + Vector2(72,20), 20, elapsed * 5, elapsed * 5 + PI * 1.5, 24, robe, 6)
-	if practice == "flower":
-		for k in range(7):
-			var a := float(k) * TAU / 7.0
-			avatar_area.draw_circle(c + Vector2(sin(a)*15,30+cos(a)*15), 9, Color("#e7a5bb"))
+	if practice in ["flower", "fruit"]:
+		var progress := clampf(elapsed / 4.0, 0.0, 1.0)
+		var from := c + Vector2(0, 30)
+		var to := altar + Vector2(0, -30)
+		var lift := from.lerp(to, progress * progress * (3.0 - 2.0 * progress))
+		_draw_offering(lift, practice)
 	if practice == "beads":
 		for i in range(12):
 			var a := float(i) * TAU / 12.0 + elapsed * 3.0
 			avatar_area.draw_circle(c + Vector2(sin(a)*16,40+cos(a)*11), 4, gold)
+
+func _draw_offering(center: Vector2, kind: String) -> void:
+	if kind == "flower":
+		avatar_area.draw_line(center + Vector2(0, 12), center + Vector2(0,-14), Color("#428956"), 4)
+		for k in range(7):
+			var a := float(k) * TAU / 7.0
+			avatar_area.draw_circle(center + Vector2(sin(a)*13,-15+cos(a)*10), 9, Color("#f5afc3"))
+		avatar_area.draw_circle(center + Vector2(0,-15), 8, Color("#e9c55d"))
+	else:
+		avatar_area.draw_arc(center + Vector2(0,8), 28, 0, PI, 24, Color("#f0cf85"), 6)
+		for i in range(5):
+			var x := float(i-2)*11.0
+			avatar_area.draw_circle(center + Vector2(x,-5-absf(x)*0.2), 10, [Color("#e0aa39"),Color("#ce5b41"),Color("#81a34a"),Color("#e6c653"),Color("#bd5e3c")][i])
