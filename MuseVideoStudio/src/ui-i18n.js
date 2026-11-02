@@ -4,23 +4,41 @@
 Kể chuyện|Story
 Câu chuyện & nhân vật|Story & character
 Kịch bản → cảnh → clip Muse|Script → scenes → Muse clips
-1. Kịch bản|1. Script
-Dán cả câu chuyện hoặc lời kể. Tool chia thành các cảnh khoảng 10 giây; mỗi cảnh có lời đọc và prompt riêng.|Paste the whole story or narration. The tool splits it into scenes of about 10 seconds, each with its own narration and prompt.
+1. Câu chuyện|1. Story
+Chỉ cần dán nguyên câu chuyện. Muse tự đọc hiểu để chia cảnh và viết prompt hình; giọng đọc sẽ đọc đúng nguyên văn câu chuyện này.|Just paste the story as it is. Muse reads and understands it to split scenes and write the picture prompts; the voice reads your story word for word.
 Nhân vật (mô tả ngắn)|Character (short description)
 Phong cách hình ảnh|Visual style
 Ví dụ: Mai, bé gái tóc đen, áo dài trắng|e.g. Mai, a girl with black hair in a white áo dài
 Ví dụ: hoạt hình màu nước|e.g. watercolor animation
 Chọn ảnh nhân vật|Choose character image
-Dán hoặc kéo ảnh nhân vật vào đây. Ảnh này gắn vào mọi cảnh để nhân vật giữ nguyên.|Paste or drop the character image here. It is attached to every scene so the character stays consistent.
+Dán hoặc kéo ảnh nhân vật chính vào đây. Ảnh này gắn vào mọi cảnh để nhân vật giữ nguyên; nhân vật khác trong truyện do Muse nhận ra và mô tả cố định ở mọi cảnh.|Paste or drop the main character image here. It is attached to every scene so the character stays consistent; Muse recognizes the other characters in the story and gives each a fixed description in every scene.
 Chưa chọn ảnh nhân vật.|No character image chosen.
-Chia nhanh ngay trên máy, hoặc nhờ Muse đọc kịch bản để prompt hay hơn.|Split instantly on this computer, or ask Muse to read the script for better prompts.
-Chia cảnh nhanh|Quick split
-Nhờ Muse đọc kịch bản|Ask Muse to read the script
-Muse đọc kịch bản (tuỳ chọn)|Muse reads the script (optional)
-Bước 1: bấm «Sao chép yêu cầu», dán vào khung chat Muse (mở Muse bằng nút «Mở Muse / Đăng nhập» bên trái). Bước 2: dán trả lời của Muse vào ô dưới, rồi bấm «Tách cảnh».|Step 1: click “Copy request” and paste it into the Muse chat (open Muse with “Open Muse / Sign in” on the left). Step 2: paste Muse's reply below, then click “Split scenes”.
+Dán câu chuyện rồi bấm «Phân tích bằng Muse» (cần đã đăng nhập Muse tài khoản 1). Hoặc «Chia nhanh» ngay trên máy với prompt mẫu.|Paste the story, then click “Analyze with Muse” (you must be signed in to Muse account 1). Or use “Quick split” on this computer with template prompts.
+Chia nhanh (không dùng Muse)|Quick split (without Muse)
+Phân tích bằng Muse|Analyze with Muse
+Dán thủ công (dự phòng)|Paste manually (backup)
+Dừng phân tích|Stop analysis
+prompt mẫu|template prompt
+Prompt này do tool ghép từ lời kể, chưa qua Muse|This prompt was assembled by the tool from the narration, not written by Muse
+Muse đang phân tích…|Muse is analyzing…
+Tạo yêu cầu và sao chép|Create request and copy
+Dán câu chuyện trước.|Paste the story first.
+Dùng khi phân tích tự động không chạy được. Bước 1: bấm «Tạo yêu cầu và sao chép», dán vào khung chat Muse (mở Muse bằng nút «Mở Muse / Đăng nhập» bên trái). Bước 2: dán trả lời của Muse vào ô dưới rồi bấm «Tách cảnh».|Use this when automatic analysis cannot run. Step 1: click “Create request and copy” and paste it into the Muse chat (open Muse with “Open Muse / Sign in” on the left). Step 2: paste Muse’s reply below and click “Split scenes”.
 Sao chép yêu cầu|Copy request
-Dán trả lời của Muse (CẢNH 1 / LỜI / PROMPT …)|Paste Muse's reply (SCENE 1 / VOICE / PROMPT …)
+Dán trả lời của Muse (CẢNH 1 / CÂU / PROMPT …)|Paste Muse's reply (SCENE 1 / SENTENCES / PROMPT …)
 Tách cảnh từ trả lời của Muse|Split scenes from Muse's reply
+Chat Muse đang bận quá lâu. Chờ Muse xong việc hiện tại rồi bấm Phân tích lại.|The Muse chat has been busy for too long. Wait until Muse finishes, then analyze again.
+Chưa thấy ô chat Muse. Đăng nhập Muse tài khoản 1 trong cửa sổ Muse rồi bấm Phân tích lại.|The Muse chat box was not found. Sign in to Muse account 1 in the Muse window, then analyze again.
+Chưa bấm được nút Gửi của Muse.|Could not click Muse's Send button.
+Không thấy yêu cầu hiện trong chat Muse. Mở cửa sổ Muse tài khoản 1 xem Muse có nhận tin nhắn không.|The request did not appear in the Muse chat. Open the Muse account 1 window and check whether Muse received the message.
+Muse trả lời quá lâu. Thử lại hoặc dùng «Chia nhanh».|Muse took too long to reply. Try again or use “Quick split”.
+Đã dừng phân tích.|Analysis stopped.
+Muse đang phân tích câu chuyện. Chờ xong hoặc bấm Dừng phân tích.|Muse is analyzing the story. Wait for it to finish or click Stop analysis.
+Muse đang phân tích. Chờ xong hoặc bấm Dừng.|Muse is analyzing. Wait for it to finish or click Stop.
+Chưa mở được Muse tài khoản 1.|Could not open Muse account 1.
+Đang mở Muse…|Opening Muse…
+Dừng hàng đợi và các thao tác trình duyệt trước khi nhờ Muse phân tích.|Stop the queue and browser operations before asking Muse to analyze.
+Dán kịch bản trước khi nhờ Muse đọc.|Paste the story before asking Muse to read it.
 2. Các cảnh|2. Scenes
 Sửa lời đọc hoặc prompt từng cảnh nếu cần.|Edit each scene's narration or prompt if needed.
 Tạo clip|Create clips
@@ -423,6 +441,10 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
       [/^Dán ảnh tại đây cho (.+)$/,m=>'Paste references here for '+m[1]],
       [/^(\d+) cảnh$/,m=>m[1]+' scenes'],
 [/^Đã chia (\d+) cảnh, mỗi cảnh tối đa (\d+) giây\. Xem lại lời đọc và prompt, rồi bấm Tạo clip\.$/,m=>'Split into '+m[1]+' scenes of up to '+m[2]+' seconds. Review the narration and prompts, then click Create clips.'],
+      [/^Muse đã chia (\d+) cảnh\.(?: (.+?))? Xem lại lời đọc và prompt, rồi bấm Tạo clip\.$/,m=>'Muse split the story into '+m[1]+' scenes.'+(m[2]?' '+m[2].replace(/Phần (\d+)\/(\d+): Muse trả lời không đúng khuôn, dùng chia nhanh cho đoạn này\./g,'Part $1/$2: Muse’s reply was not in the expected format; quick split used for this part.').replace(/(\d+) cảnh dùng prompt mẫu do Muse chưa viết đúng; xem lại hoặc bấm Phân tích lại\./g,'$1 scene(s) use a template prompt because Muse did not write one properly; review them or analyze again.'):'')+' Review the narration and prompts, then click Create clips.'],
+      [/^(?:Phần (\d+)\/(\d+)|Phân tích) · (.+)$/,m=>{const head=m[1]?'Part '+m[1]+'/'+m[2]:'Analysis',tail=[[/^chuẩn bị yêu cầu…$/,()=>'preparing the request…'],[/^Muse còn đang xử lý việc trước, chờ rảnh rồi mới gửi…$/,()=>'Muse is still busy with earlier work; waiting until it is free…'],[/^chờ ô chat Muse \(đăng nhập nếu cần\)…$/,()=>'waiting for the Muse chat box (sign in if needed)…'],[/^đang gửi cho Muse…$/,()=>'sending to Muse…'],[/^Muse đang viết(?: \(đã (\d+) cảnh\))?…$/,x=>'Muse is writing'+(x[1]?' ('+x[1]+' scene(s) so far)':'')+'…'],[/^hỏi lại Muse (\d+) đoạn còn thiếu…$/,x=>'asking Muse again about '+x[1]+' missing part(s)…'],[/^xong (\d+) cảnh$/,x=>'done: '+x[1]+' scene(s)']];for(const [re,fn] of tail){const x=m[3].match(re);if(x)return head+' · '+fn(x);}return head+' · '+m[3];}],
+      [/^Muse đã chia (\d+) cảnh$/,m=>'Muse split the story into '+m[1]+' scenes'],
+      [/^⚠ (\d+) cảnh đang dùng prompt mẫu \(chưa qua Muse\): cảnh (.+)\. Bấm «Phân tích bằng Muse» để Muse viết prompt hình đúng truyện, hoặc tự sửa prompt\.$/,m=>'⚠ '+m[1]+' scene(s) use a template prompt (not written by Muse): scene '+m[2]+'. Click “Analyze with Muse” so Muse writes picture prompts that match the story, or edit the prompts yourself.'],
       [/^Muse đã chia (\d+) cảnh\. Xem phần đối chiếu với kịch bản bên dưới rồi bấm Tạo clip\.$/,m=>'Muse split the story into '+m[1]+' scenes. Check the comparison with the script below, then click Create clips.'],
       [/^Muse chỉ tạo clip tối đa (\d+) giây: chọn mỗi cảnh từ 3 đến (\d+) giây\.$/,m=>'Muse only makes clips up to '+m[1]+' seconds: choose 3 to '+m[2]+' seconds per scene.'],
       [/^✓ Lời các cảnh khớp (\d+)% kịch bản gốc, đủ và đúng thứ tự\.$/,m=>'✓ The scenes match '+m[1]+'% of the original script, complete and in order.'],

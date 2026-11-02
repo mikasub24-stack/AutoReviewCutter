@@ -18,7 +18,8 @@ const {createLicense,deviceCode}=require('./license.cjs');
 const {payment}=require('./payment.cjs');
 const {createVoiceService}=require('./story-voice.cjs');
 const {createStoryService,storyFolder}=require('./story-service.cjs');
-let licenseManager,paymentDetails,voiceService,storyService;
+const {createStoryAnalyzer}=require('./story-analyze.cjs');
+let licenseManager,paymentDetails,voiceService,storyService,storyAnalyzer;
 const { mergeVideos, checkTools } = require('./merge.cjs');
 const { exportEditPackage } = require('./edit-package.cjs');
 const { createSessionStore } = require('./session-store.cjs');
@@ -46,7 +47,7 @@ const defaults = { language:'en', accountSessionIds:{}, dispatchMode:'parallel',
 function ui(vi,en){return settings?.language==='vi'?vi:en;}
 async function atomic(file, data) { await fs.writeFile(file + '.tmp', JSON.stringify(data, null, 2)); await fs.rename(file + '.tmp', file); }
 function snapshot() {
-  return {version:app.getVersion?.()||require('../package.json').version,jobs:queue.jobs,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,story:{...(storyService?.status()||{}),voice:voiceService?.status()||{}},
+  return {version:app.getVersion?.()||require('../package.json').version,jobs:queue.jobs,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,story:{...(storyService?.status()||{}),analyze:storyAnalyzer?.status()||{},voice:voiceService?.status()||{}},
     accounts:Array.from({length:Math.max(settings.accountCount,MAX_ACCOUNTS)},(_,index)=>{
       const browser=browsers.get(index),external=settings.browserChoice !== 'builtin';
       return {index,opened:Boolean(browser && !browser.isDestroyed()),rememberSession:external ? Boolean(browser?.external && browser.isSessionEnabled()) : profiles.get(index)?.store.isEnabled() || false,warning:external ? browserWarnings.get(index) || '' : profiles.get(index)?.warning || ''};
@@ -144,7 +145,7 @@ async function openMuse(index = 0) {
 }
 
 function accountOperationBusy() {
-  return testing || queue.active || starting || stopping || merging || packaging || opening.size || externalLaunches.size;
+  return testing || queue.active || starting || stopping || merging || packaging || opening.size || externalLaunches.size || Boolean(storyAnalyzer?.busy);
 }
 function logoutAccount(index) {
   validLoginAccount(index);
@@ -416,6 +417,7 @@ async function testBrowsers(){
 }
 async function stopAll(){
   if(stopping){while(stopping)await delay(50);return snapshot();}
+  storyAnalyzer?.cancel();
   stopping=true;runEpoch++;starting=false;probeController?.abort();queue.pause();
   const probes=[...browserTests.values()].filter(t=>testing&&t.mayHaveSubmitted&&t.status!=='ready').map(t=>({id:t.id,trackerId:t.id,account:t.index+1,mayHaveSubmitted:true}));
   const jobs=[...queue.jobs.filter(j=>!probes.some(t=>t.account===j.account)&&(j.status==='running'||(['failed','interrupted'].includes(j.status)&&j.mayHaveSubmitted&&!['confirmed','ui-stopped'].includes(j.remoteStop?.state)))),...probes];notify();
@@ -486,6 +488,7 @@ app.whenReady().then(async () => {
   queue = new Queue({ jobs: stored.jobs || [], save, run: runJob, notify });
   voiceService=createVoiceService({dataDir:app.getPath('userData'),getFfmpeg:()=>settings.ffmpeg,notify});await voiceService.load();
   storyService=createStoryService({getSettings:()=>settings,getJobs:()=>queue.jobs,voice:voiceService,ensureAllowed:()=>licenseManager.ensureAllowed(),notify,userDataDir:app.getPath('userData')});
+  storyAnalyzer=createStoryAnalyzer({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.ensureAllowed()});
   await save();
   main = new BrowserWindow({ icon:path.join(__dirname,'assets','muse-studio.png'), width: 1450, height: 950, minWidth: 1000, minHeight: 700, backgroundColor: '#101114', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true } });
   main.setMenu(null);main.setMenuBarVisibility(false);
@@ -515,6 +518,11 @@ app.whenReady().then(async () => {
     storyPrepare:async data=>storyService.prepare({storyId:String(data?.storyId||''),engine:String(data?.engine||'none'),voice:String(data?.voice||''),tempo:Number(data?.tempo)||1}),
     storyBuild:async data=>{await storyService.build({runId:String(data?.runId||''),name:String(data?.name||''),aspect:String(data?.aspect||'16:9'),subtitles:data?.subtitles!==false,srt:data?.srt===true,sfx:String(data?.sfx||'low'),scenes:Array.isArray(data?.scenes)?data.scenes:[]});return snapshot();},
     storyCancel:async()=>{storyService.cancel();return snapshot();},
+    storyAnalyze:async data=>{
+      try{return await storyAnalyzer.run({script:String(data?.script||''),options:{seconds:Number(data?.seconds),aspect:String(data?.aspect||'16:9'),style:String(data?.style||''),character:String(data?.character||'')}});}
+      finally{if(!starting&&!queue.active&&!flushingQuit&&main&&!main.isDestroyed()){main.show();main.focus();}}
+    },
+    storyAnalyzeCancel:async()=>{storyAnalyzer.cancel();return snapshot();},
     storyReveal:async()=>{const out=storyService.status().output;if(out)shell.showItemInFolder(out);return true;},
     language:async value=>{if(!['vi','en'].includes(value))throw Error('Unsupported language');settings.language=value;await save();notify();return snapshot();},
     testBrowsers,
@@ -553,6 +561,7 @@ app.whenReady().then(async () => {
     start: async data => {
       const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':'video';
       if(merging || packaging) throw Error('Đang xử lý đầu ra video.');
+      if(storyAnalyzer?.busy) throw Error('Muse đang phân tích câu chuyện. Chờ xong hoặc bấm Dừng phân tích.');
       if(resettingAccounts.size) throw Error('Chờ đăng xuất tài khoản hoàn tất trước khi chạy.');
             if(queue.active || starting || stopping) return snapshot();
       const epoch=runEpoch;starting=true;startError='';notify();

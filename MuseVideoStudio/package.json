@@ -15,7 +15,8 @@
     "test:sessions": "node test/session-store.test.cjs",
     "test:browser-smoke": "node test/external-browser-smoke.cjs",
     "test:story": "node --test test/story-plan.test.cjs test/story-render.test.cjs test/story-voice.test.cjs test/story-service.test.cjs",
-    "test:story-ui": "node test/story-tab-smoke.cjs"
+    "test:story-ui": "node test/story-tab-smoke.cjs",
+    "test:story-analyze": "node test/story-analyze-smoke.cjs"
   },
   "devDependencies": {
     "electron": "^40.0.0",

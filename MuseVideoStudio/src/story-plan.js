@@ -66,14 +66,12 @@
     return { seconds, aspect, style: String(input.style || '').trim(), character: String(input.character || '').trim() };
   }
 
-  // Bỏ «Cảnh 3:», dấu markdown và khoảng trắng thừa khỏi lời đọc.
-  function speechText(text) {
-    return String(text || '')
-      .replace(/^[\t ]*(?:#{1,6}[\t ]*)?\[?(?:Cảnh|Scene)[\t ]+\d+[A-Za-z]?\]?[\t ]*[:：.\-–—]?[\t ]*/i, '')
-      .replace(/[*_`#>]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+  // Toàn bộ văn bản người dùng dán chính là lời đọc: không tách nhãn, không bỏ chữ.
+  // Chỉ bỏ ký hiệu markdown (* _ ` # >) và gộp khoảng trắng.
+  function storyText(script) {
+    return String(script || '').replace(/\r\n?/g, '\n').replace(/[*_`#>]+/g, '').replace(/\s+/g, ' ').trim();
   }
+  const speechText = storyText;
 
   /* ---------- tách câu / đoạn (mọi ngôn ngữ) ---------- */
   const ENDERS = '.!?…。！？｡';
@@ -141,67 +139,34 @@
     return groups;
   }
 
-  /* ---------- hiểu cấu trúc kịch bản ---------- */
-  const fold = value => String(value || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim();
-  // Nhãn «lời đọc» và «hình ảnh/chỉ dẫn» (đã bỏ dấu, chữ thường). Các ngôn ngữ phổ biến.
-  const VOICE_LABELS = new Set(['loi', 'loi dan', 'loi ke', 'loi doc', 'loi binh', 'thuyet minh', 'nguoi ke', 'nguoi ke chuyen', 'dan truyen',
-    'narrator', 'narration', 'voiceover', 'voice over', 'voice-over', 'vo', 'v.o.', 'voice', 'narracion', 'narrador', 'narrateur', 'sprecher', 'erzahler', 'narrazione', 'narrasi', 'narracao',
-    '旁白', '解说', '解說', 'ナレーション', '내레이션', 'закадровый голос', 'диктор', 'рассказчик']);
-  const VISUAL_LABELS = new Set(['hinh', 'hinh anh', 'canh quay', 'mo ta', 'mo ta hinh anh', 'mo ta canh', 'boi canh', 'goc may', 'may quay', 'hieu ung', 'am thanh', 'nhac', 'nhac nen',
-    'visual', 'visuals', 'video', 'shot', 'setting', 'camera', 'action', 'sfx', 'music', 'sound', 'description', 'scene description',
-    'imagen', 'escena', 'accion', 'sonido', 'musica', 'image', 'visuel', 'plan', 'ambiance', 'bild', 'szene', 'kamera', 'ton', 'musik', 'imagem', 'cena', 'som',
-    '画面', '畫面', '镜头', '鏡頭', '场景', '場景', '音效', '音乐', '音樂', '映像', '画像', '効果音', '音楽', '화면', '영상', '효과음', '음악', 'кадр', 'видео', 'звук', 'музыка']);
-  const HEAD_WORD = '(?:cảnh|canh|scene|escena|scène|szene|cena|сцена|场景|場景|シーン|장면|第)';
-  const HEADING = new RegExp('^\\[?' + HEAD_WORD + '[\\t ]*(\\d+)[A-Za-z]?(?:幕|场|場|場面)?\\]?(?=[\\t :：.\\-–—)]|$)[\\t ]*[:：.\\-–—)]*[\\t ]*(.*)$', 'iu');
-  const SCRIPT_LABEL = /^([^:：\n]{1,24}?)[\t ]*[:：][\t ]*(.*)$/;
-  const DIRECTION = /^[(（\[【]([^)）\]】]+)[)）\]】]$/;
-  const bare = line => line.replace(/\*\*|__/g, '').replace(/^[\t ]*(?:#{1,6}[\t ]*)?(?:[-•][\t ]+|\*[\t ]+)?/, '').trim();
 
-  // Tách kịch bản thành các khối: lời đọc (đọc thành tiếng) tách khỏi mô tả hình ảnh/chỉ dẫn (không đọc).
-  function readScript(script) {
-    const lines = String(script || '').replace(/\r\n?/g, '\n').split('\n').map(bare);
-    const kindOf = line => {
-      const label = line.match(SCRIPT_LABEL);
-      if (label) { const key = fold(label[1]); if (VOICE_LABELS.has(key)) return 'voice'; if (VISUAL_LABELS.has(key)) return 'visual'; }
-      return DIRECTION.test(line) && !HEADING.test(line) ? 'visual' : '';
-    };
-    const labelled = lines.some(line => line && kindOf(line));
-    const headed = lines.some(line => HEADING.test(line));
-    const blocks = [];
-    let current = null, mode = 'voice';
-    const open = title => { current = { title, voice: [], visual: [] }; blocks.push(current); mode = 'voice'; return current; };
-    const add = (kind, text) => { const t = text.trim(); if (t) (current || open(''))[kind].push(t); };
-    for (const line of lines) {
-      if (!line) { mode = 'voice'; continue; }
-      const heading = line.match(HEADING);
-      if (heading) {
-        open(`Cảnh ${heading[1]}`);
-        if (heading[2].trim()) handle(heading[2].trim(), true);
-        continue;
-      }
-      handle(line);
-    }
-    function handle(line, afterHeading) {
-      const kind = labelled ? kindOf(line) : '';
-      // «Cảnh 1 – Bến sông»: phần sau số cảnh không có dấu kết câu là TÊN cảnh (bối cảnh), không đọc thành tiếng.
-      if (!kind && afterHeading && labelled && !/[.!?…。！？]["”'’)]*$/.test(line)) { mode = 'voice'; add('visual', line); return; }
-      if (kind) {
-        const label = line.match(SCRIPT_LABEL);
-        const direction = line.match(DIRECTION);
-        const text = label && (VOICE_LABELS.has(fold(label[1])) || VISUAL_LABELS.has(fold(label[1]))) ? label[2] : (direction ? direction[1] : line);
-        // Không có tiêu đề «Cảnh N»: mô tả hình ảnh xuất hiện sau lời đọc là mở đầu của cảnh kế tiếp.
-        if (kind === 'visual' && !headed && current && current.voice.length) open('');
-        mode = kind;
-        add(kind, text);
-      } else add(mode, line);
-    }
-    return { blocks: blocks.filter(b => b.voice.length || b.visual.length), labelled, headed };
+  /* ---------- câu chuyện = lời đọc; Muse chỉ chọn ranh giới cảnh và viết prompt hình ---------- */
+  const scriptVoice = storyText;
+
+  // Chia câu chuyện thành các «câu» đánh số (câu quá dài cắt ở dấu phẩy). Mỗi cảnh là một dải câu liên tiếp,
+  // nên lời đọc của cảnh luôn là nguyên văn câu chuyện — Muse không được chép lại lời.
+  function storyUnits(script, input = {}) {
+    const config = options(input);
+    const text = storyText(script);
+    if (!text) throw Error('Dán kịch bản trước khi chia cảnh.');
+    const language = detectLanguage(text), limit = budgetChars(config.seconds, language);
+    const pieces = [];
+    for (const sentence of splitSentences(text)) pieces.push(...(count(sentence) > limit ? splitLong(sentence, limit) : [sentence]));
+    return pieces.map((piece, index) => ({ n: index + 1, text: piece, seconds: Math.round(estimateSeconds(piece, language) * 10) / 10 }));
   }
-  const blockText = list => list.join(' ').replace(/\s+/g, ' ').trim();
-  // Phần lời đọc của kịch bản (đã bỏ nhãn, chỉ dẫn và mô tả hình ảnh) — chuẩn để đối chiếu.
-  function scriptVoice(script) {
-    return readScript(script).blocks.map(b => blockText(b.voice)).filter(Boolean).join(' ');
+  const unitsText = (units, from, to) => units.slice(from - 1, to).map(u => u.text).reduce((a, b) => (a ? joinText(a, b) : b), '');
+  // Gom các câu liên tiếp từ `from` đến `to` thành các dải không vượt `limit` ký tự.
+  function groupRanges(units, from, to, limit) {
+    const ranges = [];
+    let start = from, text = '';
+    for (let i = from; i <= to; i++) {
+      const next = text ? joinText(text, units[i - 1].text) : units[i - 1].text;
+      if (text && count(next) > limit) { ranges.push([start, i - 1]); start = i; text = units[i - 1].text; } else text = next;
+    }
+    if (from <= to) ranges.push([start, to]);
+    return ranges;
   }
+  const limitFor = (units, config) => budgetChars(config.seconds, detectLanguage(units.map(u => u.text).join(' ')));
 
   function scenePrompt(voiceover, config, visual = '') {
     return [
@@ -223,64 +188,78 @@
     ].filter((line, index, lines) => line !== '' || (index > 0 && lines[index - 1] !== '')).join('\n');
   }
 
-  function makeScene(index, voiceover, visual, config) {
-    return { title: `Cảnh ${index}`, source: voiceover || visual, voiceover, visual: visual || '', prompt: scenePrompt(voiceover, config, visual), durationSeconds: config.seconds };
+  // `range` = [câu đầu, câu cuối]. Cảnh `offline` là cảnh có prompt mẫu do tool ghép, chưa qua Muse.
+  function makeScene(index, voiceover, visual, config, range) {
+    return { title: `Cảnh ${index}`, source: voiceover || visual, voiceover, visual: visual || '', prompt: scenePrompt(voiceover, config, visual), durationSeconds: config.seconds, ...(range ? { units: range } : {}), offline: true };
   }
 
-  // Chia nhanh ngay trên máy: gộp câu cho vừa thời lượng mỗi cảnh. Dùng khi chưa cần Muse đọc kịch bản.
+  // Chia nhanh ngay trên máy: gộp câu cho vừa thời lượng mỗi cảnh. Prompt là mẫu chung, chưa qua Muse.
   function planStory(script, input = {}) {
     const config = options(input);
     if (typeof script !== 'string' || !script.trim()) throw Error('Dán kịch bản trước khi chia cảnh.');
-    const read = readScript(script);
-    const language = detectLanguage(read.blocks.map(b => blockText(b.voice)).join(' ') || script);
-    const limit = budgetChars(config.seconds, language);
-    const scenes = [];
-    for (const block of read.blocks) {
-      const voice = blockText(block.voice), visual = blockText(block.visual);
-      const parts = voice ? groupSentences(voice, limit) : [''];
-      parts.forEach(part => { const text = speechText(part); if (text || visual) scenes.push(makeScene(scenes.length + 1, text, visual, config)); });
-      if (scenes.length > MAX_SCENES) throw Error('Kịch bản tạo hơn 100 cảnh. Hãy chia thành nhiều lượt hoặc tăng giới hạn ký tự mỗi cảnh.');
-    }
-    return scenes;
+    const units = storyUnits(script, config);
+    const ranges = groupRanges(units, 1, units.length, limitFor(units, config));
+    if (ranges.length > MAX_SCENES) throw Error('Kịch bản tạo hơn 100 cảnh. Hãy chia thành nhiều lượt hoặc tăng giới hạn ký tự mỗi cảnh.');
+    return ranges.map(([a, b], index) => makeScene(index + 1, unitsText(units, a, b), '', config, [a, b]));
   }
 
-  // Câu lệnh gửi cho Muse để Muse tự đọc, hiểu và viết prompt từng cảnh theo khuôn dễ tách.
-  function buildMuseInstruction(script, input = {}) {
+  const CONTEXT_CHARS = 12000;
+  // Phần câu chuyện đưa kèm để Muse hiểu ngữ cảnh khi chỉ chia một đoạn.
+  function contextText(script, units, first, last) {
+    const full = storyText(script);
+    if (count(full) <= CONTEXT_CHARS) return full;
+    return (first > 1 ? '… ' : '') + unitsText(units, Math.max(1, first - 12), Math.min(units.length, last + 6)) + (last < units.length ? ' …' : '');
+  }
+
+  /* Câu lệnh gửi cho Muse: đọc hiểu cả câu chuyện, gom các câu đánh số thành cảnh, viết prompt hình.
+     ctx: { units, ranges: [[từ, đến]…] (mặc định cả truyện), cast, part, parts, marker } */
+  function buildMuseInstruction(script, input = {}, ctx = {}) {
     const config = options(input);
     if (typeof script !== 'string' || !script.trim()) throw Error('Dán kịch bản trước khi nhờ Muse đọc.');
-    const voice = scriptVoice(script) || script;
-    const language = detectLanguage(voice);
-    const expected = Math.max(1, Math.ceil(count(voice) / budgetChars(config.seconds, language)));
-    const words = Math.max(6, Math.round(config.seconds * 2.6));
-    const s = config.seconds;
+    const units = ctx.units || storyUnits(script, config);
+    const ranges = ctx.ranges && ctx.ranges.length ? ctx.ranges : [[1, units.length]];
+    const picked = ranges.flatMap(([a, b]) => units.slice(a - 1, b));
+    const whole = picked.length === units.length;
+    const s = config.seconds, budget = Math.round(s * 0.9 * 10) / 10;
+    const marker = ctx.marker ? String(ctx.marker) : '';
+    const numbered = list => list.map(u => `[${u.n}] (${u.seconds} giây) ${u.text}`);
+    const first = picked[0].n, last = picked[picked.length - 1].n;
+    const partNote = ctx.parts > 1 ? ` Đây là phần ${ctx.part}/${ctx.parts} của câu chuyện.` : '';
     return [
-      `Bạn là đạo diễn video. Hãy đọc KỊCH BẢN ở cuối rồi chia thành các cảnh (dự kiến khoảng ${expected} cảnh, mỗi cảnh khoảng ${s} giây). Mỗi cảnh sẽ được tạo thành MỘT video ${s} giây, không dài hơn.`,
+      `Bạn là đạo diễn hình ảnh cho video kể chuyện. Mỗi cảnh sẽ được AI tạo thành MỘT video ${s} giây (không dài hơn) và mỗi lần tạo đều tốn lượt, nên hình ảnh, hành động và nét mặt phải đúng ngay từ lần đầu.`,
       '',
-      'QUY TẮC BẮT BUỘC',
-      `1. LỜI: chép NGUYÊN VĂN từ kịch bản, giữ đúng ngôn ngữ gốc, đúng thứ tự; không bỏ sót, không thêm, không sửa, không dịch, không tóm tắt. Nối LỜI của mọi cảnh từ đầu đến cuối phải ra đúng toàn bộ phần lời của kịch bản. Ngắt ở cuối câu, mỗi cảnh đọc không quá khoảng ${words} từ.`,
-      `2. Mỗi cảnh chỉ là MỘT khoảnh khắc liên tục trong ${s} giây: một địa điểm, một nhóm nhân vật, tối đa 2–3 hành động nối tiếp nhau; KHÔNG nhảy thời gian, KHÔNG đổi địa điểm, KHÔNG cắt cảnh trong cùng video. Việc nào cần hơn ${s} giây hoặc đổi bối cảnh thì tách thành cảnh khác.`,
-      `3. PROMPT mô tả chính xác điều kịch bản nêu: ai, ở đâu, lúc nào, làm gì, theo thứ tự thời gian (ví dụ 0–3 giây…, 3–7 giây…, 7–${s} giây…), kèm nét mặt, cử chỉ, tư thế, hướng nhìn, cảm xúc, ánh sáng và góc máy. Dùng từ cụ thể, không mơ hồ; không bịa thêm nhân vật, vật thể, sự kiện hay đổi kết cục; không mô tả điều không thể hiện bằng hình trong ${s} giây.`,
+      `BƯỚC 1 – ĐỌC HIỂU: đọc kỹ toàn bộ câu chuyện${whole ? ' ở cuối' : ' ở phần NGỮ CẢNH'} để nắm nhân vật, bối cảnh, thời điểm, diễn biến, cảm xúc và ý nghĩa của từng câu.${partNote}`,
+      `BƯỚC 2 – CHIA CẢNH: ${whole ? '' : 'chỉ chia các câu ở phần CÁC CÂU CẦN CHIA CẢNH; phần còn lại chỉ để hiểu. '}Gom các câu đánh số LIÊN TIẾP thành cảnh, đủ mọi câu, đúng thứ tự, không bỏ sót, không lặp. Số trong ngoặc là số giây đọc câu đó; tổng của mỗi cảnh không quá ${budget} giây. KHÔNG chép lại lời: chỉ ghi số câu, giọng đọc sẽ đọc đúng nguyên văn các câu đó.`,
+      'BƯỚC 3 – VIẾT PROMPT cho từng cảnh theo quy tắc dưới đây.',
+      '',
+      'QUY TẮC',
+      `1. Mỗi cảnh chỉ là MỘT khoảnh khắc liên tục trong ${s} giây: một địa điểm, một nhóm nhân vật, tối đa 2–3 hành động nối tiếp; KHÔNG nhảy thời gian, KHÔNG đổi địa điểm, KHÔNG cắt cảnh trong cùng video. Các câu liên tiếp mà đổi địa điểm hoặc nhảy thời gian thì tách thành cảnh khác.`,
+      `2. PROMPT thể hiện đúng điều các câu của cảnh nói: ai, ở đâu, lúc nào, làm gì, theo thứ tự thời gian (0–3 giây…, 3–7 giây…, 7–${s} giây…), kèm nét mặt, ánh mắt, cử chỉ, tư thế, cảm xúc, ánh sáng và góc máy. Dùng từ cụ thể, không mơ hồ.`,
+      '3. Không bịa thêm nhân vật, vật thể hay sự kiện; không đổi kết cục; không bỏ hành động quan trọng. Suy nghĩ, cảm xúc hay ý trừu tượng thì thể hiện bằng nét mặt, cử chỉ hoặc vật cụ thể có trong câu.',
       '4. Mỗi cảnh được tạo video riêng nên PROMPT phải tự đủ ý: nhắc lại tên, ngoại hình, trang phục và bối cảnh của nhân vật theo cùng một cách ở mọi cảnh; không viết «như cảnh trước».',
-      `5. Nhân vật tuyệt đối không nói, không hát, không mấp máy môi: nếu kịch bản có thoại, thể hiện bằng cử chỉ và nét mặt. Phần chữ trong kịch bản là lời người kể.`,
-      `6. Không chèn chữ, phụ đề hay logo vào hình${config.style ? `; phong cách hình ảnh: ${config.style}` : ''}; nhân vật chính giữ đúng như ảnh tham chiếu; tỷ lệ ${config.aspect}.`,
-      '7. Viết PROMPT cùng ngôn ngữ với kịch bản, riêng câu cuối của PROMPT luôn là đúng câu tiếng Anh này: ' + NO_SPEECH,
+      '5. NHÂN VẬT: nhận ra MỌI nhân vật trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Nhân vật chính là người ở ảnh tham chiếu đính kèm: giữ đúng khuôn mặt, tóc, trang phục trong ảnh, không tự đổi. Mỗi nhân vật khác được chốt MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó. Trong PROMPT của mỗi cảnh, gọi từng người xuất hiện trong khung hình bằng đúng tên/vai đó kèm mô tả cố định, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.',
+      '6. Nhân vật tuyệt đối không nói, không hát, không mấp máy môi: lời thoại trong truyện thể hiện bằng cử chỉ và nét mặt. Lời kể do người đọc, không phải nhân vật.',
+      `7. Không chèn chữ, phụ đề hay logo vào hình${config.style ? `; phong cách hình ảnh: ${config.style}` : ''}; nhân vật chính giữ đúng như ảnh tham chiếu; tỷ lệ ${config.aspect}.`,
+      '8. Viết PROMPT cùng ngôn ngữ với câu chuyện, riêng câu cuối của PROMPT luôn là đúng câu tiếng Anh này: ' + NO_SPEECH,
       '',
-      'Trả lời đúng khuôn sau cho MỖI cảnh và KHÔNG viết thêm câu dẫn hay giải thích:',
+      'Trả lời đúng khuôn sau, KHÔNG viết thêm câu dẫn hay giải thích:',
+      ...(ctx.cast ? [] : ['NHÂN VẬT: <mọi nhân vật trong truyện, mỗi người một mục: tên/vai – tuổi, vóc dáng, tóc, trang phục cố định; nhân vật chính ghi «theo ảnh tham chiếu»>']),
       'CẢNH 1',
-      'LỜI: <lời kể trong cảnh, nguyên văn từ kịch bản>',
+      `CÂU: <số câu đầu>-<số câu cuối> (ví dụ 1-3; một câu thì chỉ ghi số đó)`,
       'PROMPT: <mô tả hình ảnh theo quy tắc trên>',
-      '',
       'CẢNH 2',
-      'LỜI: …',
+      'CÂU: …',
       'PROMPT: …',
+      `(cứ thế đến câu số ${last}${marker ? `; dòng cuối cùng của trả lời chỉ gồm đúng một từ: MSDONE${marker}` : ''})`,
+      ctx.cast ? `\nNHÂN VẬT ĐÃ CHỐT (dùng y nguyên trong mọi PROMPT; người mới xuất hiện ở phần này thì bổ sung thêm vào dòng NHÂN VẬT): ${ctx.cast}` : '',
+      config.character ? `\nNhân vật chính (người dùng mô tả): ${config.character}` : '',
       '',
-      '(cứ thế đến hết kịch bản)',
-      config.character ? `\nNhân vật chính: ${config.character}` : '',
-      '',
-      'KỊCH BẢN:',
-      script.trim()
-    ].filter((line, index, lines) => line !== '' || (index > 0 && lines[index - 1] !== '')).join('\n');
+      ...(whole ? ['CÂU CHUYỆN (đã đánh số câu):'] : ['NGỮ CẢNH – câu chuyện (chỉ để hiểu, KHÔNG viết cảnh cho phần này):', contextText(script, units, first, last), '', 'CÁC CÂU CẦN CHIA CẢNH:']),
+      ...numbered(picked),
+      marker ? `MSEND${marker}` : ''
+    ].filter((line, index, lines) => line !== '' || (index > 0 && lines[index - 1] !== '' && index < lines.length - 1)).join('\n');
   }
+
 
   /* ---------- đối chiếu trả lời của Muse với kịch bản ---------- */
   // Mỗi chữ Hán/Kana là một đơn vị; các chữ khác tách theo từ. Bỏ dấu câu, không phân biệt hoa thường.
@@ -425,55 +404,129 @@
     return warn;
   }
 
-  const LOI = /^(?:lời(?:\s*(?:đọc|kể|thoại))?|loi|voice(?:\s*over)?|voiceover|narration|thoại|lời dẫn)$/i;
+
   const PROMPT = /^(?:prompt|mô tả(?:\s*hình)?|hình ảnh|video prompt)$/i;
+  const SENTENCES = /^(?:câu|cau|các câu|sentences?|lines?|dòng|dong)(?:\s*(?:số|so|nos?\.?))?$/i;
+  const CAST = /^(?:nhân vật|nhan vat|characters?|cast)(?:\s*chính)?$/i;
+  const LOI = /^(?:lời(?:\s*(?:đọc|kể|thoại))?|loi|voice(?:\s*over)?|voiceover|narration|thoại|lời dẫn)$/i;
+  const DONE = /^\W*MSDONE[0-9a-f]+\W*$/i;
   const HEAD = /^[\t ]*(?:#{1,6}[\t ]*)?(?:[-*•][\t ]*)?(?:\*\*|__)?(?:\[)?(?:cảnh|canh|scene)[\t ]*(\d+)[A-Za-z]?(?:\])?(?:\*\*|__)?[\t ]*[:：.\-–—)]*[\t ]*(.*)$/i;
   const LABEL = /^[\t ]*(?:[-*•][\t ]*)?(?:\*\*|__)?([^:：\n]{2,24}?)(?:\*\*|__)?[\t ]*[:：][\t ]*(?:\*\*|__)?(.*)$/;
 
   function clean(value) {
     return String(value || '').replace(/^[\s"“”'`]+|[\s"“”'`]+$/g, '').replace(/\*\*|__/g, '').replace(/[ \t]+\n/g, '\n').trim();
   }
+  const ensureNoSpeech = prompt => (/no speech/i.test(prompt) ? prompt : prompt + '\n' + NO_SPEECH);
 
-  // Tách trả lời của Muse thành các cảnh {title, voiceover, prompt}.
-  function parseMuseReply(reply, input = {}) {
-    const config = options(input);
+  // Tách trả lời của Muse: {scenes: [{title, units: [đầu, cuối] | null, voiceover, prompt}], cast, done}.
+  // Hiểu cả khuôn «CÂU: 1-3» (chuẩn) lẫn khuôn cũ «LỜI: …».
+  function parseReply(reply, input = {}) {
+    options(input);
     const lines = String(reply || '').replace(/\r\n?/g, '\n').split('\n');
     const scenes = [];
-    let current = null, field = null;
-    const push = () => { if (current && (current.voiceover || current.prompt)) scenes.push(current); };
+    let current = null, field = null, cast = '', done = false;
+    const push = () => { if (current && (current.voiceover || current.prompt || current.units)) scenes.push(current); };
     for (const raw of lines) {
+      if (DONE.test(raw.trim())) { done = true; break; }
       // Bỏ chữ đậm/nghiêng và gạch đầu dòng của markdown trước khi nhận nhãn.
       const line = raw.replace(/\*\*|__/g, '').replace(/^[\t ]*(?:[-•][\t ]+|\*[\t ]+)/, '');
       const head = line.match(HEAD);
       if (head && !PROMPT.test(head[2].split(/[:：]/)[0].trim())) {
         push();
-        current = { title: `Cảnh ${head[1]}`, voiceover: '', prompt: '' };
+        current = { title: `Cảnh ${head[1]}`, voiceover: '', prompt: '', units: null };
         field = null;
         const rest = head[2].trim();
         if (rest) { const lab = rest.match(LABEL); if (lab && (LOI.test(lab[1].trim()) || PROMPT.test(lab[1].trim()))) { field = LOI.test(lab[1].trim()) ? 'voiceover' : 'prompt'; current[field] = lab[2]; } }
         continue;
       }
-      if (!current) continue;
       const label = line.match(LABEL);
+      if (!current) {
+        if (label && CAST.test(label[1].trim())) { field = 'cast'; cast = label[2].trim(); }
+        else if (field === 'cast' && line.trim()) cast += (cast ? ' ' : '') + line.trim();
+        continue;
+      }
       if (label) {
         const name = label[1].trim();
+        if (SENTENCES.test(name)) {
+          const nums = (label[2].match(/\d+/g) || []).map(Number).filter(n => n > 0);
+          current.units = nums.length ? [Math.min(...nums), Math.max(...nums)] : null;
+          field = null; continue;
+        }
         if (LOI.test(name)) { field = 'voiceover'; current.voiceover = label[2]; continue; }
         if (PROMPT.test(name)) { field = 'prompt'; current.prompt = label[2]; continue; }
       }
       if (field && line.trim()) current[field] += (current[field] ? '\n' : '') + line.trim();
     }
     push();
-    const result = scenes.map((scene, index) => {
-      const voiceover = speechText(clean(scene.voiceover));
-      let prompt = clean(scene.prompt);
-      if (!prompt) prompt = scenePrompt(voiceover, config);
-      // Dù Muse có quên, prompt nào cũng phải có ràng buộc «không nói».
-      else if (!/no speech/i.test(prompt)) prompt += '\n' + NO_SPEECH;
-      return { title: `Cảnh ${index + 1}`, source: voiceover, voiceover, prompt, durationSeconds: config.seconds };
-    }).filter(scene => scene.voiceover || scene.prompt);
-    if (!result.length) throw Error('Chưa thấy cảnh nào trong trả lời của Muse. Cần các dòng «CẢNH 1», «LỜI: …», «PROMPT: …». Gửi lại yêu cầu cho Muse hoặc dùng nút chia cảnh nhanh.');
-    return result;
+    const result = scenes.map((scene, index) => ({ title: `Cảnh ${index + 1}`, units: scene.units, voiceover: speechText(clean(scene.voiceover)), prompt: clean(scene.prompt) }))
+      .filter(scene => scene.units || scene.voiceover || scene.prompt);
+    if (!result.length) throw Error('Chưa thấy cảnh nào trong trả lời của Muse. Cần các dòng «CẢNH 1», «CÂU: 1-3», «PROMPT: …». Gửi lại yêu cầu cho Muse hoặc dùng nút chia cảnh nhanh.');
+    return { scenes: result, cast: clean(cast), done };
   }
+
+  // Tương thích khuôn cũ: trả mảng cảnh {title, source, voiceover, prompt, durationSeconds}.
+  function parseMuseReply(reply, input = {}) {
+    const config = options(input);
+    return parseReply(reply, config).scenes.map((scene, index) => {
+      const prompt = scene.prompt ? ensureNoSpeech(scene.prompt) : scenePrompt(scene.voiceover, config);
+      return { title: `Cảnh ${index + 1}`, source: scene.voiceover, voiceover: scene.voiceover, prompt, durationSeconds: config.seconds, ...(scene.units ? { units: scene.units } : {}) };
+    });
+  }
+
+  /* Ghép trả lời của Muse (các dải câu + prompt) với lời THẬT của câu chuyện.
+     - Lời đọc luôn là nguyên văn các câu; Muse không chép lại lời nên không thể sai lời.
+     - Muse bỏ sót câu, đánh số chồng lên nhau hoặc gom quá dài → phần đó thành cảnh `offline` (prompt mẫu) để hỏi lại Muse.
+     range = {from, to}: chỉ ghép trong dải câu này (dùng khi hỏi lại một đoạn). */
+  function assembleScenes(units, parsed, input = {}, range = null) {
+    const config = options(input);
+    const lo = Math.max(1, range?.from || 1), hi = Math.min(units.length, range?.to || units.length);
+    const limit = limitFor(units, config);
+    // Muse cộng số giây đã làm tròn nên có thể gom sát 100% clip; chấp nhận đến hết thời lượng clip, chỉ cắt khi vượt hẳn.
+    const hard = Math.floor(config.seconds * charsPerSecond(detectLanguage(units.map(u => u.text).join(' '))));
+    const out = [];
+    let next = lo;
+    const fresh = (a, b) => { for (const [x, y] of groupRanges(units, a, b, limit)) out.push(makeScene(0, unitsText(units, x, y), '', config, [x, y])); };
+    for (const item of parsed) {
+      if (!item.units) continue;
+      const a = Math.max(item.units[0], next, lo), b = Math.min(item.units[1], hi);
+      if (a > b) continue;
+      if (a > next) fresh(next, a - 1);
+      let end = a;
+      while (end < b && count(unitsText(units, a, end + 1)) <= hard) end++;
+      const voiceover = unitsText(units, a, end);
+      out.push({ title: '', source: voiceover, voiceover, visual: '', prompt: item.prompt ? ensureNoSpeech(item.prompt) : scenePrompt(voiceover, config), durationSeconds: config.seconds, units: [a, end], ...(item.prompt ? {} : { offline: true }) });
+      if (end < b) fresh(end + 1, b);
+      next = b + 1;
+    }
+    if (next <= hi) fresh(next, hi);
+    return out.map((scene, index) => ({ ...scene, title: `Cảnh ${index + 1}` }));
+  }
+
+  // Từ trả lời của Muse ra danh sách cảnh cuối cùng. Trả lời dùng khuôn cũ «LỜI:» thì căn lời về nguyên văn.
+  function scenesFromReply(script, reply, input = {}, range = null) {
+    const config = options(input);
+    const parsed = parseReply(reply, config);
+    if (parsed.scenes.some(scene => scene.units)) return { scenes: assembleScenes(storyUnits(script, config), parsed.scenes, config, range), cast: parsed.cast, done: parsed.done };
+    const legacy = parseMuseReply(reply, config).filter(scene => scene.voiceover);
+    if (!legacy.length) return { scenes: [], cast: parsed.cast, done: parsed.done };
+    if (!range) return { scenes: alignToScript(script, legacy, config), cast: parsed.cast, done: parsed.done };
+    // Một đoạn: căn lời Muse chép về nguyên văn đoạn đó, rồi gắn lại số câu cho từng cảnh khi khớp chính xác.
+    const units = storyUnits(script, config), lo = Math.max(1, range.from || 1), hi = Math.min(units.length, range.to || units.length);
+    const aligned = alignToScript(unitsText(units, lo, hi), legacy, config);
+    const norm = text => String(text).replace(/\s+/g, ' ').trim();
+    let at = lo;
+    const scenes = aligned.map(scene => {
+      let text = '';
+      for (let i = at; i <= hi; i++) {
+        text = text ? joinText(text, units[i - 1].text) : units[i - 1].text;
+        if (norm(text) === norm(scene.voiceover)) { const found = { ...scene, units: [at, i] }; at = i + 1; return found; }
+        if (count(text) > count(scene.voiceover) + 8) break;
+      }
+      return scene;
+    });
+    return { scenes, cast: parsed.cast, done: parsed.done };
+  }
+
 
   /* ---------- phụ đề ---------- */
   const lineLimit = (text, maxChars) => (isCjk(detectLanguage(text)) ? Math.max(8, Math.round(maxChars * 0.4)) : maxChars);
@@ -529,5 +582,5 @@
     return entries.map((entry, index) => `${index + 1}\n${srtTime(entry.start)} --> ${srtTime(entry.end)}\n${entry.text}\n`).join('\n');
   }
 
-  return { ASPECTS, MAX_SECONDS, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, splitSentences, readScript, scriptVoice, scenePrompt, planStory, buildMuseInstruction, parseMuseReply, checkAgainstScript, alignToScript, lintScenes, subtitleChunks, srtTime, toSrt };
+  return { ASPECTS, MAX_SECONDS, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, buildMuseInstruction, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, subtitleChunks, srtTime, toSrt };
 });

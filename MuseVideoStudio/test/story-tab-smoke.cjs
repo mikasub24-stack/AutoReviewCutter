@@ -32,6 +32,15 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
         onUpdate: fn => listener = fn,
         invoke: async (name, data) => {
           window.calls.push({ name, data: name === 'storyBuild' ? { ...data, scenes: data.scenes.map(sc => ({ id: sc.id, chunks: sc.chunks.map(c => ({ text: c.text, start: c.start, end: c.end, x: c.x, y: c.y, png: c.png ? [...c.png.slice(0, 4)] : null })) })) } : data });
+          if (name === 'storyAnalyze') {
+            s.story.analyze = { busy: true, progress: 'Phần 1/1 · Muse đang viết (đã 2 cảnh)…', part: 1, parts: 1, error: '' }; listener(structuredClone(s));
+            await new Promise(r => setTimeout(r, window.analyzeDelay || 300));
+            s.story.analyze = { busy: false, progress: 'Muse đã chia 2 cảnh', part: 1, parts: 1, error: '' };
+            listener(structuredClone(s));
+            const units = data.script.split(/(?<=[.!?])\s+/);
+            return { scenes: [{ title: 'Cảnh 1', source: units.slice(0, 2).join(' '), voiceover: units.slice(0, 2).join(' '), visual: '', prompt: 'Mai dắt trâu qua cánh đồng lúc bình minh, mỉm cười.\nAudio: no speech, no dialogue, no singing, no narration, no lip movement - characters stay silent with mouths closed.', durationSeconds: 10, units: [1, 2] }, { title: 'Cảnh 2', source: units.slice(2).join(' '), voiceover: units.slice(2).join(' '), visual: '', prompt: 'Chú cá vàng nhảy lên thuyền, Mai ngạc nhiên đưa tay đón.\nAudio: no speech, no dialogue, no singing, no narration, no lip movement - characters stay silent with mouths closed.', durationSeconds: 10, units: [3, 4], offline: true }], cast: 'Mai – theo ảnh', notes: ['1 cảnh dùng prompt mẫu do Muse chưa viết đúng; xem lại hoặc bấm Phân tích lại.'] };
+          }
+          if (name === 'storyAnalyzeCancel') { s.story.analyze = { busy: false, progress: '', part: 0, parts: 0, error: '' }; }
           if (name === 'images') return ['C:\\Refs\\mai.png'];
           if (name === 'add') s.jobs.push(...data.map(j => ({ ...j, id: String(++id), status: 'pending', stage: 'pending', order: s.jobs.filter(x => x.kind === 'story').length + 1 })));
           if (name === 'start') { s.active = true; s.paused = false; }
@@ -74,14 +83,18 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await page.locator('#storyRefs').click();
     assert.match(await page.locator('#storyRefInfo').textContent(), /mai\.png/);
 
-    // Ask Muse: instruction + reply parsing.
+    // Dán thủ công (dự phòng): yêu cầu có câu đánh số; trả lời theo số câu → lời lấy NGUYÊN VĂN từ truyện.
+    await page.locator('#storyMuse summary').click();
     await page.locator('#storyAsk').click();
     const instruction = await page.locator('#storyInstruction').inputValue();
-    assert.match(instruction, /KỊCH BẢN:/); assert.match(instruction, /Audio: no speech/);
-    await page.locator('#storyReply').fill('CẢNH 1\nLỜI: Mai ra bến sông đón đò.\nPROMPT: Cô bé Mai đứng trên bến sông lúc bình minh.\n\nCẢNH 2\nLỜI: Cá vàng nhảy lên thuyền.\nPROMPT: Cá vàng bật lên khỏi mặt nước.');
+    assert.match(instruction, /CÂU CHUYỆN \(đã đánh số câu\):/); assert.match(instruction, /^\[1\] \(/m); assert.match(instruction, /Audio: no speech/);
+    assert.match(instruction, /nhận ra MỌI nhân vật/);
+    await page.locator('#storyReply').fill('NHÂN VẬT: Mai – theo ảnh tham chiếu\nCẢNH 1\nCÂU: 1-2\nPROMPT: Cô bé Mai đứng trên bến sông lúc bình minh, mỉm cười nhìn mặt nước.\n\nCẢNH 2\nCÂU: 3-4\nPROMPT: Cá vàng bật lên khỏi mặt nước, Mai ngạc nhiên đưa tay đón.');
     await page.locator('#storyParse').click();
     assert.equal(await page.locator('#storyScenes .draftRow').count(), 2);
     assert.match(await page.locator('#storyScenes .draftRow textarea').nth(1).inputValue(), /Cô bé Mai đứng trên bến sông[\s\S]*no speech/);
+    assert.equal(await page.locator('#storyScenes .draftRow textarea').nth(0).inputValue(), 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng Mai dậy sớm ra bến đón đò.');
+    assert.equal(await page.locator('#storyScenes .storyTag:visible').count(), 0, 'cảnh do Muse viết không bị đánh dấu là prompt mẫu');
     await page.locator('#storyReply').fill('Xin lỗi tôi không làm được'); await page.locator('#storyParse').click();
     assert.match(await page.locator('#toast').textContent(), /Chưa thấy cảnh nào/);
     assert.equal(await page.locator('#storyScenes .draftRow').count(), 2, 'trả lời hỏng không xóa cảnh đang có');
@@ -91,7 +104,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     const add = (await called('add')).at(-1).data;
     assert.equal(add.length, 2);
     assert.ok(add.every(j => j.kind === 'story' && /^Truyen-\d{8}-\d{6}$/.test(j.storyId) && j.storyId === add[0].storyId));
-    assert.deepEqual(add.map(j => j.voiceover), ['Mai ra bến sông đón đò.', 'Cá vàng nhảy lên thuyền.']);
+    assert.deepEqual(add.map(j => j.voiceover), ['Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng Mai dậy sớm ra bến đón đò.', 'Một hôm có chú cá vàng nhảy lên thuyền. Mai thả cá về sông và cá hứa sẽ giúp cô một điều ước.']);
     assert.ok(add.every(j => j.references.length === 1 && j.references[0] === 'C:\\Refs\\mai.png' && j.image === 'C:\\Refs\\mai.png'));
     assert.deepEqual((await called('start')).at(-1).data, { kind: 'story' });
     assert.equal(await page.locator('#storyScenes .draftRow').count(), 0);
@@ -100,17 +113,27 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await page.evaluate(() => { document.getElementById('storyPanel').open = true; document.getElementById('storyMuse').open = true; });
     await page.locator('#storyScript').fill('Mai ra bến sông lúc bình minh. Cá vàng nhảy lên thuyền. Mai thả cá về sông.');
     await page.locator('#storySplit').click();
-    await page.waitForFunction(() => /khớp 100% kịch bản gốc/.test(document.getElementById('storyCheck').textContent));
-    assert.equal(await page.locator('#storyCheck').evaluate(e => e.classList.contains('bad')), false);
+    await page.waitForFunction(() => /khớp 100% kịch bản gốc[\s\S]*prompt mẫu/.test(document.getElementById('storyCheck').textContent));
+    assert.match(await page.locator('#storyCheck').textContent(), /3 cảnh đang dùng prompt mẫu \(chưa qua Muse\)|\d+ cảnh đang dùng prompt mẫu/, 'chia nhanh: nhắc rõ prompt mẫu chưa qua Muse');
+    // Muse chép «LỜI» và bỏ sót một câu → app tự căn lời về nguyên văn truyện, câu bị bỏ thành cảnh mẫu.
     await page.locator('#storyReply').fill('CẢNH 1\nLỜI: Mai ra bến sông lúc bình minh.\nPROMPT: Cô bé Mai đứng trên bến sông lúc bình minh, sương mỏng, mặt mỉm cười nhìn mặt nước.\n\nCẢNH 2\nLỜI: Mai thả cá về sông.\nPROMPT: Mai cúi xuống thả cá vàng xuống nước, nét mặt dịu dàng, mặt nước gợn sóng.');
     await page.locator('#storyParse').click();
-    await page.waitForFunction(() => /Chưa khớp kịch bản gốc/.test(document.getElementById('storyCheck').textContent));
-    assert.match(await page.locator('#storyCheck').textContent(), /Thiếu 1 câu của kịch bản: «Cá vàng nhảy lên thuyền\.»/);
-    assert.equal(await page.locator('#storyCheck').evaluate(e => e.classList.contains('bad')), true);
-    await page.locator('#storyCheck button:has-text("Sửa lời theo kịch bản gốc")').click();
     await page.waitForFunction(() => document.querySelectorAll('#storyScenes .draftRow').length === 3);
     assert.deepEqual(await page.locator('#storyScenes .draftRow textarea:nth-of-type(1)').evaluateAll(list => list.map(t => t.value)), ['Mai ra bến sông lúc bình minh.', 'Cá vàng nhảy lên thuyền.', 'Mai thả cá về sông.']);
+    await page.waitForFunction(() => /prompt mẫu \(chưa qua Muse\): cảnh 2\./.test(document.getElementById('storyCheck').textContent));
+    assert.match(await page.locator('#storyCheck').textContent(), /khớp 100% kịch bản gốc[\s\S]*1 cảnh đang dùng prompt mẫu \(chưa qua Muse\): cảnh 2/);
+    assert.equal(await page.locator('#storyScenes .draftRow .storyTag').nth(1).isVisible(), true, 'cảnh mẫu có nhãn');
+    assert.equal(await page.locator('#storyScenes .draftRow .storyTag').nth(0).isVisible(), false);
+    // Người dùng tự xóa mất một câu trong lời đọc → báo lệch kịch bản gốc, một chạm sửa lại.
+    await page.locator('#storyScenes .draftRow').nth(0).locator('textarea').nth(0).fill('Mai ra bến.');
+    await page.waitForFunction(() => /Chưa khớp kịch bản gốc/.test(document.getElementById('storyCheck').textContent));
+    assert.equal(await page.locator('#storyCheck').evaluate(e => e.classList.contains('bad')), true);
+    await page.locator('#storyCheck button:has-text("Sửa lời theo kịch bản gốc")').click();
     await page.waitForFunction(() => /khớp 100% kịch bản gốc/.test(document.getElementById('storyCheck').textContent));
+    assert.equal(await page.locator('#storyScenes .draftRow').nth(0).locator('textarea').nth(0).inputValue(), 'Mai ra bến sông lúc bình minh.');
+    // Sửa prompt của cảnh mẫu thì không còn bị coi là mẫu.
+    await page.locator('#storyScenes .draftRow').nth(1).locator('textarea').nth(1).fill('Chú cá vàng nhảy lên thuyền, Mai ngạc nhiên đưa hai tay đón, mắt tròn, miệng hé mở.\nAudio: no speech, no dialogue.');
+    await page.waitForFunction(() => document.querySelectorAll('#storyScenes .draftRow .storyTag')[1].hidden);
     // Soát từng cảnh: sửa prompt thành quá ngắn → có cảnh báo ngay trên cảnh đó.
     const prompts = page.locator('#storyScenes .draftRow').nth(0).locator('textarea').nth(1);
     await prompts.fill('Mai ra bến.');
@@ -121,10 +144,9 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.match(await page.locator('#toast').textContent(), /Muse chỉ tạo clip tối đa 10 giây/);
     await page.locator('#storySeconds').fill('10');
     // Đa ngôn ngữ: kịch bản tiếng Anh chọn giọng tiếng Anh trước; kịch bản tiếng Trung chia theo chữ Hán.
-    await page.locator('#storyScript').fill('Scene 1\nVisual: A fisherman rows across a calm lake at dawn.\nNarrator: Every morning, Tom rowed out to the middle of the lake.\nScene 2\nVisual: A golden fish leaps into the boat.\nNarrator: One day, a golden fish jumped into his boat.');
+    await page.locator('#storyScript').fill('Every morning, Tom rowed out to the middle of the lake. One day, a golden fish jumped into his boat.');
     await page.locator('#storySplit').click();
-    assert.deepEqual(await page.locator('#storyScenes .draftRow textarea:nth-of-type(1)').evaluateAll(list => list.map(t => t.value)), ['Every morning, Tom rowed out to the middle of the lake.', 'One day, a golden fish jumped into his boat.']);
-    assert.match(await page.locator('#storyScenes .draftRow').nth(1).locator('textarea').nth(1).inputValue(), /HÌNH ẢNH THEO KỊCH BẢN[^\n]*\nA golden fish leaps into the boat\./);
+    assert.deepEqual(await page.locator('#storyScenes .draftRow textarea:nth-of-type(1)').evaluateAll(list => list.map(t => t.value)), ['Every morning, Tom rowed out to the middle of the lake. One day, a golden fish jumped into his boat.']);
     await page.locator('#storyEngine').selectOption('edge');
     await page.locator('#storyVoice').evaluate(e => { e.dispatchEvent(new Event('change')); });
     assert.match(await page.locator('#storyVoice option').first().textContent(), /Aria.*Tiếng Anh ✓/, 'kịch bản tiếng Anh: giọng tiếng Anh đứng đầu');
@@ -161,7 +183,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await page.locator('#storyTempo').selectOption('1.15');
     await page.locator('#storyListen').click();
     await page.waitForFunction(() => !document.querySelector('#storyAudio').hidden);
-    assert.deepEqual((await called('storyListen')).at(-1).data, { engine: 'clone', voice: 'Giong-cua-toi', tempo: '1.15', text: 'Mai ra bến sông đón đò.' });
+    assert.deepEqual((await called('storyListen')).at(-1).data, { engine: 'clone', voice: 'Giong-cua-toi', tempo: '1.15', text: 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng Mai dậy sớm ra bến đón đò.' });
     assert.match(await page.locator('#storyAudio').getAttribute('src'), /^file:\/\/\/C:\/Data\/preview\/nghe\.mp3$/);
 
     // Subtitles: preview is drawn; export sends PNG captions only when on; .srt and sound-effect level pass through.
@@ -227,15 +249,36 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     // Phần kiểm tra kịch bản cũng được dịch sang tiếng Anh.
     await page.evaluate(() => { document.getElementById('storyPanel').open = true; document.getElementById('storyMuse').open = true; });
     await page.locator('#storyScript').fill('Mai ra bến sông lúc bình minh. Cá vàng nhảy lên thuyền.');
-    await page.locator('#storyReply').fill('CẢNH 1\nLỜI: Mai ra bến sông lúc bình minh.\nPROMPT: Ngắn.');
+    await page.locator('#storyReply').fill('CẢNH 1\nCÂU: 1-2\nPROMPT: Ngắn.');
     await page.locator('#storyParse').click();
+    await page.locator('#storyScenes .draftRow').first().locator('textarea').nth(0).fill('Mai ra bến sông lúc bình minh.');
     await page.waitForFunction(() => /Does not match the original script/.test(document.getElementById('storyCheck').textContent));
     const englishCheck = await page.locator('#storyCheck').textContent();
     assert.match(englishCheck, /1 sentence\(s\) of the script are missing/);
     assert.match(englishCheck, /1 scene\(s\) need a look before creating/);
     assert.equal(await page.locator('#storyCheck button').textContent(), 'Fix narration to match the original script');
     assert.match(await page.locator('#storyScenes .storyWarn').first().textContent(), /Prompt too short/);
-    assert.match(await page.locator('#storyInfo').textContent(), /Muse split the story into 1 scenes/);
+    // Phân tích bằng Muse (giao diện): tiến độ hiện trong lúc chờ, nút Dừng, kết quả thay danh sách cảnh.
+    await page.evaluate(() => { window.analyzeDelay = 700; });
+    await page.locator('#storyScript').fill('Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng Mai dậy sớm ra bến đón đò. Một hôm có chú cá vàng nhảy lên thuyền. Mai thả cá về sông và cá hứa sẽ giúp cô một điều ước.');
+    await page.locator('#storyAnalyze').click();
+    await page.waitForFunction(() => document.getElementById('storyAnalyze').disabled && !document.getElementById('storyAnalyzeStop').hidden);
+    assert.equal(await page.locator('#storyAnalyze').textContent(), 'Muse is analyzing…');
+    assert.equal(await page.locator('#storySplit').isDisabled(), true, 'đang phân tích thì không chia nhanh');
+    assert.match(await page.locator('#storyInfo').textContent(), /Part 1\/1 · Muse is writing \(2 scene\(s\) so far\)…/);
+    await page.waitForFunction(() => !document.getElementById('storyAnalyze').disabled);
+    assert.equal(await page.locator('#storyAnalyzeStop').isHidden(), true);
+    assert.equal(await page.locator('#storyScenes .draftRow').count(), 2);
+    assert.match(await page.locator('#storyInfo').textContent(), /Muse split the story into 2 scenes\. 1 scene\(s\) use a template prompt because Muse did not write one properly/);
+    await page.waitForFunction(() => /scene 2\. Click “Analyze with Muse”/.test(document.getElementById('storyCheck').textContent));
+    assert.match(await page.locator('#storyCheck').textContent(), /scene 2\. Click “Analyze with Muse”/);
+    assert.equal(await page.locator('#storyScenes .draftRow .storyTag').nth(1).textContent(), 'template prompt');
+    assert.equal(await page.locator('#storyScenes .draftRow .storyTag').nth(0).isVisible(), false);
+    const analyze = (await called('storyAnalyze')).at(-1).data;
+    assert.equal(analyze.seconds, 10); assert.equal(analyze.aspect, '16:9'); assert.match(analyze.script, /^Ngày xưa/); assert.equal(analyze.character, 'Mai, bé gái tóc đen');
+    await page.locator('#storyScript').fill(''); await page.locator('#storyAnalyze').click();
+    assert.match(await page.locator('#toast').textContent(), /Paste the story first/);
+    assert.equal((await called('storyAnalyze')).length, 1, 'không gửi Muse khi chưa có truyện');
     assert.deepEqual(errors, []);
     console.log('PASS: story tab — own jobs/counts/folder, quick split + Muse reply parsing (no-speech rule kept), character image on every scene, free voice setup/listen/clone with consent, subtitles on/off + .srt + PNG captions, auto-edit report, export errors, persistence, English labels.');
   } finally { await browser.close(); server.close(); }

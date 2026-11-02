@@ -279,5 +279,7 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 #storySceneCount { color: #93a4bd; font-size: 11px; }
 .storyWarn { margin: 6px 0 0; padding: 6px 8px; border-left: 3px solid #e0b252; background: #3a2f12; color: #f1d28a; font-size: 11px; line-height: 1.45; white-space: pre-line; border-radius: 4px; }
 .storyCheck { margin: 8px 0; padding: 8px 10px; border-left: 3px solid #49d8ca; background: #12302d; color: #bff3ec; font-size: 12px; line-height: 1.5; white-space: pre-line; border-radius: 4px; }
+.storyTag { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 9px; background: #3a2f12; color: #f1d28a; font-size: 10px; vertical-align: middle; }
+.storyTag[hidden] { display: none; }
 .storyCheck.bad { border-left-color: #e0b252; background: #3a2f12; color: #f1d28a; }
 .storyCheck button { margin-top: 6px; }

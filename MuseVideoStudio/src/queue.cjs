@@ -33,7 +33,7 @@ class Queue {
   async clearAll(kind){await this.stop();this.jobs=kind?this.jobs.filter(j=>j.kind!==kind):[];await this.publish();}
   async applyReferences(files){
     if(!Array.isArray(files)||files.some(x=>typeof x!=='string'||!x))throw Error('Ảnh tham chiếu không hợp lệ.');
-    for(const j of this.jobs)if(j.status==='pending'&&!j.lockedInput){j.references=[...files];j.image=files[0]||'';}
+    for(const j of this.jobs)if(j.kind!=='story'&&j.status==='pending'&&!j.lockedInput){j.references=[...files];j.image=files[0]||'';}
     await this.publish();
   }
   pause(){this.paused=true;}

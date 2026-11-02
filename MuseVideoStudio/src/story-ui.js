@@ -10,7 +10,7 @@
     subOutline: ['subOutline', '#000000'], subPos: ['subPos', 'bottom'], storySfx: ['sfx', 'low'], storyName: ['name', '']
   };
   const CHECKS = { subOn: ['subOn', true], subSrt: ['subSrt', false], subBox: ['subBox', false] };
-  let saved = {}, scenes = [], refs = [], exporting = false, listening = false, voiceSignature = '', windowsAsked = false, lastStory = '';
+  let saved = {}, scenes = [], refs = [], analyzing = false, exporting = false, listening = false, voiceSignature = '', windowsAsked = false, lastStory = '';
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { saved = {}; }
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch { /* không lưu được thì bỏ qua */ } };
 
@@ -50,8 +50,10 @@
       if (result && result.checked) lines.push(result.ok ? `✓ Lời các cảnh khớp ${Math.round(result.coverage * 100)}% kịch bản gốc, đủ và đúng thứ tự.` : '⚠ Chưa khớp kịch bản gốc:');
       if (result && !result.ok) lines.push(...result.issues.map(x => '• ' + x));
       if (flagged) lines.push(`⚠ ${flagged} cảnh cần xem lại trước khi tạo (mỗi lượt tạo tốn credit Muse).`);
+      const sample = scenes.map((s, i) => s.offline ? i + 1 : 0).filter(Boolean);
+      if (sample.length) lines.push(`⚠ ${sample.length} cảnh đang dùng prompt mẫu (chưa qua Muse): cảnh ${sample.slice(0, 12).join(', ')}${sample.length > 12 ? '…' : ''}. Bấm «Phân tích bằng Muse» để Muse viết prompt hình đúng truyện, hoặc tự sửa prompt.`);
       check.hidden = !lines.length; check.replaceChildren(...lines.map(line => el('div', '', line)));
-      check.classList.toggle('bad', Boolean((result && !result.ok) || flagged));
+      check.classList.toggle('bad', Boolean((result && !result.ok) || flagged || sample.length));
       if (result && !result.ok) { const fix = el('button', 'secondary', 'Sửa lời theo kịch bản gốc'); fix.onclick = alignScript; check.append(fix); }
     }, 250);
   }
@@ -67,10 +69,12 @@
     box.replaceChildren(); warnBoxes = [];
     scenes.forEach((scene, index) => {
       const row = el('div', 'draftRow'), body = el('div', 'draftContent');
-      body.append(el('strong', '', `${scene.title || 'Cảnh ' + (index + 1)} · ${scene.durationSeconds || ''} giây`));
+      const heading = el('strong', '', `${scene.title || 'Cảnh ' + (index + 1)} · ${scene.durationSeconds || ''} giây`);
+      const tag = el('span', 'storyTag', 'prompt mẫu'); tag.hidden = !scene.offline; tag.title = 'Prompt này do tool ghép từ lời kể, chưa qua Muse';
+      body.append(heading, tag);
       const warn = el('div', 'storyWarn'); warn.hidden = true; warnBoxes[index] = warn;
       const voice = el('textarea'); voice.value = scene.voiceover || ''; voice.placeholder = 'Lời đọc của cảnh này'; voice.oninput = () => { scene.voiceover = voice.value; scene.source = voice.value; refreshChecks(); };
-      const prompt = el('textarea'); prompt.value = scene.prompt || ''; prompt.placeholder = 'Prompt gửi Muse'; prompt.oninput = () => { scene.prompt = prompt.value; refreshChecks(); };
+      const prompt = el('textarea'); prompt.value = scene.prompt || ''; prompt.placeholder = 'Prompt gửi Muse'; prompt.oninput = () => { scene.prompt = prompt.value; if (scene.offline) { scene.offline = false; tag.hidden = true; } refreshChecks(); };
       const tools = el('div', 'draftTools'), remove = el('button', 'secondary', 'Xóa cảnh');
       remove.onclick = () => { scenes.splice(index, 1); scenes.forEach((s, i) => { s.title = 'Cảnh ' + (i + 1); }); renderScenes(); };
       tools.append(remove);
@@ -93,6 +97,25 @@
     try { await navigator.clipboard.writeText(value); toast('Đã sao chép yêu cầu. Dán vào khung chat Muse.'); }
     catch { $('storyInstruction').select(); toast('Nhấn Ctrl+C để sao chép yêu cầu rồi dán vào chat Muse.'); }
   }
+  async function analyze() {
+    if (analyzing) return;
+    if (!$('storyScript').value.trim()) return toast('Dán câu chuyện trước.');
+    analyzing = true; renderAnalyze();
+    try {
+      const result = await call('storyAnalyze', { script: $('storyScript').value, ...options() });
+      if (result?.scenes?.length) {
+        scenes = result.scenes; renderScenes();
+        $('storyInfo').textContent = `Muse đã chia ${scenes.length} cảnh.${result.notes?.length ? ' ' + result.notes.join(' ') : ''} Xem lại lời đọc và prompt, rồi bấm Tạo clip.`;
+      }
+    } finally { analyzing = false; renderAnalyze(); }
+  }
+  // Tiến độ lấy từ tiến trình chính (state.story.analyze) nên vẫn đúng khi tải lại giao diện.
+  function renderAnalyze() {
+    const a = state?.story?.analyze || {}, busy = analyzing || Boolean(a.busy);
+    $('storyAnalyze').disabled = busy; $('storySplit').disabled = busy; $('storyAnalyzeStop').hidden = !busy;
+    $('storyAnalyze').textContent = busy ? 'Muse đang phân tích…' : 'Phân tích bằng Muse';
+    if (busy && a.progress) $('storyInfo').textContent = a.progress;
+  }
   function ask() {
     try {
       $('storyInstruction').value = plan().buildMuseInstruction($('storyScript').value, options());
@@ -101,7 +124,7 @@
   }
   function parse() {
     try {
-      scenes = plan().parseMuseReply($('storyReply').value, options());
+      scenes = plan().scenesFromReply($('storyScript').value, $('storyReply').value, options()).scenes;
       renderScenes();
       $('storyInfo').textContent = `Muse đã chia ${scenes.length} cảnh. Xem phần đối chiếu với kịch bản bên dưới rồi bấm Tạo clip.`;
     } catch (e) { toast(e.message); }
@@ -372,7 +395,8 @@
     if (story && story.id !== lastStory) { lastStory = story.id; }
   }
 
-  $('storySplit').onclick = split; $('storyAsk').onclick = ask; $('storyCopy').onclick = copyInstruction; $('storyParse').onclick = parse;
+  $('storySplit').onclick = split; $('storyAnalyze').onclick = analyze; $('storyAnalyzeStop').onclick = async () => { const r = await call('storyAnalyzeCancel'); if (r) render(r); };
+  $('storyAsk').onclick = ask; $('storyCopy').onclick = copyInstruction; $('storyParse').onclick = parse;
   $('storyRefs').onclick = async () => { const files = await call('images', { multiple: true }); if (files?.length) { refs = files; refInfo(); } };
   $('storyRefsClear').onclick = () => { refs = []; refInfo(); };
   $('storyRefPaste').onpaste = pasteRefs; $('storyRefPaste').ondragover = e => e.preventDefault(); $('storyRefPaste').ondrop = pasteRefs;
@@ -384,7 +408,7 @@
   renderScenes(); refInfo(); drawPreview();
 
   window.storyUi = {
-    render() { renderVoice(); renderStatus(); },
+    render() { renderVoice(); renderStatus(); renderAnalyze(); },
     drawCaption, wrap, get scenes() { return scenes; }
   };
 })();

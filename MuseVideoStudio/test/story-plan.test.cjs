@@ -24,30 +24,11 @@ test('chia nhanh gộp câu theo thời lượng, giữ đủ chữ, mỗi cản
   assert.equal(joined, story.replace(/\s/g, ''));
 });
 
-test('kịch bản có «Cảnh N» thì giữ đúng mốc cảnh và bỏ nhãn khỏi lời đọc', () => {
-  const scenes = sp.planStory('Cảnh 1: Mai ra bến sông.\nCảnh 2: Cá vàng nhảy lên thuyền.', { seconds: 10 });
-  assert.equal(scenes.length, 2);
-  assert.equal(scenes[0].voiceover, 'Mai ra bến sông.');
-  assert.equal(scenes[1].voiceover, 'Cá vàng nhảy lên thuyền.');
-});
-
 test('báo lỗi tiếng Việt khi thiếu kịch bản hoặc cấu hình sai', () => {
   assert.throws(() => sp.planStory('   ', {}), /Dán kịch bản/);
   assert.throws(() => sp.planStory('a', { seconds: 1 }), /3 đến 10/);
   assert.throws(() => sp.planStory('a', { seconds: 11 }), /tối đa 10 giây/);
   assert.throws(() => sp.planStory('a', { aspect: '4:3' }), /16:9/);
-});
-
-test('câu lệnh gửi Muse nêu thời lượng, tỉ lệ, nhân vật, khuôn trả lời và kèm đủ kịch bản', () => {
-  const text = sp.buildMuseInstruction(story, { seconds: 8, aspect: '9:16', style: 'điện ảnh', character: 'Mai' });
-  assert.match(text, /mỗi cảnh khoảng 8 giây/);
-  assert.match(text, /tỷ lệ 9:16/);
-  assert.match(text, /^LỜI:/m);
-  assert.match(text, /^PROMPT:/m);
-  assert.match(text, /Nhân vật chính: Mai/);
-  assert.ok(text.includes('Mỗi sáng Mai dậy sớm ra bến đón đò.'));
-  assert.ok(text.indexOf('KỊCH BẢN:') < text.indexOf('Ngày xưa'));
-  assert.ok(text.includes(sp.NO_SPEECH), 'yêu cầu Muse luôn kết thúc prompt bằng câu «no speech» tiếng Anh');
 });
 
 const reply = `Dưới đây là kết quả:
@@ -129,37 +110,6 @@ test('hàng đợi nhận loại «story», đánh số riêng và giữ storyId
 });
 
 /* ---------- hiểu kịch bản, đa ngôn ngữ, 10 giây ---------- */
-const labelled = `Cảnh 1
-Hình ảnh: Cô bé Mai đứng trước cổng làng lúc bình minh, sương mỏng.
-Lời dẫn: Ngày xưa có một cô bé tên Mai.
-(Nhạc nhẹ, tiếng chim hót)
-
-Cảnh 2
-Hình ảnh: Chú cá vàng nhảy lên thuyền, Mai ngạc nhiên.
-Lời dẫn: Một hôm có chú cá vàng nhảy lên thuyền.`;
-
-test('kịch bản có nhãn «Hình ảnh / Lời dẫn»: chỉ lời dẫn được đọc, mô tả hình và chỉ dẫn vào prompt', () => {
-  const scenes = sp.planStory(labelled, { seconds: 10 });
-  assert.equal(scenes.length, 2);
-  assert.equal(scenes[0].voiceover, 'Ngày xưa có một cô bé tên Mai.');
-  assert.equal(scenes[1].voiceover, 'Một hôm có chú cá vàng nhảy lên thuyền.');
-  assert.ok(scenes.every(s => !/Hình ảnh|Lời dẫn|Nhạc/.test(s.voiceover)), 'nhãn và chỉ dẫn không được đọc thành tiếng');
-  assert.match(scenes[0].prompt, /HÌNH ẢNH THEO KỊCH BẢN[^\n]*\nCô bé Mai đứng trước cổng làng lúc bình minh, sương mỏng\. Nhạc nhẹ, tiếng chim hót/);
-  assert.match(scenes[1].prompt, /Chú cá vàng nhảy lên thuyền, Mai ngạc nhiên/);
-  assert.equal(sp.scriptVoice(labelled), 'Ngày xưa có một cô bé tên Mai. Một hôm có chú cá vàng nhảy lên thuyền.');
-});
-
-test('kịch bản tiếng Anh: Scene / Visual / Narrator; không có nhãn thì mọi dòng là lời', () => {
-  const english = 'Scene 1\nVisual: A fisherman rows across a calm lake at dawn.\nNarrator: Every morning, Tom rowed out to the middle of the lake.\nScene 2\nVisual: A golden fish leaps into the boat.\nNarrator: One day, a golden fish jumped into his boat.';
-  const scenes = sp.planStory(english, { seconds: 10 });
-  assert.deepEqual(scenes.map(s => s.voiceover), ['Every morning, Tom rowed out to the middle of the lake.', 'One day, a golden fish jumped into his boat.']);
-  assert.match(scenes[1].prompt, /A golden fish leaps into the boat\./);
-  const plain = sp.planStory('Dòng một.\nDòng hai.', { seconds: 10 });
-  assert.equal(plain.length, 1);
-  assert.equal(plain[0].voiceover, 'Dòng một. Dòng hai.');
-  assert.equal(sp.planStory('Minh: Chào bạn nhé.\nLan: Chào Minh!', { seconds: 10 })[0].voiceover, 'Minh: Chào bạn nhé. Lan: Chào Minh!', 'tên người nói không bị coi là nhãn chỉ dẫn');
-});
-
 test('nhận ngôn ngữ và ước lượng độ dài lời đọc theo ngôn ngữ', () => {
   const sample = {
     vi: 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông.', en: 'Every morning Tom rowed out to the middle of the lake and waited for the sun.',
@@ -206,7 +156,6 @@ test('đối chiếu trả lời của Muse với kịch bản: đủ, thiếu c
   const zh = '小明划船到湖中央。金鱼跳进船里。小明把金鱼放回水中。';
   assert.equal(sp.checkAgainstScript(zh, [sceneOf('小明划船到湖中央。金鱼跳进船里。'), sceneOf('小明把金鱼放回水中。')]).ok, true);
   assert.equal(sp.checkAgainstScript(zh, [sceneOf('小明划船到湖中央。'), sceneOf('小明把金鱼放回水中。')]).ok, false);
-  assert.equal(sp.checkAgainstScript(labelled, sp.planStory(labelled, { seconds: 10 })).ok, true, 'kịch bản có nhãn: chỉ so với phần lời');
 });
 
 test('sửa theo kịch bản: lời đúng nguyên văn, câu bị bỏ thành cảnh mới ở đúng vị trí, cảnh bịa bị loại', () => {
@@ -242,19 +191,6 @@ test('soát cảnh trước khi tạo: lời quá dài, thoại, nhảy thời g
   assert.match(sp.lintScenes([sceneOf('Tom rowed the boat. Then, later that night, the storm came.')], { seconds: 10 })[0].join('|'), /chuyển mốc thời gian/);
 });
 
-test('yêu cầu gửi Muse: nguyên văn lời, mỗi cảnh một khoảnh khắc trong 10 giây, mô tả hành động và nét mặt, nhân vật không nói', () => {
-  const text = sp.buildMuseInstruction(story, { seconds: 10, aspect: '16:9', character: 'Mai' });
-  assert.match(text, /NGUYÊN VĂN/);
-  assert.match(text, /MỘT video 10 giây/);
-  assert.match(text, /KHÔNG nhảy thời gian/);
-  assert.match(text, /nét mặt, cử chỉ/);
-  assert.match(text, /0–3 giây/);
-  assert.match(text, /không bịa thêm/);
-  assert.match(text, /dự kiến khoảng \d+ cảnh/);
-  const withLabels = sp.buildMuseInstruction(labelled, { seconds: 10 });
-  assert.ok(withLabels.includes('Hình ảnh: Cô bé Mai'), 'kịch bản gốc được gửi nguyên vẹn');
-});
-
 test('phụ đề: chia theo câu ở mọi ngôn ngữ, chữ Hán không khoảng trắng, và dịch ranh giới về đúng chỗ nghỉ', () => {
   const zh = sp.subtitleChunks('小明划船到湖中央等待日出。有一天，一条金鱼跳进了他的船里，请求他放它回去。小明轻轻地把金鱼放回水中。', 9, { maxChars: 80 });
   assert.ok(zh.length >= 3);
@@ -272,12 +208,154 @@ test('phụ đề: chia theo câu ở mọi ngôn ngữ, chữ Hán không kho�
   assert.equal(sp.subtitleChunks('', 5).length, 0);
 });
 
-test('tiêu đề cảnh «Cảnh 1 – Bến sông» trong kịch bản có nhãn là bối cảnh, không bị đọc thành tiếng', () => {
-  const scenes = sp.planStory('**Cảnh 1 – Bến sông**\n**Hình ảnh:** Bình minh trên sông.\n**Lời dẫn:** Mai ra bến sông.\n\n**Cảnh 2 – Con thuyền**\n**Hình ảnh:** Cá vàng nhảy.\n**Lời dẫn:** Cá nhảy lên thuyền.', { seconds: 10 });
-  assert.deepEqual(scenes.map(s => s.voiceover), ['Mai ra bến sông.', 'Cá nhảy lên thuyền.']);
-  assert.match(scenes[0].visual, /Bến sông.*Bình minh trên sông/);
-  // Không có nhãn: phần sau «Cảnh N:» vẫn là lời kể như trước.
-  assert.deepEqual(sp.planStory('Cảnh 1: Mai ra bến sông.\nCảnh 2: Cá nhảy lên thuyền.', { seconds: 10 }).map(s => s.voiceover), ['Mai ra bến sông.', 'Cá nhảy lên thuyền.']);
-  assert.equal(sp.planStory('## Cảnh 1\nMai ra bến sông.\n## Cảnh 2\nCá vàng nhảy lên thuyền.', { seconds: 10 }).length, 2);
+/* ---------- chỉ dán câu chuyện: lời đọc luôn là nguyên văn, Muse chỉ chia cảnh và viết prompt hình ---------- */
+const tale = 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng, em dắt trâu ra đồng. Một hôm, em nhặt được chiếc hộp gỗ cũ bên bờ nước, bên trong là một chiếc chìa khóa nhỏ. Em hoảng hốt nhìn quanh, rồi mỉm cười. Bà Ba từ xa gọi em về ăn cơm.';
+
+test('toàn bộ văn bản dán vào là lời đọc: không coi «Cảnh 1:», «Lời dẫn:» hay tên người nói là nhãn', () => {
+  const pasted = 'Cảnh 1: Mai ra bến sông.\nLời dẫn: cá vàng nhảy lên thuyền.\nMinh: Chào bạn nhé.';
+  assert.equal(sp.storyText(pasted), 'Cảnh 1: Mai ra bến sông. Lời dẫn: cá vàng nhảy lên thuyền. Minh: Chào bạn nhé.');
+  const scenes = sp.planStory(pasted, { seconds: 10 });
+  assert.equal(scenes.map(s => s.voiceover).join(' '), sp.storyText(pasted), 'không bỏ chữ nào của truyện');
+  assert.equal(sp.storyText('**Mai** đi _chậm_ `lại`.'), 'Mai đi chậm lại.', 'chỉ bỏ ký hiệu markdown');
   assert.equal(sp.planStory('3.5 km đường dài. TS. Nguyễn nói. Mr. Smith agreed. Xong.', { seconds: 10 }).length, 1, 'số thập phân và viết tắt không bị cắt câu');
+  assert.ok(sp.planStory(pasted, { seconds: 10 }).every(s => s.offline === true), 'chia nhanh: prompt mẫu, chưa qua Muse');
+});
+
+test('câu được đánh số; câu quá dài cắt ở dấu phẩy; mỗi câu có số giây đọc', () => {
+  const units = sp.storyUnits(tale, { seconds: 10 });
+  assert.equal(units.length, 5);
+  assert.deepEqual(units.map(u => u.n), [1, 2, 3, 4, 5]);
+  assert.ok(units.every(u => u.seconds > 0 && u.seconds <= 10));
+  assert.equal(units.map(u => u.text).join(' '), tale);
+  const long = 'Mỗi sáng, ' + 'em dắt trâu ra đồng cỏ xanh ven sông, '.repeat(8) + 'rồi về.';
+  const cut = sp.storyUnits(long, { seconds: 10 });
+  assert.ok(cut.length > 1 && cut.every(u => u.seconds <= 10), 'câu dài được cắt cho vừa 10 giây');
+  assert.equal(cut.map(u => u.text).join(' ').replace(/\s/g, ''), long.replace(/\s/g, ''));
+});
+
+test('yêu cầu gửi Muse: đọc hiểu cả truyện, chia theo SỐ CÂU, không chép lời, prompt đúng hành động và nét mặt, nhận ra mọi nhân vật', () => {
+  const text = sp.buildMuseInstruction(tale, { seconds: 10, aspect: '9:16', style: 'điện ảnh', character: 'Mai, bé gái tóc đen' }, { marker: 'ab12cd' });
+  assert.match(text, /MỘT video 10 giây/);
+  assert.match(text, /ĐỌC HIỂU/);
+  assert.match(text, /KHÔNG chép lại lời/);
+  assert.match(text, /tổng của mỗi cảnh không quá 9 giây/);
+  assert.match(text, /KHÔNG nhảy thời gian/);
+  assert.match(text, /nét mặt, ánh mắt, cử chỉ/);
+  assert.match(text, /0–3 giây/);
+  assert.match(text, /nhận ra MỌI nhân vật/);
+  assert.match(text, /ảnh tham chiếu đính kèm/);
+  assert.match(text, /KHÔNG vẽ vào hình/);
+  assert.match(text, /^CÂU: <số câu đầu>/m);
+  assert.match(text, /^PROMPT:/m);
+  assert.match(text, /^\[1\] \(\d+(\.\d)? giây\) Ngày xưa có một cô bé/m);
+  assert.match(text, /^\[5\] \([\d.]+ giây\) Bà Ba từ xa/m);
+  assert.match(text, /MSDONEab12cd/);
+  assert.ok(text.trimEnd().endsWith('MSENDab12cd'), 'dòng cuối là mốc kết thúc yêu cầu để app tìm ra trả lời');
+  assert.match(text, /Nhân vật chính \(người dùng mô tả\): Mai, bé gái tóc đen/);
+  assert.match(text, /phong cách hình ảnh: điện ảnh/);
+  assert.match(text, /tỷ lệ 9:16/);
+  assert.ok(text.includes(sp.NO_SPEECH));
+  assert.ok(!/MSDONE|MSEND/.test(sp.buildMuseInstruction(tale, { seconds: 10 })), 'không có mốc khi dán thủ công');
+});
+
+test('chia một đoạn: Muse vẫn đọc cả truyện làm ngữ cảnh, nhận nhân vật đã chốt, chỉ chia các câu được chỉ định', () => {
+  const units = sp.storyUnits(tale, { seconds: 10 });
+  const text = sp.buildMuseInstruction(tale, { seconds: 10 }, { units, ranges: [[3, 5]], cast: 'Mai – theo ảnh; Bà Ba – 60 tuổi, tóc bạc, áo nâu', part: 2, parts: 2, marker: 'ff00aa' });
+  assert.match(text, /phần 2\/2/);
+  assert.match(text, /NGỮ CẢNH/);
+  assert.ok(text.indexOf('NGỮ CẢNH') < text.indexOf('CÁC CÂU CẦN CHIA CẢNH'));
+  assert.ok(text.includes(tale), 'toàn bộ truyện nằm trong ngữ cảnh');
+  const list = text.slice(text.indexOf('CÁC CÂU CẦN CHIA CẢNH'));
+  assert.ok(!/^\[1\]|^\[2\]/m.test(list) && /^\[3\]/m.test(list) && /^\[5\]/m.test(list));
+  assert.match(text, /NHÂN VẬT ĐÃ CHỐT[^:]*: Mai – theo ảnh; Bà Ba – 60 tuổi/);
+  assert.ok(!/^NHÂN VẬT: </m.test(text), 'đã chốt nhân vật thì không đòi lại từ đầu');
+  assert.match(text, /đến câu số 5/);
+});
+
+const goodReply = `Dưới đây là kết quả:
+
+NHÂN VẬT: Mai – theo ảnh tham chiếu; Bà Ba – 60 tuổi, tóc bạc búi, áo bà ba nâu
+**CẢNH 1**
+**CÂU:** 1-2
+**PROMPT:** 0–3 giây: Mai, bé gái tóc đen, đứng bên bờ sông lúc bình minh, mỉm cười nhìn mặt nước.
+3–10 giây: em dắt con trâu đi dọc bờ ruộng, ánh nắng xiên.
+
+Cảnh 2
+Câu: 3
+Prompt: Mai ngồi xổm bên bờ nước cầm chiếc hộp gỗ cũ, mở nắp, nhìn chiếc chìa khóa nhỏ, mắt tròn ngạc nhiên.
+
+CẢNH 3
+CÂU: 4 - 5
+PROMPT: Mai nhìn quanh hoảng hốt, rồi mỉm cười khi thấy bà Ba (60 tuổi, tóc bạc, áo nâu) vẫy tay từ xa.
+MSDONEab12cd
+Câu chúc thừa này phải bị bỏ qua.`;
+
+test('trả lời của Muse theo số câu: lời đọc lấy từ truyện thật, prompt từ Muse, nhận danh sách nhân vật', () => {
+  const r = sp.scenesFromReply(tale, goodReply, { seconds: 10, aspect: '16:9' });
+  assert.equal(r.done, true);
+  assert.match(r.cast, /Mai – theo ảnh tham chiếu; Bà Ba – 60 tuổi/);
+  assert.equal(r.scenes.length, 3);
+  assert.deepEqual(r.scenes.map(s => s.units), [[1, 2], [3, 3], [4, 5]]);
+  assert.equal(r.scenes[0].voiceover, 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng, em dắt trâu ra đồng.');
+  assert.equal(r.scenes.map(s => s.voiceover).join(' '), tale, 'ghép các cảnh lại ra đúng nguyên văn truyện');
+  assert.match(r.scenes[0].prompt, /^0–3 giây: Mai, bé gái tóc đen[^]*7?3–10 giây: em dắt/);
+  assert.ok(r.scenes.every(s => s.prompt.includes(sp.NO_SPEECH) && !s.offline), 'prompt nào cũng có no speech; không cảnh nào là mẫu');
+  assert.ok(!r.scenes.some(s => /chúc thừa|MSDONE/.test(s.prompt)), 'nội dung sau mốc kết thúc bị bỏ');
+  assert.equal(sp.checkAgainstScript(tale, r.scenes).ok, true);
+  assert.deepEqual(r.scenes.map(s => s.title), ['Cảnh 1', 'Cảnh 2', 'Cảnh 3']);
+});
+
+test('Muse đánh số sai: câu bị bỏ, chồng lên nhau, gom quá dài, ngoài phạm vi → vẫn đủ chữ, đúng thứ tự, phần sai thành cảnh mẫu để hỏi lại', () => {
+  const input = { seconds: 10, aspect: '16:9' };
+  const p = n => `PROMPT: Mô tả đủ dài cho cảnh ${n}: Mai đứng bên sông, nét mặt ngạc nhiên, gió thổi nhẹ qua tóc.`;
+  // bỏ sót câu 3; cảnh 3 lặp lại câu 2
+  const gap = sp.scenesFromReply(tale, `CẢNH 1\nCÂU: 1-2\n${p(1)}\nCẢNH 2\nCÂU: 2-2\n${p(2)}\nCẢNH 3\nCÂU: 4-5\n${p(3)}`, input).scenes;
+  assert.equal(gap.map(s => s.voiceover).join(' '), tale);
+  assert.deepEqual(gap.map(s => s.units), [[1, 2], [3, 3], [4, 5]]);
+  assert.deepEqual(gap.map(s => Boolean(s.offline)), [false, true, false], 'chỉ câu bị bỏ sót là cảnh mẫu');
+  // gom cả 5 câu vào một cảnh: quá 10 giây → cắt cho vừa, phần dư thành cảnh mẫu
+  const all = sp.scenesFromReply(tale, `CẢNH 1\nCÂU: 1-5\n${p(1)}`, input).scenes;
+  assert.ok(all.length >= 2 && all.every(s => sp.estimateSeconds(s.voiceover) <= 10));
+  assert.equal(all.map(s => s.voiceover).join(' '), tale);
+  assert.equal(all[0].offline, undefined);
+  assert.ok(all.slice(1).every(s => s.offline));
+  // số câu ngoài phạm vi và cảnh không có số
+  const wild = sp.scenesFromReply(tale, `CẢNH 1\nCÂU: 1-99\n${p(1)}\nCẢNH 2\nCÂU: 7-9\n${p(2)}`, input).scenes;
+  assert.equal(wild.map(s => s.voiceover).join(' '), tale);
+  // thiếu PROMPT → cảnh mẫu, vẫn có no speech
+  const none = sp.scenesFromReply(tale, 'CẢNH 1\nCÂU: 1-5', input).scenes;
+  assert.ok(none.every(s => s.offline && s.prompt.includes(sp.NO_SPEECH)));
+  // sau cùng không có câu nào bị mất hay nhân đôi dù Muse đảo thứ tự
+  const swapped = sp.scenesFromReply(tale, `CẢNH 1\nCÂU: 4-5\n${p(1)}\nCẢNH 2\nCÂU: 1-3\n${p(2)}`, input).scenes;
+  assert.equal(swapped.map(s => s.voiceover).join(' '), tale, 'thứ tự luôn theo truyện, không theo thứ tự Muse viết');
+});
+
+test('hỏi lại một đoạn: chỉ ghép trong phạm vi câu được hỏi', () => {
+  const input = { seconds: 10 };
+  const reply = 'CẢNH 1\nCÂU: 3\nPROMPT: Mai ngồi bên bờ nước mở hộp gỗ cũ, ngạc nhiên nhìn chiếc chìa khóa nhỏ trong hộp.\nCẢNH 2\nCÂU: 1-2\nPROMPT: Cảnh nằm ngoài phạm vi, phải bị bỏ qua hoàn toàn khi hỏi lại.';
+  const r = sp.scenesFromReply(tale, reply, input, { from: 3, to: 3 }).scenes;
+  assert.equal(r.length, 1);
+  assert.deepEqual(r[0].units, [3, 3]);
+  assert.match(r[0].voiceover, /^Một hôm, em nhặt được/);
+  const legacy = sp.scenesFromReply(tale, 'CẢNH 1\nLỜI: Một hôm em nhặt được chiếc hộp gỗ cũ bên bờ nước, bên trong là chiếc chìa khóa nhỏ.\nPROMPT: Mai mở chiếc hộp gỗ cũ bên bờ nước, ngạc nhiên nhìn chiếc chìa khóa nhỏ.', input, { from: 3, to: 3 }).scenes;
+  assert.equal(legacy.length, 1, 'khuôn cũ «LỜI» vẫn dùng được khi hỏi lại một đoạn');
+  assert.equal(legacy[0].voiceover, 'Một hôm, em nhặt được chiếc hộp gỗ cũ bên bờ nước, bên trong là một chiếc chìa khóa nhỏ.', 'lời lấy lại nguyên văn từ truyện');
+  assert.deepEqual(legacy[0].units, [3, 3]);
+  assert.match(legacy[0].prompt, /Mai mở chiếc hộp gỗ cũ/);
+  assert.deepEqual(sp.scenesFromReply(tale, 'Xin lỗi\nCẢNH 1\nPROMPT: chỉ có prompt, không có số câu cũng không có lời', input, { from: 3, to: 3 }).scenes, [], 'không có số câu lẫn lời thì không ghép được (người gọi sẽ hỏi lại)');
+});
+
+test('Muse quên khuôn «CÂU» mà chép LỜI: lời được sửa về nguyên văn truyện', () => {
+  const reply = 'CẢNH 1\nLỜI: Ngày xưa có cô bé tên Mai sống ở làng ven sông. Mỗi sáng em dắt trâu ra đồng.\nPROMPT: Mai dắt trâu qua cánh đồng xanh lúc bình minh, mỉm cười nhìn mặt trời.\nCẢNH 2\nLỜI: Một hôm em nhặt được chiếc hộp gỗ.\nPROMPT: Mai mở chiếc hộp gỗ bên bờ nước, ngạc nhiên nhìn vào trong.';
+  const r = sp.scenesFromReply(tale, reply, { seconds: 10 });
+  assert.equal(r.scenes.map(s => s.voiceover).join(' '), tale);
+  assert.ok(r.scenes[0].prompt.includes('dắt trâu qua cánh đồng'));
+});
+
+test('hàng đợi: «áp ảnh cho hàng chờ» ở tab video không ghi đè ảnh của cảnh kể chuyện', async () => {
+  const q = new Queue({ save: async () => {}, run: async () => '' });
+  await q.add([{ prompt: 'v', references: [] }, { kind: 'story', prompt: 's', voiceover: 'a', references: ['C:\\mai.png'] }]);
+  await q.applyReferences(['C:\\khac.png']);
+  assert.deepEqual(q.jobs.find(j => j.kind === 'video').references, ['C:\\khac.png']);
+  assert.deepEqual(q.jobs.find(j => j.kind === 'story').references, ['C:\\mai.png']);
 });
