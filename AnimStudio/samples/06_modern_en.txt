@@ -1,0 +1,11 @@
+@title The Last Train | One rainy night
+@lang en
+@char Emma: female
+@char Mr. Brown: male, old
+@char Leo: boy
+[Scene: waiting room at the station, rainy night | Emma, Mr. Brown, Leo]
+Narrator: Eleven at night, and only three people are left in the waiting room.
+Emma (sad): The last train has been cancelled because of the storm.
+Mr. Brown (happy): No worries, dear. We can wait until morning.
+Leo (surprised): Grandpa, why is the thunder so bright?
+Mr. Brown: Because the sky is telling us a story.

@@ -1,0 +1,14 @@
+@title Lá Thư Từ Chiến Hào | Mùa đông năm ấy
+@era war
+@char Trung Sĩ Nam: nam
+@char Lính Hùng: nam, trẻ
+@char Cô Hoa: nữ
+[Cảnh: chiến hào đêm | Trung Sĩ Nam, Lính Hùng]
+Dẫn: Đêm thứ ba của trận đánh, pháo vẫn nổ rền ở phía chân trời.
+Trung Sĩ Nam (giận): Cúi xuống! Pháo kích!
+Lính Hùng (sợ): Báo cáo, đạn sắp hết rồi, trung sĩ!
+Trung Sĩ Nam: Giữ vững vị trí. Trời sáng sẽ có tiếp viện.
+[Cảnh: hầm chỉ huy đêm | Trung Sĩ Nam, Cô Hoa]
+Cô Hoa (vui): Tôi mang thuốc và thư của mọi người đến đây.
+Trung Sĩ Nam (ngạc nhiên): Cô đi qua bãi pháo bằng cách nào?
+Cô Hoa (thì thầm): Đường nào rồi cũng có lối, thưa trung sĩ.

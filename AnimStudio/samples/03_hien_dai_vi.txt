@@ -1,0 +1,10 @@
+@title Chuyến Tàu Cuối | Một đêm mưa
+@char Lan: nữ
+@char Ông Sáu: nam, già
+@char Bé Ti: bé trai
+[Cảnh: phòng chờ ga tàu đêm mưa | Lan, Ông Sáu, Bé Ti]
+Dẫn: Mười một giờ đêm, phòng chờ ga tàu chỉ còn ba người.
+Lan (buồn): Chuyến tàu cuối bị hoãn vì mưa lớn rồi.
+Ông Sáu (vui): Không sao đâu cháu, ngồi chờ cho đến sáng cũng được.
+Bé Ti (ngạc nhiên): Ông ơi, sao ngoài kia sét đánh sáng thế ạ?
+Ông Sáu: Vì trời đang kể chuyện cho chúng ta nghe đấy.

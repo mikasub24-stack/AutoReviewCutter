@@ -1,0 +1,422 @@
+{
+ "emo_an_mung": {
+  "era": "modern",
+  "kind": "human",
+  "name": "an mung"
+ },
+ "emo_dung_va_met": {
+  "era": "modern",
+  "kind": "human",
+  "name": "dung va met"
+ },
+ "emo_gian_va_chi_tay": {
+  "era": "modern",
+  "kind": "human",
+  "name": "gian va chi tay"
+ },
+ "emo_khoc": {
+  "era": "modern",
+  "kind": "human",
+  "name": "khoc"
+ },
+ "emo_kiet_suc": {
+  "era": "modern",
+  "kind": "human",
+  "name": "kiet suc"
+ },
+ "emo_lam_viec": {
+  "era": "modern",
+  "kind": "human",
+  "name": "lam viec"
+ },
+ "emo_nghi_ngo": {
+  "era": "modern",
+  "kind": "human",
+  "name": "nghi ngo"
+ },
+ "emo_soc": {
+  "era": "modern",
+  "kind": "human",
+  "name": "soc"
+ },
+ "emo_vui_mung": {
+  "era": "modern",
+  "kind": "human",
+  "name": "vui mung"
+ },
+ "emo_xem_dien_thoai": {
+  "era": "modern",
+  "kind": "human",
+  "name": "xem dien thoai"
+ },
+ "job_bac_si": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Bác sĩ"
+ },
+ "job_barista": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Pha chế"
+ },
+ "job_canh_sat": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Cảnh sát"
+ },
+ "job_dau_bep": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Đầu bếp"
+ },
+ "job_doanh_nhan": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Doanh nhân"
+ },
+ "job_giao_vien": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Giáo viên"
+ },
+ "job_hoa_si": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Họa sĩ"
+ },
+ "job_hoc_sinh": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Học sinh"
+ },
+ "job_lao_cong": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Lao công"
+ },
+ "job_lap_trinh_vien": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Lập trình viên"
+ },
+ "job_moi_gioi_nha": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Môi giới nhà"
+ },
+ "job_nghe_si_guitar": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Nghệ sĩ guitar"
+ },
+ "job_nhiep_anh": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Nhiếp ảnh gia"
+ },
+ "job_nong_dan": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Nông dân"
+ },
+ "job_shipper": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Shipper"
+ },
+ "job_streamer": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Livestream"
+ },
+ "job_tho_lam_toc": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Thợ làm tóc"
+ },
+ "job_tho_may": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Thợ máy"
+ },
+ "job_tho_xay_dung": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Công nhân xây dựng"
+ },
+ "job_y_ta": {
+  "era": "modern",
+  "kind": "human",
+  "name": "Y tá"
+ },
+ "modern_ba_cu": {
+  "era": "modern",
+  "kind": "human",
+  "name": "ba cu"
+ },
+ "modern_be_trai_va_be_gai": {
+  "era": "modern",
+  "kind": "human",
+  "name": "be trai va be gai"
+ },
+ "modern_co_gai": {
+  "era": "modern",
+  "kind": "human",
+  "name": "co gai"
+ },
+ "modern_em_be": {
+  "era": "modern",
+  "kind": "human",
+  "name": "em be"
+ },
+ "modern_hs_nu": {
+  "era": "modern",
+  "kind": "human",
+  "name": "hs nu"
+ },
+ "modern_nam_cong_so": {
+  "era": "modern",
+  "kind": "human",
+  "name": "nam cong so"
+ },
+ "modern_nguoi_map": {
+  "era": "modern",
+  "kind": "human",
+  "name": "nguoi map"
+ },
+ "modern_nu_cong_so": {
+  "era": "modern",
+  "kind": "human",
+  "name": "nu cong so"
+ },
+ "modern_ong_kinh": {
+  "era": "modern",
+  "kind": "human",
+  "name": "ong kinh"
+ },
+ "modern_thanh_nien_balo": {
+  "era": "modern",
+  "kind": "human",
+  "name": "thanh nien balo"
+ },
+ "modern_thanh_nien_hoodie": {
+  "era": "modern",
+  "kind": "human",
+  "name": "thanh nien hoodie"
+ },
+ "stone_ba_lao": {
+  "era": "ancient",
+  "kind": "human",
+  "name": "ba lao"
+ },
+ "stone_be_gai_va_em_be": {
+  "era": "ancient",
+  "kind": "human",
+  "name": "be gai va em be"
+ },
+ "stone_be_trai": {
+  "era": "ancient",
+  "kind": "human",
+  "name": "be trai"
+ },
+ "stone_bo_rung": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "bo rung"
+ },
+ "stone_ca_sau": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "ca sau"
+ },
+ "stone_cao": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "cao"
+ },
+ "stone_chim_go_kien": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "chim go kien"
+ },
+ "stone_chim_nho": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "chim nho"
+ },
+ "stone_chim_sao": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "chim sao"
+ },
+ "stone_chim_xanh": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "chim xanh"
+ },
+ "stone_cu_meo": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "cu meo"
+ },
+ "stone_dai_bang": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "dai bang"
+ },
+ "stone_dan_ong": {
+  "era": "ancient",
+  "kind": "human",
+  "name": "dan ong"
+ },
+ "stone_de_nui": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "de nui"
+ },
+ "stone_gau": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "gau"
+ },
+ "stone_ho": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "ho"
+ },
+ "stone_ho_rang_kiem": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "ho rang kiem"
+ },
+ "stone_huou_con": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "huou con"
+ },
+ "stone_huou_duc": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "huou duc"
+ },
+ "stone_khi": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "khi"
+ },
+ "stone_lon_rung": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "lon rung"
+ },
+ "stone_ong_lao": {
+  "era": "ancient",
+  "kind": "human",
+  "name": "ong lao"
+ },
+ "stone_phu_nu": {
+  "era": "ancient",
+  "kind": "human",
+  "name": "phu nu"
+ },
+ "stone_ran": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "ran"
+ },
+ "stone_soi": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "soi"
+ },
+ "stone_te_giac": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "te giac"
+ },
+ "stone_thanh_nien_nam": {
+  "era": "ancient",
+  "kind": "human",
+  "name": "thanh nien nam"
+ },
+ "stone_thanh_nien_nu": {
+  "era": "ancient",
+  "kind": "human",
+  "name": "thanh nien nu"
+ },
+ "stone_tho": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "tho"
+ },
+ "stone_voi": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "voi"
+ },
+ "stone_voi_ma_mut": {
+  "era": "ancient",
+  "kind": "animal",
+  "name": "voi ma mut"
+ },
+ "war_cong_nhan_nu": {
+  "era": "war",
+  "kind": "human",
+  "name": "cong nhan nu"
+ },
+ "war_lien_lac_ngam": {
+  "era": "war",
+  "kind": "human",
+  "name": "lien lac ngam"
+ },
+ "war_lien_lac_vo_tuyen": {
+  "era": "war",
+  "kind": "human",
+  "name": "lien lac vo tuyen"
+ },
+ "war_linh_bo_binh": {
+  "era": "war",
+  "kind": "human",
+  "name": "linh bo binh"
+ },
+ "war_nguoi_me": {
+  "era": "war",
+  "kind": "human",
+  "name": "nguoi me"
+ },
+ "war_nu_y_ta": {
+  "era": "war",
+  "kind": "human",
+  "name": "nu y ta"
+ },
+ "war_ong_cu": {
+  "era": "war",
+  "kind": "human",
+  "name": "ong cu"
+ },
+ "war_phi_cong": {
+  "era": "war",
+  "kind": "human",
+  "name": "phi cong"
+ },
+ "war_quan_y": {
+  "era": "war",
+  "kind": "human",
+  "name": "quan y"
+ },
+ "war_si_quan": {
+  "era": "war",
+  "kind": "human",
+  "name": "si quan"
+ },
+ "war_tho_sua_chua": {
+  "era": "war",
+  "kind": "human",
+  "name": "tho sua chua"
+ },
+ "war_tre_so_tan": {
+  "era": "war",
+  "kind": "human",
+  "name": "tre so tan"
+ }
+}

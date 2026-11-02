@@ -1,0 +1,6 @@
+numpy
+Pillow
+edge-tts>=7.0.0
+playwright
+scipy
+vieneu

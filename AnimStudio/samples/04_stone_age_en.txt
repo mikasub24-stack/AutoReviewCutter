@@ -1,0 +1,12 @@
+@title The Last Ember | A Stone Age story
+@era ancient
+@lang en
+@char Gru: male, chief
+@char Mara: female
+[Scene: cave night | Gru, Mara]
+Narrator: Deep in the wild valley, the tribe hides in a cave while wolves howl outside.
+Gru (angry): Who let the fire die? The beasts will smell our fear!
+Mara (sad): There is no dry wood left, chief.
+Gru (thinking): Then I will climb the burning mountain and bring back a flame.
+Mara (surprised): Alone? That is madness!
+Gru (happy): No, Mara. That is how legends begin.

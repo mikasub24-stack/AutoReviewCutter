@@ -1,0 +1,12 @@
+@title Letters From The Trench | Winter, 1944
+@era war
+@lang en
+@char Sergeant Cole: male
+@char Private Jack: male, young
+[Scene: trench night | Sergeant Cole, Private Jack]
+Narrator: Third night of the offensive, and the shelling never stops.
+Sergeant Cole (angry): Heads down! Incoming!
+Private Jack (scared): Sergeant, we are almost out of ammunition!
+Sergeant Cole: Hold the line. Reinforcements arrive at dawn.
+Private Jack (whisper): Do you think anyone will remember us?
+Sergeant Cole (happy): If we hold, kid, they will remember us all.
