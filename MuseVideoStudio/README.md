@@ -1,10 +1,10 @@
 Continue in 1.1.6 resubmits unfinished scenes with new attempt IDs, ignoring tentative send flags and old receipts. Completed files are kept. The sidebar now displays the actual application version.
 
-# Muse Video Studio V1 · 1.1.11 · Windows
+# Muse Video Studio V1 · 1.2.0 · Windows
 
 ## Bản cài đặt Windows
 
-Tải `MuseVideoStudio-1.1.11-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
+Tải `MuseVideoStudio-1.2.0-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
 
 Build riêng: `node tools/build-installer.cjs` trên Windows. Workflow installer kiểm thử cài đặt, shortcut, mở app, một cửa sổ chính và gỡ cài đặt trước khi thêm Setup.exe vào release hiện tại.
 
@@ -141,6 +141,17 @@ Nối MP4 tùy chọn cần FFmpeg/ffprobe trên máy (chưa đóng kèm): chọ
 Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. Các kiểm tra `node test/submit-diagnostics-smoke.cjs`, `node test/cards-smoke.cjs`, `node test/muse-tracker-smoke.cjs`, `node test/download-capture-smoke.cjs` xác minh thẻ video, gắn kết quả theo prompt và tải/cancel tệp video thật từ máy chủ cục bộ; smoke tải cần FFmpeg hoặc MUSE_VIDEO_FIXTURE. Test UI và browser smoke cần Chromium; đặt CHROMIUM_PATH nếu khác /usr/bin/chromium. `node test/attachment-ready-smoke.cjs` kiểm tra readiness ảnh trên DOM fixture thật. FFmpeg smoke riêng: `npm run test:merge`.
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
+
+## Update 1.2.0
+
+- Thêm tab **Kể chuyện** (riêng, cạnh Tạo video và Tạo ảnh). Luồng: dán kịch bản + ảnh tham chiếu nhân vật → chia thành cảnh → Muse tạo clip qua hàng đợi sẵn có → giọng đọc → phụ đề → tự dựng → **Xuất MP4**. Chỉ việc của tab này chạy khi bấm Chạy ở tab này.
+- Chia cảnh: «Chia nhanh» cắt theo câu, mỗi cảnh dài khoảng số giây đã chọn (14 ký tự ≈ 1 giây lời đọc), không cần mạng. «Nhờ Muse chia» tạo sẵn một yêu cầu để bạn dán vào Muse rồi dán câu trả lời lại; tool tách cảnh, lời đọc và prompt từ câu trả lời (chịu được chữ đậm, «Cảnh/Scene», «Lời/Voice»). Tool không tự đọc chat Muse cho bước này.
+- Nhân vật không nói: mọi prompt cảnh đều có câu tiếng Anh `no speech` (không thoại, không hát, không lời bình), chỉ cho phép tiếng động và hiệu ứng âm thanh; cũng dặn không chèn chữ/phụ đề/logo vào hình.
+- Đúng thứ tự khi chạy nhiều luồng: mỗi cảnh có số riêng, clip lưu `001.mp4`, `002.mp4`… theo số cảnh dù cảnh nào xong trước; khi xuất, tool chỉ ghép theo số cảnh và báo «Còn N cảnh chưa có clip» nếu thiếu. Clip nằm trong `KeChuyen/<mã truyện>/` của thư mục lưu.
+- Giọng đọc miễn phí, có nút **Nghe thử** (đọc cảnh đầu của truyện mới nhất): giọng Windows có sẵn (offline, không cần Python); giọng Microsoft Edge (`edge-tts`, cần mạng, miễn phí); **clone giọng miễn phí** (VieNeu, chạy trên máy, thêm mẫu 3–15 giây và phải tick xác nhận có quyền dùng giọng đó). Edge và clone cần Python 3.10–3.13; nút «Cài giọng» tạo môi trường riêng trong dữ liệu app, không đụng Python của bạn. Lần clone đầu tải mô hình từ Hugging Face. Tốc độ đọc 0,9 / 1 / 1,15 / 1,3.
+- Phụ đề bật/tắt; chọn font, cỡ, màu, viền, vị trí, nền; xem trước ngay; tùy chọn lưu thêm file `.srt`. Phụ đề chia theo câu, khớp thời lượng giọng đọc.
+- Tự dựng: có giọng thì mỗi cảnh dài bằng lời đọc + 0,4 giây (tối thiểu 1,5 giây) và **cắt phần clip thừa**; lời dài hơn clip thì giữ khung hình cuối. Không có giọng thì giữ nguyên clip. Âm thanh gốc của clip (tiếng động) hạ nhỏ dưới giọng: Tắt / Nhỏ / Trung bình; không có giọng thì giữ âm thanh gốc.
+- Chưa thử với tài khoản Muse thật, điện thoại thật, Windows thật, cài Python/VieNeu/edge-tts thật hay chất lượng giọng thật. Phần ghép, cắt, thứ tự, phụ đề, SRT và giao thức giọng đọc đã kiểm bằng FFmpeg thật, Chromium thật và thư viện giọng giả.
 
 ## Update 1.1.11
 

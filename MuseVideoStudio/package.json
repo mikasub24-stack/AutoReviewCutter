@@ -1,6 +1,6 @@
 {
   "name": "muse-video-studio",
-  "version": "1.1.11",
+  "version": "1.2.0",
   "private": true,
   "description": "Windows desktop queue for Muse image-to-video workflows",
   "main": "src/main.cjs",
@@ -13,7 +13,9 @@
     "test:merge": "node test/merge.test.cjs",
     "test:package": "node test/edit-package.test.cjs",
     "test:sessions": "node test/session-store.test.cjs",
-    "test:browser-smoke": "node test/external-browser-smoke.cjs"
+    "test:browser-smoke": "node test/external-browser-smoke.cjs",
+    "test:story": "node --test test/story-plan.test.cjs test/story-render.test.cjs test/story-voice.test.cjs test/story-service.test.cjs",
+    "test:story-ui": "node test/story-tab-smoke.cjs"
   },
   "devDependencies": {
     "electron": "^40.0.0",

@@ -691,3 +691,40 @@ test('image result that cannot be read is retried, never saved as a broken file'
     await app.invoke('stop');
   }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
+
+test('story tab runs only its own scenes, saves clips under KeChuyen/<truyện> by scene number, and never touches the video tab or its merge',{timeout:12000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-story-run-'));
+  let app;const sent=[],trackers=[];
+  try{
+    await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+    app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>{
+      let closed=false,draft='';return{external:true,isDestroyed:()=>closed,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},openMuse:async()=>{},
+      evaluate:async(fn,arg)=>{
+        if(fn.name==='submitPrompt'){sent.push(draft);return{clicked:true};}
+        if(fn.name==='beginTracking'){trackers.push({...arg});return{phase:'waiting-prompt'};}
+        if(fn.name==='pollTracking')return{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null};
+        if(fn.name==='downloadAction')return{action:'clicked',clicked:true,needsMenu:false};
+        if(arg?.prompt && !arg?.id)draft=arg.prompt;return null;
+      },pressEnter:async()=>{sent.push(draft);},
+      captureDownload:async(target,{trigger,onProgress})=>{await trigger();await fs.writeFile(target,fixtureMp4());onProgress({receivedBytes:80,totalBytes:80});},
+      close:async()=>{closed=true;}};
+    }});
+    await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'merge'});await app.invoke('browser',0);
+    await app.invoke('add',[{prompt:'Video tab scene stays pending.',number:1}]);
+    await app.invoke('add',[{kind:'story',storyId:'Truyen-01',prompt:'Story scene one.',voiceover:'Lời cảnh một.'},{kind:'story',storyId:'Truyen-01',prompt:'Story scene two.',voiceover:'Lời cảnh hai.'}]);
+    assert.deepEqual([...app.invoke('state').jobs.map(j=>j.kind)],['video','story','story']);
+    await app.invoke('start',{kind:'story'});await until(()=>!app.invoke('state').active&&app.invoke('state').jobs[2].status==='completed');
+    const result=app.invoke('state');
+    assert.deepEqual(sent,['Story scene one.','Story scene two.']);
+    assert.deepEqual([...result.jobs.map(j=>j.status)],['pending','completed','completed']);
+    assert.ok(trackers.every(t=>t.mediaKind==='video'));
+    assert.deepEqual((await fs.readdir(path.join(dir,'KeChuyen','Truyen-01'))).sort(),['001.mp4','002.mp4']);
+    assert.equal(path.basename(path.dirname(result.jobs[1].output)),'Truyen-01');
+    assert.equal(result.jobs[1].voiceover,'Lời cảnh một.');
+    assert.equal((await fs.readdir(dir)).some(f=>/\.(mp4|webm|part)$/.test(f)),false,'không có clip hay file tạm ở thư mục video');
+    assert.equal(result.mergedOutput,'','không tự nối: tab Kể chuyện không dùng chức năng nối của tab video');
+    assert.ok(result.story&&result.story.voice&&Array.isArray(result.story.voice.clones));
+    await app.invoke('clearList',{kind:'story'});assert.deepEqual([...app.invoke('state').jobs.map(j=>j.kind)],['video']);
+    await app.stop();
+  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});

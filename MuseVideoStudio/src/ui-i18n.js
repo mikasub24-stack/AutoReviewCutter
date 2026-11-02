@@ -1,6 +1,121 @@
 // Interface-only localization. User prompts, titles, paths and form values are never translated.
 (()=>{
   const dictionary=Object.fromEntries(`
+Kể chuyện|Story
+Câu chuyện & nhân vật|Story & character
+Kịch bản → cảnh → clip Muse|Script → scenes → Muse clips
+1. Kịch bản|1. Script
+Dán cả câu chuyện hoặc lời kể. Tool chia thành các cảnh khoảng 10 giây; mỗi cảnh có lời đọc và prompt riêng.|Paste the whole story or narration. The tool splits it into scenes of about 10 seconds, each with its own narration and prompt.
+Nhân vật (mô tả ngắn)|Character (short description)
+Phong cách hình ảnh|Visual style
+Ví dụ: Mai, bé gái tóc đen, áo dài trắng|e.g. Mai, a girl with black hair in a white áo dài
+Ví dụ: hoạt hình màu nước|e.g. watercolor animation
+Chọn ảnh nhân vật|Choose character image
+Dán hoặc kéo ảnh nhân vật vào đây. Ảnh này gắn vào mọi cảnh để nhân vật giữ nguyên.|Paste or drop the character image here. It is attached to every scene so the character stays consistent.
+Chưa chọn ảnh nhân vật.|No character image chosen.
+Chia nhanh ngay trên máy, hoặc nhờ Muse đọc kịch bản để prompt hay hơn.|Split instantly on this computer, or ask Muse to read the script for better prompts.
+Chia cảnh nhanh|Quick split
+Nhờ Muse đọc kịch bản|Ask Muse to read the script
+Muse đọc kịch bản (tuỳ chọn)|Muse reads the script (optional)
+Bước 1: bấm «Sao chép yêu cầu», dán vào khung chat Muse (mở Muse bằng nút «Mở Muse / Đăng nhập» bên trái). Bước 2: dán trả lời của Muse vào ô dưới, rồi bấm «Tách cảnh».|Step 1: click “Copy request” and paste it into the Muse chat (open Muse with “Open Muse / Sign in” on the left). Step 2: paste Muse's reply below, then click “Split scenes”.
+Sao chép yêu cầu|Copy request
+Dán trả lời của Muse (CẢNH 1 / LỜI / PROMPT …)|Paste Muse's reply (SCENE 1 / VOICE / PROMPT …)
+Tách cảnh từ trả lời của Muse|Split scenes from Muse's reply
+2. Các cảnh|2. Scenes
+Sửa lời đọc hoặc prompt từng cảnh nếu cần.|Edit each scene's narration or prompt if needed.
+Tạo clip|Create clips
+Giọng, phụ đề & xuất MP4|Voice, subtitles & MP4 export
+Nghe thử · Phụ đề bật/tắt|Listen · Subtitles on/off
+Giọng kể|Narrator voice
+Giọng|Voice
+Không lồng tiếng|No voiceover
+Microsoft (miễn phí, cần mạng)|Microsoft (free, needs internet)
+Giọng clone của bạn (miễn phí)|Your cloned voice (free)
+Giọng có sẵn trong Windows|Built-in Windows voice
+Chọn giọng|Choose voice
+Tốc độ đọc|Reading speed
+Chậm|Slow
+Bình thường|Normal
+Nhanh|Fast
+Rất nhanh|Very fast
+Nghe thử giọng|Listen to voice
+Đang tạo giọng…|Generating voice…
+Cài giọng miễn phí|Install free voices
+Cài lại giọng miễn phí|Reinstall free voices
+Đang cài giọng…|Installing voices…
+Dừng cài|Stop installing
+Clone giọng của bạn (miễn phí)|Clone your voice (free)
+Tên giọng|Voice name
+Ví dụ: Giọng của tôi|e.g. My voice
+Đây là giọng của tôi hoặc của người đã đồng ý cho tôi nhân bản.|This is my voice, or the voice of someone who agreed to let me clone it.
+Chọn file ghi âm mẫu và nhân bản|Choose a voice sample and clone it
+Ghi âm 6–15 giây, một người nói rõ, không nhạc nền (.wav .mp3 .m4a …). Chạy ngay trên máy, không gửi lên dịch vụ trả phí; lần đầu dùng sẽ tải mô hình nên lâu.|Record 6–15 seconds, one clear speaker, no background music (.wav .mp3 .m4a …). It runs on this computer and is not sent to a paid service; the first use downloads a model, so it takes a while.
+Phụ đề|Subtitles
+Hiện phụ đề trong video|Show subtitles in the video
+Xuất thêm file .srt|Also export an .srt file
+Phông chữ|Font
+Cỡ chữ|Text size
+Màu chữ|Text color
+Màu viền|Outline color
+Vị trí|Position
+Dưới|Bottom
+Giữa|Middle
+Trên|Top
+Nền mờ sau chữ|Dim background behind text
+Xem trước phụ đề|Subtitle preview
+Âm thanh & xuất video|Audio & video export
+Tiếng động gốc của clip|Original clip sound effects
+Tắt|Off
+Nhỏ (nền dưới giọng kể)|Low (background under narration)
+Trung bình|Medium
+Tên video|Video name
+Tên truyện|Story name
+Truyện|Story
+Tự edit: cảnh nào lời đọc ngắn hơn clip thì cắt phần thừa; lời dài hơn clip thì giữ khung cuối cho đọc hết. Prompt đã dặn Muse không cho nhân vật nói, chỉ có tiếng động.|Auto edit: if a scene's narration is shorter than its clip, the extra footage is cut; if it is longer, the last frame is held so it can finish. Prompts tell Muse that characters must not speak, only sound effects.
+Xuất MP4|Export MP4
+Mở video|Open video
+Đang xuất…|Exporting…
+Danh sách clip kể chuyện|Story clip workspace
+Clip kể chuyện lưu trong thư mục «KeChuyen» theo từng truyện, đánh số cảnh 001, 002, 003…|Story clips are saved in the “KeChuyen” folder per story, numbered by scene 001, 002, 003…
+Sẵn sàng cho câu chuyện mới|Ready for your next story
+Lời đọc|Narration
+Lời đọc của cảnh này|Narration for this scene
+Prompt gửi Muse|Prompt sent to Muse
+Xóa cảnh|Remove scene
+Đã sao chép yêu cầu. Dán vào khung chat Muse.|Request copied. Paste it into the Muse chat.
+Nhấn Ctrl+C để sao chép yêu cầu rồi dán vào chat Muse.|Press Ctrl+C to copy the request, then paste it into the Muse chat.
+Chia cảnh trước.|Split the script into scenes first.
+Cảnh nào cũng cần prompt.|Every scene needs a prompt.
+Xóa giọng clone này khỏi máy?|Delete this cloned voice from this computer?
+Đã thêm giọng clone. Bấm «Nghe thử giọng» để nghe.|Cloned voice added. Click “Listen to voice” to hear it.
+Chưa có clip kể chuyện nào trong hàng đợi.|There are no story clips in the queue yet.
+Đã xuất MP4.|MP4 exported.
+Không lồng tiếng: video giữ tiếng động của clip, phụ đề lấy từ lời đọc của cảnh.|No voiceover: the video keeps the clip's sound effects and subtitles come from each scene's narration.
+Chưa cài giọng Microsoft. Bấm «Cài giọng miễn phí» (cần Python 3.10–3.13 trên máy và mạng).|Microsoft voices are not installed. Click “Install free voices” (needs Python 3.10–3.13 and internet).
+Chưa cài giọng clone. Bấm «Cài giọng miễn phí» (cần Python 3.10–3.13 và mạng; lần đầu tải mô hình nên lâu).|Voice cloning is not installed. Click “Install free voices” (needs Python 3.10–3.13 and internet; the first run downloads a model, so it takes a while).
+Chưa có giọng clone. Mở mục «Clone giọng của bạn» và thêm file ghi âm mẫu.|No cloned voice yet. Open “Clone your voice” and add a voice sample.
+Giọng có sẵn chỉ có trên Windows.|Built-in voices are available on Windows only.
+Windows chưa có giọng đọc nào. Thêm giọng tiếng Việt trong Cài đặt Windows → Ngôn ngữ, hoặc dùng giọng Microsoft.|Windows has no speech voices. Add a Vietnamese voice in Windows Settings → Language, or use a Microsoft voice.
+Giọng clone chạy ngay trên máy, miễn phí. Lần nghe/xuất đầu tiên phải tải mô hình nên lâu.|The cloned voice runs on this computer for free. The first listen/export downloads a model, so it takes a while.
+Giọng Microsoft miễn phí, cần có mạng khi đọc.|Microsoft voices are free and need an internet connection while reading.
+Giọng Windows có sẵn, chạy offline. Chất lượng tiếng Việt tùy giọng bạn đã cài.|Built-in Windows voices run offline. Vietnamese quality depends on the voices you installed.
+Chưa có clip kể chuyện. Chia cảnh và bấm Tạo clip trước.|No story clips yet. Split the script and click Create clips first.
+Chưa có giọng|No voice yet
+Chưa có giọng clone|No cloned voice yet
+Không thấy giọng Windows|No Windows voice found
+Đang xử lý…|Working…
+Đang làm giọng đọc…|Generating narration…
+Đang đo độ dài từng cảnh…|Measuring each scene…
+Đang nối các cảnh…|Joining scenes…
+Đã xuất MP4|MP4 exported
+Đang nạp mô hình giọng (lần đầu phải tải nên lâu, vài phút)…|Loading the voice model (the first run downloads it, a few minutes)…
+Đã nạp mô hình giọng.|Voice model loaded.
+Đang tìm Python…|Looking for Python…
+Cài giọng Microsoft (edge-tts)…|Installing Microsoft voices (edge-tts)…
+Cài giọng clone VieNeu (có thể vài phút)…|Installing VieNeu cloned voices (may take a few minutes)…
+Đã cài xong giọng miễn phí. Lần nghe/clone đầu sẽ tải mô hình nên lâu hơn.|Free voices installed. The first listen/clone downloads a model and takes longer.
+Đã dừng.|Stopped.
+Đã dừng cài giọng.|Voice installation stopped.
 Đang dùng thử 24 giờ.|24-hour trial active.
 Hết 24 giờ dùng thử. Nhập key để tiếp tục tạo video.|Your 24-hour trial has ended. Activate a license to continue.
 Máy chưa hỗ trợ lưu mã hóa dùng thử/key.|Encrypted license storage is unavailable on this device.
@@ -265,7 +380,7 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
   function t(value){
     const raw=String(value??'');if(language==='vi')return raw;
     const key=norm(raw);if(dictionary[key])return raw.replace(key,dictionary[key]);
-    const decorated=key.match(/^([▶■▱▦▧↗⚙✓＋+\s]*)(.*?)([＋▾\s]*)$/u);
+    const decorated=key.match(/^([▶■▱▦▧✎↗⚙✓＋+\s]*)(.*?)([＋▾\s]*)$/u);
     if(decorated&&dictionary[decorated[2]])return decorated[1]+dictionary[decorated[2]]+decorated[3];
     const photoRetry=key.match(/^Chưa lưu được ảnh · giữ đúng kết quả và thử lại: (.+)$/);if(photoRetry)return 'Image not saved yet · Retrying the same result: '+t(photoRetry[1]);
     const retry=key.match(/^Chưa lưu được video · giữ đúng kết quả và thử tải lại: (.+)$/);if(retry)return 'Video not saved yet · Retrying the same result: '+t(retry[1]);
@@ -298,6 +413,20 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
       [/^Đang đính kèm (\d+) ảnh tham chiếu đã khóa$/,m=>'Attaching '+m[1]+' locked reference image(s)'],
       [/^Thêm (\d+) prompt và chạy toàn bộ tác vụ đang chờ\?.*$/,m=>'Add '+m[1]+' prompts and run all pending scenes? This may use Muse credits. Exact reviewed prompts and scene references will be sent.'],
       [/^Dán ảnh tại đây cho (.+)$/,m=>'Paste references here for '+m[1]],
+      [/^(\d+) cảnh$/,m=>m[1]+' scenes'],
+      [/^Đã chia (\d+) cảnh khoảng (\d+) giây\. Xem lại lời đọc và prompt, rồi bấm Tạo clip\.$/,m=>'Split into '+m[1]+' scenes of about '+m[2]+' seconds. Review the narration and prompts, then click Create clips.'],
+      [/^Muse đã chia (\d+) cảnh\. Xem lại rồi bấm Tạo clip\.$/,m=>'Muse split the story into '+m[1]+' scenes. Review them, then click Create clips.'],
+      [/^Ảnh nhân vật: (.+) — gắn vào mọi cảnh\.$/,m=>'Character image: '+m[1]+' — attached to every scene.'],
+      [/^Thêm (\d+) cảnh và chạy toàn bộ clip kể chuyện đang chờ\?.*$/,m=>'Add '+m[1]+' scenes and run all pending story clips? This may use Muse credits. The reviewed prompts are sent exactly as shown, with the character image.'],
+      [/^Còn (\d+) cảnh chưa xong\. Chạy hàng đợi cho xong rồi xuất\.$/,m=>m[1]+' scene(s) are not finished. Finish the queue, then export.'],
+      [/^Còn (\d+) cảnh chưa có clip\. Chạy hàng đợi cho xong rồi xuất MP4\.$/,m=>m[1]+' scene(s) have no clip yet. Finish the queue, then export MP4.'],
+      [/^Còn (\d+) cảnh chưa có clip \(cảnh (.+)\)\. Chạy hàng đợi cho xong rồi xuất\.$/,m=>m[1]+' scene(s) have no clip yet (scene '+m[2]+'). Finish the queue, then export.'],
+      [/^(\d+) cảnh đã sẵn sàng\. Chọn giọng, phụ đề rồi bấm Xuất MP4\.$/,m=>m[1]+' scenes are ready. Choose a voice and subtitles, then click Export MP4.'],
+      [/^Tự edit: cắt ([\d.]+) giây thừa(?:; (\d+) cảnh lời dài hơn clip nên giữ khung cuối \(cảnh (.+)\))?\.$/,m=>'Auto edit: cut '+m[1]+' s of extra footage'+(m[2]?'; '+m[2]+' scene(s) with narration longer than the clip hold the last frame (scene '+m[3]+')':'')+'.'],
+      [/^Đã chuẩn bị (\d+) cảnh$/,m=>'Prepared '+m[1]+' scenes'],
+      [/^Ghép cảnh (\d+)\/(\d+)$/,m=>'Joining scene '+m[1]+'/'+m[2]],
+      [/^Đã đọc (\d+)\/(\d+) cảnh$/,m=>'Narrated '+m[1]+'/'+m[2]+' scenes'],
+      [/^Tạo môi trường giọng \(Python (.+)\)…$/,m=>'Creating the voice environment (Python '+m[1]+')…'],
     ];
     for(const [re,fn]of patterns){const m=key.match(re);if(m)return fn(m);}return raw;
   }

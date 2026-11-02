@@ -14,3 +14,7 @@ require('./download-capture.test.cjs');
 
 require('./locked-input.test.cjs');
 require('./ordered-output.test.cjs');
+require('./story-plan.test.cjs');
+require('./story-render.test.cjs');
+require('./story-voice.test.cjs');
+require('./story-service.test.cjs');
