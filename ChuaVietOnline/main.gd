@@ -313,12 +313,9 @@ func _draw() -> void:
 	var net_color := Color("#9ad99a") if is_online else Color("#ffcf8c")
 	draw_circle(Vector2(w - 28.0, 22.0), 6.0, net_color)
 	draw_string(ThemeDB.fallback_font, Vector2(w - 145.0, 28.0), net_label, HORIZONTAL_ALIGNMENT_LEFT, 110, 13, net_color)
-	draw_string(ThemeDB.fallback_font, Vector2(18,31), "CHÙA VIỆT ONLINE  |  1.000 BỒ ĐOÀN", HORIZONTAL_ALIGNMENT_LEFT, w-24, 20, Color("#f6d18a"))
+	draw_string(ThemeDB.fallback_font, Vector2(18,31), "CHÙA VIỆT ONLINE", HORIZONTAL_ALIGNMENT_LEFT, w-170, 20, Color("#f6d18a"))
+	draw_string(ThemeDB.fallback_font, Vector2(18,86), "1.000 bồ đoàn • %d khách" % occupant_count, HORIZONTAL_ALIGNMENT_LEFT, w-24, 14, Color("#f1d4a2"))
 	draw_string(ThemeDB.fallback_font, Vector2(18,62), status_text, HORIZONTAL_ALIGNMENT_LEFT, w-24, 15, Color.WHITE)
-	if multiplayer_client != null and multiplayer_client.connected:
-		draw_circle(Vector2(w-20,22),7,Color("#4cc886"))
-	else:
-		draw_circle(Vector2(w-20,22),7,Color("#ae9280"))
 	if occupancy_notice > 0.0:
 		draw_rect(Rect2(22,h*0.40,w-44,88),Color(0.39,0.11,0.08,0.94))
 		draw_string(ThemeDB.fallback_font,Vector2(35,h*0.40+35),"BỒ ĐOÀN ĐÃ CÓ NGƯỜI NGỒI",HORIZONTAL_ALIGNMENT_LEFT,w-70,20,Color("#ffe0a6"))
