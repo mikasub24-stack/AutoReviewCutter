@@ -534,9 +534,13 @@ func _network_changed(is_connected: bool) -> void:
 	if is_connected:
 		occupied_seats.clear()
 		_sync_occupancy()
+		# A locally saved seat is never authoritative after joining a room.
 		if sitting and selected_seat >= 0:
-			_claim_seat(selected_seat)
-		status_text = "Đã kết nối chính điện trực tuyến"
+			var desired_seat := selected_seat
+			sitting = false
+			_begin_sitting(desired_seat)
+		else:
+			status_text = "Đã kết nối chính điện trực tuyến"
 	else:
 		waiting_for_seat = false
 		_seed_occupants()
