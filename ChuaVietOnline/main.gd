@@ -149,6 +149,31 @@ func _draw() -> void:
 	var camera := _camera()
 	draw_rect(Rect2(Vector2.ZERO, size), Color("#2a1a14"))
 	draw_rect(Rect2(-camera, Vector2(WORLD_W, WORLD_H)), Color("#75513b"))
+	# Vietnamese timber floorboards and warm brass inlay.
+	var board_start := maxi(0,int(camera.y / 48.0)-1)
+	var board_end := mini(int(WORLD_H/48.0),int((camera.y+h)/48.0)+1)
+	for plank in range(board_start,board_end+1):
+		var py := float(plank)*48.0-camera.y
+		var timber := Color("#82583c") if plank % 2 == 0 else Color("#765039")
+		draw_rect(Rect2(-camera.x,py,WORLD_W,46),timber)
+		draw_line(Vector2(-camera.x,py+46),Vector2(WORLD_W-camera.x,py+46),Color("#482d22"),2)
+		for joint in range(1,4):
+			var px := float(joint)*430.0 + float((plank%3)*140) - camera.x
+			draw_line(Vector2(px,py+2),Vector2(px,py+44),Color("#5b392a"),2)
+	# Symmetrical hanging lanterns and gilded lotus ornaments.
+	var lamp_start := maxi(0,int(camera.y/390.0)-1)
+	var lamp_end := mini(int(WORLD_H/390.0),int((camera.y+h)/390.0)+1)
+	for lamp_row in range(lamp_start,lamp_end+1):
+		var ly := 210.0+float(lamp_row)*390.0-camera.y
+		for lx in [WORLD_W*0.5-310.0,WORLD_W*0.5+310.0]:
+			var center := Vector2(lx-camera.x,ly)
+			draw_line(center+Vector2(0,-53),center+Vector2(0,-24),Color("#d8ae55"),3)
+			draw_circle(center,30,Color(1.0,0.75,0.31,0.11))
+			draw_colored_polygon(PackedVector2Array([center+Vector2(-18,-23),center+Vector2(18,-23),center+Vector2(24,0),center+Vector2(12,24),center+Vector2(-12,24),center+Vector2(-24,0)]),Color("#bf4b32"))
+			draw_line(center+Vector2(-16,-15),center+Vector2(16,-15),Color("#f2ce76"),3)
+			draw_line(center+Vector2(-14,13),center+Vector2(14,13),Color("#f2ce76"),3)
+			draw_circle(center,9,Color("#ffe8a1"))
+			draw_line(center+Vector2(0,24),center+Vector2(0,39),Color("#e5ae4b"),2)
 	# Central carpet and horizontal walkways.
 	draw_rect(Rect2(Vector2(WORLD_W * 0.5 - AISLE * 0.5, 0) - camera, Vector2(AISLE, WORLD_H)), Color("#a62f2b"))
 	draw_rect(Rect2(Vector2(WORLD_W * 0.5 - 6, 0) - camera, Vector2(12, WORLD_H)), Color("#dfae4e"))
