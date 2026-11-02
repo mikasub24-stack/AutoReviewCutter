@@ -172,17 +172,6 @@ func _draw() -> void:
 	for tile_y in range(floor_y_start, floor_y_end + 1):
 		for tile_x in range(floor_x_start, floor_x_end + 1):
 			draw_texture_rect(TIMBER_TILE, Rect2(Vector2(float(tile_x) * 320.0, float(tile_y) * 320.0) - camera, Vector2(320.0, 320.0)), false)
-	# Vietnamese timber floorboards and warm brass inlay.
-	var board_start := maxi(0,int(camera.y / 48.0)-1)
-	var board_end := mini(int(WORLD_H/48.0),int((camera.y+h)/48.0)+1)
-	for plank in range(board_start,board_end+1):
-		var py := float(plank)*48.0-camera.y
-		var timber := Color("#82583c") if plank % 2 == 0 else Color("#765039")
-		draw_rect(Rect2(-camera.x,py,WORLD_W,46),timber)
-		draw_line(Vector2(-camera.x,py+46),Vector2(WORLD_W-camera.x,py+46),Color("#482d22"),2)
-		for joint in range(1,4):
-			var px: float = float(joint)*430.0 + float((plank%3)*140) - camera.x
-			draw_line(Vector2(px,py+2),Vector2(px,py+44),Color("#5b392a"),2)
 	# Symmetrical hanging lanterns and gilded lotus ornaments.
 	var lamp_start := maxi(0,int(camera.y/390.0)-1)
 	var lamp_end := mini(int(WORLD_H/390.0),int((camera.y+h)/390.0)+1)
@@ -300,28 +289,12 @@ func _draw() -> void:
 			draw_rect(Rect2(remote_pos+Vector2(3,12),Vector2(9,20)),Color("#302521"))
 			draw_colored_polygon(PackedVector2Array([remote_pos+Vector2(-20,-12),remote_pos+Vector2(20,-12),remote_pos+Vector2(23,20),remote_pos+Vector2(-23,20)]),remote_robe)
 			draw_circle(remote_pos+Vector2(0,-27),15,Color("#d9a47a"))
-	# Character: bald head, Vietnamese brown or gray robe.
+	# Illustrated character sprites: no placeholder polygon is drawn beneath them.
 	var walking := not sitting and (auto_walk or joystick.length() > 0.05)
 	var gait := sin(footstep_time) * 4.0 if walking else 0.0
 	var avatar := player - camera + Vector2(0, absf(gait) * -0.4)
-	if sitting:
-		_ellipse(avatar + Vector2(0, 20), Vector2(29, 12), Color("#38241b"))
-	else:
-		draw_rect(Rect2(avatar + Vector2(-14, 13 + gait), Vector2(11, 24)), Color("#302521"))
-		draw_rect(Rect2(avatar + Vector2(4, 13 - gait), Vector2(11, 24)), Color("#302521"))
-	var robe := Color("#90969a") if character_gender == 1 else (Color("#79533b") if robe_brown else Color("#90969a"))
-	draw_colored_polygon(PackedVector2Array([avatar + Vector2(-23,-12),avatar + Vector2(23,-12),avatar + Vector2(27,22),avatar + Vector2(-27,22)]), robe)
-	draw_circle(avatar + Vector2(0,-27), 15, Color("#d9a47a"))
-	# Detailed approved-style character art overlays the temporary geometry.
-	# Rendered as a proper texture, not a screenshot of the whole UI.
 	var avatar_rect := Rect2(avatar + Vector2(-35.0, -64.0), Vector2(70.0, 100.0))
 	draw_texture_rect(NUN_AVATAR if character_gender == 1 else MONK_AVATAR, avatar_rect, false)
-	# Small hands make the walking silhouette readable on a phone.
-	draw_circle(avatar + Vector2(-24, 4 - gait), 6, Color("#d9a47a"))
-	draw_circle(avatar + Vector2(24, 4 + gait), 6, Color("#d9a47a"))
-	if character_gender == 1:
-		draw_arc(avatar + Vector2(0,-29), 16, PI, TAU, 16, Color("#282324"), 5)
-	draw_arc(avatar + Vector2(0,-27), 15, PI, TAU, 16, Color("#966547"), 2)
 	for particle in incense:
 		var a: float = float(particle["age"])
 		var pos: Vector2 = (particle["pos"] as Vector2) - camera + Vector2(sin(a * 4.0) * 13.0, -a * 42.0)
