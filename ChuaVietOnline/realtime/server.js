@@ -27,7 +27,20 @@ function occupied(seat, except) {
   for (const [ws,p] of players) if (ws !== except && p.seat === seat) return true;
   return false;
 }
+const heartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.isAlive === false) {
+      ws.terminate();
+      continue;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, 30000);
+wss.on("close", () => clearInterval(heartbeat));
 wss.on("connection", ws => {
+  ws.isAlive = true;
+  ws.on("pong", () => { ws.isAlive = true; });
   if (players.size >= MAX_CLIENTS) {
     send(ws,{type:"error",reason:"room_full"}); ws.close(); return;
   }
