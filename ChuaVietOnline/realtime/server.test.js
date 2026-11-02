@@ -17,6 +17,8 @@ async function connect() {
     try {
       return await new Promise((resolve,reject)=>{
         const ws=new WebSocket("ws://127.0.0.1:"+port);
+        ws._testQueue=[];
+        ws.on("message",raw=>ws._testQueue.push(JSON.parse(String(raw))));
         ws.once("open",()=>resolve(ws));
         ws.once("error",reject);
       });
@@ -25,23 +27,13 @@ async function connect() {
   throw Error("Server failed to start");
 }
 function messages(ws) {
-  const queue=[],waiters=[];
-  ws.on("message",raw=>{
-    const item=JSON.parse(String(raw));
-    if(waiters.length)waiters.shift()(item);
-    else queue.push(item);
-  });
+  const queue=ws._testQueue;
   return async (type,timeout=2500)=>{
     const end=Date.now()+timeout;
     while(Date.now()<end){
       const i=queue.findIndex(x=>x.type===type);
       if(i>=0)return queue.splice(i,1)[0];
-      const next=await Promise.race([
-        new Promise(resolve=>waiters.push(resolve)),
-        delay(100).then(()=>null)
-      ]);
-      if(next && next.type===type)return next;
-      if(next)queue.push(next);
+      await delay(30);
     }
     throw Error("Missing message: "+type);
   };
