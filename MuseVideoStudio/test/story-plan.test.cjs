@@ -238,7 +238,7 @@ test('câu được đánh số; câu quá dài cắt ở dấu phẩy; mỗi c�
 });
 
 test('yêu cầu gửi Muse: đọc hiểu cả truyện, chia theo SỐ CÂU, không chép lời, prompt đúng hành động và nét mặt, nhận ra mọi nhân vật', () => {
-  const text = sp.buildMuseInstruction(tale, { seconds: 10, aspect: '9:16', style: 'điện ảnh', character: 'Mai, bé gái tóc đen' }, { marker: 'ab12cd' });
+  const text = sp.buildMuseInstruction(tale, { seconds: 10, aspect: '9:16', style: 'điện ảnh', character: 'Mai, bé gái tóc đen', reference: true }, { marker: 'ab12cd' });
   assert.match(text, /MỘT video ngắn, dài tối đa 10 giây/);
   assert.match(text, /Độ dài video của cảnh tự theo lời kể/);
   assert.match(text, /video 5 giây: 0–2 giây/);
@@ -402,4 +402,27 @@ test('sửa lời về nguyên văn thì giây của cảnh cũng tính lại th
   const muse = [{ voiceover: 'Mai ra bến sông.', prompt: 'P1 ' + sp.NO_SPEECH, durationSeconds: 10 }, { voiceover: 'Cá vàng nhảy lên thuyền.', prompt: 'P2 ' + sp.NO_SPEECH, durationSeconds: 10 }];
   const fixed = sp.alignToScript(script, muse, { seconds: 10 });
   assert.ok(fixed.every(s => s.durationSeconds === sp.sceneSeconds(s.voiceover, 10)));
+});
+
+
+test('mô tả nhân vật và ảnh tham chiếu chỉ xuất hiện khi có dùng, không phải mặc định', () => {
+  const bare = { seconds: 10, aspect: '16:9' };
+  const none = sp.buildMuseInstruction(tale, bare, { marker: 'ab12cd' });
+  assert.doesNotMatch(none, /ảnh tham chiếu/, 'không có ảnh thì không nhắc ảnh tham chiếu');
+  assert.doesNotMatch(none, /Nhân vật chính \(người dùng mô tả\)/, 'không nhập mô tả thì không có dòng mô tả');
+  assert.doesNotMatch(none, /phong cách hình ảnh/);
+  assert.match(none, /nhận ra các nhân vật CÓ MẶT/);
+  assert.match(none, /KHÔNG vẽ vào hình/, 'người chỉ được nhắc tới thì không vẽ');
+  assert.match(none, /^NHÂN VẬT: </m, 'vẫn yêu cầu dòng chốt nhân vật phụ để giữ nhất quán');
+  const withRef = sp.buildMuseInstruction(tale, { ...bare, reference: true }, { marker: 'ab12cd' });
+  assert.match(withRef, /ảnh tham chiếu đính kèm/);
+  assert.match(withRef, /theo ảnh tham chiếu/);
+  assert.match(sp.buildMuseInstruction(tale, { ...bare, character: 'Mai, bé gái' }, { marker: 'ab12cd' }), /Nhân vật chính \(người dùng mô tả\): Mai, bé gái/);
+
+  const plain = sp.planStory('Mai ra bến sông lúc bình minh.', bare)[0].prompt;
+  assert.doesNotMatch(plain, /ảnh tham chiếu/);
+  assert.doesNotMatch(plain, /Nhân vật:/);
+  const full = sp.planStory('Mai ra bến sông lúc bình minh.', { ...bare, reference: true, character: 'Mai, bé gái' })[0].prompt;
+  assert.match(full, /Nhân vật: Mai, bé gái/);
+  assert.match(full, /như trong ảnh tham chiếu/);
 });

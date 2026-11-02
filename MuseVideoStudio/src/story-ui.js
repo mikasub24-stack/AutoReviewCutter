@@ -24,7 +24,7 @@
     $(id).addEventListener('change', () => { saved[key] = $(id).checked; persist(); drawPreview(); });
   }
 
-  const options = () => ({ seconds: plan().MAX_SECONDS, aspect: $('storyAspect').value, style: $('storyStyle').value, character: $('storyCharacter').value });
+  const options = () => ({ seconds: plan().MAX_SECONDS, reference: refs.length > 0, aspect: $('storyAspect').value, style: $('storyStyle').value, character: $('storyCharacter').value });
   const plan = () => window.storyPlan;
   const dims = aspect => aspect === '9:16' ? [1080, 1920] : aspect === '1:1' ? [1080, 1080] : [1920, 1080];
   const baseName = file => String(file || '').split(/[\\/]/).pop();

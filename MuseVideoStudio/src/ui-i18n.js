@@ -6,9 +6,9 @@ Câu chuyện & nhân vật|Story & character
 Kịch bản → cảnh → clip Muse|Script → scenes → Muse clips
 1. Câu chuyện|1. Story
 Chỉ cần dán nguyên câu chuyện. Muse tự đọc hiểu để chia cảnh và viết prompt hình; giọng đọc sẽ đọc đúng nguyên văn câu chuyện này.|Just paste the story as it is. Muse reads and understands it to split scenes and write the picture prompts; the voice reads your story word for word.
-Nhân vật (mô tả ngắn)|Character (short description)
+Nhân vật chính (không bắt buộc)|Main character (optional)
 Phong cách hình ảnh|Visual style
-Ví dụ: Mai, bé gái tóc đen, áo dài trắng|e.g. Mai, a girl with black hair in a white áo dài
+Để trống nếu không cần. Ví dụ: Mai, bé gái tóc đen, áo dài trắng|Leave empty if not needed. e.g. Mai, a girl with black hair in a white áo dài
 Ví dụ: hoạt hình màu nước|e.g. watercolor animation
 Chọn ảnh nhân vật|Choose character image
 Dán hoặc kéo ảnh nhân vật chính vào đây. Ảnh này gắn vào mọi cảnh để nhân vật giữ nguyên; nhân vật khác trong truyện do Muse nhận ra và mô tả cố định ở mọi cảnh.|Paste or drop the main character image here. It is attached to every scene so the character stays consistent; Muse recognizes the other characters in the story and gives each a fixed description in every scene.

@@ -519,7 +519,7 @@ app.whenReady().then(async () => {
     storyBuild:async data=>{await storyService.build({runId:String(data?.runId||''),name:String(data?.name||''),aspect:String(data?.aspect||'16:9'),subtitles:data?.subtitles!==false,srt:data?.srt===true,sfx:String(data?.sfx||'low'),scenes:Array.isArray(data?.scenes)?data.scenes:[]});return snapshot();},
     storyCancel:async()=>{storyService.cancel();return snapshot();},
     storyAnalyze:async data=>{
-      try{return await storyAnalyzer.run({script:String(data?.script||''),options:{seconds:Number(data?.seconds),aspect:String(data?.aspect||'16:9'),style:String(data?.style||''),character:String(data?.character||'')}});}
+      try{return await storyAnalyzer.run({script:String(data?.script||''),options:{seconds:Number(data?.seconds),reference:Boolean(data?.reference),aspect:String(data?.aspect||'16:9'),style:String(data?.style||''),character:String(data?.character||'')}});}
       finally{if(!starting&&!queue.active&&!flushingQuit&&main&&!main.isDestroyed()){main.show();main.focus();}}
     },
     storyAnalyzeCancel:async()=>{storyAnalyzer.cancel();return snapshot();},
