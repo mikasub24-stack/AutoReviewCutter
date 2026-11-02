@@ -73,6 +73,9 @@ func _process(delta: float) -> void:
 		seat_request_timeout -= delta
 		if seat_request_timeout <= 0.0:
 			waiting_for_seat = false
+			sitting = false
+			selected_seat = -1
+			_claim_seat(-1)
 			status_text = "Máy chủ chưa phản hồi. Vui lòng thử lại."
 	network_tick += delta
 	if network_tick >= 0.15:
@@ -107,9 +110,7 @@ func _process(delta: float) -> void:
 						return
 					selected_seat = approach_seat
 					approach_seat = -1
-					sitting = true
-					status_text = "Đang ngồi tại bồ đoàn %d" % (selected_seat + 1)
-					_claim_seat(selected_seat)
+					_begin_sitting(selected_seat)
 					_save_progress()
 		else:
 			movement_facing = remaining.normalized()
@@ -386,12 +387,14 @@ func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 				status_text = "Chỗ đã có người ngồi, vui lòng chọn bồ đoàn khác."
 				occupancy_notice = 3.0
 				return
-			sitting = not sitting
-			if not sitting:
+			if sitting:
+				sitting = false
 				_claim_seat(-1)
+				status_text = "Đã đứng dậy"
 			elif selected_seat >= 0:
-				_claim_seat(selected_seat)
-			status_text = "Đang ngồi thiền" if sitting else "Đã đứng dậy"
+				_begin_sitting(selected_seat)
+			else:
+				status_text = "Hãy chọn một bồ đoàn trước khi ngồi"
 		else:
 			if character_gender == 0 and robe_brown:
 				robe_brown = false
@@ -436,9 +439,7 @@ func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 			if player.distance_to(_seat_position(best)) < 125.0:
 				player = _seat_position(best)
 				approach_seat = -1
-				sitting = true
-				status_text = "Đang ngồi tại bồ đoàn số %d" % (best+1)
-				_claim_seat(best)
+				_begin_sitting(best)
 			else:
 				_navigate_to_seat(best)
 				status_text += " (đang tự tìm đường)"
@@ -506,6 +507,23 @@ func _draw_seated_occupant(pos: Vector2, variant: int) -> void:
 	if variant == 1:
 		draw_arc(pos + Vector2(0,-43), 10, PI, TAU, 12, Color("#252323"), 3)
 
+func _begin_sitting(index: int) -> void:
+	if index < 0 or index >= CAPACITY:
+		return
+	if occupied_seats.has(index):
+		status_text = "Chỗ đã có người ngồi, vui lòng chọn bồ đoàn khác."
+		occupancy_notice = 3.0
+		sitting = false
+		return
+	selected_seat = index
+	if multiplayer_client != null and multiplayer_client.connected:
+		sitting = false
+		status_text = "Đang xin phép ngồi tại bồ đoàn %d..." % (index + 1)
+		_claim_seat(index)
+	else:
+		sitting = true
+		status_text = "Đang ngồi tại bồ đoàn %d" % (index + 1)
+
 func _claim_seat(index: int) -> void:
 	if multiplayer_client != null and multiplayer_client.connected:
 		waiting_for_seat = index >= 0
@@ -540,6 +558,7 @@ func _seat_confirmed(index: int) -> void:
 		_claim_seat(-1)
 		return
 	if index >= 0:
+		sitting = true
 		status_text = "Máy chủ xác nhận bồ đoàn số %d" % (index+1)
 	else:
 		status_text = "Đã trả lại bồ đoàn"
