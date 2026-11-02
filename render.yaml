@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: chua-viet-online-realtime
+    runtime: node
+    rootDir: ChuaVietOnline/realtime
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
