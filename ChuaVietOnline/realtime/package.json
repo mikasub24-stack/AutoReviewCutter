@@ -1,0 +1,10 @@
+{
+  "name": "chua-viet-online-realtime",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WebSocket room server for temple seats and avatars",
+  "main": "server.js",
+  "scripts": {"start": "node server.js"},
+  "dependencies": {"ws": "^8.18.0"},
+  "engines": {"node": ">=20"}
+}
