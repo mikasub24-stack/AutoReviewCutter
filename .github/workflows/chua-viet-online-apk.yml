@@ -8,6 +8,9 @@ on:
       - 'ChuaVietOnline/**'
       - '.github/workflows/chua-viet-online-apk.yml'
 
+permissions:
+  contents: write
+
 jobs:
   android-apk:
     runs-on: ubuntu-24.04
@@ -32,13 +35,20 @@ jobs:
           unzip -q Godot_v4.3-stable_export_templates.tpz
           cp -a templates/. "$HOME/.local/share/godot/export_templates/4.3.stable/"
           test -f "$HOME/.local/share/godot/export_templates/4.3.stable/android_debug.apk"
+      - name: Restore stable debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: chua-viet-online-debug-signing-v1
       - name: Configure Android SDK and debug signing
         shell: bash
         run: |
           set -euo pipefail
           echo "GODOT_ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
           mkdir -p "$HOME/.android"
-          keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-34" "build-tools;33.0.2" "build-tools;34.0.0"
       - name: Import Godot project
@@ -105,6 +115,34 @@ jobs:
             exit 1
           fi
           grep -q "PASS: Godot clients handshake" godot-network.log
+      - name: Record actual game rituals under Xvfb
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ChuaVietOnline/build
+          timeout 120s xvfb-run -a -s "-screen 0 720x1280x24" godot --path ChuaVietOnline --script res://tests/render_test.gd --audio-driver Dummy 2>&1 | tee godot-render.log
+          if grep -Ei "SCRIPT ERROR|Assertion failed|ERROR:" godot-render.log; then exit 1; fi
+          grep -q "PASS: real viewport recorded" godot-render.log
+          ffmpeg -v error -y -framerate 20 -i ChuaVietOnline/build/review_frames/frame_%04d.png -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p ChuaVietOnline/build/ritual-preview.mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChuaVietOnline-ritual-review
+          path: |
+            ChuaVietOnline/build/*.png
+            ChuaVietOnline/build/ritual-preview.mp4
+          if-no-files-found: error
+      - name: Save screenshots to project documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp ChuaVietOnline/build/*.png ChuaVietOnline/docs/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ChuaVietOnline/docs/*.png
+          if ! git diff --cached --quiet; then
+            git commit -m "Update actual ritual screenshots [skip ci]"
+            git push origin HEAD:chua-viet-online
+          fi
       - name: Export APK
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /home/runner/.android/debug.keystore
@@ -121,3 +159,8 @@ jobs:
           name: ChuaVietOnline-debug-APK
           path: ChuaVietOnline/build/ChuaVietOnline-debug.apk
           if-no-files-found: error
+      - name: Verify packaged animation metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -l ChuaVietOnline/build/ChuaVietOnline-debug.apk | grep 'art/ritual_atlases.json'

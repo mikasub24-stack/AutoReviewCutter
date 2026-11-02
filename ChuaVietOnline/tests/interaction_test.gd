@@ -32,6 +32,7 @@ func _run() -> void:
 	await process_frame
 	hall.multiplayer_client.set_process(false)
 	hall.multiplayer_client.socket.close()
+	hall.view_section = 0
 	hall.player = Vector2(860,900)
 	# All 1,000 world seats retain stable projection and hit coordinates.
 	for index in range(1000):
@@ -74,15 +75,68 @@ func _run() -> void:
 		await process_frame
 		hall.hud.modal.queue_free()
 		await process_frame
-	for script in [hall.PRACTICE_SCRIPT,hall.SHOP_SCRIPT]:
-		hall.open_panel(script)
+	for act in ["bow","kneel","prayer","wood","beads","meditate","incense","bell","flower","fruit","wheel","mantra","music","stop"]:
+		hall.open_panel(hall.PRACTICE_SCRIPT)
 		await process_frame
-		if script == hall.PRACTICE_SCRIPT:
-			for act in ["bow","wood","beads","meditate","incense","bell","flower","fruit","wheel","mantra","music","stop","dai_bi","lang_nghiem"]:
-				hall.overlay._act(act)
-				await process_frame
+		hall.overlay._act(act)
+		await process_frame
+		assert(not is_instance_valid(hall.overlay))
+	for act in ["dai_bi","lang_nghiem"]:
+		hall.open_panel(hall.PRACTICE_SCRIPT)
+		await process_frame
+		hall.overlay._act(act)
+		await process_frame
 		hall.overlay.queue_free()
 		await process_frame
+	hall.open_panel(hall.SHOP_SCRIPT)
+	await process_frame
+	hall.overlay.queue_free()
+	await process_frame
+	# Visible body actions run in the hall and completion is credited only once.
+	hall.action("pause")
+	hall.action("kneel")
+	assert(hall.body_action == "kneel")
+	hall._process(.5)
+	assert(hall.RITUAL_ANIMATION.sample(hall.body_action,hall.body_action_elapsed).frame == 3)
+	var old_bows: int = hall.practice_stats.bows
+	hall.action("bow")
+	hall._process(1.6)
+	assert(hall.body_action == "bow")
+	assert(hall.RITUAL_ANIMATION.sample(hall.body_action,hall.body_action_elapsed).frame == 5)
+	assert(hall.practice_stats.bows == old_bows)
+	hall._process(1.5)
+	assert(hall.body_action == "kneel")
+	assert(hall.practice_stats.bows == old_bows+1)
+	hall._process(4.0)
+	assert(hall.practice_stats.bows == old_bows+1)
+	hall.action("bow")
+	hall._process(.4)
+	hall.action("pause")
+	hall._process(4.0)
+	assert(hall.practice_stats.bows == old_bows+1)
+	# Joystick movement cannot move the HUD or camera; emulated mouse is ignored.
+	hall.view_section = 0
+	hall.player = Vector2(860,900)
+	var hud_rect: Rect2 = hall.hud.action_buttons.bow.get_global_rect()
+	var view_start: float = hall._view_start()
+	var touch := InputEventScreenTouch.new()
+	touch.index = 2
+	touch.pressed = true
+	touch.position = Vector2(100,66)
+	hall.hud._joystick_input(touch)
+	var mouse := InputEventMouseButton.new()
+	mouse.device = InputEvent.DEVICE_ID_EMULATION
+	mouse.button_index = MOUSE_BUTTON_LEFT
+	mouse.pressed = true
+	hall.hud._joystick_input(mouse)
+	assert(hall.hud.active_touch == 2)
+	hall._process(.15)
+	assert(hall._view_start() == view_start)
+	assert(hall.hud.action_buttons.bow.get_global_rect() == hud_rect)
+	touch.pressed = false
+	touch.position = Vector2(900,900)
+	hall.hud._input(touch)
+	assert(hall.joystick == Vector2.ZERO)
 	hall._save_progress()
 	print("PASS: 1000 seat projections, sitting, rituals, characters, menus and overlays")
 	hall.queue_free()

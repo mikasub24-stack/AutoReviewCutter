@@ -18,12 +18,14 @@ var pending_seat := -1
 var last_position := Vector2(860, 900)
 var last_gender := 0
 var last_robe := 0
+var last_pose := "idle"
+var last_pose_elapsed := 0.0
 
 func _ready() -> void:
 	var saved := ConfigFile.new()
 	if saved.load("user://multiplayer.cfg") == OK:
 		server_url = str(saved.get_value("network", "url", server_url))
-	if not OS.has_feature("editor") and server_url == "ws://127.0.0.1:8788":
+	if server_url == "ws://127.0.0.1:8788":
 		set_process(false)
 		return
 	connect_server()
@@ -84,6 +86,7 @@ func _receive(msg: Dictionary) -> void:
 		"welcome":
 			client_id = int(msg.get("id",-1))
 			set_display_name(display_name)
+			_send({"type":"action","pose":last_pose,"elapsed":last_pose_elapsed})
 			_send({"type":"move","x":last_position.x,"y":last_position.y,"gender":last_gender,"robe":last_robe})
 			remote_players.clear()
 			occupants.clear()
@@ -107,6 +110,12 @@ func _receive(msg: Dictionary) -> void:
 			var id := int(msg.get("id",-1))
 			if id != client_id and remote_players.has(id):
 				remote_players[id]["name"] = str(msg.get("name","Khách"))
+		"action":
+			var id := int(msg.get("id",-1))
+			if id != client_id and remote_players.has(id):
+				remote_players[id]["pose"] = str(msg.get("pose","idle"))
+				remote_players[id]["pose_elapsed"] = float(msg.get("elapsed",0.0))
+				remote_players[id]["pose_received"] = Time.get_ticks_msec()
 		"move":
 			var id := int(msg.get("id",-1))
 			if id != client_id:
@@ -137,6 +146,7 @@ func _add_player(p: Dictionary) -> void:
 	var id := int(p.get("id",-1))
 	if id < 0 or id == client_id:
 		return
+	p["pose_received"] = Time.get_ticks_msec()
 	remote_players[id] = p
 	_rebuild_occupancy()
 
@@ -171,3 +181,11 @@ func set_display_name(value: String) -> void:
 	display_name = value
 	if not value.is_empty():
 		_send({"type":"profile","name":value})
+
+func send_action(value: String, elapsed: float) -> void:
+	last_pose_elapsed = elapsed
+	if value == last_pose:
+		return
+	last_pose = value
+	if connected:
+		_send({"type":"action","pose":value,"elapsed":elapsed})

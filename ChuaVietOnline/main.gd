@@ -3,7 +3,7 @@ extends Control
 const SHOP_SCRIPT = preload("res://payment_shop.gd")
 const PRACTICE_SCRIPT = preload("res://practice_panel.gd")
 const MULTIPLAYER_SCRIPT = preload("res://multiplayer.gd")
-const CUSHION_ART = preload("res://art/bo_doan.svg")
+const CUSHION_ART = preload("res://art/meditation_cushion.tres")
 const ALTAR_ART = preload("res://art/chinh_dien_altar.svg")
 const ROWS := 50
 const COLS_PER_SIDE := 10
@@ -14,6 +14,7 @@ const AISLE := 175.0
 const WORLD_W := 1720.0
 const WORLD_H := 4600.0
 const SPEED := 240.0
+const RITUAL_ANIMATION = preload("res://ritual_animation.gd")
 var player_name := ""
 var player := Vector2(WORLD_W * 0.5, 900.0)
 var selected_seat := -1
@@ -48,6 +49,14 @@ var floor_texture: Texture2D
 var character_art: Dictionary = {}
 var hud
 var ritual := ""
+var body_action := "idle"
+var body_action_elapsed := 0.0
+var practice_stats: Dictionary = {"bows":0,"incense":0,"bells":0,"knocks":0,"flowers":0,"fruits":0,"wheels":0,"mantras":0}
+var view_section := 0
+var wide_view := false
+var ritual_sheets: Dictionary = {}
+var ritual_regions: Dictionary = {}
+var hall_background: Texture2D
 var ritual_time := 0.0
 var meditation_seconds := 0.0
 var beads_count := 0
@@ -60,7 +69,7 @@ var overlay: Control
 func _ready() -> void:
 	get_tree().quit_on_go_back = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	var voices := DisplayServer.tts_get_voices_for_language("vi")
+	var voices := DisplayServer.tts_get_voices_for_language("vi") if OS.has_feature("android") else PackedStringArray()
 	if not voices.is_empty():
 		hall_voice = voices[0]
 	for gender in ["monk","nun"]:
@@ -81,7 +90,15 @@ func _ready() -> void:
 		floor_texture = load("res://art/stone_floor.png")
 	if ResourceLoader.exists("res://art/temple_sanctuary.png"):
 		shrine_texture = load("res://art/temple_sanctuary.png")
+	if ResourceLoader.exists("res://art/hall_background.png"):
+		hall_background = load("res://art/hall_background.png")
+	if FileAccess.file_exists("res://art/ritual_atlases.json"):
+		var metadata: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://art/ritual_atlases.json"))
+		for key in metadata:
+			ritual_sheets[key] = load("res://art/"+str(metadata[key]["file"]))
+			ritual_regions[key] = metadata[key]["frames"]
 	_load_progress()
+	view_section = clampi(int((player.y-420)/780),0,4)
 	_seed_occupants()
 	multiplayer_client = MULTIPLAYER_SCRIPT.new()
 	multiplayer_client.display_name = player_name
@@ -112,6 +129,21 @@ func _process(delta: float) -> void:
 		queue_redraw()
 		return
 	elapsed += delta
+	body_action_elapsed += delta
+	if body_action == "bow" and body_action_elapsed >= RITUAL_ANIMATION.BOW_DURATION:
+		practice_stats["bows"] = int(practice_stats["bows"])+1
+		merit += 1
+		_set_body_action("kneel")
+		status_text = "Đã hoàn thành một lạy • Đang quỳ chắp tay"
+		_save_progress()
+	elif body_action == "incense" and body_action_elapsed >= RITUAL_ANIMATION.INCENSE_DURATION:
+		practice_stats["incense"] = int(practice_stats["incense"])+1
+		merit += 1
+		_set_body_action("kneel")
+		status_text = "Đã dâng hương • Nguyện tâm an lành"
+		_save_progress()
+	elif body_action == "stand" and body_action_elapsed >= .42:
+		_set_body_action("idle")
 	if ritual == "meditate" and sitting:
 		meditation_seconds += delta
 	if ritual == "chant":
@@ -122,7 +154,13 @@ func _process(delta: float) -> void:
 			merit += 1
 			_speak_chant()
 	if joystick.length() > 0.05 or auto_walk:
+		if multiplayer_client.connected and multiplayer_client.own_seat >= 0:
+			_claim_seat(-1)
 		ritual = ""
+		if body_action != "walk":
+			_set_body_action("walk")
+	elif body_action == "walk":
+		_set_body_action("idle")
 
 	occupancy_notice = maxf(0.0, occupancy_notice - delta)
 	if waiting_for_seat:
@@ -138,6 +176,7 @@ func _process(delta: float) -> void:
 		network_tick = 0.0
 		if multiplayer_client != null:
 			multiplayer_client.send_position(player,character_gender,0 if robe_brown else 1)
+			multiplayer_client.send_action(body_action,body_action_elapsed)
 	save_timer += delta
 	if save_timer > 15.0:
 		save_timer = 0.0
@@ -184,7 +223,11 @@ func _process(delta: float) -> void:
 		footstep_time += delta * 12.0
 		var next := player + joystick.normalized() * SPEED * delta
 		next.x = clampf(next.x, 30.0, WORLD_W - 30.0)
-		next.y = clampf(next.y, 340.0, WORLD_H - 80.0)
+		next.y = clampf(next.y,_view_start()+60.0,minf(_view_start()+850.0,WORLD_H-80.0))
+		var depth := (next.y-_view_start())/940.0
+		var spread := _spread(depth)
+		var half_visible := (size.x*.5-48.0)/spread
+		next.x = clampf(next.x,WORLD_W*.5-half_visible,WORLD_W*.5+half_visible)
 		# Cushions occupy two wings; the main and cross aisles stay open.
 		var on_main := absf(next.x - WORLD_W * 0.5) < AISLE * 0.47
 		var cross_offset := fposmod(next.y - 380.0, STEP_Y * 10.0)
@@ -218,49 +261,32 @@ func _draw() -> void:
 	_draw_hall()
 
 func _view_start() -> float:
-	return clampf(player.y - 470.0, 340.0, WORLD_H - 940.0)
+	return 340.0+float(view_section)*780.0
 
 func _view_center() -> float:
-	return clampf(player.x,400.0,WORLD_W-400.0)
+	return WORLD_W*.5
+
+func _spread(depth: float) -> float:
+	return lerpf(.20 if wide_view else .42,.30 if wide_view else 1.10,depth)*size.x/540.0
 
 func _project(world: Vector2) -> Vector2:
 	var depth := (world.y - _view_start()) / 940.0
-	var spread := lerpf(0.42, 0.78, depth) * size.x / 540.0
+	var spread := _spread(depth)
 	return Vector2(size.x * 0.5 + (world.x - _view_center()) * spread, size.y * 0.43 + depth * size.y * 0.42)
 
 func _unproject(screen: Vector2) -> Vector2:
 	var depth := (screen.y - size.y * 0.43) / (size.y * 0.42)
-	var spread := lerpf(0.42, 0.78, depth) * size.x / 540.0
+	var spread := _spread(depth)
 	return Vector2((screen.x-size.x*0.5)/spread+_view_center(), _view_start()+depth*940.0)
 
 func _draw_hall() -> void:
 	var w := size.x
 	var h := size.y
-	draw_rect(Rect2(Vector2.ZERO,size),Color("#493126"))
-	if shrine_texture != null:
-		# Artwork remains scenery; every avatar, seat and control is interactive.
-		draw_texture_rect_region(shrine_texture,Rect2(0,65,w,h*0.40),Rect2(0,0,shrine_texture.get_width(),shrine_texture.get_height()*0.48))
+	if hall_background != null:
+		draw_texture_rect(hall_background,Rect2(Vector2.ZERO,size),false)
 	else:
-		draw_texture_rect(ALTAR_ART,Rect2(0,75,w,h*0.36),false)
-	var horizon := h*0.43
-	if floor_texture != null:
-		draw_texture_rect(floor_texture,Rect2(0,horizon,w,h-horizon),false,Color("#b5a493"))
-	else:
-		draw_rect(Rect2(0,horizon,w,h-horizon),Color("#9e876a"))
-	var near_y := _view_start()+940.0*(1.0-.43)/.42
-	var carpet := PackedVector2Array([_project(Vector2(772.5,_view_start())),_project(Vector2(947.5,_view_start())),_project(Vector2(947.5,near_y)),_project(Vector2(772.5,near_y))])
-	draw_colored_polygon(carpet,Color("#8f292b"))
-	for side in [-1.0,1.0]:
-		var edge: float = WORLD_W*.5+float(side)*AISLE*.5
-		draw_line(_project(Vector2(edge,_view_start())),_project(Vector2(edge,near_y)),Color("#e2b963"),3,true)
-		draw_line(_project(Vector2(edge+side*9,_view_start())),_project(Vector2(edge+side*9,near_y)),Color("#bc8650"),2,true)
-		for trim in range(30):
-			var world_y := _view_start()+float(trim)*45.0
-			var ornament := _project(Vector2(edge-side*10,world_y))
-			draw_arc(ornament,3,0,TAU,12,Color("#d5a15c"),1,true)
-	for i in range(5):
-		var center := _project(Vector2(860,_view_start()+130+float(i)*275))
-		draw_texture_rect(preload("res://art/ui_lotus.svg"),Rect2(center-Vector2(20,20),Vector2(40,40)),false,Color(1.0,.85,.6,.65))
+		draw_texture_rect(ALTAR_ART,Rect2(0,0,w,h*.48),false)
+	var horizon := h*.43
 	var first := maxi(0,int((_view_start()-420.0)/STEP_Y))
 	var last := mini(ROWS-1,first+13)
 	var actors: Array[Dictionary] = []
@@ -272,7 +298,7 @@ func _draw_hall() -> void:
 			if pos.y < horizon or pos.y > h*.87:
 				continue
 			var scale_value := clampf((pos.y-horizon)/(h*.42),0.0,1.0)
-			var cushion_size := Vector2(23,12).lerp(Vector2(49,25),scale_value)*w/540.0
+			var cushion_size := Vector2(31,16).lerp(Vector2(64,34),scale_value)*w/540.0
 			draw_texture_rect(CUSHION_ART,Rect2(pos-cushion_size*.5,cushion_size),false)
 			if idx == selected_seat:
 				_ellipse(pos, cushion_size*.55,Color(1.0,.85,.35,.25))
@@ -281,18 +307,22 @@ func _draw_hall() -> void:
 				var gender := 1 if style == 1 else 0
 				var robe := 0 if style == 0 else 1
 				var peer_name := ""
+				var peer_action := "meditate"
+				var peer_elapsed := 1.0
 				if multiplayer_client.connected:
 					var peer: Dictionary = multiplayer_client.remote_players.get(style,{})
 					gender = int(peer.get("gender",0))
 					robe = int(peer.get("robe",0))
 					peer_name = str(peer.get("name","Khách"))
-				actors.append({"pos":world,"gender":gender,"robe":robe,"name":peer_name,"sit":true,"self":false})
+					peer_action = str(peer.get("pose","meditate"))
+					peer_elapsed = _remote_action_elapsed(peer)
+				actors.append({"pos":world,"gender":gender,"robe":robe,"name":peer_name,"action":peer_action,"elapsed":peer_elapsed,"sit":true,"self":false})
 	if multiplayer_client.connected:
 		for id in multiplayer_client.remote_players:
 			var peer: Dictionary = multiplayer_client.remote_players[id]
 			if int(peer.get("seat",-1)) < 0:
-				actors.append({"pos":Vector2(float(peer.get("x",860)),float(peer.get("y",900))),"gender":int(peer.get("gender",0)),"robe":int(peer.get("robe",0)),"name":str(peer.get("name","Khách")),"sit":false,"self":false})
-	actors.append({"pos":player,"gender":character_gender,"robe":0 if robe_brown else 1,"name":player_name,"sit":sitting,"self":true})
+				actors.append({"pos":Vector2(float(peer.get("x",860)),float(peer.get("y",900))),"gender":int(peer.get("gender",0)),"robe":int(peer.get("robe",0)),"name":str(peer.get("name","Khách")),"action":str(peer.get("pose","idle")),"elapsed":_remote_action_elapsed(peer),"sit":false,"self":false})
+	actors.append({"pos":player,"gender":character_gender,"robe":0 if robe_brown else 1,"name":player_name,"action":body_action,"elapsed":body_action_elapsed,"sit":sitting,"self":true})
 	actors.sort_custom(func(a: Dictionary,b: Dictionary) -> bool: return a.pos.y < b.pos.y)
 	for actor in actors:
 		_draw_actor(actor)
@@ -317,15 +347,24 @@ func _draw_actor(actor: Dictionary) -> void:
 			var a := float(step)*TAU/48.0
 			ring.append(point+Vector2(cos(a)*height*.35,sin(a)*height*.10+3))
 		draw_polyline(ring,Color("#f4d38a"),2,true)
-	var pose := "seated" if actor.sit else "standing"
-	var key := ("nun" if actor.gender == 1 else "monk")+"_"+("brown" if actor.robe == 0 else "grey")+"_"+pose
-	var texture: Texture2D = character_art[key]
-	var sprite_height := height * (0.62 if actor.sit else 1.0)
-	var sprite_width := sprite_height * texture.get_width()/texture.get_height()
-	var bob := sin(footstep_time)*1.4 if own and not sitting and (auto_walk or joystick.length()>.05) else 0.0
-	draw_texture_rect(texture,Rect2(point+Vector2(-sprite_width*.5,-sprite_height+bob),Vector2(sprite_width,sprite_height)),false)
+	var style := "nun_grey" if actor.gender == 1 else ("monk_brown" if actor.robe == 0 else "monk_grey")
+	var visible_height := height
+	if ritual_sheets.has(style):
+		var sample: Dictionary = RITUAL_ANIMATION.sample(str(actor.get("action","meditate" if actor.sit else "idle")),float(actor.get("elapsed",1.0)))
+		var frame: int = int(sample.frame)
+		var next_frame: int = int(sample.next)
+		var blend: float = float(sample.blend)
+		visible_height = _draw_ritual_frame(style,frame,point,height,1.0-blend)
+		if blend > 0.0:
+			visible_height = maxf(visible_height,_draw_ritual_frame(style,next_frame,point,height,blend))
+	else:
+		var key := style+("_seated" if actor.sit else "_standing")
+		var texture: Texture2D = character_art[key]
+		visible_height = height*(.62 if actor.sit else 1.0)
+		var width := visible_height*texture.get_width()/texture.get_height()
+		draw_texture_rect(texture,Rect2(point+Vector2(-width*.5,-visible_height),Vector2(width,visible_height)),false)
 	if own or not str(actor.get("name","")).is_empty():
-		var label_y := point.y-sprite_height-27
+		var label_y := point.y-visible_height-27
 		for entry in [[str(actor.get("name","Đạo hữu")),Color("#fff1c9")]] + ([["‹ Đệ Tử ›",Color("#a8d785")]] if own else []):
 			var text_width := ThemeDB.fallback_font.get_string_size(entry[0],HORIZONTAL_ALIGNMENT_LEFT,-1,15).x
 			draw_string_outline(ThemeDB.fallback_font,Vector2(point.x-text_width*.5,label_y),entry[0],HORIZONTAL_ALIGNMENT_LEFT,-1,15,4,Color("#21170f"))
@@ -402,7 +441,7 @@ func _save_progress() -> void:
 	var file := FileAccess.open("user://temple_progress.json", FileAccess.WRITE)
 	if file == null:
 		return
-	file.store_string(JSON.stringify({"name":player_name,"x":player.x,"y":player.y,"seat":selected_seat,"robe_brown":robe_brown,"gender":character_gender,"beads":beads_count,"meditation_seconds":meditation_seconds,"merit":merit}))
+	file.store_string(JSON.stringify({"practice_stats":practice_stats,"name":player_name,"x":player.x,"y":player.y,"seat":selected_seat,"robe_brown":robe_brown,"gender":character_gender,"beads":beads_count,"meditation_seconds":meditation_seconds,"merit":merit}))
 
 func _load_progress() -> void:
 	if not FileAccess.file_exists("user://temple_progress.json"):
@@ -412,6 +451,14 @@ func _load_progress() -> void:
 		return
 	var data: Dictionary = parsed
 	player_name = clean_player_name(str(data.get("name","")))
+	var saved_stats: Variant = data.get("practice_stats",{})
+	if not data.has("practice_stats") and FileAccess.file_exists("user://practice_progress.json"):
+		var legacy: Variant = JSON.parse_string(FileAccess.get_file_as_string("user://practice_progress.json"))
+		if legacy is Dictionary:
+			saved_stats = legacy
+	if saved_stats is Dictionary:
+		for key in practice_stats:
+			practice_stats[key] = maxi(0,int(saved_stats.get(key,0)))
 	player = Vector2(clampf(float(data.get("x",player.x)),30.0,WORLD_W-30.0),clampf(float(data.get("y",player.y)),340.0,WORLD_H-80.0))
 	selected_seat = clampi(int(data.get("seat",-1)),-1,CAPACITY-1)
 	robe_brown = bool(data.get("robe_brown",true))
@@ -468,6 +515,7 @@ func _begin_sitting(index: int) -> void:
 		player = _seat_position(index)
 		sitting = true
 		ritual = "meditate"
+		_set_body_action("meditate")
 		status_text = "Đang ngồi tại bồ đoàn %d" % (index + 1)
 
 func _claim_seat(index: int) -> void:
@@ -513,6 +561,7 @@ func _seat_confirmed(index: int) -> void:
 		player = _seat_position(index)
 		sitting = true
 		ritual = "meditate"
+		_set_body_action("meditate")
 		status_text = "Máy chủ xác nhận bồ đoàn số %d" % (index+1)
 	else:
 		status_text = "Đã trả lại bồ đoàn"
@@ -539,7 +588,7 @@ func stop_walking() -> void:
 	approach_seat = -1
 
 func open_panel(script: Script) -> void:
-	DisplayServer.tts_stop()
+	_stop_voice()
 	stop_walking()
 	ritual = ""
 	if overlay != null and is_instance_valid(overlay):
@@ -549,8 +598,10 @@ func open_panel(script: Script) -> void:
 	add_child(overlay)
 
 func action(kind: String) -> void:
+	if player_name.is_empty():
+		return
 	if kind != "chant":
-		DisplayServer.tts_stop()
+		_stop_voice()
 	stop_walking()
 	match kind:
 		"practice": open_panel(PRACTICE_SCRIPT)
@@ -564,43 +615,118 @@ func action(kind: String) -> void:
 				character_gender = 0
 				robe_brown = true
 			status_text = "Đã đổi trang phục nhân vật"
+		"bow":
+			if body_action in ["bow","incense"]:
+				return
+			ritual = ""
+			sitting = false
+			_set_body_action("bow")
+			hall_audio.trigger("bow")
+			status_text = "Quỳ xuống • Cúi lạy • Phủ phục • Trở về quỳ chắp tay"
+		"kneel":
+			ritual = ""
+			if body_action in ["kneel","meditate"] or sitting:
+				stand_up()
+			else:
+				sitting = false
+				_set_body_action("kneel")
+				status_text = "Đang quỳ chắp tay trước Phật"
+		"prayer":
+			ritual = ""
+			_set_body_action("prayer" if body_action != "prayer" else "idle")
+			status_text = "Chắp tay hướng Phật"
 		"meditate":
 			if sitting:
-				sitting = false
-				_claim_seat(-1)
-				ritual = ""
-				status_text = "Đã đứng dậy"
+				stand_up()
 			elif selected_seat >= 0 and player.distance_to(_seat_position(selected_seat)) < 125:
 				_begin_sitting(selected_seat)
-				ritual = "meditate"
 			else:
-				status_text = "Chạm một bồ đoàn trống để đến ngồi thiền"
-		"chant":
+				sitting = true
+				ritual = "meditate"
+				_set_body_action("meditate")
+				status_text = "Đang ngồi thiền tại chỗ • Chạm bồ đoàn nếu muốn chọn ghế"
+		"chant", "mantra":
 			ritual = "chant"
 			ritual_time = 0.0
 			beads_count = beads_count % 108 + 1
 			merit += 1
+			_set_body_action("kneel" if body_action in ["kneel","meditate"] else "prayer")
 			_speak_chant()
 			hall_audio.trigger("wood")
 			status_text = "Nam mô A Di Đà Phật"
 		"incense":
+			if body_action in ["bow","incense"]:
+				return
+			ritual = ""
+			sitting = false
+			_set_body_action("incense")
 			hall_audio.trigger("incense")
 			for i in range(8):
 				incense.append({"pos":player+Vector2(float(i-4)*4,-45),"age":float(i)*.1})
+			status_text = "Chắp tay nâng hương • Quỳ dâng hương"
+		"beads":
+			beads_count = beads_count % 108 + 1
 			merit += 1
-			status_text = "Đã dâng hương • Nguyện tâm an lành"
-		"pause":
-			ritual = ""
+			_set_body_action("prayer")
+			status_text = "Niệm hạt %d/108" % beads_count
+		"wood", "bell", "flower", "fruit", "wheel":
+			var stat: String = {"wood":"knocks","bell":"bells","flower":"flowers","fruit":"fruits","wheel":"wheels"}[kind]
+			practice_stats[stat] = int(practice_stats[stat])+1
+			hall_audio.trigger(kind)
+			_set_body_action("prayer")
+			status_text = {"wood":"Đã gõ mõ","bell":"Đã thỉnh chuông","flower":"Đã dâng hoa","fruit":"Đã dâng quả","wheel":"Đã chuyển kinh luân"}[kind]
+		"music":
+			hall_audio.set_ambient(not hall_audio.ambient)
+			status_text = "Nhạc thiền " + ("đang phát" if hall_audio.ambient else "đã tắt")
+		"pause", "stop":
+			stand_up()
 			hall_audio.set_ambient(false)
-			status_text = "Đã tạm dừng tu tập"
+			status_text = "Đã dừng nghi thức • Đang đứng"
 	_save_progress()
+
+func stand_up() -> void:
+	ritual = ""
+	sitting = false
+	if selected_seat >= 0 or waiting_for_seat:
+		_claim_seat(-1)
+	waiting_for_seat = false
+	_set_body_action("stand")
+	status_text = "Đã đứng dậy"
+
+func _set_body_action(value: String) -> void:
+	body_action = value
+	body_action_elapsed = 0.0
+	if multiplayer_client != null:
+		multiplayer_client.send_action(value,0.0)
+
+func goto_section(index: int) -> void:
+	stop_walking()
+	stand_up()
+	view_section = clampi(index,0,4)
+	selected_seat = -1
+	player = Vector2(860,_view_start()+470)
+	_set_body_action("idle")
+	status_text = "Chính điện • Khu %d/5" % (view_section+1)
+
+func _remote_action_elapsed(peer: Dictionary) -> float:
+	return float(peer.get("pose_elapsed",0.0))+maxf(0.0,float(Time.get_ticks_msec()-int(peer.get("pose_received",Time.get_ticks_msec())))/1000.0)
+
+func _draw_ritual_frame(style: String, frame: int, point: Vector2, height: float, alpha: float) -> float:
+	var frames: Array = ritual_regions[style]
+	var coords: Array = frames[clampi(frame,0,11)]
+	var source := Rect2(float(coords[0]),float(coords[1]),float(coords[2]),float(coords[3]))
+	var factor := height / float(frames[0][3])
+	var extent := source.size*factor
+	var offset := point-Vector2(extent.x*.5,extent.y)
+	draw_texture_rect_region(ritual_sheets[style],Rect2(offset,extent),source,Color(1,1,1,alpha))
+	return extent.y
 
 func _speak_chant() -> void:
 	if not hall_voice.is_empty():
 		DisplayServer.tts_speak("Nam mô A Di Đà Phật",hall_voice,60,1.0,0.78,0,true)
 
 func _exit_tree() -> void:
-	DisplayServer.tts_stop()
+	_stop_voice()
 
 func clean_player_name(value: String) -> String:
 	var clean := " ".join(value.strip_edges().split(" ",false))
@@ -620,3 +746,7 @@ func set_player_name(value: String) -> bool:
 	status_text = "Chào mừng " + player_name + " đến chính điện!"
 	queue_redraw()
 	return true
+
+func _stop_voice() -> void:
+	if not hall_voice.is_empty():
+		DisplayServer.tts_stop()

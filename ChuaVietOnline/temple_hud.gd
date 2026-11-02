@@ -12,6 +12,8 @@ var active_touch := -2
 var axis := Vector2.ZERO
 var mission_claimed := false
 var muted := false
+var merit_label: Label
+var action_buttons: Dictionary = {}
 
 func _ready() -> void:
 	root = get_parent()
@@ -21,7 +23,7 @@ func _ready() -> void:
 	skin.default_font_size = 14
 	for type in ["Button","LineEdit","TextEdit","PanelContainer","ScrollContainer"]:
 		var box := StyleBoxFlat.new()
-		box.bg_color = Color("#30231eea")
+		box.bg_color = Color("#30231ef0")
 		box.border_color = GOLD
 		box.set_border_width_all(1)
 		box.set_corner_radius_all(14)
@@ -37,114 +39,149 @@ func _ready() -> void:
 		var pressed := box.duplicate()
 		pressed.bg_color = Color("#997044")
 		skin.set_stylebox("pressed",type,pressed)
+		skin.set_stylebox("focus",type,hover)
 		skin.set_color("font_color",type,Color("#fff1ce"))
 		skin.set_color("font_hover_color",type,Color.WHITE)
-		skin.set_color("font_focus_color",type,Color.WHITE)
 		skin.set_color("font_pressed_color",type,Color.WHITE)
-		skin.set_stylebox("focus",type,hover)
 	get_parent().theme = skin
 	theme = skin
 	var top := PanelContainer.new()
 	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	top.offset_left = 10
-	top.offset_right = -10
-	top.offset_top = 10
-	top.offset_bottom = 88
+	top.offset_left = 8
+	top.offset_right = -144
+	top.offset_top = 8
+	top.offset_bottom = 101
+	var glass := StyleBoxFlat.new()
+	glass.bg_color = Color("#24160da8")
+	glass.border_color = Color("#dab16680")
+	glass.set_border_width_all(1)
+	glass.set_corner_radius_all(32)
+	glass.content_margin_left = 7
+	glass.content_margin_right = 12
+	glass.content_margin_top = 5
+	glass.content_margin_bottom = 5
+	top.add_theme_stylebox_override("panel",glass)
 	add_child(top)
-	var top_row := HBoxContainer.new()
-	top.add_child(top_row)
+	var row := HBoxContainer.new()
+	top.add_child(row)
 	var portrait := TextureRect.new()
-	portrait.texture = load("res://art/monk_brown_standing.svg")
-	portrait.custom_minimum_size = Vector2(45,60)
+	portrait.texture = load("res://art/monk_avatar.svg")
+	portrait.custom_minimum_size = Vector2(52,68)
 	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	top_row.add_child(portrait)
+	row.add_child(portrait)
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = SIZE_EXPAND_FILL
-	top_row.add_child(info)
+	info.add_theme_constant_override("separation",1)
+	row.add_child(info)
 	profile = Label.new()
-	profile.text = root.player_name + "  ·  Đệ Tử"
+	profile.text = root.player_name
 	profile.add_theme_font_size_override("font_size",20)
 	profile.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	info.add_child(profile)
+	merit_label = Label.new()
+	merit_label.add_theme_font_size_override("font_size",12)
+	info.add_child(merit_label)
 	connection = Label.new()
-	connection.add_theme_font_size_override("font_size",11)
+	connection.add_theme_font_size_override("font_size",10)
+	connection.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	info.add_child(connection)
-	for entry in [["bell","Thông báo"],["gear","Cài đặt"]]:
-		var button := _icon_button(entry[0],entry[1],Vector2(42,48))
-		button.pressed.connect(_show_info.bind(entry[0]))
-		top_row.add_child(button)
+	var top_actions := HBoxContainer.new()
+	top_actions.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	top_actions.position = Vector2(-140,12)
+	top_actions.add_theme_constant_override("separation",3)
+	add_child(top_actions)
+	for entry in [["bell","Thông báo"],["mail","Hướng dẫn"],["gear","Cài đặt"]]:
+		var button := _icon_button(entry[0],entry[1],Vector2(43,43))
+		button.pressed.connect(_show_info.bind("bell" if entry[0] == "mail" else entry[0]))
+		top_actions.add_child(button)
 	var title := Label.new()
 	title.text = "Chùa Việt Online"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	title.offset_top = 98
+	title.offset_top = 108
 	title.add_theme_color_override("font_color",Color("#ffdf8c"))
 	title.add_theme_color_override("font_outline_color",Color("#391b15"))
-	title.add_theme_constant_override("outline_size",8)
-	title.add_theme_font_size_override("font_size",29)
+	title.add_theme_constant_override("outline_size",7)
+	title.add_theme_font_size_override("font_size",30)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(title)
 	var left := VBoxContainer.new()
-	left.position = Vector2(9,190)
+	left.anchor_top = .27
+	left.anchor_bottom = .27
+	left.position = Vector2(8,0)
 	left.add_theme_constant_override("separation",9)
 	add_child(left)
-	for entry in [["lotus","Tu hành","practice"],["scroll","Nhiệm vụ","missions"],["shop","Cửa hàng","shop"],["bag","Túi đồ","inventory"],["calendar","Nhật ký","journal"]]:
+	for entry in [["lotus","Tu hành","practice"],["scroll","Nhiệm vụ","missions"],["shop","Cửa hàng","shop"],["bag","Túi đồ","inventory"],["calendar","Khu vực","sections"]]:
 		_menu_item(left,entry)
 	var right := VBoxContainer.new()
 	right.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	right.position = Vector2(-70,190)
+	right.anchor_top = .27
+	right.anchor_bottom = .27
+	right.position = Vector2(-66,0)
 	right.add_theme_constant_override("separation",9)
 	add_child(right)
 	for entry in [["people","Đồng tu","peers"],["gift","Phúc lợi","rewards"],["person","Nhân vật","character"]]:
 		_menu_item(right,entry)
 	joystick_pad = Control.new()
 	joystick_pad.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	joystick_pad.position = Vector2(10,-164)
+	joystick_pad.position = Vector2(9,-210)
 	joystick_pad.size = Vector2(132,132)
 	joystick_pad.mouse_filter = Control.MOUSE_FILTER_STOP
 	joystick_pad.draw.connect(_draw_joystick)
 	joystick_pad.gui_input.connect(_joystick_input)
 	add_child(joystick_pad)
-	var actions := HBoxContainer.new()
+	var actions := GridContainer.new()
+	actions.columns = 3
 	actions.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	actions.offset_left = 153
-	actions.offset_right = -9
-	actions.offset_top = -132
-	actions.offset_bottom = -44
-	actions.add_theme_constant_override("separation",4)
+	actions.offset_left = 154
+	actions.offset_right = -8
+	actions.offset_top = -218
+	actions.offset_bottom = -76
+	actions.add_theme_constant_override("h_separation",9)
+	actions.add_theme_constant_override("v_separation",2)
 	add_child(actions)
-	for entry in [["meditate","Ngồi thiền","meditate"],["prayer","Niệm Phật","chant"],["incense","Thắp hương","incense"],["lotus","Tạm dừng","pause"]]:
+	for entry in [["prayer","Quỳ / Đứng","kneel"],["meditate","Lạy Phật","bow"],["prayer","Chắp tay","prayer"],["meditate","Ngồi thiền","meditate"],["lotus","Niệm Phật","chant"],["incense","Thắp hương","incense"]]:
 		var box := VBoxContainer.new()
 		box.size_flags_horizontal = SIZE_EXPAND_FILL
+		box.add_theme_constant_override("separation",0)
 		actions.add_child(box)
-		var button := _icon_button(entry[0],entry[1],Vector2(55,55))
+		var button := _icon_button(entry[0],entry[1],Vector2(51,51))
 		button.size_flags_horizontal = SIZE_SHRINK_CENTER
 		button.pressed.connect(root.action.bind(entry[2]))
+		action_buttons[entry[2]] = button
 		box.add_child(button)
 		var label := Label.new()
 		label.text = entry[1]
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.add_theme_font_size_override("font_size",12)
+		label.add_theme_color_override("font_outline_color",Color("#21140d"))
+		label.add_theme_constant_override("outline_size",5)
 		box.add_child(label)
+	var stop := Button.new()
+	stop.text = "Đứng / Dừng"
+	stop.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	stop.position = Vector2(-110,-257)
+	stop.size = Vector2(100,32)
+	stop.pressed.connect(root.action.bind("pause"))
+	add_child(stop)
 	var bottom := PanelContainer.new()
 	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom.offset_left = 7
 	bottom.offset_right = -7
-	bottom.offset_top = -40
+	bottom.offset_top = -70
 	bottom.offset_bottom = -5
 	add_child(bottom)
+	var footer := VBoxContainer.new()
+	footer.add_theme_constant_override("separation",2)
+	bottom.add_child(footer)
 	status = Label.new()
-	status.add_theme_font_size_override("font_size",12)
+	status.add_theme_font_size_override("font_size",11)
 	status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	bottom.add_child(status)
+	footer.add_child(status)
 	counters = Label.new()
-	counters.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	counters.position = Vector2(-266,-165)
-	counters.add_theme_color_override("font_outline_color",Color("#231b17"))
-	counters.add_theme_constant_override("outline_size",5)
-	counters.add_theme_font_size_override("font_size",12)
-	add_child(counters)
+	counters.add_theme_font_size_override("font_size",11)
+	footer.add_child(counters)
 	var saved := ConfigFile.new()
 	if saved.load("user://preferences.cfg") == OK:
 		muted = bool(saved.get_value("audio","muted",false))
@@ -163,13 +200,30 @@ func _icon_button(icon: String, caption: String, minimum: Vector2) -> Button:
 	button.add_theme_constant_override("icon_max_width",int(minimum.x*.64))
 	button.custom_minimum_size = minimum
 	button.tooltip_text = caption
+	var circle := StyleBoxFlat.new()
+	circle.bg_color = Color("#392517ed")
+	circle.border_color = GOLD
+	circle.set_border_width_all(2)
+	circle.set_corner_radius_all(40)
+	circle.content_margin_left = 8
+	circle.content_margin_right = 8
+	circle.content_margin_top = 8
+	circle.content_margin_bottom = 8
+	button.add_theme_stylebox_override("normal",circle)
+	var hover := circle.duplicate()
+	hover.bg_color = Color("#785329")
+	button.add_theme_stylebox_override("hover",hover)
+	var pressed := circle.duplicate()
+	pressed.bg_color = Color("#b08040")
+	button.add_theme_stylebox_override("pressed",pressed)
+	button.add_theme_stylebox_override("focus",circle)
 	return button
 
 func _menu_item(parent: Control, entry: Array) -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation",0)
 	parent.add_child(box)
-	var b := _icon_button(entry[0],entry[1],Vector2(57,48))
+	var b := _icon_button(entry[0],entry[1],Vector2(53,53))
 	b.size_flags_horizontal = SIZE_SHRINK_CENTER
 	b.pressed.connect(_menu.bind(entry[2]))
 	box.add_child(b)
@@ -184,12 +238,13 @@ func _menu_item(parent: Control, entry: Array) -> void:
 func _process(_delta: float) -> void:
 	if root == null:
 		return
-	profile.text = (root.player_name if not root.player_name.is_empty() else "Đạo hữu") + "  ·  Đệ Tử"
+	profile.text = root.player_name if not root.player_name.is_empty() else "Đạo hữu"
+	merit_label.text = "Công đức: %d  ·  Lạy: %d" % [root.merit,int(root.practice_stats.bows)]
 	status.text = "[Hệ thống] " + root.status_text
 	var net = root.multiplayer_client
 	connection.text = ("Trực tuyến · " if net.connected else "Ngoại tuyến · khách mô phỏng · ")+str(root.occupant_count)+" người"
 	connection.modulate = Color("#b3d8a0") if net.connected else Color("#e0bd88")
-	counters.text = "Niệm: %d/108   Thiền: %ds   Công đức: %d" % [root.beads_count,int(root.meditation_seconds),root.merit]
+	counters.text = "Niệm: %d/108  ·  Thiền: %ds  ·  Khu %d/5" % [root.beads_count,int(root.meditation_seconds),root.view_section+1]
 	if not root.joystick_active:
 		axis = Vector2.ZERO
 	joystick_pad.queue_redraw()
@@ -216,13 +271,13 @@ func _joystick_input(event: InputEvent) -> void:
 			_release_stick()
 	elif event is InputEventScreenDrag and event.index == active_touch:
 		_move_stick(event.position)
-	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+	elif event is InputEventMouseButton and event.device != InputEvent.DEVICE_ID_EMULATION and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			active_touch = -1
 			_move_stick(event.position)
 		else:
 			_release_stick()
-	elif event is InputEventMouseMotion and active_touch == -1:
+	elif event is InputEventMouseMotion and event.device != InputEvent.DEVICE_ID_EMULATION and active_touch == -1:
 		_move_stick(event.position)
 
 func _move_stick(point: Vector2) -> void:
@@ -298,6 +353,12 @@ func _show_info(kind: String) -> void:
 			_add_text_button(column,"Đổi tên nhân vật",func(): show_name_editor(false))
 			_add_text_button(column,"Đổi nhân vật / áo nâu / áo xám",func(): root.action("character"))
 			_add_text_button(column,"Nhạc thiền bật / tắt",func(): root.hall_audio.set_ambient(not root.hall_audio.ambient))
+		"sections":
+			title.text = "Các khu chính điện"
+			body.text = "Cảnh đứng yên khi đi lại và thực hiện nghi thức. Chuyển khu bằng các nút dưới đây."
+			for index in range(5):
+				_add_text_button(column,"Khu %d / 5" % (index+1),_choose_section.bind(index))
+			_add_text_button(column,"Xem rộng / gần",func(): root.wide_view = not root.wide_view; modal.queue_free())
 		"missions":
 			title.text = "Nhiệm vụ tu tập"
 			body.text = "Niệm Phật: %d/108 hạt\nNgồi thiền: %d giây\n\nHoàn thành một chuỗi 108 hạt hoặc thiền đủ 60 giây để nhận phúc lợi trong ngày." % [root.beads_count,int(root.meditation_seconds)]
@@ -384,3 +445,13 @@ func show_name_editor(first_visit: bool = false) -> void:
 	if not first_visit:
 		_add_text_button(column,"Hủy",func(): dialog.queue_free())
 	field.call_deferred("grab_focus")
+
+func _choose_section(index: int) -> void:
+	root.goto_section(index)
+	modal.queue_free()
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and not event.pressed and event.index == active_touch:
+		_release_stick()
+	elif event is InputEventMouseButton and event.device != InputEvent.DEVICE_ID_EMULATION and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed and active_touch == -1:
+		_release_stick()

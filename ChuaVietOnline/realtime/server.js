@@ -5,6 +5,7 @@ const PORT = Number(process.env.PORT || 8788);
 const MAX_SEATS = 1000;
 const MAX_CLIENTS = 1000;
 const MAX_MESSAGES_PER_SECOND = 35;
+const POSES = new Set(["idle","walk","prayer","kneel","stand","bow","meditate","incense"]);
 const players = new Map();
 let nextId = 1;
 const httpServer = http.createServer((req, res) => {
@@ -22,7 +23,7 @@ function broadcast(obj, except=null) {
   }
 }
 function snapshot() {
-  return [...players.values()].map(p=>({id:p.id,name:p.name,seat:p.seat,x:p.x,y:p.y,gender:p.gender,robe:p.robe}));
+  return [...players.values()].map(p=>({id:p.id,name:p.name,pose:p.pose,pose_elapsed:Math.max(0,(Date.now()-p.poseStarted)/1000),seat:p.seat,x:p.x,y:p.y,gender:p.gender,robe:p.robe}));
 }
 function occupied(seat, except) {
   for (const [ws,p] of players) if (ws !== except && p.seat === seat) return true;
@@ -45,7 +46,7 @@ wss.on("connection", ws => {
   if (players.size >= MAX_CLIENTS) {
     send(ws,{type:"error",reason:"room_full"}); ws.close(); return;
   }
-  const player = {id:nextId++,name:"Khách",seat:-1,x:860,y:900,gender:0,robe:0,lastMove:0,windowStart:Date.now(),messageCount:0};
+  const player = {id:nextId++,name:"Khách",pose:"idle",poseStarted:Date.now(),seat:-1,x:860,y:900,gender:0,robe:0,lastMove:0,windowStart:Date.now(),messageCount:0};
   players.set(ws,player);
   send(ws,{type:"welcome",id:player.id,players:snapshot(),capacity:MAX_SEATS});
   broadcast({type:"join",player},ws);
@@ -62,6 +63,12 @@ wss.on("connection", ws => {
       if ([...name].length < 2 || [...name].length > 20 || !/^[\p{L}\p{M}\p{N} ._'’-]+$/u.test(name)) return;
       player.name = name;
       broadcast({type:"profile",id:player.id,name});
+    } else if (msg.type === "action") {
+      if (!POSES.has(msg.pose)) return;
+      const elapsed = typeof msg.elapsed === "number" && Number.isFinite(msg.elapsed) ? Math.max(0,Math.min(60,msg.elapsed)) : 0;
+      player.pose = msg.pose;
+      player.poseStarted = Date.now()-elapsed*1000;
+      broadcast({type:"action",id:player.id,pose:player.pose,elapsed});
     } else if (msg.type === "seat") {
       const seat = msg.seat;
       if (typeof seat !== "number" || !Number.isInteger(seat) || seat < -1 || seat >= MAX_SEATS) {
@@ -76,8 +83,11 @@ wss.on("connection", ws => {
         const column = seat % 20;
         player.x = column < 10 ? 772.5 - (10-column)*72 : 947.5 + (column-9)*72;
         player.y = 420 + Math.floor(seat/20)*78;
+        player.pose = "meditate";
+        player.poseStarted = Date.now();
       }
       broadcast({type:"seat_update",id:player.id,seat});
+      if (seat >= 0) broadcast({type:"action",id:player.id,pose:player.pose,elapsed:0});
       send(ws,{type:"seat_ok",seat});
     } else if (msg.type === "move") {
       const now = Date.now();

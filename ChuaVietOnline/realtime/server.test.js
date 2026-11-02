@@ -130,3 +130,27 @@ test("chosen Vietnamese names broadcast, survive snapshots and reject invalid na
     assert.equal(b._testQueue.filter(m=>m.type==="profile").length,0);
   } finally {a.terminate();if(b)b.terminate();}
 });
+
+test("ritual poses broadcast and remain in new-player snapshots",async()=>{
+  const a=await connect(),b=await connect();
+  const nextA=messages(a),nextB=messages(b);
+  let c;
+  try {
+    const welcome=await nextA("welcome");
+    await nextB("welcome");
+    a.send(JSON.stringify({type:"action",pose:"kneel",elapsed:0.5}));
+    const kneel=await nextB("action");
+    assert.equal(kneel.id,welcome.id);
+    assert.equal(kneel.pose,"kneel");
+    a.send(JSON.stringify({type:"action",pose:"unknown",elapsed:0}));
+    a.send(JSON.stringify({type:"action",pose:"bow",elapsed:1.6}));
+    assert.equal((await nextB("action")).pose,"bow");
+    c=await connect();
+    const snapshot=await messages(c)("welcome");
+    const peer=snapshot.players.find(p=>p.id===welcome.id);
+    assert.equal(peer.pose,"bow");
+    assert.ok(peer.pose_elapsed>=1.6 && peer.pose_elapsed<4);
+    a.send(JSON.stringify({type:"action",pose:"idle",elapsed:0}));
+    assert.equal((await nextB("action")).pose,"idle");
+  } finally {a.terminate();b.terminate();if(c)c.terminate();}
+});
