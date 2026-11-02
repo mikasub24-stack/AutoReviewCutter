@@ -24,6 +24,7 @@ var message := "Chọn một nghi thức"
 var buttons: Array[Button] = []
 var voice_note: Label
 var avatar_area: Control
+var practice_save_elapsed := 0.0
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -77,6 +78,7 @@ func _ready() -> void:
 	close.text = "Trở lại chính điện"
 	close.pressed.connect(queue_free)
 	column.add_child(close)
+	_load_practice()
 	temple_audio = TEMPLE_AUDIO.new()
 	add_child(temple_audio)
 	set_process(true)
@@ -133,10 +135,15 @@ func _act(action: String) -> void:
 				mantra_count += 1
 				message = "Om Mani Padme Hum - lần %d" % mantra_count
 	voice_note.text = message
+	_save_practice()
 	avatar_area.queue_redraw()
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	practice_save_elapsed += delta
+	if practice_save_elapsed >= 30.0:
+		practice_save_elapsed = 0.0
+		_save_practice()
 	if practice == "chant":
 		chant_seconds += delta
 		if elapsed >= 3.5:
@@ -252,3 +259,30 @@ func _draw_offering(center: Vector2, kind: String) -> void:
 		for i in range(5):
 			var x := float(i-2)*11.0
 			avatar_area.draw_circle(center + Vector2(x,-5-absf(x)*0.2), 10, [Color("#e0aa39"),Color("#ce5b41"),Color("#81a34a"),Color("#e6c653"),Color("#bd5e3c")][i])
+
+func _save_practice() -> void:
+	var file := FileAccess.open("user://practice_progress.json", FileAccess.WRITE)
+	if file == null:
+		return
+	file.store_string(JSON.stringify({"bows":bows,"knocks":knocks,"beads":beads,"incense":incense,"bells":bells,"flowers":flowers,"fruits":fruits,"wheels":wheel_turns,"mantras":mantra_count,"chant_seconds":chant_seconds,"altar_incense":altar_incense,"altar_flowers":altar_flowers,"altar_fruits":altar_fruits}))
+
+func _load_practice() -> void:
+	if not FileAccess.file_exists("user://practice_progress.json"):
+		return
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string("user://practice_progress.json"))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	var data: Dictionary = parsed
+	bows = maxi(0,int(data.get("bows",0)))
+	knocks = maxi(0,int(data.get("knocks",0)))
+	beads = clampi(int(data.get("beads",0)),0,108)
+	incense = maxi(0,int(data.get("incense",0)))
+	bells = maxi(0,int(data.get("bells",0)))
+	flowers = maxi(0,int(data.get("flowers",0)))
+	fruits = maxi(0,int(data.get("fruits",0)))
+	wheel_turns = maxi(0,int(data.get("wheels",0)))
+	mantra_count = maxi(0,int(data.get("mantras",0)))
+	chant_seconds = maxf(0.0,float(data.get("chant_seconds",0.0)))
+	altar_incense = maxi(0,int(data.get("altar_incense",0)))
+	altar_flowers = maxi(0,int(data.get("altar_flowers",0)))
+	altar_fruits = maxi(0,int(data.get("altar_fruits",0)))
