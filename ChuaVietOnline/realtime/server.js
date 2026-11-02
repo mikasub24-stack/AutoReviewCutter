@@ -57,8 +57,8 @@ wss.on("connection", ws => {
     if(tick-player.windowStart>=1000){player.windowStart=tick;player.messageCount=0;}
     if(++player.messageCount>MAX_MESSAGES_PER_SECOND){ws.close(1008,"rate_limit");return;}
     if (msg.type === "seat") {
-      const seat = Number(msg.seat);
-      if (!Number.isInteger(seat) || seat < -1 || seat >= MAX_SEATS) {
+      const seat = msg.seat;
+      if (typeof seat !== "number" || !Number.isInteger(seat) || seat < -1 || seat >= MAX_SEATS) {
         send(ws,{type:"seat_denied",seat:Number.isFinite(seat)?seat:-1,reason:"invalid_seat"});
         return;
       }
