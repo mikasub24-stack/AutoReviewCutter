@@ -48,6 +48,7 @@ func _ready() -> void:
 	add_child(multiplayer_client)
 	multiplayer_client.occupancy_changed.connect(_sync_occupancy)
 	multiplayer_client.seat_rejected.connect(_seat_denied)
+	multiplayer_client.seat_confirmed.connect(_seat_confirmed)
 	multiplayer_client.connection_changed.connect(_network_changed)
 	set_process(true)
 	queue_redraw()
@@ -438,6 +439,7 @@ func _network_changed(is_connected: bool) -> void:
 			_claim_seat(selected_seat)
 		status_text = "Đã kết nối chính điện trực tuyến"
 	else:
+		waiting_for_seat = false
 		_seed_occupants()
 		status_text = "Chế độ ngoại tuyến - khách mô phỏng"
 
@@ -449,6 +451,13 @@ func _sync_occupancy() -> void:
 		occupied_seats[int(seat)] = 1
 	occupant_count = occupied_seats.size()
 	queue_redraw()
+
+func _seat_confirmed(index: int) -> void:
+	waiting_for_seat = false
+	if index >= 0:
+		status_text = "Máy chủ xác nhận bồ đoàn số %d" % (index+1)
+	else:
+		status_text = "Đã trả lại bồ đoàn"
 
 func _seat_denied(index: int) -> void:
 	waiting_for_seat = false
