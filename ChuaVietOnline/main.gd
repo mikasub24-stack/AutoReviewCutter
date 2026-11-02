@@ -38,6 +38,7 @@ var occupant_count := 0
 var occupancy_notice := 0.0
 var multiplayer_client
 var network_tick := 0.0
+var waiting_for_seat := false
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -342,6 +343,9 @@ func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 					distance = d
 					best = idx
 		if best >= 0:
+			if waiting_for_seat:
+				status_text = "Đang chờ máy chủ xác nhận chỗ ngồi"
+				return
 			if best == selected_seat and sitting:
 				status_text = "Bạn đang ngồi tại bồ đoàn này"
 				return
@@ -423,6 +427,7 @@ func _draw_seated_occupant(pos: Vector2, variant: int) -> void:
 
 func _claim_seat(index: int) -> void:
 	if multiplayer_client != null and multiplayer_client.connected:
+		waiting_for_seat = index >= 0
 		multiplayer_client.request_seat(index)
 
 func _network_changed(is_connected: bool) -> void:
@@ -446,6 +451,7 @@ func _sync_occupancy() -> void:
 	queue_redraw()
 
 func _seat_denied(index: int) -> void:
+	waiting_for_seat = false
 	if selected_seat == index:
 		selected_seat = -1
 	sitting = false
