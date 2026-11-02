@@ -134,16 +134,17 @@ jobs:
           name: ChuaVietOnline-ritual-review
           path: |
             ChuaVietOnline/build/*.png
+            ChuaVietOnline/build/*.jpg
             ChuaVietOnline/build/ritual-preview.mp4
           if-no-files-found: error
       - name: Save screenshots to project documentation
         shell: bash
         run: |
           set -euo pipefail
-          cp ChuaVietOnline/build/*.png ChuaVietOnline/docs/
+          cp ChuaVietOnline/build/*.png ChuaVietOnline/build/*.jpg ChuaVietOnline/docs/
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ChuaVietOnline/docs/*.png
+          git add ChuaVietOnline/docs/*.png ChuaVietOnline/docs/*.jpg
           if ! git diff --cached --quiet; then
             git commit -m "Update actual ritual screenshots [skip ci]"
             git push origin HEAD:chua-viet-online

@@ -65,7 +65,10 @@ func _ready() -> void:
 	var row := HBoxContainer.new()
 	top.add_child(row)
 	var portrait := TextureRect.new()
-	portrait.texture = load("res://art/monk_avatar.svg")
+	var portrait_crop := AtlasTexture.new()
+	portrait_crop.atlas = preload("res://art/monk_avatar.svg")
+	portrait_crop.region = Rect2(40,5,80,100)
+	portrait.texture = portrait_crop
 	portrait.custom_minimum_size = Vector2(52,68)
 	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -136,7 +139,7 @@ func _ready() -> void:
 	actions.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	actions.offset_left = 154
 	actions.offset_right = -8
-	actions.offset_top = -218
+	actions.offset_top = -230
 	actions.offset_bottom = -76
 	actions.add_theme_constant_override("h_separation",9)
 	actions.add_theme_constant_override("v_separation",2)
@@ -161,7 +164,7 @@ func _ready() -> void:
 	var stop := Button.new()
 	stop.text = "Đứng / Dừng"
 	stop.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	stop.position = Vector2(-110,-257)
+	stop.position = Vector2(-110,-269)
 	stop.size = Vector2(100,32)
 	stop.pressed.connect(root.action.bind("pause"))
 	add_child(stop)

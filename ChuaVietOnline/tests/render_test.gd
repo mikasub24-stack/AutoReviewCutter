@@ -13,6 +13,7 @@ func capture(label: String = "") -> void:
 	picture.save_png("res://build/review_frames/frame_%04d.png" % frame_index)
 	if not label.is_empty():
 		picture.save_png("res://build/"+label+".png")
+		picture.save_jpg("res://build/"+label+".jpg",.85)
 	frame_index += 1
 func advance(seconds: float) -> void:
 	for i in range(int(seconds/FRAME_DELTA)):
