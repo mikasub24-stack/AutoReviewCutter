@@ -73,17 +73,21 @@ jobs:
 
           APK lấy từ build GitHub Actions đã kiểm thử thành công. Chưa kiểm thử trên điện thoại vật lý; chưa cấu hình máy chủ Internet công khai; cửa hàng vẫn là sandbox.
           NOTES
-          gh release create "$tag" "$asset" review/ritual-preview.mp4 review/temple-preview.jpg review/ritual-kneel.jpg review/ritual-bow.jpg review/ritual-incense.jpg --target "$SOURCE_SHA" --title "Chùa Việt Online $APK_VERSION — Android thử nghiệm" --notes-file notes.md --prerelease --latest=false
+          printf '\nCommit APK đã kiểm thử: %s\n' "$SOURCE_SHA" >> notes.md
+          gh release create "$tag" "$asset" review/ritual-preview.mp4 review/temple-preview.jpg review/ritual-kneel.jpg review/ritual-bow.jpg review/ritual-incense.jpg --target "$GITHUB_SHA" --title "Chùa Việt Online $APK_VERSION — Android thử nghiệm" --notes-file notes.md --prerelease --latest=false
       - uses: actions/checkout@v4
+        if: always()
         with:
           ref: chua-viet-online
       - name: Package source history for handoff
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
           git fetch --no-tags --unshallow origin chua-viet-online
           git bundle create ChuaVietOnline-source.bundle HEAD
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: ChuaVietOnline-source-bundle
           path: ChuaVietOnline-source.bundle
