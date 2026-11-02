@@ -7,6 +7,7 @@ const MONK_AVATAR = preload("res://art/monk_avatar.svg")
 const NUN_AVATAR = preload("res://art/nun_avatar.svg")
 const CUSHION_ART = preload("res://art/bo_doan.svg")
 const ALTAR_ART = preload("res://art/chinh_dien_altar.svg")
+const TIMBER_TILE = preload("res://art/san_go_cham_khac.svg")
 const ROWS := 50
 const COLS_PER_SIDE := 10
 const CAPACITY := ROWS * COLS_PER_SIDE * 2
@@ -163,6 +164,14 @@ func _draw() -> void:
 	var camera := _camera()
 	draw_rect(Rect2(Vector2.ZERO, size), Color("#2a1a14"))
 	draw_rect(Rect2(-camera, Vector2(WORLD_W, WORLD_H)), Color("#75513b"))
+	# Illustrated carved timber floor is tiled in world coordinates, camera-correct.
+	var floor_x_start := maxi(0, int(camera.x / 320.0))
+	var floor_x_end := mini(int(WORLD_W / 320.0), int((camera.x + w) / 320.0) + 1)
+	var floor_y_start := maxi(0, int(camera.y / 320.0))
+	var floor_y_end := mini(int(WORLD_H / 320.0), int((camera.y + h) / 320.0) + 1)
+	for tile_y in range(floor_y_start, floor_y_end + 1):
+		for tile_x in range(floor_x_start, floor_x_end + 1):
+			draw_texture_rect(TIMBER_TILE, Rect2(Vector2(float(tile_x) * 320.0, float(tile_y) * 320.0) - camera, Vector2(320.0, 320.0)), false)
 	# Vietnamese timber floorboards and warm brass inlay.
 	var board_start := maxi(0,int(camera.y / 48.0)-1)
 	var board_end := mini(int(WORLD_H/48.0),int((camera.y+h)/48.0)+1)
