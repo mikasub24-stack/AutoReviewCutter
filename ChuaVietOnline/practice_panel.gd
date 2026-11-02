@@ -27,6 +27,9 @@ var avatar_area: Control
 var practice_save_elapsed := 0.0
 var server_address: LineEdit
 var network_status: Label
+var speech_enabled := true
+var vietnamese_voice := ""
+var voice_notice := ""
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -100,11 +103,20 @@ func _ready() -> void:
 	close.pressed.connect(queue_free)
 	column.add_child(close)
 	_load_practice()
+	# Android uses the device's installed Vietnamese TTS engine; no voice recordings are bundled.
+	var voices := DisplayServer.tts_get_voices_for_language("vi")
+	if voices.size() > 0:
+		vietnamese_voice = voices[0]
+	else:
+		speech_enabled = false
+		voice_notice = "Máy chưa cài giọng đọc tiếng Việt"
 	temple_audio = TEMPLE_AUDIO.new()
 	add_child(temple_audio)
 	set_process(true)
 
 func _act(action: String) -> void:
+	if action != "chant" and action != "mantra":
+		DisplayServer.tts_stop()
 	if action == "music":
 		temple_audio.set_ambient(not temple_audio.ambient)
 		message = "Nhạc thiền " + ("đang phát" if temple_audio.ambient else "đã tắt")
@@ -125,6 +137,7 @@ func _act(action: String) -> void:
 				message = "Gõ mõ lần %d" % knocks
 			"chant":
 				message = "Đang tụng: Nam mô A Di Đà Phật"
+			_speak("Nam mô A Di Đà Phật")
 			"beads":
 				beads = (beads % 108) + 1
 				message = "Niệm hạt %d/108" % beads
@@ -155,9 +168,18 @@ func _act(action: String) -> void:
 			"mantra":
 				mantra_count += 1
 				message = "Om Mani Padme Hum - lần %d" % mantra_count
-	voice_note.text = message
+			_speak("Án Ma Ni Bát Mê Hồng")
+	voice_note.text = message + (" • " + voice_notice if not voice_notice.is_empty() else "")
 	_save_practice()
 	avatar_area.queue_redraw()
+
+func _speak(phrase: String) -> void:
+	if speech_enabled and not vietnamese_voice.is_empty():
+		DisplayServer.tts_speak(phrase, vietnamese_voice, 60, 1.0, 0.78, 0, true)
+
+func _exit_tree() -> void:
+	DisplayServer.tts_stop()
+	_save_practice()
 
 func _process(delta: float) -> void:
 	elapsed += delta
@@ -170,6 +192,7 @@ func _process(delta: float) -> void:
 		if elapsed >= 3.5:
 			elapsed = 0.0
 			message = "Nam mô A Di Đà Phật - %ds" % int(chant_seconds)
+			_speak("Nam mô A Di Đà Phật")
 			voice_note.text = message
 	if practice == "bow" and elapsed >= 1.8:
 		practice = ""
