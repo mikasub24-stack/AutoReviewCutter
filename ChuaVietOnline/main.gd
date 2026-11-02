@@ -3,6 +3,7 @@ extends Control
 const SHOP_SCRIPT = preload("res://payment_shop.gd")
 const PRACTICE_SCRIPT = preload("res://practice_panel.gd")
 const MULTIPLAYER_SCRIPT = preload("res://multiplayer.gd")
+const MONK_AVATAR = preload("res://art/monk_avatar.svg")
 const ROWS := 50
 const COLS_PER_SIDE := 10
 const CAPACITY := ROWS * COLS_PER_SIDE * 2
@@ -295,6 +296,11 @@ func _draw() -> void:
 	var robe := Color("#90969a") if character_gender == 1 else (Color("#79533b") if robe_brown else Color("#90969a"))
 	draw_colored_polygon(PackedVector2Array([avatar + Vector2(-23,-12),avatar + Vector2(23,-12),avatar + Vector2(27,22),avatar + Vector2(-27,22)]), robe)
 	draw_circle(avatar + Vector2(0,-27), 15, Color("#d9a47a"))
+	# Detailed approved-style character art overlays the temporary geometry.
+	# Rendered as a proper texture, not a screenshot of the whole UI.
+	if character_gender == 0:
+		var avatar_rect := Rect2(avatar + Vector2(-35.0, -64.0), Vector2(70.0, 100.0))
+		draw_texture_rect(MONK_AVATAR, avatar_rect, false)
 	# Small hands make the walking silhouette readable on a phone.
 	draw_circle(avatar + Vector2(-24, 4 - gait), 6, Color("#d9a47a"))
 	draw_circle(avatar + Vector2(24, 4 + gait), 6, Color("#d9a47a"))
