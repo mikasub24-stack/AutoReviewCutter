@@ -168,7 +168,7 @@ func _draw() -> void:
 		draw_rect(Rect2(-camera.x,py,WORLD_W,46),timber)
 		draw_line(Vector2(-camera.x,py+46),Vector2(WORLD_W-camera.x,py+46),Color("#482d22"),2)
 		for joint in range(1,4):
-			var px := float(joint)*430.0 + float((plank%3)*140) - camera.x
+			var px: float = float(joint)*430.0 + float((plank%3)*140) - camera.x
 			draw_line(Vector2(px,py+2),Vector2(px,py+44),Color("#5b392a"),2)
 	# Symmetrical hanging lanterns and gilded lotus ornaments.
 	var lamp_start := maxi(0,int(camera.y/390.0)-1)
@@ -307,7 +307,7 @@ func _draw() -> void:
 		draw_circle(pos, 7.0 + a * 3.0, Color(0.95,0.92,0.83, (3.0-a) * 0.13))
 	# HUD with accessible touch regions.
 	draw_rect(Rect2(0,0,w,100), Color(0.11,0.07,0.05,0.92))
-	var is_online := multiplayer_client != null and multiplayer_client.connected
+	var is_online: bool = multiplayer_client != null and multiplayer_client.connected
 	var net_label := "TRỰC TUYẾN" if is_online else "NGOẠI TUYẾN"
 	var net_color := Color("#9ad99a") if is_online else Color("#ffcf8c")
 	draw_circle(Vector2(w - 28.0, 22.0), 6.0, net_color)
