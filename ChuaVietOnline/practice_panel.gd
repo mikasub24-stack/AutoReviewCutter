@@ -2,7 +2,7 @@ extends Control
 ## Interactive Buddhist practice panel: procedural avatar animation and counters.
 ## No external audio or image assets required.
 const TEMPLE_AUDIO = preload("res://temple_audio.gd")
-var temple_audio: Node
+var temple_audio
 var wheel_turns := 0
 var flowers := 0
 var fruits := 0
@@ -189,7 +189,7 @@ func _draw_avatar() -> void:
 	elif practice == "incense":
 		avatar_area.draw_line(c + Vector2(0,15), c + Vector2(0,-110), gold, 3)
 		for i in range(5):
-			var drift := sin(elapsed * 2.0 + i) * 8
+			var drift: float = sin(elapsed * 2.0 + i) * 8.0
 			avatar_area.draw_circle(c + Vector2(drift,-120-i*12), 5, Color(0.85,0.84,0.8,0.5))
 	else:
 		avatar_area.draw_line(c + Vector2(-30,0+offset), c + Vector2(-10,35+offset), skin, 9)
