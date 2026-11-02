@@ -196,7 +196,7 @@ func _draw() -> void:
 	for pillar_row in range(pillar_start, pillar_end + 1):
 		var py := 335.0 + float(pillar_row) * 500.0 - camera.y
 		for px_world in [48.0, WORLD_W - 48.0, WORLD_W * 0.5 - AISLE * 0.5 - 22.0, WORLD_W * 0.5 + AISLE * 0.5 + 22.0]:
-			var px := px_world - camera.x
+			var px: float = float(px_world) - camera.x
 			draw_rect(Rect2(px - 15.0, py - 120.0, 30.0, 240.0), Color("#50291e"))
 			draw_rect(Rect2(px - 20.0, py - 122.0, 40.0, 18.0), Color("#d9a64d"))
 			draw_rect(Rect2(px - 21.0, py + 106.0, 42.0, 16.0), Color("#d9a64d"))
