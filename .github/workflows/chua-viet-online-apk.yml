@@ -13,6 +13,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Test multiplayer server
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ChuaVietOnline/realtime
+          npm install --omit=dev
+          npm test
       - name: Install Godot 4.3 and Android export templates
         shell: bash
         run: |
