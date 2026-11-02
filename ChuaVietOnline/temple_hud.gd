@@ -99,16 +99,12 @@ func _ready() -> void:
 		button.pressed.connect(_show_info.bind("bell" if entry[0] == "mail" else entry[0]))
 		top_actions.add_child(button)
 	var title := Label.new()
-	title.text = "Chùa Việt Online"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	title.offset_top = 108
-	title.add_theme_color_override("font_color",Color("#ffdf8c"))
-	title.add_theme_color_override("font_outline_color",Color("#391b15"))
-	title.add_theme_constant_override("outline_size",7)
-	title.add_theme_font_size_override("font_size",30)
+	title.text = "CHÙA VIỆT ONLINE"
+	title.add_theme_font_size_override("font_size",10)
+	title.add_theme_color_override("font_color",Color("#eac884"))
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(title)
+	info.add_child(title)
+	info.move_child(title,0)
 	var left := VBoxContainer.new()
 	left.anchor_top = .27
 	left.anchor_bottom = .27
