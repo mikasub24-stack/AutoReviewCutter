@@ -145,7 +145,7 @@ func _act(action: String) -> void:
 				message = "Gõ mõ lần %d" % knocks
 			"chant":
 				message = "Đang tụng: Nam mô A Di Đà Phật"
-			_speak("Nam mô A Di Đà Phật")
+				_speak("Nam mô A Di Đà Phật")
 			"beads":
 				beads = (beads % 108) + 1
 				message = "Niệm hạt %d/108" % beads
@@ -176,7 +176,7 @@ func _act(action: String) -> void:
 			"mantra":
 				mantra_count += 1
 				message = "Om Mani Padme Hum - lần %d" % mantra_count
-			_speak("Án Ma Ni Bát Mê Hồng")
+				_speak("Án Ma Ni Bát Mê Hồng")
 	voice_note.text = message + (" • " + voice_notice if not voice_notice.is_empty() else "")
 	_save_practice()
 	avatar_area.queue_redraw()
