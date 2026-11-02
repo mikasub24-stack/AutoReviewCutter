@@ -48,15 +48,16 @@ func _process(delta: float) -> void:
 		next.y = clampf(next.y, 340.0, WORLD_H - 80.0)
 		# Cushions occupy two wings; the main and cross aisles stay open.
 		var on_main := absf(next.x - WORLD_W * 0.5) < AISLE * 0.47
-		var on_cross := fmod(next.y - 380.0, STEP_Y * 10.0) < 105.0
+		var cross_offset := fposmod(next.y - 380.0, STEP_Y * 10.0)
+		var on_cross := cross_offset < 105.0
 		if on_main or on_cross:
 			player = next
 			sitting = false
 		else:
 			status_text = "Đi theo lối giữa hoặc hành lang ngang"
 	for i in range(incense.size() - 1, -1, -1):
-		incense[i]["age"] += delta
-		if incense[i]["age"] > 3.0:
+		incense[i]["age"] = float(incense[i]["age"]) + delta
+		if float(incense[i]["age"]) > 3.0:
 			incense.remove_at(i)
 	queue_redraw()
 
@@ -104,8 +105,8 @@ func _draw() -> void:
 	draw_circle(avatar + Vector2(0,-27), 15, Color("#d9a47a"))
 	draw_arc(avatar + Vector2(0,-27), 15, PI, TAU, 16, Color("#966547"), 2)
 	for particle in incense:
-		var a: float = particle["age"]
-		var pos: Vector2 = particle["pos"] - camera + Vector2(sin(a * 4.0) * 13.0, -a * 42.0)
+		var a: float = float(particle["age"])
+		var pos: Vector2 = (particle["pos"] as Vector2) - camera + Vector2(sin(a * 4.0) * 13.0, -a * 42.0)
 		draw_circle(pos, 7.0 + a * 3.0, Color(0.95,0.92,0.83, (3.0-a) * 0.13))
 	# HUD with accessible touch regions.
 	draw_rect(Rect2(0,0,w,100), Color(0.11,0.07,0.05,0.92))
