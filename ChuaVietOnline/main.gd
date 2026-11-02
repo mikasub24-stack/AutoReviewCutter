@@ -24,6 +24,7 @@ var incense: Array[Dictionary] = []
 var last_touch := Vector2.ZERO
 var approach_seat := -1
 var movement_facing := Vector2(0, -1)
+var joystick_touch_id := -1
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -53,8 +54,11 @@ func _process(delta: float) -> void:
 		var on_main := absf(next.x - WORLD_W * 0.5) < AISLE * 0.47
 		var cross_offset := fposmod(next.y - 380.0, STEP_Y * 10.0)
 		var on_cross := cross_offset < 105.0
+		# Narrow paths between cushion rows remain walkable.
+		var seat_lane := fposmod(next.y - 420.0, STEP_Y)
+		var between_rows := seat_lane > 24.0 and seat_lane < STEP_Y - 24.0
 		var entering_seat := approach_seat >= 0 and next.distance_to(_seat_position(approach_seat)) < 125.0
-		if on_main or on_cross or entering_seat:
+		if on_main or on_cross or between_rows or entering_seat:
 			player = next
 			sitting = false
 			if approach_seat >= 0 and player.distance_to(_seat_position(approach_seat)) < 30.0:
@@ -146,11 +150,12 @@ func _ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		if event.pressed:
-			_touch_down(event.position)
-		else:
+			_touch_down(event.position, event.index)
+		elif event.index == joystick_touch_id:
 			joystick_active = false
+			joystick_touch_id = -1
 			joystick = Vector2.ZERO
-	elif event is InputEventScreenDrag and joystick_active:
+	elif event is InputEventScreenDrag and joystick_active and event.index == joystick_touch_id:
 		joystick = ((event.position - joystick_origin) / 60.0).limit_length(1.0)
 	elif event is InputEventMouseButton:
 		if event.pressed:
@@ -161,11 +166,12 @@ func _gui_input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion and joystick_active and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		joystick = ((event.position - joystick_origin) / 60.0).limit_length(1.0)
 
-func _touch_down(pos: Vector2) -> void:
+func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 	var w := size.x
 	var h := size.y
 	if pos.y > h - 170 and pos.x < 205:
 		joystick_active = true
+		joystick_touch_id = touch_id
 		joystick_origin = Vector2(105,h-84)
 		joystick = ((pos - joystick_origin) / 60.0).limit_length(1.0)
 		return
