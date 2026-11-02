@@ -78,8 +78,10 @@ func _ready() -> void:
 	server_address = LineEdit.new()
 	server_address.placeholder_text = "wss://your-temple-server.example"
 	server_address.text = "ws://127.0.0.1:8788"
-	if get_parent() != null and get_parent().multiplayer_client != null:
-		server_address.text = get_parent().multiplayer_client.server_url
+	if get_parent() != null:
+		var net = get_parent().get("multiplayer_client")
+		if net != null:
+			server_address.text = net.server_url
 	column.add_child(server_address)
 	var connect_button := Button.new()
 	connect_button.text = "Kết nối máy chủ nhiều người chơi"
@@ -308,12 +310,16 @@ func _load_practice() -> void:
 
 func _connect_multiplayer() -> void:
 	var root = get_parent()
-	if root == null or root.multiplayer_client == null:
+	if root == null:
 		network_status.text = "Không tìm thấy kết nối nhiều người chơi."
+		return
+	var net = root.get("multiplayer_client")
+	if net == null:
+		network_status.text = "Chưa khởi tạo kết nối nhiều người chơi."
 		return
 	var url := server_address.text.strip_edges()
 	if not (url.begins_with("ws://") or url.begins_with("wss://")):
 		network_status.text = "Địa chỉ phải bắt đầu bằng ws:// hoặc wss://"
 		return
-	root.multiplayer_client.configure(url)
+	net.configure(url)
 	network_status.text = "Đang kết nối: " + url
