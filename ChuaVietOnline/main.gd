@@ -82,6 +82,8 @@ func _process(delta: float) -> void:
 		auto_path.clear()
 		approach_seat = -1
 	if auto_walk and auto_path.size() > 0:
+		if sitting:
+			_claim_seat(-1)
 		sitting = false
 		var waypoint := auto_path[0]
 		var remaining := waypoint - player
@@ -382,6 +384,9 @@ func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 				status_text = "Chỗ này đã có người ngồi! Hãy chọn bồ đoàn khác."
 				occupancy_notice = 3.0
 				return
+			if sitting and selected_seat != best:
+				_claim_seat(-1)
+				sitting = false
 			selected_seat = best
 			approach_seat = best
 			status_text = "Bồ đoàn %d/1000 - chọn chỗ ngồi" % (best+1)
