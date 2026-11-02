@@ -39,6 +39,7 @@ var occupancy_notice := 0.0
 var multiplayer_client
 var network_tick := 0.0
 var waiting_for_seat := false
+var seat_request_timeout := 0.0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -68,6 +69,11 @@ func _camera() -> Vector2:
 func _process(delta: float) -> void:
 	elapsed += delta
 	occupancy_notice = maxf(0.0, occupancy_notice - delta)
+	if waiting_for_seat:
+		seat_request_timeout -= delta
+		if seat_request_timeout <= 0.0:
+			waiting_for_seat = false
+			status_text = "Máy chủ chưa phản hồi. Vui lòng thử lại."
 	network_tick += delta
 	if network_tick >= 0.15:
 		network_tick = 0.0
@@ -501,6 +507,7 @@ func _draw_seated_occupant(pos: Vector2, variant: int) -> void:
 func _claim_seat(index: int) -> void:
 	if multiplayer_client != null and multiplayer_client.connected:
 		waiting_for_seat = index >= 0
+		seat_request_timeout = 8.0 if index >= 0 else 0.0
 		multiplayer_client.request_seat(index)
 
 func _network_changed(is_connected: bool) -> void:
