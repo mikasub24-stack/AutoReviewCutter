@@ -25,9 +25,13 @@ var last_touch := Vector2.ZERO
 var approach_seat := -1
 var movement_facing := Vector2(0, -1)
 var joystick_touch_id := -1
+var character_gender := 0
+var footstep_time := 0.0
+var save_timer := 0.0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	_load_progress()
 	set_process(true)
 	queue_redraw()
 
@@ -45,8 +49,13 @@ func _camera() -> Vector2:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	save_timer += delta
+	if save_timer > 15.0:
+		save_timer = 0.0
+		_save_progress()
 	if joystick.length() > 0.05:
 		movement_facing = joystick.normalized()
+		footstep_time += delta * 12.0
 		var next := player + joystick.normalized() * SPEED * delta
 		next.x = clampf(next.x, 30.0, WORLD_W - 30.0)
 		next.y = clampf(next.y, 340.0, WORLD_H - 80.0)
@@ -92,6 +101,28 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2(WORLD_W * 0.5 - 265, 62) - camera, Vector2(530, 198)), Color("#bb842c"))
 	draw_circle(Vector2(WORLD_W * 0.5, 150) - camera, 77, Color("#f1c56a"))
 	draw_circle(Vector2(WORLD_W * 0.5, 145) - camera, 44, Color("#a36a26"))
+	# Carved timber beams, lotus halo and a bronze incense urn.
+	for beam in range(5):
+		var by := 12.0 + float(beam) * 12.0
+		draw_rect(Rect2(Vector2(WORLD_W * 0.5 - 330 + beam * 12, by) - camera, Vector2(660 - beam * 24, 8)), Color("#402018"))
+	for petal in range(12):
+		var angle := float(petal) * TAU / 12.0
+		var halo := Vector2(WORLD_W * 0.5, 150) + Vector2(cos(angle), sin(angle)) * 94.0 - camera
+		_ellipse(halo, Vector2(15, 24), Color("#f2ca68"))
+	var altar_base := Vector2(WORLD_W * 0.5, 252) - camera
+	draw_rect(Rect2(altar_base + Vector2(-220, -5), Vector2(440, 17)), Color("#4a241a"))
+	draw_rect(Rect2(altar_base + Vector2(-212, -13), Vector2(424, 8)), Color("#d9a34b"))
+	for dx in [-158.0, 158.0]:
+		var vase := altar_base + Vector2(dx, -26)
+		draw_circle(vase, 16, Color("#d9bb70"))
+		for p in range(5):
+			var a := float(p) * TAU / 5.0
+			_ellipse(vase + Vector2(sin(a)*16, -26+cos(a)*9), Vector2(10, 16), Color("#eaa4b8"))
+	draw_circle(altar_base + Vector2(0,-16), 25, Color("#8b6a42"))
+	for stick in range(5):
+		var sx := float(stick-2)*7.0
+		draw_line(altar_base + Vector2(sx,-16), altar_base + Vector2(sx,-59), Color("#a65a3b"), 2)
+		draw_circle(altar_base + Vector2(sx+sin(elapsed*1.4+stick)*9,-72), 7, Color(0.94,0.91,0.79,0.25))
 	for x in [130.0, WORLD_W - 130.0]:
 		for y in range(260, int(WORLD_H), 470):
 			draw_rect(Rect2(Vector2(x - 24, float(y)) - camera, Vector2(48, 240)), Color("#6e241a"))
@@ -104,7 +135,9 @@ func _draw() -> void:
 			var idx := row * COLS_PER_SIDE * 2 + col
 			var pos := _seat_position(idx) - camera
 			var color := Color("#63bca4") if idx == selected_seat else Color("#c5a45b")
-			_ellipse(pos, Vector2(26, 11), color)
+			_ellipse(pos + Vector2(0,4), Vector2(29, 13), Color("#3b241a"))
+			_ellipse(pos, Vector2(27, 11), Color("#7d492b"))
+			_ellipse(pos + Vector2(0,-2), Vector2(24, 9), color)
 			if idx == selected_seat:
 				draw_arc(pos, 30, 0, TAU, 20, Color.WHITE, 2)
 	# Character: bald head, Vietnamese brown or gray robe.
@@ -114,9 +147,11 @@ func _draw() -> void:
 	else:
 		draw_rect(Rect2(avatar + Vector2(-14, 13), Vector2(11, 24)), Color("#302521"))
 		draw_rect(Rect2(avatar + Vector2(4, 13), Vector2(11, 24)), Color("#302521"))
-	var robe := Color("#79533b") if robe_brown else Color("#90969a")
+	var robe := Color("#90969a") if character_gender == 1 else (Color("#79533b") if robe_brown else Color("#90969a"))
 	draw_colored_polygon(PackedVector2Array([avatar + Vector2(-23,-12),avatar + Vector2(23,-12),avatar + Vector2(27,22),avatar + Vector2(-27,22)]), robe)
 	draw_circle(avatar + Vector2(0,-27), 15, Color("#d9a47a"))
+	if character_gender == 1:
+		draw_arc(avatar + Vector2(0,-29), 16, PI, TAU, 16, Color("#282324"), 5)
 	draw_arc(avatar + Vector2(0,-27), 15, PI, TAU, 16, Color("#966547"), 2)
 	for particle in incense:
 		var a: float = float(particle["age"])
@@ -138,7 +173,7 @@ func _draw() -> void:
 	draw_rect(Rect2(w-180,h-150,170,55), Color("#75513a"))
 	draw_string(ThemeDB.fallback_font, Vector2(w-171,h-115), "NGỒI / ĐỨNG", HORIZONTAL_ALIGNMENT_LEFT, 160, 17, Color.WHITE)
 	draw_rect(Rect2(w-180,h-78,170,55), Color("#75513a"))
-	draw_string(ThemeDB.fallback_font, Vector2(w-170,h-44), "ĐỔI ÁO", HORIZONTAL_ALIGNMENT_LEFT, 160, 17, Color.WHITE)
+	draw_string(ThemeDB.fallback_font, Vector2(w-170,h-44), "ĐỔI NHÂN VẬT", HORIZONTAL_ALIGNMENT_LEFT, 160, 17, Color.WHITE)
 
 func _ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
 	var points := PackedVector2Array()
@@ -188,8 +223,17 @@ func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 			sitting = not sitting
 			status_text = "Đang ngồi thiền" if sitting else "Đã đứng dậy"
 		else:
-			robe_brown = not robe_brown
-			status_text = "Đổi sang áo nâu" if robe_brown else "Đổi sang áo xám"
+			if character_gender == 0 and robe_brown:
+				robe_brown = false
+				status_text = "Nam cư sĩ - áo xám"
+			elif character_gender == 0:
+				character_gender = 1
+				status_text = "Nữ Phật tử - áo lam"
+			else:
+				character_gender = 0
+				robe_brown = true
+				status_text = "Nam cư sĩ - áo nâu"
+			_save_progress()
 		return
 	if pos.y > 160 and pos.y < h-180:
 		var world := pos + _camera()
@@ -215,3 +259,21 @@ func _touch_down(pos: Vector2, touch_id: int = -1) -> void:
 				status_text += " (đi đến chỗ đã chọn)"
 		else:
 			incense.append({"pos":world,"age":0.0})
+
+func _save_progress() -> void:
+	var file := FileAccess.open("user://temple_progress.json", FileAccess.WRITE)
+	if file == null:
+		return
+	file.store_string(JSON.stringify({"x":player.x,"y":player.y,"seat":selected_seat,"robe_brown":robe_brown,"gender":character_gender}))
+
+func _load_progress() -> void:
+	if not FileAccess.file_exists("user://temple_progress.json"):
+		return
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string("user://temple_progress.json"))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	var data: Dictionary = parsed
+	player = Vector2(clampf(float(data.get("x",player.x)),30.0,WORLD_W-30.0),clampf(float(data.get("y",player.y)),340.0,WORLD_H-80.0))
+	selected_seat = clampi(int(data.get("seat",-1)),-1,CAPACITY-1)
+	robe_brown = bool(data.get("robe_brown",true))
+	character_gender = clampi(int(data.get("gender",0)),0,1)
