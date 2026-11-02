@@ -2,6 +2,7 @@ extends Control
 
 const CAPACITY := 1000
 const SHOP_SCRIPT = preload("res://payment_shop.gd")
+const PRACTICE_SCRIPT = preload("res://practice_panel.gd")
 var selected_seat := -1
 var beads := 0
 var incense_particles: Array[Dictionary] = []
@@ -69,6 +70,11 @@ func _gui_input(event: InputEvent) -> void:
 		_handle_touch(event.position)
 
 func _handle_touch(p: Vector2) -> void:
+	if p.y >= size.y * 0.80:
+		var practice_panel := Control.new()
+		practice_panel.set_script(PRACTICE_SCRIPT)
+		add_child(practice_panel)
+		return
 	if p.y >= size.y * 0.47 and p.y <= size.y * 0.47 + 52 and p.x >= size.x * 0.27 and p.x <= size.x * 0.73:
 		var shop := Control.new()
 		shop.set_script(SHOP_SCRIPT)
