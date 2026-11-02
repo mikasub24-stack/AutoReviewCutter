@@ -139,10 +139,17 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await prompts.fill('Mai ra bến.');
     await page.waitForFunction(() => /Prompt quá ngắn/.test(document.querySelector('#storyScenes .draftRow .storyWarn').textContent));
     assert.match(await page.locator('#storyCheck').textContent(), /1 cảnh cần xem lại trước khi tạo/);
-    // Muse chỉ tạo clip 10 giây.
-    await page.locator('#storySeconds').fill('12'); await page.locator('#storySplit').click();
-    assert.match(await page.locator('#toast').textContent(), /Muse chỉ tạo clip tối đa 10 giây/);
-    await page.locator('#storySeconds').fill('10');
+    // Giây mỗi cảnh tự tính theo lời kể, không còn ô nhập tay.
+    assert.equal(await page.locator('#storySeconds').count(), 0, 'không còn ô Giây / cảnh');
+    await page.locator('#storyScript').fill('Mai ra bến. Cá vàng nhảy lên thuyền, Mai thả cá về sông và mỉm cười thật lâu cùng bà.'); await page.locator('#storySplit').click();
+    await page.waitForFunction(() => /độ dài mỗi cảnh tự tính theo lời kể/.test(document.getElementById('storyInfo').textContent));
+    const secs = async () => (await page.locator('#storyScenes .draftRow strong').allTextContents()).map(t => Number(/· (\d+) giây/.exec(t)?.[1]));
+    const first = await secs();
+    assert.ok(first.length >= 1 && first.every(n => n >= 3 && n <= 10), 'giây trong khoảng 3–10: ' + first);
+    await page.locator('#storyScenes .draftRow').nth(0).locator('textarea').nth(0).fill('Mai ra bến.');
+    assert.equal((await secs())[0], 3, 'sửa lời ngắn lại thì giây của cảnh đó tự giảm');
+    await page.locator('#storyScenes .draftRow').nth(0).locator('textarea').nth(0).fill('Mai ra bến sông lúc bình minh, sương mỏng phủ kín mặt nước yên ả, cô bé đứng lặng thật lâu nhìn dòng nước.');
+    assert.ok((await secs())[0] > 3, 'sửa lời dài ra thì giây tăng');
     // Đa ngôn ngữ: kịch bản tiếng Anh chọn giọng tiếng Anh trước; kịch bản tiếng Trung chia theo chữ Hán.
     await page.locator('#storyScript').fill('Every morning, Tom rowed out to the middle of the lake. One day, a golden fish jumped into his boat.');
     await page.locator('#storySplit').click();

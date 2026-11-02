@@ -5,7 +5,7 @@
   const $ = id => document.getElementById(id);
   const KEY = 'museStudio.story';
   const FIELDS = {
-    storyScript: ['script', ''], storySeconds: ['seconds', '10'], storyAspect: ['aspect', '16:9'], storyCharacter: ['character', ''], storyStyle: ['style', ''],
+    storyScript: ['script', ''], storyAspect: ['aspect', '16:9'], storyCharacter: ['character', ''], storyStyle: ['style', ''],
     storyEngine: ['engine', 'none'], storyTempo: ['tempo', '1'], subFont: ['subFont', 'Arial'], subSize: ['subSize', '54'], subColor: ['subColor', '#ffffff'],
     subOutline: ['subOutline', '#000000'], subPos: ['subPos', 'bottom'], storySfx: ['sfx', 'low'], storyName: ['name', '']
   };
@@ -24,7 +24,7 @@
     $(id).addEventListener('change', () => { saved[key] = $(id).checked; persist(); drawPreview(); });
   }
 
-  const options = () => ({ seconds: Number($('storySeconds').value), aspect: $('storyAspect').value, style: $('storyStyle').value, character: $('storyCharacter').value });
+  const options = () => ({ seconds: plan().MAX_SECONDS, aspect: $('storyAspect').value, style: $('storyStyle').value, character: $('storyCharacter').value });
   const plan = () => window.storyPlan;
   const dims = aspect => aspect === '9:16' ? [1080, 1920] : aspect === '1:1' ? [1080, 1080] : [1920, 1080];
   const baseName = file => String(file || '').split(/[\\/]/).pop();
@@ -64,16 +64,19 @@
       toast('Đã sửa lời các cảnh về đúng nguyên văn kịch bản. Câu bị bỏ sót thành cảnh mới.');
     } catch (e) { toast(e.message); }
   }
+  // Giây mỗi cảnh tự tính theo lời kể của cảnh đó (3–10 giây), không nhập tay.
+  const secondsOf = scene => plan().sceneSeconds(scene.voiceover || scene.source || '', plan().MAX_SECONDS);
+  const headingText = (scene, index) => `${scene.title || 'Cảnh ' + (index + 1)} · ${secondsOf(scene)} giây`;
   function renderScenes() {
     const box = $('storyScenes');
     box.replaceChildren(); warnBoxes = [];
     scenes.forEach((scene, index) => {
       const row = el('div', 'draftRow'), body = el('div', 'draftContent');
-      const heading = el('strong', '', `${scene.title || 'Cảnh ' + (index + 1)} · ${scene.durationSeconds || ''} giây`);
+      const heading = el('strong', '', headingText(scene, index));
       const tag = el('span', 'storyTag', 'prompt mẫu'); tag.hidden = !scene.offline; tag.title = 'Prompt này do tool ghép từ lời kể, chưa qua Muse';
       body.append(heading, tag);
       const warn = el('div', 'storyWarn'); warn.hidden = true; warnBoxes[index] = warn;
-      const voice = el('textarea'); voice.value = scene.voiceover || ''; voice.placeholder = 'Lời đọc của cảnh này'; voice.oninput = () => { scene.voiceover = voice.value; scene.source = voice.value; refreshChecks(); };
+      const voice = el('textarea'); voice.value = scene.voiceover || ''; voice.placeholder = 'Lời đọc của cảnh này'; voice.oninput = () => { scene.voiceover = voice.value; scene.source = voice.value; scene.durationSeconds = secondsOf(scene); heading.textContent = headingText(scene, index); refreshChecks(); };
       const prompt = el('textarea'); prompt.value = scene.prompt || ''; prompt.placeholder = 'Prompt gửi Muse'; prompt.oninput = () => { scene.prompt = prompt.value; if (scene.offline) { scene.offline = false; tag.hidden = true; } refreshChecks(); };
       const tools = el('div', 'draftTools'), remove = el('button', 'secondary', 'Xóa cảnh');
       remove.onclick = () => { scenes.splice(index, 1); scenes.forEach((s, i) => { s.title = 'Cảnh ' + (i + 1); }); renderScenes(); };
@@ -89,7 +92,7 @@
     try {
       scenes = plan().planStory($('storyScript').value, options());
       renderScenes();
-      $('storyInfo').textContent = `Đã chia ${scenes.length} cảnh, mỗi cảnh tối đa ${$('storySeconds').value} giây. Xem lại lời đọc và prompt, rồi bấm Tạo clip.`;
+      $('storyInfo').textContent = `Đã chia ${scenes.length} cảnh, độ dài mỗi cảnh tự tính theo lời kể (3–${plan().MAX_SECONDS} giây). Xem lại lời đọc và prompt, rồi bấm Tạo clip.`;
     } catch (e) { toast(e.message); }
   }
   async function copyInstruction() {
@@ -157,7 +160,7 @@
       if (!confirm(`Thêm ${scenes.length} cảnh và chạy toàn bộ clip kể chuyện đang chờ? Tạo video có thể dùng credit Muse. Tool gửi nguyên prompt đã xem, cùng ảnh nhân vật.`)) return;
     }
     const storyId = newStoryId();
-    const result = await call('add', scenes.map(s => ({ kind: 'story', storyId, title: s.title, source: s.voiceover || s.source || '', voiceover: s.voiceover || '', prompt: s.prompt, durationSeconds: s.durationSeconds, image: refs[0] || '', references: [...refs] })));
+    const result = await call('add', scenes.map(s => ({ kind: 'story', storyId, title: s.title, source: s.voiceover || s.source || '', voiceover: s.voiceover || '', prompt: s.prompt, durationSeconds: secondsOf(s), image: refs[0] || '', references: [...refs] })));
     if (!result) return;
     scenes = []; renderScenes(); render(result);
     if (startNow) render(await call('start', { kind: 'story' }));

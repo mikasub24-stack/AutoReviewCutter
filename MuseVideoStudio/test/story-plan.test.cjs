@@ -11,14 +11,17 @@ test('chia nhanh gộp câu theo thời lượng, giữ đủ chữ, mỗi cản
   for (const [index, scene] of scenes.entries()) {
     assert.equal(scene.title, 'Cảnh ' + (index + 1));
     assert.ok(scene.voiceover.length > 0 && scene.voiceover.length <= 10 * sp.CHARS_PER_SECOND + 1, 'dài ' + scene.voiceover.length);
-    assert.match(scene.prompt, /dài 10 giây, tỷ lệ 16:9/);
+    assert.match(scene.prompt, /dài \d+ giây, tỷ lệ 16:9/);
     assert.ok(scene.prompt.includes(scene.voiceover));
     assert.match(scene.prompt, /Nhân vật: Mai, bé gái tóc đen/);
     assert.match(scene.prompt, /Phong cách hình ảnh: hoạt hình màu nước/);
     assert.match(scene.prompt, /Không chèn chữ, phụ đề/);
     assert.match(scene.prompt, /Audio: no speech, no dialogue, no singing/);
     assert.match(scene.prompt, /mouths closed/);
-    assert.equal(scene.durationSeconds, 10);
+    assert.equal(scene.durationSeconds, sp.sceneSeconds(scene.voiceover, 10), 'giây của cảnh tự tính theo lời kể');
+    assert.ok(scene.durationSeconds >= 3 && scene.durationSeconds <= 10);
+    assert.ok(sp.estimateSeconds(scene.voiceover) <= scene.durationSeconds, 'lời đọc luôn vừa trong clip');
+    assert.ok(scene.prompt.includes(`Tạo video dài ${scene.durationSeconds} giây`), 'prompt mẫu ghi đúng số giây của cảnh');
   }
   const joined = scenes.map(s => s.voiceover).join(' ').replace(/\s/g, '');
   assert.equal(joined, story.replace(/\s/g, ''));
@@ -57,7 +60,8 @@ test('tách trả lời của Muse (đậm, chữ hoa/thường, nhiều dòng, 
   assert.ok(scenes.every(s => s.prompt.includes(sp.NO_SPEECH)), 'prompt nào cũng có câu no speech, kể cả khi Muse quên');
   assert.equal(scenes[1].prompt.split(sp.NO_SPEECH).length, 2);
   assert.equal(scenes[2].voiceover, 'Mai thả cá về sông.');
-  assert.ok(scenes.every(s => s.durationSeconds === 10));
+  assert.ok(scenes.every(s => s.durationSeconds === sp.sceneSeconds(s.voiceover, 10)));
+  assert.ok(scenes[2].durationSeconds < 10, 'lời ngắn thì clip ngắn, không cố định 10 giây');
 });
 
 test('thiếu PROMPT thì tự dựng prompt từ lời; không có cảnh nào thì báo lỗi rõ', () => {
@@ -235,7 +239,9 @@ test('câu được đánh số; câu quá dài cắt ở dấu phẩy; mỗi c�
 
 test('yêu cầu gửi Muse: đọc hiểu cả truyện, chia theo SỐ CÂU, không chép lời, prompt đúng hành động và nét mặt, nhận ra mọi nhân vật', () => {
   const text = sp.buildMuseInstruction(tale, { seconds: 10, aspect: '9:16', style: 'điện ảnh', character: 'Mai, bé gái tóc đen' }, { marker: 'ab12cd' });
-  assert.match(text, /MỘT video 10 giây/);
+  assert.match(text, /MỘT video ngắn, dài tối đa 10 giây/);
+  assert.match(text, /Độ dài video của cảnh tự theo lời kể/);
+  assert.match(text, /video 5 giây: 0–2 giây/);
   assert.match(text, /ĐỌC HIỂU/);
   assert.match(text, /KHÔNG chép lại lời/);
   assert.match(text, /tổng của mỗi cảnh không quá 9 giây/);
@@ -358,4 +364,42 @@ test('hàng đợi: «áp ảnh cho hàng chờ» ở tab video không ghi đè 
   await q.applyReferences(['C:\\khac.png']);
   assert.deepEqual(q.jobs.find(j => j.kind === 'video').references, ['C:\\khac.png']);
   assert.deepEqual(q.jobs.find(j => j.kind === 'story').references, ['C:\\mai.png']);
+});
+
+
+test('giây mỗi cảnh tự tính theo lời kể: ngắn thì ngắn, tối thiểu 3, tối đa 10, làm tròn lên có chừa nhịp nghỉ', () => {
+  assert.equal(sp.sceneSeconds('Mai ra bến.', 10), 3, 'rất ngắn thì vẫn 3 giây');
+  assert.equal(sp.sceneSeconds('', 10), 10, 'chưa có lời thì dùng mức tối đa');
+  const eleven = 'Mai ra bến sông lúc bình minh, sương mỏng phủ kín mặt nước yên ả và lạnh buốt.'; // ~11 giây nếu đọc chậm
+  for (const text of ['Mai ra bến sông lúc bình minh.', 'Mai ra bến sông lúc bình minh, sương mỏng phủ kín mặt nước.', eleven, tale]) {
+    const need = Math.ceil(Math.round(sp.estimateSeconds(text) / 0.9 * 100) / 100);
+    const got = sp.sceneSeconds(text, 10);
+    assert.equal(got, Math.min(10, Math.max(3, need)), text);
+    assert.ok(got >= 3 && got <= 10);
+  }
+  // Đúng 4,5 giây đọc (63 ký tự, 14 ký tự/giây) thì cần 5 giây chứ không phải 6 (không để sai số số thực đẩy lên).
+  const text63 = 'a'.repeat(63);
+  assert.equal(sp.estimateSeconds(text63, 'vi'), 4.5);
+  assert.equal(sp.sceneSeconds(text63, 10), 5);
+  assert.equal(sp.sceneSeconds('a '.repeat(2000), 10), 10, 'không bao giờ vượt mức tối đa của Muse');
+  assert.equal(sp.sceneSeconds('a '.repeat(2000), 6), 6, 'mức tối đa tùy chọn vẫn được giữ');
+});
+
+test('các cảnh trong cùng một truyện có độ dài khác nhau theo lời kể, kể cả cảnh Muse viết và cảnh mẫu', () => {
+  const script = 'Mai ra bến. Một hôm, em nhặt được chiếc hộp gỗ cũ bên bờ nước, bên trong là một chiếc chìa khóa nhỏ rất cũ kỹ. Em mỉm cười.';
+  const units = sp.storyUnits(script, { seconds: 10 });
+  const parsed = [{ units: [1, 1], prompt: 'Mai đứng bên bến sông lúc sáng sớm, mắt nhìn mặt nước phẳng lặng, hai tay buông thõng.' }, { units: [2, 3], prompt: '' }];
+  const out = sp.assembleScenes(units, parsed, { seconds: 10 });
+  assert.equal(out.length, 2);
+  assert.equal(out[0].durationSeconds, 3, 'cảnh một câu ngắn');
+  assert.equal(out[1].durationSeconds, sp.sceneSeconds(out[1].voiceover, 10));
+  assert.ok(out[1].durationSeconds > out[0].durationSeconds);
+  assert.ok(out[1].prompt.includes(`Tạo video dài ${out[1].durationSeconds} giây`), 'cảnh mẫu ghi giây theo lời của chính nó');
+});
+
+test('sửa lời về nguyên văn thì giây của cảnh cũng tính lại theo lời mới', () => {
+  const script = 'Mai ra bến sông. Cá vàng nhảy lên thuyền, Mai thả cá về sông và mỉm cười thật lâu.';
+  const muse = [{ voiceover: 'Mai ra bến sông.', prompt: 'P1 ' + sp.NO_SPEECH, durationSeconds: 10 }, { voiceover: 'Cá vàng nhảy lên thuyền.', prompt: 'P2 ' + sp.NO_SPEECH, durationSeconds: 10 }];
+  const fixed = sp.alignToScript(script, muse, { seconds: 10 });
+  assert.ok(fixed.every(s => s.durationSeconds === sp.sceneSeconds(s.voiceover, 10)));
 });

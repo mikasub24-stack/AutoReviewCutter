@@ -57,6 +57,14 @@
   // Số ký tự tối đa của lời đọc để vừa trong một clip (chừa 10% cho nhịp nghỉ).
   const budgetChars = (seconds, language) => Math.max(8, Math.floor(seconds * charsPerSecond(language) * 0.9));
   const estimateSeconds = (text, language) => count(String(text || '').replace(/\s+/g, ' ').trim()) / charsPerSecond(language || detectLanguage(text));
+  const MIN_SECONDS = 3;
+  // Độ dài clip của một cảnh tự tính theo lời kể: thời gian đọc cộng ~10% nghỉ, làm tròn lên, từ 3 giây đến mức tối đa của Muse.
+  function sceneSeconds(text, cap = MAX_SECONDS) {
+    const value = String(text || '').trim();
+    if (!value) return cap;
+    const need = Math.ceil(Math.round(estimateSeconds(value) / 0.9 * 100) / 100);
+    return Math.min(cap, Math.max(MIN_SECONDS, need));
+  }
 
   function options(input = {}) {
     const seconds = Number(input.seconds ?? MAX_SECONDS);
@@ -169,8 +177,9 @@
   const limitFor = (units, config) => budgetChars(config.seconds, detectLanguage(units.map(u => u.text).join(' ')));
 
   function scenePrompt(voiceover, config, visual = '') {
+    const seconds = sceneSeconds(voiceover || visual, config.seconds);
     return [
-      `Tạo video dài ${config.seconds} giây, tỷ lệ ${config.aspect}, thể hiện đúng cảnh dưới đây.`,
+      `Tạo video dài ${seconds} giây, tỷ lệ ${config.aspect}, thể hiện đúng cảnh dưới đây.`,
       '',
       visual ? 'HÌNH ẢNH THEO KỊCH BẢN (làm đúng như mô tả):' : '',
       visual || '',
@@ -180,7 +189,7 @@
       config.character ? `Nhân vật: ${config.character}` : '',
       config.style ? `Phong cách hình ảnh: ${config.style}` : '',
       'Nhân vật chính giữ đúng khuôn mặt, trang phục và thiết kế như trong ảnh tham chiếu, ở mọi cảnh.',
-      `Chỉ một khoảnh khắc liên tục trong ${config.seconds} giây, không chuyển cảnh; thể hiện đúng người, nơi chốn, thời gian, hành động và nét mặt được nêu.`,
+      `Chỉ một khoảnh khắc liên tục trong ${seconds} giây, không chuyển cảnh; thể hiện đúng người, nơi chốn, thời gian, hành động và nét mặt được nêu.`,
       'Chuyển động: tự nhiên, mượt; không tự thêm nhân vật, sự kiện hay địa điểm, không bỏ chi tiết quan trọng.',
       'Máy quay: khung hình rõ ràng, chuyển động nhẹ hoặc cố định.',
       NO_SPEECH,
@@ -190,7 +199,7 @@
 
   // `range` = [câu đầu, câu cuối]. Cảnh `offline` là cảnh có prompt mẫu do tool ghép, chưa qua Muse.
   function makeScene(index, voiceover, visual, config, range) {
-    return { title: `Cảnh ${index}`, source: voiceover || visual, voiceover, visual: visual || '', prompt: scenePrompt(voiceover, config, visual), durationSeconds: config.seconds, ...(range ? { units: range } : {}), offline: true };
+    return { title: `Cảnh ${index}`, source: voiceover || visual, voiceover, visual: visual || '', prompt: scenePrompt(voiceover, config, visual), durationSeconds: sceneSeconds(voiceover || visual, config.seconds), ...(range ? { units: range } : {}), offline: true };
   }
 
   // Chia nhanh ngay trên máy: gộp câu cho vừa thời lượng mỗi cảnh. Prompt là mẫu chung, chưa qua Muse.
@@ -226,15 +235,15 @@
     const first = picked[0].n, last = picked[picked.length - 1].n;
     const partNote = ctx.parts > 1 ? ` Đây là phần ${ctx.part}/${ctx.parts} của câu chuyện.` : '';
     return [
-      `Bạn là đạo diễn hình ảnh cho video kể chuyện. Mỗi cảnh sẽ được AI tạo thành MỘT video ${s} giây (không dài hơn) và mỗi lần tạo đều tốn lượt, nên hình ảnh, hành động và nét mặt phải đúng ngay từ lần đầu.`,
+      `Bạn là đạo diễn hình ảnh cho video kể chuyện. Mỗi cảnh sẽ được AI tạo thành MỘT video ngắn, dài tối đa ${s} giây, và mỗi lần tạo đều tốn lượt, nên hình ảnh, hành động và nét mặt phải đúng ngay từ lần đầu.`,
       '',
       `BƯỚC 1 – ĐỌC HIỂU: đọc kỹ toàn bộ câu chuyện${whole ? ' ở cuối' : ' ở phần NGỮ CẢNH'} để nắm nhân vật, bối cảnh, thời điểm, diễn biến, cảm xúc và ý nghĩa của từng câu.${partNote}`,
-      `BƯỚC 2 – CHIA CẢNH: ${whole ? '' : 'chỉ chia các câu ở phần CÁC CÂU CẦN CHIA CẢNH; phần còn lại chỉ để hiểu. '}Gom các câu đánh số LIÊN TIẾP thành cảnh, đủ mọi câu, đúng thứ tự, không bỏ sót, không lặp. Số trong ngoặc là số giây đọc câu đó; tổng của mỗi cảnh không quá ${budget} giây. KHÔNG chép lại lời: chỉ ghi số câu, giọng đọc sẽ đọc đúng nguyên văn các câu đó.`,
+      `BƯỚC 2 – CHIA CẢNH: ${whole ? '' : 'chỉ chia các câu ở phần CÁC CÂU CẦN CHIA CẢNH; phần còn lại chỉ để hiểu. '}Gom các câu đánh số LIÊN TIẾP thành cảnh, đủ mọi câu, đúng thứ tự, không bỏ sót, không lặp. Số trong ngoặc là số giây đọc câu đó; tổng của mỗi cảnh không quá ${budget} giây. Độ dài video của cảnh tự theo lời kể: tổng số giây các câu chia cho 0,9, làm tròn lên (tối thiểu ${MIN_SECONDS}, tối đa ${s} giây); cảnh ngắn thì video ngắn, không kéo dài cho đủ ${s} giây. KHÔNG chép lại lời: chỉ ghi số câu, giọng đọc sẽ đọc đúng nguyên văn các câu đó.`,
       'BƯỚC 3 – VIẾT PROMPT cho từng cảnh theo quy tắc dưới đây.',
       '',
       'QUY TẮC',
-      `1. Mỗi cảnh chỉ là MỘT khoảnh khắc liên tục trong ${s} giây: một địa điểm, một nhóm nhân vật, tối đa 2–3 hành động nối tiếp; KHÔNG nhảy thời gian, KHÔNG đổi địa điểm, KHÔNG cắt cảnh trong cùng video. Các câu liên tiếp mà đổi địa điểm hoặc nhảy thời gian thì tách thành cảnh khác.`,
-      `2. PROMPT thể hiện đúng điều các câu của cảnh nói: ai, ở đâu, lúc nào, làm gì, theo thứ tự thời gian (0–3 giây…, 3–7 giây…, 7–${s} giây…), kèm nét mặt, ánh mắt, cử chỉ, tư thế, cảm xúc, ánh sáng và góc máy. Dùng từ cụ thể, không mơ hồ.`,
+      `1. Mỗi cảnh chỉ là MỘT khoảnh khắc liên tục trong độ dài video của cảnh: một địa điểm, một nhóm nhân vật, tối đa 2–3 hành động nối tiếp; KHÔNG nhảy thời gian, KHÔNG đổi địa điểm, KHÔNG cắt cảnh trong cùng video. Các câu liên tiếp mà đổi địa điểm hoặc nhảy thời gian thì tách thành cảnh khác.`,
+      `2. PROMPT thể hiện đúng điều các câu của cảnh nói: ai, ở đâu, lúc nào, làm gì, theo thứ tự thời gian, chia mốc theo đúng độ dài video của cảnh (video 5 giây: 0–2 giây…, 2–5 giây…; video ${s} giây: 0–3 giây…, 3–7 giây…, 7–${s} giây…), kèm nét mặt, ánh mắt, cử chỉ, tư thế, cảm xúc, ánh sáng và góc máy. Dùng từ cụ thể, không mơ hồ.`,
       '3. Không bịa thêm nhân vật, vật thể hay sự kiện; không đổi kết cục; không bỏ hành động quan trọng. Suy nghĩ, cảm xúc hay ý trừu tượng thì thể hiện bằng nét mặt, cử chỉ hoặc vật cụ thể có trong câu.',
       '4. Mỗi cảnh được tạo video riêng nên PROMPT phải tự đủ ý: nhắc lại tên, ngoại hình, trang phục và bối cảnh của nhân vật theo cùng một cách ở mọi cảnh; không viết «như cảnh trước».',
       '5. NHÂN VẬT: nhận ra MỌI nhân vật trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Nhân vật chính là người ở ảnh tham chiếu đính kèm: giữ đúng khuôn mặt, tóc, trang phục trong ảnh, không tự đổi. Mỗi nhân vật khác được chốt MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó. Trong PROMPT của mỗi cảnh, gọi từng người xuất hiện trong khung hình bằng đúng tên/vai đó kèm mô tả cố định, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.',
@@ -374,7 +383,7 @@
     const final = [];
     for (const item of result) {
       if (item.fresh) final.push(makeScene(0, item.voiceover, '', config));
-      else final.push({ ...scenes[item.scene], voiceover: voices[item.scene].join(' '), source: voices[item.scene].join(' ') });
+      else { const voice = voices[item.scene].join(' '); final.push({ ...scenes[item.scene], voiceover: voice, source: voice, durationSeconds: sceneSeconds(voice, config.seconds) }); }
     }
     // Cảnh Muse viết nhưng không có câu nào của kịch bản thì bỏ (không có gì để thể hiện).
     return final.map((scene, index) => ({ ...scene, title: `Cảnh ${index + 1}` }));
@@ -391,14 +400,14 @@
       const w = [];
       const voice = String(scene.voiceover || ''), prompt = String(scene.prompt || '');
       const language = detectLanguage(voice || prompt);
-      const seconds = estimateSeconds(voice, language);
+      const seconds = estimateSeconds(voice, language), own = sceneSeconds(voice || prompt, config.seconds);
       if (voice && seconds > config.seconds) w.push(`Lời đọc dài khoảng ${seconds.toFixed(1)} giây, hơn clip ${config.seconds} giây — sẽ phải giữ khung cuối. Nên tách cảnh.`);
       if (!prompt.trim()) w.push('Chưa có prompt: cảnh này sẽ không tạo được.');
       else if (count(prompt.replace(NO_SPEECH, '').trim()) < 40) w.push('Prompt quá ngắn, dễ ra hình sai. Mô tả rõ ai, ở đâu, làm gì, nét mặt.');
       if (prompt.trim() && !/no speech/i.test(prompt)) w.push('Prompt thiếu câu «no speech» — nhân vật có thể bị nói.');
       if (QUOTED.test(voice) || QUOTED.test(prompt)) w.push('Có lời thoại trong ngoặc kép — nhân vật sẽ không nói, chỉ thể hiện bằng cử chỉ và nét mặt.');
-      if (TIME_SKIP.test(voice) || TIME_SKIP.test(prompt)) w.push(`Có chuyển mốc thời gian — ${config.seconds} giây khó chứa nhiều khoảnh khắc. Nên tách thành cảnh riêng.`);
-      if (splitSentences(voice).length > 4) w.push(`Quá nhiều câu cho ${config.seconds} giây; hành động dễ bị bỏ sót hoặc dồn lại.`);
+      if (TIME_SKIP.test(voice) || TIME_SKIP.test(prompt)) w.push(`Có chuyển mốc thời gian — ${own} giây khó chứa nhiều khoảnh khắc. Nên tách thành cảnh riêng.`);
+      if (splitSentences(voice).length > 4) w.push(`Quá nhiều câu cho ${own} giây; hành động dễ bị bỏ sót hoặc dồn lại.`);
       warn.push(w);
     });
     return warn;
@@ -469,7 +478,7 @@
     const config = options(input);
     return parseReply(reply, config).scenes.map((scene, index) => {
       const prompt = scene.prompt ? ensureNoSpeech(scene.prompt) : scenePrompt(scene.voiceover, config);
-      return { title: `Cảnh ${index + 1}`, source: scene.voiceover, voiceover: scene.voiceover, prompt, durationSeconds: config.seconds, ...(scene.units ? { units: scene.units } : {}) };
+      return { title: `Cảnh ${index + 1}`, source: scene.voiceover, voiceover: scene.voiceover, prompt, durationSeconds: sceneSeconds(scene.voiceover, config.seconds), ...(scene.units ? { units: scene.units } : {}) };
     });
   }
 
@@ -494,7 +503,7 @@
       let end = a;
       while (end < b && count(unitsText(units, a, end + 1)) <= hard) end++;
       const voiceover = unitsText(units, a, end);
-      out.push({ title: '', source: voiceover, voiceover, visual: '', prompt: item.prompt ? ensureNoSpeech(item.prompt) : scenePrompt(voiceover, config), durationSeconds: config.seconds, units: [a, end], ...(item.prompt ? {} : { offline: true }) });
+      out.push({ title: '', source: voiceover, voiceover, visual: '', prompt: item.prompt ? ensureNoSpeech(item.prompt) : scenePrompt(voiceover, config), durationSeconds: sceneSeconds(voiceover, config.seconds), units: [a, end], ...(item.prompt ? {} : { offline: true }) });
       if (end < b) fresh(end + 1, b);
       next = b + 1;
     }
@@ -582,5 +591,5 @@
     return entries.map((entry, index) => `${index + 1}\n${srtTime(entry.start)} --> ${srtTime(entry.end)}\n${entry.text}\n`).join('\n');
   }
 
-  return { ASPECTS, MAX_SECONDS, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, buildMuseInstruction, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, subtitleChunks, srtTime, toSrt };
+  return { ASPECTS, MAX_SECONDS, MIN_SECONDS, sceneSeconds, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, buildMuseInstruction, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, subtitleChunks, srtTime, toSrt };
 });

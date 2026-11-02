@@ -209,7 +209,6 @@ Tự nhận diện PROMPT / SCENE / CẢNH — giữ nguyên|Detect PROMPT / SCE
 Toàn bộ là một prompt|Use everything as one prompt
 Mỗi dòng là một prompt (chọn khi cần)|One prompt per line
 Kịch bản thô → prompt theo mẫu|Draft script → template prompts
-Giây / cảnh|Seconds / scene
 Tỉ lệ|Aspect ratio
 Phong cách|Style
 Ảnh tham chiếu|Reference image
@@ -440,7 +439,7 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
       [/^Thêm (\d+) prompt và chạy toàn bộ tác vụ đang chờ\?.*$/,m=>'Add '+m[1]+' prompts and run all pending scenes? This may use Muse credits. Exact reviewed prompts and scene references will be sent.'],
       [/^Dán ảnh tại đây cho (.+)$/,m=>'Paste references here for '+m[1]],
       [/^(\d+) cảnh$/,m=>m[1]+' scenes'],
-[/^Đã chia (\d+) cảnh, mỗi cảnh tối đa (\d+) giây\. Xem lại lời đọc và prompt, rồi bấm Tạo clip\.$/,m=>'Split into '+m[1]+' scenes of up to '+m[2]+' seconds. Review the narration and prompts, then click Create clips.'],
+[/^Đã chia (\d+) cảnh, độ dài mỗi cảnh tự tính theo lời kể \(3–(\d+) giây\)\. Xem lại lời đọc và prompt, rồi bấm Tạo clip\.$/,m=>'Split into '+m[1]+' scenes; each scene length is set automatically from its narration (3–'+m[2]+' seconds). Review the narration and prompts, then click Create clips.'],
       [/^Muse đã chia (\d+) cảnh\.(?: (.+?))? Xem lại lời đọc và prompt, rồi bấm Tạo clip\.$/,m=>'Muse split the story into '+m[1]+' scenes.'+(m[2]?' '+m[2].replace(/Phần (\d+)\/(\d+): Muse trả lời không đúng khuôn, dùng chia nhanh cho đoạn này\./g,'Part $1/$2: Muse’s reply was not in the expected format; quick split used for this part.').replace(/(\d+) cảnh dùng prompt mẫu do Muse chưa viết đúng; xem lại hoặc bấm Phân tích lại\./g,'$1 scene(s) use a template prompt because Muse did not write one properly; review them or analyze again.'):'')+' Review the narration and prompts, then click Create clips.'],
       [/^(?:Phần (\d+)\/(\d+)|Phân tích) · (.+)$/,m=>{const head=m[1]?'Part '+m[1]+'/'+m[2]:'Analysis',tail=[[/^chuẩn bị yêu cầu…$/,()=>'preparing the request…'],[/^Muse còn đang xử lý việc trước, chờ rảnh rồi mới gửi…$/,()=>'Muse is still busy with earlier work; waiting until it is free…'],[/^chờ ô chat Muse \(đăng nhập nếu cần\)…$/,()=>'waiting for the Muse chat box (sign in if needed)…'],[/^đang gửi cho Muse…$/,()=>'sending to Muse…'],[/^Muse đang viết(?: \(đã (\d+) cảnh\))?…$/,x=>'Muse is writing'+(x[1]?' ('+x[1]+' scene(s) so far)':'')+'…'],[/^hỏi lại Muse (\d+) đoạn còn thiếu…$/,x=>'asking Muse again about '+x[1]+' missing part(s)…'],[/^xong (\d+) cảnh$/,x=>'done: '+x[1]+' scene(s)']];for(const [re,fn] of tail){const x=m[3].match(re);if(x)return head+' · '+fn(x);}return head+' · '+m[3];}],
       [/^Muse đã chia (\d+) cảnh$/,m=>'Muse split the story into '+m[1]+' scenes'],
