@@ -2,6 +2,7 @@ extends Node
 ## WebSocket client: the server alone decides who owns each seat.
 signal occupancy_changed
 signal seat_rejected(seat: int)
+signal seat_confirmed(seat: int)
 signal connection_changed(connected: bool)
 var socket := WebSocketPeer.new()
 var connected := false
@@ -56,6 +57,7 @@ func _process(delta: float) -> void:
 	elif state == WebSocketPeer.STATE_CLOSED:
 		if connected:
 			connected = false
+			pending_seat = -1
 			occupants.clear()
 			remote_players.clear()
 			connection_changed.emit(false)
@@ -109,6 +111,7 @@ func _receive(msg: Dictionary) -> void:
 		"seat_ok":
 			own_seat = int(msg.get("seat",-1))
 			pending_seat = -1
+			seat_confirmed.emit(own_seat)
 
 func _add_player(p: Dictionary) -> void:
 	var id := int(p.get("id",-1))
