@@ -26,7 +26,7 @@ LicenseFile=..\LICENSE.txt
 [Tasks]
 Name: desktopicon; Description: "Create a desktop shortcut"; Flags: checkedonce
 [Files]
-Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.lib,*.pdb,bootstrap.exe,bootstrapc.exe"
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.lib,*.pdb,*.exp,bootstrap.exe,bootstrapc.exe,Browser*.json,Browser*.log,debug.log"
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD_PARTY.md"; DestDir: "{app}"; Flags: ignoreversion

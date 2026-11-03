@@ -32,7 +32,7 @@ public:
 private:
     class Window final : public juce::DocumentWindow {
     public:
-        Window():DocumentWindow(juce::String::fromUTF8("Vocal Studio · Thu hát và mix vocal"),juce::Colour(0xff10151e),DocumentWindow::allButtons){setUsingNativeTitleBar(true);main=new StudioMain();setContentOwned(main,true);setResizable(true,true);setResizeLimits(1000,620,2560,1600);const auto area=juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userArea;centreWithSize(juce::jmin(getWidth(),area.getWidth()-30),juce::jmin(getHeight(),area.getHeight()-50));setVisible(true);main->grabKeyboardFocus();}
+        Window():DocumentWindow(juce::String::fromUTF8("Vocal Studio · Thu hát và mix vocal"),juce::Colour(0xff10151e),DocumentWindow::allButtons){setUsingNativeTitleBar(true);main=new StudioMain();setContentOwned(main,true);setResizable(true,true);setResizeLimits(1000,620,2560,1600);const auto* display=juce::Desktop::getInstance().getDisplays().getPrimaryDisplay();const auto area=display?display->userArea:juce::Rectangle<int>(0,0,1360,950);centreWithSize(juce::jmin(getWidth(),area.getWidth()-30),juce::jmin(getHeight(),area.getHeight()-50));setVisible(true);main->grabKeyboardFocus();}
         void closeButtonPressed() override {juce::JUCEApplication::getInstance()->systemRequestedQuit();}
         StudioMain* main=nullptr;
     };
