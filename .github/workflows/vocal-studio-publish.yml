@@ -10,11 +10,11 @@ permissions:
 jobs:
   publish:
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
-      SOURCE_SHA: 4f69dc090c66af167001c8fc0b2319b28564e167
-      SOURCE_RUN: '41616664063'
+      SOURCE_SHA: d7f9d644c6c1287fb974d8a71ba22b9d807a2320
+      SOURCE_RUN: '41658392635'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,40 +27,45 @@ jobs:
           $compiledTree = git rev-parse "${env:SOURCE_SHA}:VocalStudio"
           $currentTree = git rev-parse HEAD:VocalStudio
           if ($LASTEXITCODE -ne 0 -or $compiledTree -ne $currentTree) { throw 'Application source differs from reviewed build' }
-          gh run download $env:SOURCE_RUN --repo $env:GITHUB_REPOSITORY --name VocalStudio-Windows --dir release
+          gh run download $env:SOURCE_RUN --repo $env:GITHUB_REPOSITORY --name VocalStudio-Windows --dir release/dist
           if ($LASTEXITCODE -ne 0) { throw 'Artifact download failed' }
+          gh run download $env:SOURCE_RUN --repo $env:GITHUB_REPOSITORY --name VocalStudio-Review --dir release
+          if ($LASTEXITCODE -ne 0) { throw 'Verification artifact download failed' }
           $engine = Get-Content release/build/vocal/EngineSelfTest.json -Raw | ConvertFrom-Json
           $installed = Get-Content release/dist/InstalledSelfTest.json -Raw | ConvertFrom-Json
-          if (!$engine.passed -or !$installed.passed) { throw 'Native or installed self-test failed' }
+          $browser = Get-Content release/BrowserSelfTest.json -Raw | ConvertFrom-Json
+          $installedBrowser = Get-Content release/dist/InstalledBrowserSelfTest.json -Raw | ConvertFrom-Json
+          if (!$engine.passed -or !$installed.passed -or !$browser.passed -or !$installedBrowser.passed) { throw 'Native, browser or installed self-test failed' }
       - name: Publish installer, portable, source, screenshot and verification
         shell: pwsh
         run: |
           Copy-Item release/build/vocal/Testing/Temporary/LastTest.log release/dist/VocalStudio-Verification.log
-          $files = @('release/dist/VocalStudio-1.1.0-Setup.exe','release/dist/VocalStudio-1.1.0-Windows.zip','release/dist/VocalStudio-1.1.0-Source.zip','release/dist/VocalStudio-preview.jpg','release/dist/VocalStudio-FX.jpg','release/dist/VocalStudio-Tone.jpg','release/dist/VocalStudio-VoiceFit.jpg','release/dist/VocalStudio-Antares.jpg','release/dist/VocalStudio-Verification.log','release/dist/InstalledSelfTest.json','release/build/vocal/EngineSelfTest.json')
+          Copy-Item release/BrowserSelfTest.json release/dist/BrowserSelfTest.json
+          $files = @('release/dist/VocalStudio-1.2.0-Setup.exe','release/dist/VocalStudio-1.2.0-Windows.zip','release/dist/VocalStudio-1.2.0-Source.zip','release/dist/VocalStudio-preview.jpg','release/dist/VocalStudio-Studio.jpg','release/dist/BrowserSelfTest.json','release/dist/InstalledBrowserSelfTest.json','release/dist/VocalStudio-FX.jpg','release/dist/VocalStudio-Tone.jpg','release/dist/VocalStudio-VoiceFit.jpg','release/dist/VocalStudio-Antares.jpg','release/dist/VocalStudio-Verification.log','release/dist/InstalledSelfTest.json','release/build/vocal/EngineSelfTest.json')
           $sums = foreach ($file in $files) { $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant(); "$hash  $([IO.Path]::GetFileName($file))" }
           $sums | Set-Content release/dist/SHA256SUMS.txt -Encoding ascii
           $notes = @"
-          Vocal Studio 1.1.0 cho Windows x64 — thu và mix vocal cá nhân với sound card rời + micro.
+          Vocal Studio 1.2.0 Windows x64 — mở YouTube trong tool, bấm nửa cung rồi hát.
 
-          MỚI: Theo giọng tôi. Thu mẫu giọng 20 giây, dùng vocal của chính bạn hoặc đặt vùng thoải mái bằng tay. So với vocal mẫu/humming theo tone gốc của bài, đề xuất đổi beat ±6 bán âm và chọn quãng tám hát. Đổi đồng thời các beat/stem chưa mute, giữ tempo và WAV gốc. Không lấy nốt bass của beat làm quãng hát, không nhận là đã khớp khi bài vượt vùng đo.
+          Dán link hoặc tìm bài karaoke, bật micro; −½ cung / +½ cung đổi đúng một bán âm mỗi lần, giữ tốc độ; Về tone gốc trả về 0. Không bắt nhập beat, đo quãng giọng hoặc chọn vocal mẫu. Có âm lượng nhạc/micro, Reverb/Delay, preset Vang ẩn và menu FX chi tiết. Studio nâng cao giữ các chức năng thu/mix/xuất WAV của 1.1.
 
-          MỚI: Antares Key/Scale. Tự nhận diện 12 nốt và Major/Natural Minor qua nhãn tham số VST3, hoặc học giá trị từ plugin bạn đang dùng. Gửi tone sau dò/chuyển beat và đọc lại xác nhận. Nếu tone bài mới chưa rõ hoặc gửi không được xác nhận, app giữ bypass thay vì dùng tone bài trước; xác nhận mới chỉ tự bật lại bypass do cơ chế giữ, không ghi đè bypass bạn tự chọn. Mapping lưu theo ID và định danh/phiên bản plugin; không đoán thứ tự núm, không gửi mapping thiếu/sai. Hỗ trợ cập nhật điều khiển công khai khi dừng transport dù plugin không cho automation liên tục, có đọc lại xác nhận. Không kèm Antares hoặc giấy phép. Khi plugin không công khai Key/Scale, host không thể cưỡng ép gửi.
+          Chromium đi kèm và có sandbox; chỉ âm thanh của YouTube mở trong tool đi qua bộ đổi tone. Không cần cáp âm thanh ảo/tiện ích; tab Chrome/Edge bên ngoài không đi qua tool. YouTube cần mạng và có thể yêu cầu đồng ý cookie/đăng nhập/xác minh; app không vượt xác minh, tải/tách stream hoặc loại quảng cáo. Video cần DRM/codec không có trong CEF có thể không phát.
 
-          GIẢM MÉO: giữ formant dựa trên cao độ đo được của clip; chặn chỉnh phô hai lần khi Antares đang hoạt động; host bypass để nghe đối chiếu và bỏ cả trễ plugin; hỗ trợ bus mono/stereo, không cộng đôi mức khi trộn về mono; đo giọng bằng micro gốc, bỏ qua beat/vang/Antares mà không sửa mute đã lưu; mẫu đo được giữ riêng và mute mặc định, kể cả khôi phục sau gián đoạn. Sửa clip nhẹ vẫn có giới hạn; vỡ nặng/overload analog không khôi phục hoàn toàn.
+          Tự dò key từ nhạc gốc, cộng mức chuyển đúng một lần và gửi Key/Scale sang Antares VST3 đã ghép trong lúc hát/thu. Bài mới/quảng cáo/seek xóa tone cũ. Có Key/Scale gốc chọn tay khi tự dò không rõ hoặc nhầm trưởng/thứ tương đối. Không kèm Antares/giấy phép; plugin phải công khai và xác nhận tham số, nếu không app báo và tạm bypass. EQ/compressor/de-esser trước Antares; reverb/delay sau Antares để tiếng vang không làm rối bộ dò nốt.
 
-          Giữ các chức năng 1.0: WAV 24-bit gốc, ASIO, timeline, EQ/compressor/de-esser/reverb/echo 16 núm, VST3, dò tone/chỉnh phô sau thu, chuyển ±12 bán âm và ±50 cent giữ tempo, phục hồi bản gốc và dự án, xuất WAV stereo có đủ đuôi vang.
+          UPod Pro: USB 16-bit/48 kHz plug-and-play; chọn Windows Audio/WASAPI và input/output phù hợp một lần, ứng dụng lưu lại. Phần cứng: Mic with DSP OFF, Mixing OFF; tắt Direct Out/Direct Out+DSP khi nghe FX phần mềm; dùng tai nghe. Không bắt cài driver ASIO không có của hãng. Giảm gain vật lý khi clip; không phục hồi hoàn toàn giọng vỡ/quá tải đầu vào. WAV 24-bit không nâng độ phân giải ADC 16-bit của card.
 
-          Đã kiểm thử Windows: DSP/Pitch/VoiceFit/Engine, 12 Key và 2 scale có thứ tự xáo trộn qua VST3 fixture thật, guard mapping/double tune, bypass/PDC, lưu/khôi phục range và mapping, bộ cài. Có log, ảnh giao diện chạy thật, mã nguồn và checksum. Chưa thử bản Antares có giấy phép và sound card/micro của người dùng; không khẳng định mọi phiên bản Antares hỗ trợ cùng tham số.
+          Thu giọng lưu WAV micro gốc, không ghi nhạc YouTube hoặc hiệu ứng vào WAV này. Mở Studio để mix với beat của bạn và xuất file.
 
-          Bắt đầu: cài Setup.exe hoặc giải nén Windows.zip → Sound card: chọn ASIO/input micro → Vang / Tone / Chỉnh phô → Theo giọng tôi → đo giọng/chọn vocal mẫu và beat → xem đề xuất → Antares Key/Scale: nạp/ghép plugin. Bật Kiểm âm FX và dùng tai nghe để hát qua Antares. Xem README trong gói để tránh kiểm âm kép, đặt gain và hiểu giới hạn dò tone.
+          Kiểm chứng kèm log/JSON/ảnh chạy thật: DSP/Pitch/LiveMusic/VoiceFit/Engine, ±1 bán âm và quãng tám giữ thời lượng/stereo, dò key gốc khi nhạc đã đổi tone, VST3 fixture thật đổi 12 Key/Scale khi đang thu, Chromium audio capture và bộ cài. Chưa thử UPod Pro hoặc bản Antares có giấy phép trên máy người dùng; không cam kết mọi plugin/version hỗ trợ giống nhau.
 
           Mã nguồn đã build: $env:SOURCE_SHA
           Kiểm chứng: https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN
-          Source ứng dụng AGPL-3.0-or-later, kèm source ZIP và định danh dependency cố định. Không kèm plugin thương mại. Dữ liệu âm thanh lưu trên máy.
+          Source ứng dụng AGPL-3.0-or-later; kèm source ZIP và dependency ghim phiên bản. Bản thu/micro lưu tại máy. Trình duyệt kết nối tới YouTube như bình thường và không được cấp quyền micro/camera.
           "@
           $notes | Set-Content release/notes.md -Encoding utf8
           $files += 'release/dist/SHA256SUMS.txt'
-          gh release create vocal-studio-v1.1.0 @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Vocal Studio 1.1.0 · Windows preview' --notes-file release/notes.md --prerelease --latest=false
+          gh release create vocal-studio-v1.2.0 @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Vocal Studio 1.2.0 · YouTube và nửa cung' --notes-file release/notes.md --prerelease --latest=false
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
       - name: Export publication source graph for workspace
         shell: pwsh
