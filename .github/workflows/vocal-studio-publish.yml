@@ -1,0 +1,73 @@
+name: Publish reviewed Vocal Studio Windows build
+on:
+  workflow_dispatch:
+  push:
+    branches: [vocal-studio]
+    paths: ['.github/workflows/vocal-studio-publish.yml']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: ecc62b3ed09972904e10be074186b71d27e307f0
+      SOURCE_RUN: '41605943975'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify reviewed source and successful build
+        shell: pwsh
+        run: |
+          $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $run.conclusion -ne 'success' -or $run.head_sha -ne $env:SOURCE_SHA) { throw 'Reviewed Windows build is not successful' }
+          $compiledTree = git rev-parse "${env:SOURCE_SHA}:VocalStudio"
+          $currentTree = git rev-parse HEAD:VocalStudio
+          if ($LASTEXITCODE -ne 0 -or $compiledTree -ne $currentTree) { throw 'Application source differs from reviewed build' }
+          gh run download $env:SOURCE_RUN --repo $env:GITHUB_REPOSITORY --name VocalStudio-Windows --dir release
+          if ($LASTEXITCODE -ne 0) { throw 'Artifact download failed' }
+          $engine = Get-Content release/build/vocal/EngineSelfTest.json -Raw | ConvertFrom-Json
+          $installed = Get-Content release/dist/InstalledSelfTest.json -Raw | ConvertFrom-Json
+          if (!$engine.passed -or !$installed.passed) { throw 'Native or installed self-test failed' }
+      - name: Publish installer, portable, source, screenshot and verification
+        shell: pwsh
+        run: |
+          Copy-Item release/build/vocal/Testing/Temporary/LastTest.log release/dist/VocalStudio-Verification.log
+          $files = @('release/dist/VocalStudio-1.0.0-Setup.exe','release/dist/VocalStudio-1.0.0-Windows.zip','release/dist/VocalStudio-1.0.0-Source.zip','release/dist/VocalStudio-preview.jpg','release/dist/VocalStudio-FX.jpg','release/dist/VocalStudio-Tone.jpg','release/dist/VocalStudio-Verification.log','release/dist/InstalledSelfTest.json','release/build/vocal/EngineSelfTest.json')
+          $sums = foreach ($file in $files) { $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant(); "$hash  $([IO.Path]::GetFileName($file))" }
+          $sums | Set-Content release/dist/SHA256SUMS.txt -Encoding ascii
+          $notes = @"
+          Bản thử nghiệm Vocal Studio 1.0.0 cho Windows x64, tập trung thu hát và mix vocal cá nhân với sound card rời + micro.
+
+          Thu mono WAV 24-bit gốc; nhập beat; timeline kéo/cắt clip; gain/pan/mute/solo; VST3; lưu/mở/khôi phục phiên; xuất stereo WAV 24-bit. Hỗ trợ ASIO khi cài driver chính hãng.
+
+          Menu Vang / Vocal FX có 16 núm: EQ, compressor, de-esser, làm dịu gắt, reverb mix/decay/pre-delay/damping/stereo width và echo mix/time/feedback. Giữ đuôi vang khi xuất.
+
+          Menu Tone / Chỉnh phô: dò cao độ vocal và gợi ý giọng trưởng/thứ từ vocal/beat; nâng/hạ ±12 semitone và ±50 cent giữ tempo/thời lượng; chỉnh phô giọng đơn theo thang âm đầu ra, tự dò ưu tiên beat; giữ formant, mức độ/tốc độ/vùng bỏ qua, xử lý clip nhẹ. Tạo WAV mới và có nút Về bản gốc, kể cả sau khi mở lại dự án.
+
+          Đã kiểm thử native Windows: DSP, cao độ có họa âm, giọng trưởng/thứ, hợp âm đa âm, nâng/hạ tone, chỉnh phô, formant/stereo, số mẫu, phục hồi bản gốc sau save/load, clip nhẹ, echo dài, VST3 có độ trễ và ứng dụng sau khi cài. Có ảnh chụp giao diện thật và log kiểm chứng.
+
+          Chỉnh phô và nâng/hạ chạy sau thu; FX/EQ/vang/VST3 kiểm âm được lúc hát. Dò tone có điểm phù hợp và lựa chọn tay, không bảo đảm đúng mọi bản nhạc hoặc bài chuyển giọng. Clip nhẹ không phục hồi được âm đã mất do vỡ nặng. Chưa thử trực tiếp sound card/micro của người dùng; đây là công cụ thu/mix vocal cá nhân, chưa thay toàn bộ Cubase.
+
+          Cài Setup.exe hoặc giải nén Windows.zip. Mở Sound card, chọn ASIO và ngõ micro; bắt đầu với 48 kHz / 256 samples. Xem README.md để dùng kiểm âm, chỉnh gain và lưu phiên.
+
+          Mã nguồn đã build: $env:SOURCE_SHA
+          Kiểm chứng: https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN
+          Source ứng dụng AGPL-3.0-or-later, kèm source ZIP và định danh dependency cố định. Không kèm plugin thương mại. Dữ liệu âm thanh lưu trên máy.
+          "@
+          $notes | Set-Content release/notes.md -Encoding utf8
+          $files += 'release/dist/SHA256SUMS.txt'
+          gh release create vocal-studio-v1.0.0 @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Vocal Studio 1.0.0 · Windows preview' --notes-file release/notes.md --prerelease --latest=false
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
+      - name: Export publication source graph for workspace
+        shell: pwsh
+        run: |
+          git bundle create VocalStudio-publication.bundle HEAD ^4da27243521a32aa05b77cccdfcff6b5de479efc
+          if ($LASTEXITCODE -ne 0) { throw 'Publication source bundle failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VocalStudio-publication-source
+          path: VocalStudio-publication.bundle
