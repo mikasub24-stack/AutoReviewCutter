@@ -1,9 +1,11 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <array>
 #include <cstring>
+// Some tuning controls are public controller values but disallow continuous automation.
+class PublicStaticChoice final : public juce::AudioParameterChoice {public:using juce::AudioParameterChoice::AudioParameterChoice;bool isAutomatable() const noexcept override{return false;}};
 class Fixture final : public juce::AudioProcessor {
 public:
-    Fixture():AudioProcessor(BusesProperties().withInput("Input",juce::AudioChannelSet::stereo(),true).withOutput("Output",juce::AudioChannelSet::stereo(),true)){setLatencySamples(64);root=new juce::AudioParameterChoice("rootKey","Key",juce::StringArray{"A","Bb","B","C","Db","D","Eb","E","F","Gb","G","Ab"},3);scale=new juce::AudioParameterChoice("tuneScale","Scale",juce::StringArray{"Chromatic","Minor","Major"},2);addParameter(root);addParameter(scale);addParameter(new juce::AudioParameterChoice("presetDistractor","Preset",juce::StringArray{"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"},0));}
+    Fixture():AudioProcessor(BusesProperties().withInput("Input",juce::AudioChannelSet::stereo(),true).withOutput("Output",juce::AudioChannelSet::stereo(),true)){setLatencySamples(64);root=new PublicStaticChoice("rootKey","Key",juce::StringArray{"A","Bb","B","C","Db","D","Eb","E","F","Gb","G","Ab"},3);scale=new PublicStaticChoice("tuneScale","Scale",juce::StringArray{"Chromatic","Minor","Major"},2);addParameter(root);addParameter(scale);addParameter(new juce::AudioParameterChoice("presetDistractor","Preset",juce::StringArray{"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"},0));}
     const juce::String getName() const override{return "VocalStudio Test Gain";}
     void prepareToPlay(double,int) override {reset();}
     void releaseResources() override{}
