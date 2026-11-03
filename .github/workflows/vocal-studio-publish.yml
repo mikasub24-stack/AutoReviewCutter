@@ -13,8 +13,8 @@ jobs:
     timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
-      SOURCE_SHA: d7f9d644c6c1287fb974d8a71ba22b9d807a2320
-      SOURCE_RUN: '41658392635'
+      SOURCE_SHA: 8d254d98897dd2bec9457f988a0eab9877963e4e
+      SOURCE_RUN: '41666829039'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,31 +41,31 @@ jobs:
         run: |
           Copy-Item release/build/vocal/Testing/Temporary/LastTest.log release/dist/VocalStudio-Verification.log
           Copy-Item release/BrowserSelfTest.json release/dist/BrowserSelfTest.json
-          $files = @('release/dist/VocalStudio-1.2.0-Setup.exe','release/dist/VocalStudio-1.2.0-Windows.zip','release/dist/VocalStudio-1.2.0-Source.zip','release/dist/VocalStudio-preview.jpg','release/dist/VocalStudio-Studio.jpg','release/dist/BrowserSelfTest.json','release/dist/InstalledBrowserSelfTest.json','release/dist/VocalStudio-FX.jpg','release/dist/VocalStudio-Tone.jpg','release/dist/VocalStudio-VoiceFit.jpg','release/dist/VocalStudio-Antares.jpg','release/dist/VocalStudio-Verification.log','release/dist/InstalledSelfTest.json','release/build/vocal/EngineSelfTest.json')
+          $files = @('release/dist/VocalStudio-1.3.0-Setup.exe','release/dist/VocalStudio-1.3.0-Windows.zip','release/dist/VocalStudio-1.3.0-Source.zip','release/dist/VocalStudio-preview.jpg','release/dist/VocalStudio-AutoEQ.jpg','release/dist/VocalStudio-Studio.jpg','release/dist/BrowserSelfTest.json','release/dist/InstalledBrowserSelfTest.json','release/dist/VocalStudio-FX.jpg','release/dist/VocalStudio-Tone.jpg','release/dist/VocalStudio-VoiceFit.jpg','release/dist/VocalStudio-Antares.jpg','release/dist/VocalStudio-Verification.log','release/dist/InstalledSelfTest.json','release/build/vocal/EngineSelfTest.json')
           $sums = foreach ($file in $files) { $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant(); "$hash  $([IO.Path]::GetFileName($file))" }
           $sums | Set-Content release/dist/SHA256SUMS.txt -Encoding ascii
           $notes = @"
-          Vocal Studio 1.2.0 Windows x64 — mở YouTube trong tool, bấm nửa cung rồi hát.
+          Vocal Studio 1.3.0 Windows x64 — hát một bài, phân tích micro khô và nghe A/B EQ riêng.
 
-          Dán link hoặc tìm bài karaoke, bật micro; −½ cung / +½ cung đổi đúng một bán âm mỗi lần, giữ tốc độ; Về tone gốc trả về 0. Không bắt nhập beat, đo quãng giọng hoặc chọn vocal mẫu. Có âm lượng nhạc/micro, Reverb/Delay, preset Vang ẩn và menu FX chi tiết. Studio nâng cao giữ các chức năng thu/mix/xuất WAV của 1.1.
+          Mới: Hát 1 bài → Cân EQ. Thu khi hát YouTube, bấm Dừng để phân tích; hoặc chọn vocal của chính bạn trong Studio. Phân tích từ WAV micro gốc, tối đa 12 đoạn 5 giây trải đều bài. Đề xuất low-cut giữ nền giọng thấp, độ ấm, giảm chói và de-esser với mức chỉnh nhẹ; chưa áp dụng cho tới khi bạn nghe B. Mẫu quá ngắn, ít giọng rõ, tiếng ù đều, nhiễu không có giọng hoặc clip nhiều bị từ chối. Đây là gợi ý theo thống kê bản thu, không phải học một EQ chuẩn phát hành hay sao chép giọng ca sĩ.
 
-          Chromium đi kèm và có sandbox; chỉ âm thanh của YouTube mở trong tool đi qua bộ đổi tone. Không cần cáp âm thanh ảo/tiện ích; tab Chrome/Edge bên ngoài không đi qua tool. YouTube cần mạng và có thể yêu cầu đồng ý cookie/đăng nhập/xác minh; app không vượt xác minh, tải/tách stream hoặc loại quảng cáo. Video cần DRM/codec không có trong CEF có thể không phát.
+          Nghe bản thu A/B phát riêng WAV micro gốc qua FX hiện tại, không nghe lẫn mic trực tiếp hoặc track khác, không sửa mute/solo dự án. YouTube được tạm dừng lúc nghe lại. A/B chỉ thay EQ/de-esser và gain bù mức ước tính tối đa ±3 dB; giữ compressor, vang và Antares. Lưu B làm EQ riêng mới xác nhận preset; đóng cửa sổ/Về EQ đang lưu bỏ phần nghe thử chưa lưu. Autosave không biến B nghe thử thành EQ đã chấp nhận sau khi mở lại dự án. WAV gốc được giữ nguyên.
 
-          Tự dò key từ nhạc gốc, cộng mức chuyển đúng một lần và gửi Key/Scale sang Antares VST3 đã ghép trong lúc hát/thu. Bài mới/quảng cáo/seek xóa tone cũ. Có Key/Scale gốc chọn tay khi tự dò không rõ hoặc nhầm trưởng/thứ tương đối. Không kèm Antares/giấy phép; plugin phải công khai và xác nhận tham số, nếu không app báo và tạm bypass. EQ/compressor/de-esser trước Antares; reverb/delay sau Antares để tiếng vang không làm rối bộ dò nốt.
+          EQ đã lưu nằm trên máy, có thể nạp cho phiên khác. Đo lại khi đổi micro, khoảng cách hoặc phòng. Không đổi nốt/kéo giọng cao bằng EQ; dùng Antares/công cụ pitch cho phần đó. Không tự tách được beat hoặc DSP đã trộn từ phần cứng; không phục hồi hoàn toàn giọng vỡ analog và không cam kết chất lượng phát hành sau một lần hát.
 
-          UPod Pro: USB 16-bit/48 kHz plug-and-play; chọn Windows Audio/WASAPI và input/output phù hợp một lần, ứng dụng lưu lại. Phần cứng: Mic with DSP OFF, Mixing OFF; tắt Direct Out/Direct Out+DSP khi nghe FX phần mềm; dùng tai nghe. Không bắt cài driver ASIO không có của hãng. Giảm gain vật lý khi clip; không phục hồi hoàn toàn giọng vỡ/quá tải đầu vào. WAV 24-bit không nâng độ phân giải ADC 16-bit của card.
+          Giữ tính năng 1.2: YouTube ngay trong tool; −½ cung / +½ cung đổi một bán âm mỗi lần, giữ tốc độ; Về tone gốc; tự dò tone nhạc gốc và gửi Key/Scale cho Antares VST3 đã ghép. Vang ẩn, Reverb/Delay và menu FX, Studio nâng cao thu/mix/xuất WAV. Không cần cáp âm thanh ảo/tiện ích. Tab Chrome/Edge bên ngoài không đi qua bộ đổi tone. Video YouTube cần mạng, có thể yêu cầu xác minh/đăng nhập hoặc codec/DRM không có trong CEF.
 
-          Thu giọng lưu WAV micro gốc, không ghi nhạc YouTube hoặc hiệu ứng vào WAV này. Mở Studio để mix với beat của bạn và xuất file.
+          UPod Pro: Windows Audio/WASAPI 48 kHz, đúng ngõ micro; Mic with DSP OFF, Mixing OFF; dùng tai nghe, tắt Direct Out/Direct Out+DSP khi nghe FX phần mềm. Chọn một lần rồi lưu lại. Không bắt cài ASIO hãng không có. Thu giọng lưu micro khô, không ghi nhạc YouTube vào WAV gốc. Antares/giấy phép phải có sẵn; plugin cần công khai và xác nhận Key/Scale.
 
-          Kiểm chứng kèm log/JSON/ảnh chạy thật: DSP/Pitch/LiveMusic/VoiceFit/Engine, ±1 bán âm và quãng tám giữ thời lượng/stereo, dò key gốc khi nhạc đã đổi tone, VST3 fixture thật đổi 12 Key/Scale khi đang thu, Chromium audio capture và bộ cài. Chưa thử UPod Pro hoặc bản Antares có giấy phép trên máy người dùng; không cam kết mọi plugin/version hỗ trợ giống nhau.
+          Đã kiểm thử Windows: 6 bộ CTest (AutoEQ, DSP, Pitch, LiveMusic, VoiceFit, Engine); phản ứng với tăng bass/tăng chói, thay đổi âm lượng, chặn im lặng/nhiễu/ù đều/clip, hủy tác vụ; phát A/B chỉ nghe nguồn gốc; lưu EQ đã chấp nhận trong khi vẫn nghe preview; round-trip dự án; VST3 fixture đổi 12 Key/Scale lúc thu; Chromium audio và bản cài. Có ảnh giao diện thật, JSON/log/checksum. Chưa thử giọng thật, UPod Pro hoặc Antares có giấy phép của người dùng.
 
-          Mã nguồn đã build: $env:SOURCE_SHA
-          Kiểm chứng: https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN
-          Source ứng dụng AGPL-3.0-or-later; kèm source ZIP và dependency ghim phiên bản. Bản thu/micro lưu tại máy. Trình duyệt kết nối tới YouTube như bình thường và không được cấp quyền micro/camera.
+          Source đã build: $env:SOURCE_SHA
+          Actions: https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN
+          Source ứng dụng AGPL-3.0-or-later; kèm source ZIP và dependency ghim phiên bản. Phân tích giọng/preset/bản thu nằm trên máy; trình duyệt không được cấp quyền micro/camera.
           "@
           $notes | Set-Content release/notes.md -Encoding utf8
           $files += 'release/dist/SHA256SUMS.txt'
-          gh release create vocal-studio-v1.2.0 @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Vocal Studio 1.2.0 · YouTube và nửa cung' --notes-file release/notes.md --prerelease --latest=false
+          gh release create vocal-studio-v1.3.0 @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Vocal Studio 1.3.0 · EQ giọng tôi' --notes-file release/notes.md --prerelease --latest=false
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
       - name: Export publication source graph for workspace
         shell: pwsh
