@@ -19,7 +19,7 @@ public:
 private:
     class Window final : public juce::DocumentWindow {
     public:
-        Window():DocumentWindow("Vocal Studio · Thu hát và mix vocal",juce::Colour(0xff10151e),DocumentWindow::allButtons){setUsingNativeTitleBar(true);main=new StudioMain();setContentOwned(main,true);setResizable(true,true);setResizeLimits(1180,720,2560,1600);centreWithSize(getWidth(),getHeight());setVisible(true);main->grabKeyboardFocus();}
+        Window():DocumentWindow(juce::String::fromUTF8("Vocal Studio · Thu hát và mix vocal"),juce::Colour(0xff10151e),DocumentWindow::allButtons){setUsingNativeTitleBar(true);main=new StudioMain();setContentOwned(main,true);setResizable(true,true);setResizeLimits(1180,720,2560,1600);centreWithSize(getWidth(),getHeight());setVisible(true);main->grabKeyboardFocus();}
         void closeButtonPressed() override {juce::JUCEApplication::getInstance()->systemRequestedQuit();}
         StudioMain* main=nullptr;
     };

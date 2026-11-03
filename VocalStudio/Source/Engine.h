@@ -49,7 +49,7 @@ public:
     juce::Result installPlugin(std::unique_ptr<juce::AudioPluginInstance>);
     void removePlugin();
     juce::AudioPluginInstance* pluginInstance() const noexcept {return plugin.get();}
-    juce::String pluginName() const {return plugin ? plugin->getName() : "VST3: chưa chọn";}
+    juce::String pluginName() const {return plugin ? plugin->getName() : juce::String::fromUTF8("VST3: chưa chọn");}
     juce::StringArray inputNames() const;
     double rate() const noexcept {return sampleRate.load();}
     int blockSize() const noexcept {return currentBlock.load();}

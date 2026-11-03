@@ -56,9 +56,9 @@ private:
     juce::ThreadPool jobs{1};
     juce::Viewport viewport;
     juce::ScrollBar horizontal{false};
-    juce::TextButton playButton{"Phát"},stopButton{"Dừng"},recordButton{"THU"},importButton{"Nhập beat"},saveButton{"Lưu"},openButton{"Mở"},newButton{"Mới"},exportButton{"Xuất WAV"},deviceButton{"Sound card"},undoButton{"Hoàn tác"};
-    juce::TextButton pluginButton{"Nạp VST3"},editorButton{"Mở FX"},removePluginButton{"Bỏ VST3"};
-    juce::ToggleButton monitoring{"Kiểm âm FX"},bypass{"Bypass vocal FX"},mute{"Mute"},solo{"Solo"},vocalType{"Track giọng hát"};
+    juce::TextButton playButton{juce::String::fromUTF8("Phát")},stopButton{juce::String::fromUTF8("Dừng")},recordButton{"THU"},importButton{juce::String::fromUTF8("Nhập beat")},saveButton{juce::String::fromUTF8("Lưu")},openButton{juce::String::fromUTF8("Mở")},newButton{juce::String::fromUTF8("Mới")},exportButton{juce::String::fromUTF8("Xuất WAV")},deviceButton{"Sound card"},undoButton{juce::String::fromUTF8("Hoàn tác")};
+    juce::TextButton pluginButton{juce::String::fromUTF8("Nạp VST3")},editorButton{juce::String::fromUTF8("Mở FX")},removePluginButton{juce::String::fromUTF8("Bỏ VST3")};
+    juce::ToggleButton monitoring{juce::String::fromUTF8("Kiểm âm FX")},bypass{"Bypass vocal FX"},mute{"Mute"},solo{"Solo"},vocalType{juce::String::fromUTF8("Track giọng hát")};
     juce::ComboBox inputSelect,presetSelect;
     juce::Slider trackGain,trackPan,master,zoom;
     juce::Label trackTitle,trackInfo,positionLabel,deviceLabel,statusLabel,pluginLabel,gainLabel,panLabel,masterLabel;

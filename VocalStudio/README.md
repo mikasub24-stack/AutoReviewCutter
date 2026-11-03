@@ -23,6 +23,8 @@
 
 Phiên thu nằm trong Documents / Vocal Studio Sessions. Dự án `.vocalstudio` dùng đường dẫn tương đối tới audio, autosave khoảng 5 giây và ghi file thay thế theo kiểu tạm rồi đổi tên. Bản thu dùng FIFO và luồng ghi đĩa riêng. Khi buffer đầy, thiết bị mất kết nối hoặc số mẫu trên đĩa không đủ, app giữ bản `.partial.wav` và báo gián đoạn.
 
+Ứng dụng tự mở lại phiên thu gần nhất. Nếu bị tắt đột ngột trong lúc thu, khi mở phiên có dấu khôi phục, ứng dụng tạo một WAV mới từ phần PCM đã ghi ra đĩa và giữ nguyên file gián đoạn. Phần âm thanh còn trong buffer tại thời điểm mất điện có thể không khôi phục được.
+
 Không xóa file trong thư mục Audio chỉ vì bỏ clip khỏi timeline. Gỡ ứng dụng không xóa thư mục phiên thu trong Documents. Phiên bản hiện tại giới hạn 24 track và dùng audio trong RAM; dự án rất dài/nhiều track cần RAM tương ứng. VST3 chạy cùng tiến trình, vì vậy plugin lỗi có thể làm host lỗi.
 
 ## Chất lượng và kiểm chứng
@@ -31,7 +33,7 @@ Không xóa file trong thư mục Audio chỉ vì bỏ clip khỏi timeline. G�
 - Vocal chain: high-pass, shelf, presence EQ, compressor soft knee, de-esser tách dải, reverb/delay; limiter dự phòng có lookahead 1 ms, ceiling −1 dBFS. Đây là sample-peak limiter, không phải bộ đo LUFS/true-peak chuẩn phát sóng.
 - Độ trễ hiển thị lấy từ driver cộng pipeline phần mềm; chất lượng và độ trễ thực tế cần kiểm tra với sound card/micro của bạn.
 - Không kèm giọng hát thương mại hay plugin trả phí. Chế độ `--demo` dùng sóng tổng hợp có ghi nhãn kiểm thử.
-- CI kiểm thử DSP và engine thật: WAV gốc, save/load dự án, export/cancel, VST3 fixture có độ trễ 64 samples và trạng thái plugin. Không thay thế kiểm tra phần cứng thật.
+- CI kiểm thử DSP và engine thật: WAV gốc, save/load dự án, export/cancel, khôi phục WAV có header chưa cập nhật, VST3 fixture có độ trễ 64 samples và trạng thái plugin. Không thay thế kiểm tra phần cứng thật.
 
 ## Build
 

@@ -11,6 +11,7 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - name: Configure native Windows app and ASIO
@@ -25,7 +26,8 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           $app = (Resolve-Path 'build/vocal/VocalStudio_artefacts/Release/VocalStudio.exe').Path
           $shot = Join-Path $PWD 'dist/VocalStudio-preview.jpg'
-          $p = Start-Process $app -ArgumentList @('--demo', '--screenshot', "`"$shot`"") -Wait -PassThru
+          $p = Start-Process $app -ArgumentList @('--demo', '--screenshot', "`"$shot`"") -PassThru
+          if (!$p.WaitForExit(60000)) { $p.Kill(); throw 'UI screenshot timed out' }
           if ($p.ExitCode -ne 0 -or !(Test-Path $shot)) { throw 'UI screenshot failed' }
       - name: Build portable package and installer
         shell: pwsh
@@ -48,6 +50,14 @@ jobs:
           $report = Join-Path $PWD 'dist/InstalledSelfTest.json'
           $test = Start-Process "$install/VocalStudio.exe" -ArgumentList @('--self-test','--report',"`"$report`"") -Wait -PassThru
           if ($test.ExitCode -ne 0) { throw 'Installed executable self-test failed' }
+      - name: Export corresponding source and workspace handoff
+        shell: pwsh
+        run: |
+          git archive --format=zip --output=dist/VocalStudio-1.0.0-Source.zip HEAD VocalStudio .github/workflows/vocal-studio-windows.yml
+          git fetch --no-tags --unshallow origin vocal-studio
+          if ($LASTEXITCODE -ne 0) { throw 'Source history fetch failed' }
+          git bundle create dist/VocalStudio-source.bundle HEAD ^4da27243521a32aa05b77cccdfcff6b5de479efc
+          if ($LASTEXITCODE -ne 0) { throw 'Source bundle failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -56,6 +66,7 @@ jobs:
             dist/*.exe
             dist/*.zip
             dist/*.jpg
+            dist/*.bundle
             dist/*SelfTest.json
             build/vocal/EngineSelfTest.json
             build/vocal/Testing/Temporary/LastTest.log
