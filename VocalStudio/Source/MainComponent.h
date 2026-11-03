@@ -95,7 +95,6 @@ private:
     std::atomic<float> exportProgress{0};
     bool busy=false,exporting=false,closing=false,calibrating=false;
     double calibrationDeadline=0;
-    std::vector<bool> calibrationMutes;
     int autosaveTicks=0;
     float shownInput=0,shownOutput=0;
     juce::String currentStatus;

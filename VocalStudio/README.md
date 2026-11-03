@@ -19,6 +19,32 @@
 - **Nạp VST3**: chọn file hoặc bundle `.vst3`. Slot hỗ trợ audio effect stereo, không nhận nhạc cụ MIDI. **Mở FX** mở giao diện plugin. Dừng phát/thu trước khi đổi plugin.
 - Plugin được xử lý trên vocal bus, có bù trễ so với beat; trạng thái được lưu cùng dự án.
 
+## 1.1 · Theo giọng tôi → đổi beat → Antares
+
+### Đo quãng giọng của bạn
+
+Mở **Vang / Tone / Chỉnh phô → Theo giọng tôi**. Bấm **Thu mẫu giọng 20 giây** và hát ngân từ thấp đến cao trong vùng bạn thấy thoải mái. Ứng dụng lấy WAV micro gốc, tạm bỏ qua beat, vang và Antares trong đường kiểm âm; không sửa trạng thái mute của dự án. Bấm Dừng được kết thúc sớm. Mẫu phải có ít nhất 2 giây có giọng rõ và nhiều nốt cách nhau tối thiểu 4 bán âm; mẫu nhiễu/vỡ nhiều hoặc chỉ một nốt không đủ để đo quãng. Có thể chọn một track vocal của chính bạn và bấm **Dùng vocal tôi đã chọn**, hoặc tự đặt nốt thấp/cao rồi lưu. Hồ sơ chỉ lưu trên máy và trong dự án, không gửi lên mạng.
+
+### Nâng/hạ bài theo quãng giọng, không theo nốt bass
+
+Chọn **beat** và **vocal mẫu riêng/humming đúng giai điệu và tone gốc của bài (được hát khác quãng tám)**. Không dùng mẫu đo quãng ngẫu nhiên làm giai điệu bài; không dùng giọng ca sĩ khác làm hồ sơ giọng cá nhân. App so quãng giai điệu với vùng thoải mái và xét cả quãng tám khi hát. Ví dụ có thể đề xuất hạ beat 2 bán âm và hát thấp hơn bản mẫu 1 quãng tám; không cần hạ cả beat 14 bán âm gây đổi màu quá nhiều.
+
+Bấm **Tính tone theo giọng tôi**, xem mức bán âm, quãng tám và vùng nốt sau chuyển. **Đổi beat theo đề xuất** giữ tempo và số mẫu, có thể đổi đồng thời các beat/stem chưa mute, mute vocal mẫu và giữ mọi WAV gốc. Nếu không tìm được phương án trong vùng đo, app báo chưa khớp; bạn có thể đo lại/chỉnh vùng thoải mái hoặc dùng chuyển tone bằng tay. Quãng giọng ước lượng phụ thuộc cách hát mẫu, không bảo đảm mọi nốt hoặc mọi ngày đều thoải mái. Hãy nghe thử trước khi thu.
+
+Không suy ra đáng tin cậy quãng giai điệu hát chỉ từ một beat đa âm hoặc một nốt bạn nói. Vì vậy cần vocal mẫu/humming hoặc bạn tự chọn mức chuyển. Bài chuyển giọng vẫn cần kiểm tra/chia đoạn bằng tay.
+
+### Gửi Key / Scale sang Antares VST3
+
+Mở tab **Antares Key/Scale**, nạp bản Antares VST3 hợp pháp bạn đang dùng. App không kèm Auto-Tune hoặc giấy phép Antares. **Tự nhận diện** đọc nhãn tham số Key và Scale, ánh xạ đủ 12 nốt cùng Major/Natural Minor; không giả định nốt C là giá trị đầu, không chọn đại tham số hay thang âm khác. Khi nhận diện đủ, bật **Tự gửi sau dò / đổi tone bài**. Nhập beat mới, bấm dò beat, đổi tone beat hoặc áp dụng đề xuất theo giọng sẽ cập nhật Key/Scale đầu ra và đọc lại giá trị plugin để xác nhận. Nếu dò tone không rõ, dùng Key/Scale chọn tay và **Gửi Key/Scale**.
+
+Nếu phiên bản plugin chỉ công khai tham số với nhãn khó nhận diện: chọn đúng tham số Key/Scale, mở Antares, lần lượt đặt C…B trong plugin và học mỗi Key, rồi đặt/học Major và Minor. Mapping được lưu bằng ID tham số và định danh/phiên bản plugin, không dựa vào index dễ thay đổi. Mapping thiếu, trùng giá trị, sai phiên bản hoặc không xác nhận được sẽ không được gửi. Khi plugin không công khai Key/Scale cho host, app báo rõ; không có cách automation chuẩn để cưỡng ép điều khiển một tham số bị ẩn.
+
+Antares chạy **trực tiếp trên vocal bus/micro khi bật Kiểm âm FX**, với độ trễ do plugin và driver báo. Dò tone bài được thực hiện khi nhập/dò/chuyển bài và transport dừng; đây không phải bản sao giao thức riêng của Auto-Key, không đo Key liên tục trong lúc bạn đang hát. Chọn Input Type/Retune phù hợp trong giao diện Antares của bạn. Mã đã kiểm thử cầu nối trên VST3 fixture thật với thứ tự nốt/thang âm xáo trộn và kiểm tra đọc lại; chưa kiểm thử bản Antares có giấy phép trên máy bạn.
+
+### Giảm méo / tránh chỉnh hai lần
+
+Giữ formant khi đổi giọng dùng cao độ đo được của chính clip, thay vì luôn giả định giọng 180 Hz. Khi Antares đang hoạt động, app chặn chỉnh phô ngoại tuyến tích hợp để tránh hai bộ cùng kéo nốt. Dùng **Bypass plugin** để đối chiếu hoặc chuyển sang bộ tích hợp; host bỏ cả hiệu ứng và trễ plugin khi bypass. WAV micro gốc không bao giờ bị ghi Auto-Tune/vang đè lên. Sửa clip nhẹ vẫn là nội suy các đoạn chạm đỉnh ngắn; không thể tái tạo hoàn toàn âm đã mất do vỡ nặng hay overload analog. Giảm gain sound card nếu micro clip, nghe A/B và quay về bản gốc khi cần.
+
 ## Menu Vang / Tone / Chỉnh phô
 
 Chọn một track, mở **Vang / Tone / Chỉnh phô** ở cột bên phải.

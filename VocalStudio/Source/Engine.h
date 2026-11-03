@@ -68,7 +68,7 @@ public:
     juce::Result setSongKey(int tonic,bool minor,const juce::String& source);
     juce::Result sendSongKey();
     void scanToneLink();
-    int effectivePluginLatency() const noexcept {return pluginBypassed.load()?0:pluginLatency.load();}
+    int effectivePluginLatency() const noexcept {return (pluginBypassed.load()||calibrationInputOnly.load())?0:pluginLatency.load();}
     juce::AudioPluginInstance* pluginInstance() const noexcept {return plugin.get();}
     juce::String pluginName() const {return plugin ? plugin->getName() : juce::String::fromUTF8("VST3: chưa chọn");}
     juce::StringArray inputNames() const;
@@ -85,6 +85,7 @@ public:
     juce::var projectState() const;
     void createDemo();
 
+    std::atomic<bool> calibrationInputOnly{false};
     std::atomic<bool> monitor{false},fxBypass{false},latencyCompensation{true};
     std::atomic<int> inputChannel{0},recordingFault{0};
     std::atomic<float> inputDb{0},highPass{80},warmth{-2},presence{2},threshold{-18},ratio{3},makeup{2},deEss{.35f},reverb{.10f},delay{.04f},delayMs{240},masterDb{-3},manualOffsetMs{0};
