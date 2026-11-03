@@ -3,7 +3,7 @@
 #include "LiveMusic.h"
 class YouTubeBrowser final : public juce::Component,private juce::Timer {
 public:
-    explicit YouTubeBrowser(vocal::LiveMusic&);
+    explicit YouTubeBrowser(std::shared_ptr<vocal::LiveMusic>);
     ~YouTubeBrowser() override;
     void navigate(const juce::String& searchOrURL);
     void back();void pause();void home();

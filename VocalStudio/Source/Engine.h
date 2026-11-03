@@ -59,7 +59,7 @@ public:
     juce::Result exportMix(const juce::File&,std::atomic<bool>& cancel,std::atomic<float>& progress);
     juce::Result installPlugin(std::unique_ptr<juce::AudioPluginInstance>);
     void removePlugin();
-    vocal::LiveMusic liveMusic;
+    std::shared_ptr<vocal::LiveMusic> liveMusic=std::make_shared<vocal::LiveMusic>();
     std::atomic<bool> liveMode{false};
     juce::Result setLiveSongKey(int tonic,bool minor);
     vocal::VoiceProfile voiceProfile;
