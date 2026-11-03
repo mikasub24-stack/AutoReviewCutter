@@ -49,6 +49,7 @@ public:
     bool hasUnfinishedTake() const noexcept {return writer!=nullptr;}
     double position() const noexcept {return static_cast<double>(positionFrames.load())/sampleRate.load();}
     double duration() const noexcept;
+    double effectTailSeconds() const noexcept;
     juce::Result startRecording(const juce::File& directory);
     juce::Result finishRecording(juce::File& completed,double& startSeconds);
     juce::Result exportMix(const juce::File&,std::atomic<bool>& cancel,std::atomic<float>& progress);
@@ -88,7 +89,7 @@ private:
     void processChunk(const float*,float* const*,int,int,bool,bool);
     vocal::VocalParameters parameters() const noexcept;
     std::vector<std::unique_ptr<StudioTrack>> tracks;
-    std::atomic<double> sampleRate{48000};
+    std::atomic<double> sampleRate{48000},pluginTailSeconds{0};
     std::atomic<int> currentBlock{256},driverInputLatency{0},driverOutputLatency{0},pluginLatency{0};
     std::atomic<juce::int64> positionFrames{0};
     std::atomic<bool> playing{false},recording{false};

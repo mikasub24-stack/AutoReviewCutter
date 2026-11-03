@@ -2,3 +2,5 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 class StudioMain;
 juce::Component* createVocalTools(StudioMain&);
+
+void refreshVocalTools(juce::Component&);

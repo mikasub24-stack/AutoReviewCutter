@@ -8,7 +8,7 @@ struct PitchFrame {double seconds=0,midi=0,confidence=0,rms=0;};
 struct PitchAnalysis {
     std::vector<PitchFrame> frames;
     std::array<double,12> chroma{};
-    int tonic=-1;bool minor=false;
+    int tonic=-1;bool minor=false,monophonic=true;
     double keyConfidence=0,voicedFraction=0,medianHz=0,clippedFraction=0;
     std::string alternative;
 };
