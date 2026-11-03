@@ -2,6 +2,36 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// Recover our mono PCM24 recording using bytes on disk, even if a crash left
+// the RIFF/data lengths stale. Never modify the interrupted source file.
+juce::Result recoverRecording(const juce::File& source,juce::File& recovered){
+    auto input=source.createInputStream();
+    if(!input||input->readInt()!=0x46464952)return juce::Result::fail("Không đọc được RIFF của bản thu gián đoạn.");
+    input->readInt();if(input->readInt()!=0x45564157)return juce::Result::fail("Bản thu gián đoạn không phải WAV.");
+    int format=0,channels=0,bits=0,rate=0;juce::int64 dataStart=-1;
+    while(input->getPosition()+8<=input->getTotalLength()){
+        const int id=input->readInt();const auto size=static_cast<juce::uint32>(input->readInt());const auto start=input->getPosition();
+        if(id==0x20746d66&&size>=16){format=input->readShort();channels=input->readShort();rate=input->readInt();input->readInt();input->readShort();bits=input->readShort();}
+        if(id==0x61746164){dataStart=start;break;}
+        if(start+size+(size&1)>input->getTotalLength()||!input->setPosition(start+size+(size&1)))break;
+    }
+    if(dataStart<0||format!=1||channels!=1||bits!=24||rate<8000||rate>192000)return juce::Result::fail("Không khôi phục được định dạng bản thu; file gốc vẫn được giữ.");
+    auto remaining=(input->getTotalLength()-dataStart)/3;
+    if(remaining<=0)return juce::Result::fail("Bản thu gián đoạn chưa có mẫu âm thanh.");
+    recovered=source.getSiblingFile(source.getFileNameWithoutExtension()+".recovered.wav").getNonexistentSibling();
+    auto stream=recovered.createOutputStream();if(!stream)return juce::Result::fail("Không tạo được file khôi phục.");
+    juce::WavAudioFormat wav;std::unique_ptr<juce::AudioFormatWriter> output(wav.createWriterFor(stream.get(),rate,1,24,{},0));
+    if(!output)return juce::Result::fail("Không tạo được WAV khôi phục.");stream.release();
+    std::array<unsigned char,4096*3> bytes{};juce::AudioBuffer<float> buffer(1,4096);
+    while(remaining>0){const int n=static_cast<int>(juce::jmin<juce::int64>(remaining,4096));if(input->read(bytes.data(),n*3)!=n*3)return juce::Result::fail("Không đọc đủ dữ liệu khôi phục.");
+        for(int i=0;i<n;++i){const int b=i*3;int value=bytes[b]|(bytes[b+1]<<8)|(bytes[b+2]<<16);if(value&0x800000)value-=0x1000000;buffer.setSample(0,i,static_cast<float>(value)/8388608.0f);}
+        if(!output->writeFromAudioSampleBuffer(buffer,0,n))return juce::Result::fail("Ổ đĩa không ghi được bản khôi phục.");remaining-=n;
+    }
+    return juce::Result::ok();
+}
+}
+
 StudioEngine::StudioEngine(){formats.registerBasicFormats();pluginFormats.addDefaultFormats();diskThread.startThread();prepare(48000,256);}
 StudioEngine::~StudioEngine(){activeWriter.store(nullptr);if(callbackAttached)devices.removeAudioCallback(this);writer.reset();diskThread.stopThread(5000);devices.closeAudioDevice();}
 juce::String StudioEngine::openDevice(const juce::String& saved){auto xml=juce::parseXML(saved);auto error=devices.initialise(2,2,xml.get(),true);lastDeviceError=error;if(error.isEmpty()){devices.addAudioCallback(this);callbackAttached=true;}return error;}
@@ -118,6 +148,13 @@ juce::Result StudioEngine::loadProject(const juce::File& file){
     std::vector<std::unique_ptr<StudioTrack>> loaded;
     for(const auto& row:*state["tracks"].getArray()){if(loaded.size()>=24)return juce::Result::fail("Giới hạn 24 track trong phiên bản này.");std::unique_ptr<StudioTrack> t;auto path=file.getParentDirectory().getChildFile(row["file"].toString());auto result=readTrack(path,static_cast<bool>(row["vocal"]),t);if(result.failed())return result;
         t->name=row["name"].toString();t->start=static_cast<double>(row["start"]);t->trimIn=juce::jlimit(0.0,t->trimOut,static_cast<double>(row["trimIn"]));t->trimOut=juce::jlimit(t->trimIn,t->trimOut,static_cast<double>(row["trimOut"]));t->gainDb.store(juce::jlimit(-60.0f,18.0f,static_cast<float>(row["gainDb"])));t->pan.store(juce::jlimit(-1.0f,1.0f,static_cast<float>(row["pan"])));t->mute.store(static_cast<bool>(row["mute"]));t->solo.store(static_cast<bool>(row["solo"]));if(!std::isfinite(t->start)||std::abs(t->start)>86400)return juce::Result::fail("Vị trí clip không hợp lệ.");loaded.push_back(std::move(t));
+    }
+    const juce::File interrupted(state["recoveringTake"].toString());
+    if(interrupted.existsAsFile()){
+        if(loaded.size()>=24)return juce::Result::fail("Cần bỏ một track trước khi khôi phục bản thu tại "+interrupted.getFullPathName());
+        juce::File recovered;auto recovery=recoverRecording(interrupted,recovered);if(recovery.failed())return recovery;
+        std::unique_ptr<StudioTrack> take;recovery=readTrack(recovered,true,take);if(recovery.failed())return recovery;
+        take->start=static_cast<double>(state["recoveringStart"]);take->name="RECOVERED · "+recovered.getFileNameWithoutExtension();loaded.push_back(std::move(take));
     }
     std::unique_ptr<juce::AudioPluginInstance> next;
     juce::MemoryBlock pluginState;

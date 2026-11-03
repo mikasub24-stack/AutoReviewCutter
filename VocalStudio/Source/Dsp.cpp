@@ -38,7 +38,7 @@ float Biquad::tick(float x) noexcept {
     return std::isfinite(y) ? static_cast<float>(y) : 0.0f;
 }
 void Delay::prepare(double sr, double seconds) { data.assign(std::max<std::size_t>(4,static_cast<std::size_t>(sr*seconds)+2),0);cursor=0; }
-void Delay::reset() noexcept { std::fill(data.begin(),data.end(),0);cursor=0; }
+void Delay::reset() noexcept { std::fill(data.begin(),data.end(),0.0f);cursor=0; }
 float Delay::tap(std::size_t n) const noexcept { if(data.empty()) return 0; n=std::clamp<std::size_t>(n,1,data.size()-1);return data[(cursor+data.size()-n)%data.size()]; }
 void Delay::push(float x) noexcept { if(data.empty())return;data[cursor]=std::isfinite(x)?x:0;cursor=(cursor+1)%data.size(); }
 void VocalChain::prepare(double sr) {
