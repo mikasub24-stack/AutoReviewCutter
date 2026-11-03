@@ -2,13 +2,15 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Dsp.h"
+#include "Pitch.h"
 #include <atomic>
 #include <functional>
 #include <memory>
 #include <vector>
 
 struct StudioTrack {
-    juce::File file;
+    juce::File file,originalFile;
+    double originalTrimIn=0,originalTrimOut=0;
     juce::String name;
     juce::AudioBuffer<float> audio;
     std::vector<float> peaks;
@@ -33,6 +35,10 @@ public:
     juce::Result readTrack(const juce::File&,bool vocal,std::unique_ptr<StudioTrack>& result);
     void addTrack(std::unique_ptr<StudioTrack>);
     void removeTrack(int index);
+    void replaceTrack(int,std::unique_ptr<StudioTrack>);
+    juce::Result analyseTrack(int,vocal::PitchAnalysis&,std::atomic<bool>&,std::atomic<float>&);
+    juce::Result renderPitchTrack(int,const vocal::PitchOptions&,std::unique_ptr<StudioTrack>&,std::atomic<bool>&,std::atomic<float>&);
+    juce::Result restoreOriginalTrack(int,std::unique_ptr<StudioTrack>&);
     const std::vector<std::unique_ptr<StudioTrack>>& getTracks() const noexcept {return tracks;}
     juce::Result play();
     juce::Result ensureSampleRate();
@@ -67,6 +73,7 @@ public:
     std::atomic<bool> monitor{false},fxBypass{false},latencyCompensation{true};
     std::atomic<int> inputChannel{0},recordingFault{0};
     std::atomic<float> inputDb{0},highPass{80},warmth{-2},presence{2},threshold{-18},ratio{3},makeup{2},deEss{.35f},reverb{.10f},delay{.04f},delayMs{240},masterDb{-3},manualOffsetMs{0};
+    std::atomic<float> decaySeconds{1.2f},preDelayMs{20},damping{.65f},width{1},delayFeedback{.27f},deharsh{0};
     std::atomic<float> inputPeak{0},outputPeak{0},inputRms{0},gainReduction{0};
     std::atomic<bool> inputClipped{false},inputPresent{false};
     std::atomic<juce::int64> capturedFrames{0};

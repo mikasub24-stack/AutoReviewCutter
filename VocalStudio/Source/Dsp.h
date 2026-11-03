@@ -12,13 +12,14 @@ struct VocalParameters {
     float inputDb = 0, highPassHz = 80, warmthDb = -2, presenceDb = 2;
     float thresholdDb = -18, ratio = 3, makeupDb = 2, deEss = .35f;
     float reverb = .10f, delay = .04f, delayMs = 240;
+    float decaySeconds=1.2f,preDelayMs=20,damping=.65f,width=1,delayFeedback=.27f,deharsh=0;
 };
 VocalParameters preset(int index) noexcept;
 std::vector<float> resampleBandlimited(const float*,std::size_t,double fromRate,double toRate);
 
 class Biquad {
 public:
-    enum Type { highPass, lowShelf, peak, bandPass };
+    enum Type { highPass, lowPass, lowShelf, peak, bandPass };
     void configure(Type, double rate, double hz, double q, double db = 0) noexcept;
     float tick(float sample) noexcept;
     void reset() noexcept { z1 = z2 = 0; }
@@ -45,8 +46,8 @@ public:
     float gainReductionDb() const noexcept { return reduction; }
 private:
     struct Channel {
-        Biquad high, warmth, presence, ess;
-        Delay echo;
+        Biquad high, warmth, presence, ess, tame;
+        Delay echo,preDelay;
         std::array<Delay, 4> comb;
         std::array<float, 4> damping {};
         std::array<Delay, 2> allpass;
@@ -56,7 +57,8 @@ private:
     double rate = 48000;
     float envelope = 0, essEnvelope = 0, compression = 1, reduction = 0;
     float preGain = 1, makeup = 1, attack = .99f, release = .999f, essRelease = .999f;
-    std::size_t delaySamples = 1;
+    std::size_t delaySamples = 1,preDelaySamples=1;
+    std::array<float,4> roomFeedback{};
 };
 class Limiter {
 public:

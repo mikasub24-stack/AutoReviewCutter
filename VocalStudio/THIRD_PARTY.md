@@ -6,3 +6,6 @@
 - VST and ASIO are trademarks of Steinberg Media Technologies GmbH. No endorsement or certification is claimed. No Steinberg logos are included.
 
 Corresponding application source and fixed dependency identifiers are provided with builds. Sound-card drivers and user-installed commercial VST3 plugins are separate products and are not included.
+
+- Signalsmith Stretch 1.3.2, commit `88061fd4eda56a2353c5d65c74aa3f4ccf76f9da`, https://github.com/Signalsmith-Audio/signalsmith-stretch, MIT. Vendored unmodified header and license in ThirdParty/.
+- Signalsmith Linear 0.6.6, commit `7bb1c8f36794d6980080ce817c91f8da8fe56a66`, https://github.com/Signalsmith-Audio/linear, MIT. Vendored required portable headers and license in ThirdParty/.

@@ -11,7 +11,7 @@ public:
         window=std::make_unique<Window>();
         if(commandLine.contains("--demo"))window->main->loadDemo();
         const auto args=juce::StringArray::fromTokens(commandLine,true);const int shot=args.indexOf("--screenshot");
-        if(shot>=0&&shot+1<args.size()){const auto file=juce::File(args[shot+1].unquoted());juce::Timer::callAfterDelay(1200,[this,file]{if(!window)return;auto image=window->main->createComponentSnapshot(window->main->getLocalBounds());file.getParentDirectory().createDirectory();auto stream=file.createOutputStream();if(stream){juce::JPEGImageFormat format;format.setQuality(.9f);format.writeImageToStream(image,*stream);}window.reset();quit();});}
+        if(shot>=0&&shot+1<args.size()){const auto file=juce::File(args[shot+1].unquoted());juce::Timer::callAfterDelay(1200,[this,file]{if(!window)return;auto image=window->main->createComponentSnapshot(window->main->getLocalBounds());file.getParentDirectory().createDirectory();auto stream=file.createOutputStream();if(stream){juce::JPEGImageFormat format;format.setQuality(.9f);format.writeImageToStream(image,*stream);}window->main->saveToolScreenshots(file.getParentDirectory());window.reset();quit();});}
     }
     void shutdown() override {window.reset();}
     void systemRequestedQuit() override {if(window)window->main->prepareToClose([this]{quit();});else quit();}

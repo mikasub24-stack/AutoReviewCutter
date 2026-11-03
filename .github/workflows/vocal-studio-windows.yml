@@ -18,7 +18,7 @@ jobs:
         run: cmake -S VocalStudio -B build/vocal -A x64 -DVOCAL_BUILD_TESTS=ON
       - name: Build app and test VST3
         run: cmake --build build/vocal --config Release --parallel 2
-      - name: Verify DSP, recording, project round-trip and plugin latency
+      - name: Verify DSP, pitch, recording, project round-trip and plugin latency
         run: ctest --test-dir build/vocal -C Release --output-on-failure
       - name: Capture actual application UI
         shell: pwsh
@@ -35,7 +35,7 @@ jobs:
           $appDir = (Resolve-Path 'build/vocal/VocalStudio_artefacts/Release').Path
           New-Item -ItemType Directory -Force dist/portable | Out-Null
           Copy-Item "$appDir/VocalStudio.exe" dist/portable/
-          Copy-Item VocalStudio/README.md,VocalStudio/LICENSE.txt,VocalStudio/THIRD_PARTY.md,VocalStudio/JUCE-LICENSE.md dist/portable/
+          Copy-Item VocalStudio/README.md,VocalStudio/LICENSE.txt,VocalStudio/THIRD_PARTY.md,VocalStudio/JUCE-LICENSE.md,VocalStudio/ThirdParty/Signalsmith-Stretch-LICENSE.txt,VocalStudio/ThirdParty/Signalsmith-Linear-LICENSE.txt dist/portable/
           Compress-Archive -Path dist/portable/* -DestinationPath dist/VocalStudio-1.0.0-Windows.zip
           $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
           if (!(Test-Path $iscc)) { choco install innosetup -y --no-progress; if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' } }

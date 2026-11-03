@@ -31,6 +31,8 @@ Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD_PARTY.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\JUCE-LICENSE.md"; DestDir: "{app}\licenses"; Flags: ignoreversion
+Source: "..\ThirdParty\Signalsmith-Stretch-LICENSE.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
+Source: "..\ThirdParty\Signalsmith-Linear-LICENSE.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
 [Icons]
 Name: "{group}\Vocal Studio"; Filename: "{app}\VocalStudio.exe"
 Name: "{autodesktop}\Vocal Studio"; Filename: "{app}\VocalStudio.exe"; Tasks: desktopicon

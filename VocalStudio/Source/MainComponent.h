@@ -46,6 +46,15 @@ public:
     void rememberEdit(int,double,double,double,double,double,double);
     void prepareToClose(std::function<void()>);
     void loadDemo();
+    void showVocalTools();
+    void analyseSelected();
+    void applyPitch(const vocal::PitchOptions&);
+    void restorePitch();
+    void cancelToolsWork(){cancelExport.store(true);}
+    float toolsProgress() const {return exportProgress.load();}
+    void saveToolScreenshots(const juce::File&);
+    std::shared_ptr<const vocal::PitchAnalysis> pitchAnalysis;
+    juce::String toneStatus;
     StudioEngine engine;
     TrackCanvas canvas;
     int selected=-1;
@@ -58,6 +67,7 @@ private:
     juce::Viewport viewport;
     juce::ScrollBar horizontal{false};
     juce::TextButton playButton{juce::String::fromUTF8("Phát")},stopButton{juce::String::fromUTF8("Dừng")},recordButton{"THU"},importButton{juce::String::fromUTF8("Nhập beat")},saveButton{juce::String::fromUTF8("Lưu")},openButton{juce::String::fromUTF8("Mở")},newButton{juce::String::fromUTF8("Mới")},exportButton{juce::String::fromUTF8("Xuất WAV")},deviceButton{"Sound card"},undoButton{juce::String::fromUTF8("Hoàn tác")};
+    juce::TextButton toolsButton{juce::String::fromUTF8("Vang / Tone / Chỉnh phô")};
     juce::TextButton pluginButton{juce::String::fromUTF8("Nạp VST3")},editorButton{juce::String::fromUTF8("Mở FX")},removePluginButton{juce::String::fromUTF8("Bỏ VST3")};
     juce::ToggleButton monitoring{juce::String::fromUTF8("Kiểm âm FX")},bypass{"Bypass vocal FX"},mute{"Mute"},solo{"Solo"},vocalType{juce::String::fromUTF8("Track giọng hát")};
     juce::ComboBox inputSelect,presetSelect;
@@ -65,7 +75,7 @@ private:
     juce::Label trackTitle,trackInfo,positionLabel,deviceLabel,statusLabel,pluginLabel,gainLabel,panLabel,masterLabel;
     std::array<std::unique_ptr<Knob>,10> knobs;
     std::unique_ptr<juce::FileChooser> chooser;
-    std::unique_ptr<juce::DocumentWindow> deviceWindow,pluginWindow;
+    std::unique_ptr<juce::DocumentWindow> deviceWindow,pluginWindow,toolsWindow;
     juce::File projectFile;
     std::deque<Edit> undo,redo;
     std::deque<std::pair<juce::File,bool>> importQueue;
