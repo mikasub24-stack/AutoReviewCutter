@@ -49,6 +49,12 @@ public:
     void prepareToClose(std::function<void()>);
     void loadDemo();
     void showVocalTools();
+    void showAutoEq();
+    void listenAutoEq();void pauseMusicForEq();
+    void recordAutoEq();void analyseAutoEq();void previewAutoEq(bool);void saveAutoEq();void loadAutoEq();void cancelAutoEq();
+    vocal::EqRecommendation eqSuggestion;juce::String eqStatus;
+    bool eqRecording=false,eqPreview=false;
+
     void learnVoiceFromSelected();
     void recordVoiceSample();
     void planSongFit(int beat,int melody,bool allBacking);
@@ -96,7 +102,9 @@ private:
     juce::Label trackTitle,trackInfo,positionLabel,deviceLabel,statusLabel,pluginLabel,gainLabel,panLabel,masterLabel;
     std::array<std::unique_ptr<Knob>,10> knobs;
     std::unique_ptr<juce::FileChooser> chooser;
-    std::unique_ptr<juce::DocumentWindow> deviceWindow,pluginWindow,toolsWindow;
+    std::unique_ptr<juce::DocumentWindow> deviceWindow,pluginWindow,toolsWindow,eqWindow;
+    vocal::EqSettings eqBefore,eqRestore,eqLast;
+    juce::String eqSession,eqSourceFile;int eqSource=-1;
     juce::File projectFile;
     std::deque<Edit> undo,redo;
     std::deque<std::pair<juce::File,bool>> importQueue;

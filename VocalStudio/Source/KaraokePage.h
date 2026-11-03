@@ -8,13 +8,14 @@ public:
     void resized() override;
     void paint(juce::Graphics&) override;
     void leave();
+    void pauseMusic(){browser.pause();}
     void probe(){browser.runAudioProbe();}
     float capturedPeak() const{return browser.capturedPeak();}
     std::uint64_t captured() const{return browser.capturedFrames();}
 private:
     StudioMain& owner;YouTubeBrowser browser;
     juce::TextEditor search;
-    juce::TextButton open,back,home,down,up,reset,advanced,devices,fx,antares,loadPlugin,mic,record,softReverb;
+    juce::TextButton open,back,home,down,up,reset,advanced,devices,fx,antares,loadPlugin,mic,record,softReverb,autoEq;
     juce::Label title,offset,key,musicLabel,micLabel,reverbLabel,delayLabel;
     juce::TextEditor status;
     juce::Viewport sidebar;juce::Component controls;

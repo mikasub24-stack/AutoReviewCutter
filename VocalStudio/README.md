@@ -2,6 +2,16 @@
 
 Ứng dụng Windows x64 để hát trên beat, thu micro qua sound card và mix vocal tại máy. Dự án nằm trong `VocalStudio/`, nhánh `vocal-studio`, không sửa Chùa Việt Online.
 
+## 1.3 · Hát một bài → Cân EQ riêng
+
+Màn hình hát có **Hát 1 bài → Cân EQ**. Mở bài YouTube như bình thường, vào bảng này và bấm **Thu bài để cân EQ**. Hát vài câu có cả trầm/cao/mạnh (nên từ 10 giây; có thể hát cả bài), rồi bấm **Dừng thu → Phân tích**. Bản micro gốc được giữ nguyên và đặt tên riêng, mute trong timeline để không phát lẫn. Có thể chọn một track vocal của chính bạn ở Studio rồi bấm **Phân tích vocal đang chọn**. Nếu track đã xử lý, phân tích/nghe A/B dùng WAV gốc theo lịch sử track.
+
+Tool lấy tối đa 12 đoạn 5 giây trải đều bài, chỉ đo quanh các đoạn giọng rõ: gợi ý low-cut theo nốt thấp, low-shelf giảm ù/giữ độ dày, presence và làm dịu gắt, de-esser. Mức chỉnh được giới hạn nhẹ; không học một “EQ chuẩn phát hành”, không sao chép màu giọng ca sĩ, không tách được beat/phòng/DSP đã trộn sẵn. Cần WAV micro khô: UPod Pro **Mixing OFF**, **Mic with DSP OFF**, dùng tai nghe. Mẫu quá ngắn, ít giọng rõ, nhiễu không có giọng hoặc clip nhiều sẽ không tạo đề xuất. Bản thân giọng, nguyên âm, khoảng cách micro và phòng ảnh hưởng kết quả; nghe đối chiếu và đo lại khi điều kiện thay đổi.
+
+Bấm **Nghe bản thu A/B** để phát riêng WAV micro gốc qua FX hiện tại; YouTube được tạm dừng và tiếng micro trực tiếp tạm bỏ khỏi đường nghe, không thay mute/solo của dự án. Bấm **A · EQ trước** / **B · EQ đề xuất** trong lúc nghe, hoặc hát lại qua micro để thử. Chỉ EQ/de-esser và gain bù mức ước tính thay đổi; compressor, vang, Antares và tone bài giữ nguyên. Bù mức tối đa ±3 dB giúp giảm thiên lệch vì bản B to hơn, không phải đo LUFS chuẩn. Nếu bật Bypass vocal FX, hãy tắt bypass để nghe tác dụng EQ.
+
+**Lưu B làm EQ riêng** mới xác nhận B và lưu preset ở máy, đồng thời lưu EQ vào phiên. **Dùng EQ đã lưu** nạp cho phiên khác. Đóng bảng hoặc **Về EQ đang lưu** bỏ nghe thử chưa lưu. Autosave vẫn lưu EQ đã xác nhận, không biến một lần nghe B thành preset sau khi mở lại. Không sửa WAV, không tự đổi tone hoặc nâng nốt thấp lên cao; chỉnh cao độ vẫn thuộc Antares/công cụ pitch. Không phục hồi hoàn toàn clipping/overload analog. Đây là gợi ý ban đầu cần nghe thử, không cam kết âm thanh đạt chất lượng phát hành sau một lần hát.
+
 ## 1.2 · Mở YouTube, bấm nửa cung rồi hát
 
 Màn hình mặc định có YouTube ngay trong tool. Dán link hoặc tìm tên bài, mở video karaoke, bật micro rồi hát. **−½ cung / +½ cung** đổi **một bán âm mỗi lần** (±1 semitone); giữ nguyên tốc độ, giới hạn ±12 bán âm. **Về tone gốc** trả về 0. Không bắt đo quãng giọng, nhập beat hay chọn vocal mẫu. Mức chuyển do bạn chọn bằng tai cho vừa giọng, không tự đoán quãng hát từ beat.

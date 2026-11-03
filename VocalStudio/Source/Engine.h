@@ -2,6 +2,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Dsp.h"
+#include "AutoEq.h"
 #include "LiveMusic.h"
 #include "Pitch.h"
 #include "VoiceFit.h"
@@ -62,6 +63,11 @@ public:
     std::shared_ptr<vocal::LiveMusic> liveMusic=std::make_shared<vocal::LiveMusic>();
     std::atomic<bool> liveMode{false};
     juce::Result setLiveSongKey(int tonic,bool minor);
+    juce::Result auditionOriginal(int);
+    bool isEqListening() const noexcept{return eqListening.load();}
+    vocal::EqSettings eqSettings() const;
+    void applyEq(const vocal::EqSettings&);
+    juce::Result analyseEqTrack(int,vocal::EqRecommendation&,std::atomic<bool>&,std::atomic<float>&);
     vocal::VoiceProfile voiceProfile;
     PluginToneLink toneLink;
     int songTonic=-1;bool songMinor=false;
@@ -83,10 +89,10 @@ public:
     void selectPreset(int index);
     void setSessionDirectory(juce::File dir) {sessionDirectory=std::move(dir);}
     const juce::File& session() const noexcept {return sessionDirectory;}
-    juce::Result saveProject(const juce::File&);
+    juce::Result saveProject(const juce::File&,const vocal::EqSettings* storedEq=nullptr);
     juce::Result loadProject(const juce::File&);
     void newProject();
-    juce::var projectState() const;
+    juce::var projectState(const vocal::EqSettings* storedEq=nullptr) const;
     void createDemo();
 
     std::atomic<bool> calibrationInputOnly{false};
@@ -108,6 +114,8 @@ private:
     void processChunk(const float*,float* const*,int,int,bool,bool);
     vocal::VocalParameters parameters() const noexcept;
     std::vector<std::unique_ptr<StudioTrack>> tracks;
+    std::unique_ptr<StudioTrack> eqAudition;
+    std::atomic<bool> eqListening{false};
     std::atomic<double> sampleRate{48000},pluginTailSeconds{0};
     std::atomic<int> pluginInputs{2},pluginOutputs{2};
     std::atomic<int> currentBlock{256},driverInputLatency{0},driverOutputLatency{0},pluginLatency{0};
