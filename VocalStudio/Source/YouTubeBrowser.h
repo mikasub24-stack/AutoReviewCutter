@@ -13,6 +13,7 @@ public:
     juce::String error() const;
     bool advertisement() const;
     std::uint64_t capturedFrames() const;
+    float capturedPeak() const;
     void runAudioProbe();
 private:
     struct Impl;std::unique_ptr<Impl> impl;

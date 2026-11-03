@@ -16,7 +16,7 @@ struct BrowserState {
     std::shared_ptr<vocal::LiveMusic> music;std::mutex mutex;CefRefPtr<CefBrowser> browser;
     juce::String url="https://www.youtube.com/",problem,lastSong;
     std::atomic<bool> closing{false},ad{false};std::atomic<std::uint64_t> captured{0};
-    std::atomic<int> channels{2};juce::WaitableEvent closed;
+    std::atomic<float> peak{0};std::atomic<int> channels{2};juce::WaitableEvent closed;
     CefRefPtr<CefBrowser> get(){std::lock_guard<std::mutex> lock(mutex);return browser;}
 };
 class CloseNativeWindow final : public CefTask {
@@ -33,7 +33,7 @@ public:
     CefRefPtr<CefPermissionHandler> GetPermissionHandler() override{return this;}
     bool GetAudioParameters(CefRefPtr<CefBrowser>,CefAudioParameters& p) override{p.channel_layout=CEF_CHANNEL_LAYOUT_STEREO;p.sample_rate=48000;p.frames_per_buffer=480;return true;}
     void OnAudioStreamStarted(CefRefPtr<CefBrowser>,const CefAudioParameters&,int channels) override{state->channels=channels;}
-    void OnAudioStreamPacket(CefRefPtr<CefBrowser>,const float** data,int frames,int64_t) override{state->music->push(data,state->channels.load(),frames);state->captured+=frames;}
+    void OnAudioStreamPacket(CefRefPtr<CefBrowser>,const float** data,int frames,int64_t) override{state->music->push(data,state->channels.load(),frames);state->captured+=frames;float peak=0;for(int c=0;c<state->channels.load();++c)for(int i=0;i<frames;++i)peak=std::max(peak,std::abs(data[c][i]));float previous=state->peak.load();while(peak>previous&&!state->peak.compare_exchange_weak(previous,peak)){}}
     void OnAudioStreamStopped(CefRefPtr<CefBrowser>) override{std::array<float,9600> zeros{};const float* data[]={zeros.data(),zeros.data()};state->music->push(data,2,static_cast<int>(zeros.size()));}
     void OnAudioStreamError(CefRefPtr<CefBrowser>,const CefString& message) override{std::lock_guard<std::mutex> lock(state->mutex);state->problem=juce::String::fromUTF8(message.ToString().c_str());}
     void OnAfterCreated(CefRefPtr<CefBrowser> b) override{{std::lock_guard<std::mutex> lock(state->mutex);state->browser=b;}if(state->closing)b->GetHost()->CloseBrowser(true);}
@@ -74,4 +74,5 @@ juce::String YouTubeBrowser::address() const{std::lock_guard<std::mutex> lock(im
 juce::String YouTubeBrowser::error() const{std::lock_guard<std::mutex> lock(impl->state->mutex);return impl->state->problem;}
 bool YouTubeBrowser::advertisement() const{return impl->state->ad.load();}
 std::uint64_t YouTubeBrowser::capturedFrames() const{return impl->state->captured.load();}
+float YouTubeBrowser::capturedPeak() const{return impl->state->peak.load();}
 void YouTubeBrowser::runAudioProbe(){if(auto b=impl->state->get()){const auto html=juce::String("<html><body style='background:#10151e;color:white'><h1>Native browser audio probe</h1><script>let a=new AudioContext({sampleRate:48000}),o=a.createOscillator(),g=a.createGain();o.frequency.value=220;g.gain.value=.15;o.connect(g).connect(a.destination);o.start();a.resume();</script></body></html>");b->GetMainFrame()->LoadURL(("data:text/html;charset=utf-8,"+juce::URL::addEscapeChars(html,true)).toStdString());}}

@@ -9,6 +9,7 @@ public:
     void paint(juce::Graphics&) override;
     void leave();
     void probe(){browser.runAudioProbe();}
+    float capturedPeak() const{return browser.capturedPeak();}
     std::uint64_t captured() const{return browser.capturedFrames();}
 private:
     StudioMain& owner;YouTubeBrowser browser;

@@ -31,6 +31,9 @@ jobs:
           $app = (Resolve-Path 'build/vocal/VocalStudio_artefacts/Release/VocalStudio.exe').Path
           $p = Start-Process $app -ArgumentList @('--browser-probe','--autoplay-policy=no-user-gesture-required') -PassThru
           if (!$p.WaitForExit(45000)) { $p.Kill(); throw 'Browser audio probe timed out' }
+          Write-Host "Browser exit: $($p.ExitCode)"
+          if (Test-Path BrowserStartup.log) { Get-Content BrowserStartup.log }
+          if (Test-Path BrowserRuntime.log) { Get-Content BrowserRuntime.log -Tail 100 }
           if ($p.ExitCode -ne 0 -or !(Test-Path BrowserSelfTest.json)) { throw 'Browser audio capture failed' }
           Get-Content BrowserSelfTest.json
       - name: Capture actual application UI
@@ -72,6 +75,10 @@ jobs:
           $report = Join-Path $PWD 'dist/InstalledSelfTest.json'
           $test = Start-Process "$install/VocalStudio.exe" -ArgumentList @('--self-test','--report',"`"$report`"") -Wait -PassThru
           if ($test.ExitCode -ne 0) { throw 'Installed executable self-test failed' }
+          $browser = Start-Process "$install/VocalStudio.exe" -ArgumentList @('--browser-probe','--autoplay-policy=no-user-gesture-required') -PassThru
+          if (!$browser.WaitForExit(45000)) { $browser.Kill(); throw 'Installed browser probe timed out' }
+          if ($browser.ExitCode -ne 0) { throw 'Installed Chromium runtime/sandbox/audio probe failed' }
+          Copy-Item BrowserSelfTest.json dist/InstalledBrowserSelfTest.json
       - name: Export corresponding source and workspace handoff
         shell: pwsh
         run: |
@@ -98,6 +105,8 @@ jobs:
             dist/*.bundle
             dist/*SelfTest.json
             BrowserSelfTest.json
+            Browser*.log
+            debug.log
             build/vocal/EngineSelfTest.json
             build/vocal/Testing/Temporary/LastTest.log
             build/vocal/VocalStudio_artefacts/Release/debug.log

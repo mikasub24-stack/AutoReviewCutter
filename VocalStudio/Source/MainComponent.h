@@ -61,6 +61,7 @@ public:
     void showQuickMode(bool);
     void startBrowserProbe();
     std::uint64_t browserCaptured() const;
+    float browserPeak() const;
     void chooseAntaresPlugin(){choosePlugin();}
     void openAntaresEditor(){showPlugin();}
     std::shared_ptr<SongFitPlan> fitPlan;

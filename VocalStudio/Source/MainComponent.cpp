@@ -123,3 +123,5 @@ void StudioMain::saveToolScreenshots(const juce::File& folder){showVocalTools();
 void StudioMain::showQuickMode(bool enabled){if(enabled){if(!karaoke){karaoke=std::make_unique<KaraokePage>(*this);addChildComponent(karaoke.get());}karaoke->setBounds(getLocalBounds());karaoke->setVisible(true);karaoke->toFront(false);engine.liveMode=true;}else{engine.liveMode=false;if(karaoke)karaoke->setVisible(false);syncKnobs();}}
 void StudioMain::startBrowserProbe(){if(auto* page=dynamic_cast<KaraokePage*>(karaoke.get()))page->probe();}
 std::uint64_t StudioMain::browserCaptured() const{if(auto* page=dynamic_cast<KaraokePage*>(karaoke.get()))return page->captured();return 0;}
+
+float StudioMain::browserPeak() const{if(auto* page=dynamic_cast<KaraokePage*>(karaoke.get()))return page->capturedPeak();return 0;}

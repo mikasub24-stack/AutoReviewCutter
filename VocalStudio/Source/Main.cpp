@@ -17,10 +17,12 @@ public:
     const juce::String getApplicationVersion() override {return "1.2.0";}
     bool moreThanOneInstanceAllowed() override {return false;}
     void initialise(const juce::String& commandLine) override {
+        juce::File::getCurrentWorkingDirectory().getChildFile("BrowserStartup.log").appendText("JUCE initialise\n");
         if(commandLine.contains("--self-test")){const int code=runStudioSelfTests(commandLine);setApplicationReturnValue(code);quit();return;}
         window=std::make_unique<Window>();
+        juce::File::getCurrentWorkingDirectory().getChildFile("BrowserStartup.log").appendText("Window ready\n");
         if(commandLine.contains("--demo")){window->main->loadDemo();window->main->showQuickMode(false);}
-        if(commandLine.contains("--browser-probe")){juce::Timer::callAfterDelay(4000,[this]{if(window)window->main->startBrowserProbe();});juce::Timer::callAfterDelay(11000,[this]{if(!window)return;auto* main=window->main;const auto frames=main->browserCaptured();const auto stats=main->engine.liveMusic->statistics();auto report=juce::File::getCurrentWorkingDirectory().getChildFile("BrowserSelfTest.json");auto* obj=new juce::DynamicObject;obj->setProperty("capturedFrames",static_cast<juce::int64>(frames));obj->setProperty("processedFrames",static_cast<juce::int64>(stats.outputFrames));obj->setProperty("inputFrames",static_cast<juce::int64>(stats.inputFrames));obj->setProperty("sandboxEnabled",true);obj->setProperty("passed",frames>48000&&stats.inputFrames>48000);report.replaceWithText(juce::JSON::toString(juce::var(obj)));setApplicationReturnValue(frames>48000&&stats.inputFrames>48000?0:1);quit();});}
+        if(commandLine.contains("--browser-probe")){juce::Timer::callAfterDelay(4000,[this]{if(window)window->main->startBrowserProbe();});juce::Timer::callAfterDelay(11000,[this]{if(!window)return;auto* main=window->main;const auto frames=main->browserCaptured();const auto stats=main->engine.liveMusic->statistics();auto report=juce::File::getCurrentWorkingDirectory().getChildFile("BrowserSelfTest.json");auto* obj=new juce::DynamicObject;obj->setProperty("capturedFrames",static_cast<juce::int64>(frames));obj->setProperty("processedFrames",static_cast<juce::int64>(stats.outputFrames));obj->setProperty("inputFrames",static_cast<juce::int64>(stats.inputFrames));obj->setProperty("sandboxEnabled",true);obj->setProperty("capturePeak",main->browserPeak());obj->setProperty("passed",frames>48000&&stats.inputFrames>48000&&main->browserPeak()>.01f);report.replaceWithText(juce::JSON::toString(juce::var(obj)));setApplicationReturnValue(frames>48000&&stats.inputFrames>48000&&main->browserPeak()>.01f?0:1);quit();});}
         const auto args=juce::StringArray::fromTokens(commandLine,true);const int shot=args.indexOf("--screenshot");
         if(shot>=0&&shot+1<args.size()){const auto file=juce::File(args[shot+1].unquoted());juce::Timer::callAfterDelay(5000,[this,file]{if(!window)return;auto image=captureVisibleWindow(*window->main);file.getParentDirectory().createDirectory();auto stream=file.createOutputStream();if(stream){juce::JPEGImageFormat format;format.setQuality(.9f);format.writeImageToStream(image,*stream);}window->main->saveToolScreenshots(file.getParentDirectory());window.reset();quit();});}
     }
@@ -50,11 +52,12 @@ bool allowSandboxRuntimeRead(){
 }
 // Chromium subprocesses run before JUCE's application/single-instance setup.
 CEF_BOOTSTRAP_EXPORT int RunWinMain(HINSTANCE instance,LPWSTR commandLine,int,void* sandbox,cef_version_info_t*){
+    const auto trace=juce::File::getCurrentWorkingDirectory().getChildFile("BrowserStartup.log");if(!juce::String(commandLine).contains("--type="))trace.appendText("Bootstrap main\n");
     CefMainArgs args(instance);const int child=CefExecuteProcess(args,nullptr,sandbox);if(child>=0)return child;
     const bool tests=juce::String(commandLine).contains("--self-test");bool initialized=false;
-    if(!tests){allowSandboxRuntimeRead();CefSettings settings;settings.multi_threaded_message_loop=true;settings.log_severity=LOGSEVERITY_WARNING;
+    if(!tests){trace.appendText("CEF initialize\n");allowSandboxRuntimeRead();CefSettings settings;settings.multi_threaded_message_loop=true;settings.log_severity=LOGSEVERITY_INFO;CefString(&settings.log_file)=juce::File::getCurrentWorkingDirectory().getChildFile("BrowserRuntime.log").getFullPathName().toStdString();
         const auto cache=juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("VocalStudio/YouTubeCache");cache.createDirectory();CefString(&settings.root_cache_path)=cache.getFullPathName().toStdString();CefString(&settings.cache_path)=cache.getChildFile("Profile").getFullPathName().toStdString();
-        if(!sandbox)return 2;if(!CefInitialize(args,settings,nullptr,sandbox))return CefGetExitCode();initialized=true;}
+        if(!sandbox)return 2;if(!CefInitialize(args,settings,nullptr,sandbox)){trace.appendText("CEF initialization failed: "+juce::String(CefGetExitCode())+"\n");return CefGetExitCode();}trace.appendText("CEF ready\n");initialized=true;}
     juce::JUCEApplicationBase::createInstance=[]()->juce::JUCEApplicationBase*{return new VocalStudioApplication();};
     const int result=juce::JUCEApplicationBase::main();if(initialized)CefShutdown();return result;
 }
