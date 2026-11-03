@@ -1,0 +1,62 @@
+name: Vocal Studio Windows
+on:
+  workflow_dispatch:
+  push:
+    branches: [vocal-studio]
+    paths:
+      - 'VocalStudio/**'
+      - '.github/workflows/vocal-studio-windows.yml'
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure native Windows app and ASIO
+        run: cmake -S VocalStudio -B build/vocal -A x64 -DVOCAL_BUILD_TESTS=ON
+      - name: Build app and test VST3
+        run: cmake --build build/vocal --config Release --parallel 2
+      - name: Verify DSP, recording, project round-trip and plugin latency
+        run: ctest --test-dir build/vocal -C Release --output-on-failure
+      - name: Capture actual application UI
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $app = (Resolve-Path 'build/vocal/VocalStudio_artefacts/Release/VocalStudio.exe').Path
+          $shot = Join-Path $PWD 'dist/VocalStudio-preview.jpg'
+          $p = Start-Process $app -ArgumentList @('--demo', '--screenshot', "`"$shot`"") -Wait -PassThru
+          if ($p.ExitCode -ne 0 -or !(Test-Path $shot)) { throw 'UI screenshot failed' }
+      - name: Build portable package and installer
+        shell: pwsh
+        run: |
+          $appDir = (Resolve-Path 'build/vocal/VocalStudio_artefacts/Release').Path
+          New-Item -ItemType Directory -Force dist/portable | Out-Null
+          Copy-Item "$appDir/VocalStudio.exe" dist/portable/
+          Copy-Item VocalStudio/README.md,VocalStudio/LICENSE.txt,VocalStudio/THIRD_PARTY.md,VocalStudio/JUCE-LICENSE.md dist/portable/
+          Compress-Archive -Path dist/portable/* -DestinationPath dist/VocalStudio-1.0.0-Windows.zip
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (!(Test-Path $iscc)) { choco install innosetup -y --no-progress; if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' } }
+          & $iscc "/DSourceDir=$appDir" "/DOutputDir=$PWD\dist" VocalStudio/installer/VocalStudio.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
+      - name: Test installed executable
+        shell: pwsh
+        run: |
+          $install = Join-Path $env:RUNNER_TEMP 'VocalStudioInstalled'
+          $setup = Start-Process "$PWD/dist/VocalStudio-1.0.0-Setup.exe" -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
+          if ($setup.ExitCode -ne 0 -or !(Test-Path "$install/VocalStudio.exe")) { throw 'Installer failed' }
+          $report = Join-Path $PWD 'dist/InstalledSelfTest.json'
+          $test = Start-Process "$install/VocalStudio.exe" -ArgumentList @('--self-test','--report',"`"$report`"") -Wait -PassThru
+          if ($test.ExitCode -ne 0) { throw 'Installed executable self-test failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: VocalStudio-Windows
+          path: |
+            dist/*.exe
+            dist/*.zip
+            dist/*.jpg
+            dist/*SelfTest.json
+            build/vocal/EngineSelfTest.json
+            build/vocal/Testing/Temporary/LastTest.log
+          if-no-files-found: warn
