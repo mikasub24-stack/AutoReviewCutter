@@ -105,6 +105,7 @@ private:
     vocal::VocalParameters parameters() const noexcept;
     std::vector<std::unique_ptr<StudioTrack>> tracks;
     std::atomic<double> sampleRate{48000},pluginTailSeconds{0};
+    std::atomic<int> pluginInputs{2},pluginOutputs{2};
     std::atomic<int> currentBlock{256},driverInputLatency{0},driverOutputLatency{0},pluginLatency{0};
     std::atomic<juce::int64> positionFrames{0};
     std::atomic<bool> playing{false},recording{false},pluginBypassed{false};
