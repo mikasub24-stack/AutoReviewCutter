@@ -104,7 +104,7 @@ juce::Result StudioEngine::startRecording(const juce::File& dir){
     recordFile=dir.getNonexistentChildFile("Take_"+juce::Time::getCurrentTime().formatted("%Y%m%d_%H%M%S"),".recording.wav",false);
     auto stream=recordFile.createOutputStream();if(!stream)return juce::Result::fail(juce::String::fromUTF8("Không ghi được vào ổ đĩa."));
     juce::WavAudioFormat wav;auto* raw=wav.createWriterFor(stream.get(),rate(),1,24,{},0);if(!raw)return juce::Result::fail(juce::String::fromUTF8("Không tạo được WAV 24-bit."));stream.release();
-    withAudioStopped([&]{writer=std::make_unique<juce::AudioFormatWriter::ThreadedWriter>(raw,diskThread,262144);writer->setFlushInterval(16384);recordingFault.store(0);capturedFrames.store(0);recordStart=position();if(latencyCompensation.load())recordStart-=(driverInputLatency.load()+driverOutputLatency.load()+pluginLatency.load()+static_cast<int>(limiter.latency()))/rate();recordStart+=manualOffsetMs.load()/1000.0;resetProcessing();activeWriter.store(writer.get());recording.store(true);playing.store(true);});
+    withAudioStopped([&]{writer=std::make_unique<juce::AudioFormatWriter::ThreadedWriter>(raw,diskThread,262144);writer->setFlushInterval(16384);recordingFault.store(0);inputClipped.store(false);capturedFrames.store(0);recordStart=position();if(latencyCompensation.load())recordStart-=(driverInputLatency.load()+driverOutputLatency.load()+pluginLatency.load()+static_cast<int>(limiter.latency()))/rate();recordStart+=manualOffsetMs.load()/1000.0;resetProcessing();activeWriter.store(writer.get());recording.store(true);playing.store(true);});
     return juce::Result::ok();
 }
 juce::Result StudioEngine::finishRecording(juce::File& completed,double& startSeconds){

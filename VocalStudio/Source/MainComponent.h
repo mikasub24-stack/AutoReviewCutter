@@ -40,6 +40,7 @@ public:
     void stop();
     void save();
     void status(const juce::String&);
+    bool isBusy() const noexcept {return busy;}
     bool canEdit() const {return !busy&&!engine.isPlaying()&&!engine.isRecording();}
     void refreshTracks();
     void rememberEdit(int,double,double,double,double,double,double);
