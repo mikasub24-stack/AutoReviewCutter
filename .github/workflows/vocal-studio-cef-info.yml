@@ -1,0 +1,27 @@
+name: Inspect official CEF browser runtime
+on:
+  push:
+    branches: [vocal-studio]
+    paths: ['.github/workflows/vocal-studio-cef-info.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read official Windows x64 stable distributions
+        shell: python
+        run: |
+          import urllib.request,json
+          data=json.load(urllib.request.urlopen('https://cef-builds.spotifycdn.com/index.json',timeout=60))
+          versions=data['windows64']['versions']
+          count=0
+          for version in versions:
+              if version.get('channel','stable')!='stable': continue
+              files=[f for f in version['files'] if f['type']=='minimal']
+              if not files: continue
+              print(json.dumps({'cef_version':version['cef_version'],'chromium_version':version.get('chromium_version'),'channel':version.get('channel'),'files':files}))
+              count+=1
+              if count==2: break
