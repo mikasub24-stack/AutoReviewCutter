@@ -13,3 +13,15 @@ juce::Result StudioEngine::setSongKey(int tonic,bool minor,const juce::String& s
     toneLinkStatus=u("Đã lưu tone bài. Nạp/bật Antares và ghép Key/Scale để tự gửi.");return juce::Result::ok();
 }
 juce::Result StudioEngine::sendSongKey(){if(isPlaying()||isRecording())return juce::Result::fail(u("Dừng phát/thu trước khi gửi Key/Scale."));if(!plugin)return juce::Result::fail(u("Chưa nạp Antares VST3."));if(isPluginBypassed())return juce::Result::fail(u("Plugin đang bypass. Bật plugin trước khi gửi tone."));juce::Result result=juce::Result::ok();withAudioStopped([&]{auto link=toneLink;link.enabled=true;result=applyPluginTone(*plugin,link,songTonic,songMinor);});toneLinkStatus=result.wasOk()?u("Đã gửi và đọc lại xác nhận: ")+juce::String(vocal::noteName(60+songTonic))+(songMinor?" minor":" major")+u(" → ")+plugin->getName():result.getErrorMessage();return result;}
+
+// GUI-thread controller updates use the VST3 parameter queue; audio keeps running.
+// Never release/reprepare a plug-in or detach the device callback during singing.
+juce::Result StudioEngine::setLiveSongKey(int tonic,bool minor){
+    songTonic=tonic;songMinor=minor;songKeySource="YouTube live";
+    if(!plugin||!toneLink.enabled)return juce::Result::ok();
+    if(tonic<0||tonic>11){if(!pluginBypassed.load()||heldForUnknownKey){pluginBypassed=true;heldForUnknownKey=true;}toneLinkStatus=u("Đang nghe nhạc để dò tone · Antares tạm bypass");return juce::Result::ok();}
+    if(pluginBypassed.load()&&!heldForUnknownKey)return juce::Result::ok();
+    auto result=applyPluginTone(*plugin,toneLink,tonic,minor);
+    if(result.wasOk()){pluginBypassed=false;heldForUnknownKey=false;toneLinkStatus=u("Đã gửi Key/Scale: ")+juce::String(vocal::noteName(60+tonic))+(minor?" minor":" major");}
+    else{pluginBypassed=true;heldForUnknownKey=true;toneLinkStatus=result.getErrorMessage();}return result;
+}

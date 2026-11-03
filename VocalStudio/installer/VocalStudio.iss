@@ -7,7 +7,7 @@
 [Setup]
 AppId={{3BEE7FF2-E9DE-47C8-A770-B8D4E2E3AE1C}
 AppName=Vocal Studio
-AppVersion=1.1.0
+AppVersion=1.2.0
 AppPublisher=VocalStudio
 DefaultDirName={localappdata}\Programs\VocalStudio
 DefaultGroupName=Vocal Studio
@@ -16,7 +16,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
 OutputDir={#OutputDir}
-OutputBaseFilename=VocalStudio-1.1.0-Setup
+OutputBaseFilename=VocalStudio-1.2.0-Setup
 Compression=lzma2
 SolidCompression=yes
 CloseApplications=yes
@@ -26,7 +26,7 @@ LicenseFile=..\LICENSE.txt
 [Tasks]
 Name: desktopicon; Description: "Create a desktop shortcut"; Flags: checkedonce
 [Files]
-Source: "{#SourceDir}\VocalStudio.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.lib,*.pdb,bootstrap.exe,bootstrapc.exe"
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD_PARTY.md"; DestDir: "{app}"; Flags: ignoreversion

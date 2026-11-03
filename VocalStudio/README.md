@@ -2,7 +2,21 @@
 
 Ứng dụng Windows x64 để hát trên beat, thu micro qua sound card và mix vocal tại máy. Dự án nằm trong `VocalStudio/`, nhánh `vocal-studio`, không sửa Chùa Việt Online.
 
-## Quy trình thu
+## 1.2 · Mở YouTube, bấm nửa cung rồi hát
+
+Màn hình mặc định có YouTube ngay trong tool. Dán link hoặc tìm tên bài, mở video karaoke, bật micro rồi hát. **−½ cung / +½ cung** đổi **một bán âm mỗi lần** (±1 semitone); giữ nguyên tốc độ, giới hạn ±12 bán âm. **Về tone gốc** trả về 0. Không bắt đo quãng giọng, nhập beat hay chọn vocal mẫu. Mức chuyển do bạn chọn bằng tai cho vừa giọng, không tự đoán quãng hát từ beat.
+
+Nhạc trình duyệt được đưa riêng qua bộ đổi tone; micro đi qua vocal FX/Antares. Không cần cáp âm thanh ảo hoặc tiện ích Chrome. Chỉ nhạc YouTube mở **trong ứng dụng** được đổi tone; tab Chrome/Edge bên ngoài không đi qua tool. Trình duyệt Chromium đi kèm, có sandbox. Xem video cần mạng; YouTube có thể yêu cầu đồng ý cookie, đăng nhập hoặc xác minh. App không tải/tách stream, vượt xác minh hoặc loại quảng cáo. Nội dung cần DRM/codec không có trong CEF có thể không phát được.
+
+**iCON UPod Pro:** USB 16-bit/48 kHz, plug-and-play; không bắt cài driver ASIO không có của hãng. Chọn Windows Audio/WASAPI, UPod Pro input/output, 48 kHz và ngõ micro trong **Sound card** lần đầu. Chọn buffer thấp ổn định mà thiết bị thật hỗ trợ. App lưu thiết bị và phiên Antares để mở lần sau. Trên phần cứng: **Mic with DSP OFF**, **Mixing OFF**; tắt **Direct Out/Direct Out+DSP** khi nghe FX bằng phần mềm để tránh hai tiếng. Không bật loopback Mixing. Những nút vật lý này app không điều khiển được. WAV 24-bit là định dạng lưu, không nâng độ phân giải ADC 16-bit của UPod.
+
+**Vang ẩn** là preset reverb/delay nhẹ. Có thanh Reverb/Delay và menu FX chi tiết; không bật DSP phần cứng cùng lúc nếu không muốn chồng vang. Cảnh báo MIC CLIP nhắc giảm gain vật lý; không thể phục hồi hoàn toàn giọng méo đã quá tải ở đầu vào.
+
+**Tự dò tone → Antares** nghe nhạc gốc trước khi chuyển, chờ vài giây có nhiều nốt rõ và hai cửa sổ phân tích đồng ý; cộng mức ± bán âm rồi gửi Key/Scale cho VST3 đã ghép. Không cộng dồn tone qua mỗi lần bấm. Bài mới/đổi video/quảng cáo làm bỏ key cũ; chờ dò lại hoặc tắt tự dò để chọn Key/Scale gốc bằng tay. Cập nhật tham số trực tiếp không dừng thiết bị âm thanh. Dò tone có thể nhầm Major/Minor tương đối hoặc không theo kịp bài chuyển giọng; luôn nghe đối chiếu. Chưa thử với Antares có giấy phép và UPod Pro thật của bạn. Nếu plugin không công khai/không xác nhận Key/Scale, app báo lỗi và giữ bypass để tránh kéo sai nốt. Antares và giấy phép phải có sẵn trên máy; app không kèm plugin thương mại.
+
+**Thu giọng** lưu WAV micro gốc, không ghi nhạc YouTube hay hiệu ứng vào WAV này. **Studio nâng cao** giữ toàn bộ timeline/nhập beat/mix/xuất WAV và quy trình đo quãng giọng cũ là tùy chọn. Nhạc YouTube bị tạm dừng khi vào Studio.
+
+## Quy trình thu trong Studio nâng cao
 
 1. Cài driver chính hãng của sound card. Mở **Sound card**, chọn ASIO, sample rate 48 kHz và buffer 128 hoặc 256 samples nếu thiết bị hỗ trợ.
 2. Chọn đúng input micro trong bảng bên phải. Chỉnh gain trên sound card để giọng lớn nhất thường quanh −12 đến −6 dBFS, không chạm CLIP.
@@ -86,4 +100,4 @@ cmake --build build/vocal --config Release --parallel 2
 ctest --test-dir build/vocal -C Release --output-on-failure
 ```
 
-CMake lấy JUCE và ASIO SDK ở commit cố định. Source ứng dụng AGPL-3.0-or-later; xem LICENSE.txt và THIRD_PARTY.md. Không yêu cầu tài khoản hoặc upload audio lên dịch vụ ngoài.
+CMake lấy JUCE và ASIO SDK ở commit cố định. Source ứng dụng AGPL-3.0-or-later; xem LICENSE.txt và THIRD_PARTY.md. Micro và bản thu lưu trên máy; trình duyệt YouTube kết nối tới YouTube như trình duyệt thông thường và không được cấp quyền micro/camera. CEF Windows x64 stable 156.0.15 được ghim version và checksum trong cmake/Browser.cmake.

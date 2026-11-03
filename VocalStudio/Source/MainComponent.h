@@ -55,6 +55,11 @@ public:
     void loadVoicePreference();
     void setComfortableRange(double low,double high);
     void finishCalibration(bool success);
+    void openSoundCard(){showDevices();}
+    juce::PropertiesFile* settings(){return preferences.getUserSettings();}
+    void showQuickMode(bool);
+    void startBrowserProbe();
+    std::uint64_t browserCaptured() const;
     void chooseAntaresPlugin(){choosePlugin();}
     void openAntaresEditor(){showPlugin();}
     std::shared_ptr<SongFitPlan> fitPlan;
@@ -73,6 +78,8 @@ public:
 private:
     struct Edit {int track;double beforeStart,beforeIn,beforeOut,afterStart,afterIn,afterOut;};
     struct Knob {juce::Label label;juce::Slider slider;std::atomic<float>* value=nullptr;};
+    std::unique_ptr<juce::Component> karaoke;
+    juce::TextButton quickButton{"YouTube / Hat"};
     StudioLook look;
     juce::ApplicationProperties preferences;
     juce::ThreadPool jobs{1};

@@ -2,6 +2,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Dsp.h"
+#include "LiveMusic.h"
 #include "Pitch.h"
 #include "VoiceFit.h"
 #include "PluginTone.h"
@@ -58,6 +59,9 @@ public:
     juce::Result exportMix(const juce::File&,std::atomic<bool>& cancel,std::atomic<float>& progress);
     juce::Result installPlugin(std::unique_ptr<juce::AudioPluginInstance>);
     void removePlugin();
+    vocal::LiveMusic liveMusic;
+    std::atomic<bool> liveMode{false};
+    juce::Result setLiveSongKey(int tonic,bool minor);
     vocal::VoiceProfile voiceProfile;
     PluginToneLink toneLink;
     int songTonic=-1;bool songMinor=false;
