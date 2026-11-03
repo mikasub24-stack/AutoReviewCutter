@@ -5,6 +5,11 @@
 #include <aclapi.h>
 #include <sddl.h>
 #include <juce_gui_extra/juce_gui_extra.h>
+namespace {
+juce::Image captureVisibleWindow(juce::Component& c){
+    const auto pos=c.localPointToGlobal(juce::Point<int>(0,0));const int w=c.getWidth(),h=c.getHeight();auto screen=GetDC(nullptr);auto dc=CreateCompatibleDC(screen);BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=w;info.bmiHeader.biHeight=-h;info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;void* pixels=nullptr;auto bitmap=CreateDIBSection(screen,&info,DIB_RGB_COLORS,&pixels,nullptr,0);auto old=SelectObject(dc,bitmap);const bool ok=BitBlt(dc,0,0,w,h,screen,pos.x,pos.y,SRCCOPY|CAPTUREBLT)!=FALSE;juce::Image image(juce::Image::ARGB,w,h,true);if(ok&&pixels){juce::Image::BitmapData target(image,juce::Image::BitmapData::writeOnly);for(int y=0;y<h;++y){auto* row=target.getLinePointer(y);memcpy(row,static_cast<unsigned char*>(pixels)+y*w*4,w*4);for(int x=0;x<w;++x)row[x*4+3]=255;}}SelectObject(dc,old);DeleteObject(bitmap);DeleteDC(dc);ReleaseDC(nullptr,screen);return ok?image:c.createComponentSnapshot(c.getLocalBounds());
+}
+}
 int runStudioSelfTests(const juce::String& commandLine);
 class VocalStudioApplication final : public juce::JUCEApplication {
 public:
@@ -17,7 +22,7 @@ public:
         if(commandLine.contains("--demo")){window->main->loadDemo();window->main->showQuickMode(false);}
         if(commandLine.contains("--browser-probe")){juce::Timer::callAfterDelay(4000,[this]{if(window)window->main->startBrowserProbe();});juce::Timer::callAfterDelay(11000,[this]{if(!window)return;auto* main=window->main;const auto frames=main->browserCaptured();const auto stats=main->engine.liveMusic.statistics();auto report=juce::File::getCurrentWorkingDirectory().getChildFile("BrowserSelfTest.json");auto* obj=new juce::DynamicObject;obj->setProperty("capturedFrames",static_cast<juce::int64>(frames));obj->setProperty("processedFrames",static_cast<juce::int64>(stats.outputFrames));obj->setProperty("inputFrames",static_cast<juce::int64>(stats.inputFrames));obj->setProperty("sandboxEnabled",true);obj->setProperty("passed",frames>48000&&stats.inputFrames>48000);report.replaceWithText(juce::JSON::toString(juce::var(obj)));setApplicationReturnValue(frames>48000&&stats.inputFrames>48000?0:1);quit();});}
         const auto args=juce::StringArray::fromTokens(commandLine,true);const int shot=args.indexOf("--screenshot");
-        if(shot>=0&&shot+1<args.size()){const auto file=juce::File(args[shot+1].unquoted());juce::Timer::callAfterDelay(1200,[this,file]{if(!window)return;auto image=window->main->createComponentSnapshot(window->main->getLocalBounds());file.getParentDirectory().createDirectory();auto stream=file.createOutputStream();if(stream){juce::JPEGImageFormat format;format.setQuality(.9f);format.writeImageToStream(image,*stream);}window->main->saveToolScreenshots(file.getParentDirectory());window.reset();quit();});}
+        if(shot>=0&&shot+1<args.size()){const auto file=juce::File(args[shot+1].unquoted());juce::Timer::callAfterDelay(5000,[this,file]{if(!window)return;auto image=captureVisibleWindow(*window->main);file.getParentDirectory().createDirectory();auto stream=file.createOutputStream();if(stream){juce::JPEGImageFormat format;format.setQuality(.9f);format.writeImageToStream(image,*stream);}window->main->saveToolScreenshots(file.getParentDirectory());window.reset();quit();});}
     }
     void shutdown() override {window.reset();}
     void systemRequestedQuit() override {if(window)window->main->prepareToClose([this]{quit();});else quit();}
@@ -25,7 +30,7 @@ public:
 private:
     class Window final : public juce::DocumentWindow {
     public:
-        Window():DocumentWindow(juce::String::fromUTF8("Vocal Studio · Thu hát và mix vocal"),juce::Colour(0xff10151e),DocumentWindow::allButtons){setUsingNativeTitleBar(true);main=new StudioMain();setContentOwned(main,true);setResizable(true,true);setResizeLimits(1180,720,2560,1600);centreWithSize(getWidth(),getHeight());setVisible(true);main->grabKeyboardFocus();}
+        Window():DocumentWindow(juce::String::fromUTF8("Vocal Studio · Thu hát và mix vocal"),juce::Colour(0xff10151e),DocumentWindow::allButtons){setUsingNativeTitleBar(true);main=new StudioMain();setContentOwned(main,true);setResizable(true,true);setResizeLimits(1000,620,2560,1600);const auto area=juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userArea;centreWithSize(juce::jmin(getWidth(),area.getWidth()-30),juce::jmin(getHeight(),area.getHeight()-50));setVisible(true);main->grabKeyboardFocus();}
         void closeButtonPressed() override {juce::JUCEApplication::getInstance()->systemRequestedQuit();}
         StudioMain* main=nullptr;
     };
@@ -48,7 +53,7 @@ CEF_BOOTSTRAP_EXPORT int RunWinMain(HINSTANCE instance,LPWSTR commandLine,int,vo
     CefMainArgs args(instance);const int child=CefExecuteProcess(args,nullptr,sandbox);if(child>=0)return child;
     const bool tests=juce::String(commandLine).contains("--self-test");bool initialized=false;
     if(!tests){allowSandboxRuntimeRead();CefSettings settings;settings.multi_threaded_message_loop=true;settings.log_severity=LOGSEVERITY_WARNING;
-        const auto cache=juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("VocalStudio/YouTubeCache");cache.createDirectory();CefString(&settings.root_cache_path)=cache.getFullPathName().toStdWString();
+        const auto cache=juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("VocalStudio/YouTubeCache");cache.createDirectory();CefString(&settings.root_cache_path)=cache.getFullPathName().toStdWString();CefString(&settings.cache_path)=cache.getChildFile("Profile").getFullPathName().toStdWString();
         if(!sandbox)return 2;if(!CefInitialize(args,settings,nullptr,sandbox))return CefGetExitCode();initialized=true;}
     juce::JUCEApplicationBase::createInstance=[]()->juce::JUCEApplicationBase*{return new VocalStudioApplication();};
     const int result=juce::JUCEApplicationBase::main();if(initialized)CefShutdown();return result;

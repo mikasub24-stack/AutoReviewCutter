@@ -28,7 +28,7 @@ struct LiveMusic::Impl {
     std::atomic<int> target{0},latency{0};std::atomic<std::uint64_t> generation{1},inputFrames{0},outputFrames{0},dropped{0},underflows{0};
     std::mutex analysisMutex,keyMutex;std::vector<float> analysis=std::vector<float>(analysisSize);std::uint64_t analysisCount=0,analysisGeneration=0;LiveKey detected;
     std::uint64_t renderGeneration=0;Frame a,b;double phase=0,drift=1;bool primed=false;float fade=0,lastLeft=0,lastRight=0;
-    void publishUnknown(std::uint64_t epoch){std::lock_guard<std::mutex> lock(keyMutex);detected.tonic=-1;detected.confidence=0;detected.generation=epoch;++detected.revision;}
+    void publishUnknown(std::uint64_t epoch){std::lock_guard<std::mutex> lock(keyMutex);if(epoch!=generation.load())return;detected.tonic=-1;detected.confidence=0;detected.generation=epoch;++detected.revision;}
     void process(){
         signalsmith::stretch::SignalsmithStretch<float> stretch(9017);stretch.presetDefault(2,static_cast<float>(rate));stretch.setFormantFactor(1,false);latency=stretch.inputLatency()+stretch.outputLatency();
         std::array<std::array<float,block>,2> in{},out{};std::array<const float*,2> inputs{in[0].data(),in[1].data()};std::array<float*,2> outputs{out[0].data(),out[1].data()};std::uint64_t epoch=0;float pitch=0;int collected=0;bool wasBlocked=false;
@@ -49,7 +49,7 @@ struct LiveMusic::Impl {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));AudioChannels snapshot(1);std::uint64_t count=0,epoch=0;
             {std::lock_guard<std::mutex> lock(analysisMutex);count=analysisCount;epoch=analysisGeneration;if(epoch!=lastGeneration){lastGeneration=epoch;lastCount=0;candidate=-1;streak=0;}if(count<rate*4||count-lastCount<rate)continue;const auto n=static_cast<std::size_t>(std::min<std::uint64_t>(count,analysisSize));snapshot[0].resize(n);for(std::size_t i=0;i<n;++i)snapshot[0][i]=analysis[static_cast<std::size_t>(count-n+i)%analysisSize];lastCount=count;}
             if(!running.load())break;auto result=analysePitch(snapshot,rate,false,cancel,progress);if(epoch!=generation.load()||!running.load())continue;
-            if(result.tonic>=0&&result.keyConfidence>=.55){if(result.tonic==candidate&&result.minor==candidateMinor)++streak;else{candidate=result.tonic;candidateMinor=result.minor;streak=1;}if(streak>=2){std::lock_guard<std::mutex> lock(keyMutex);if(detected.tonic!=candidate||detected.minor!=candidateMinor||detected.generation!=epoch){detected={candidate,candidateMinor,result.keyConfidence,epoch,detected.revision+1};}}}else streak=0;
+            if(result.tonic>=0&&result.keyConfidence>=.55){if(result.tonic==candidate&&result.minor==candidateMinor)++streak;else{candidate=result.tonic;candidateMinor=result.minor;streak=1;}if(streak>=2){std::lock_guard<std::mutex> lock(keyMutex);if(epoch!=generation.load())continue;if(detected.tonic!=candidate||detected.minor!=candidateMinor||detected.generation!=epoch){detected={candidate,candidateMinor,result.keyConfidence,epoch,detected.revision+1};}}}else streak=0;
         }
     }
     bool next(Frame& f) noexcept {for(std::size_t i=0;i<queueSize;++i){if(!output.pop(f))return false;if(f.generation==renderGeneration)return true;}return false;}

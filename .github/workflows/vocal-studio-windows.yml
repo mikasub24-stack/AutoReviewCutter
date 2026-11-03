@@ -14,6 +14,11 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/cache/restore@v4
+        with:
+          path: build/vocal
+          key: vocal-browser156-v1-${{ github.sha }}
+          restore-keys: vocal-browser156-v1-
       - name: Configure native Windows app and ASIO
         run: cmake -S VocalStudio -B build/vocal -A x64 -DVOCAL_BUILD_TESTS=ON
       - name: Build app and test VST3
@@ -97,3 +102,8 @@ jobs:
             build/vocal/Testing/Temporary/LastTest.log
             build/vocal/VocalStudio_artefacts/Release/debug.log
           if-no-files-found: warn
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: build/vocal
+          key: vocal-browser156-v1-${{ github.sha }}

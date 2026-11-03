@@ -6,6 +6,7 @@
 #include "include/cef_load_handler.h"
 #include "include/cef_display_handler.h"
 #include "include/cef_permission_handler.h"
+#include "include/cef_task.h"
 #include "include/cef_sandbox_win.h"
 #include <mutex>
 #include <windows.h>
@@ -17,6 +18,10 @@ struct BrowserState {
     std::atomic<bool> closing{false},ad{false};std::atomic<std::uint64_t> captured{0};
     std::atomic<int> channels{2};juce::WaitableEvent closed;
     CefRefPtr<CefBrowser> get(){std::lock_guard<std::mutex> lock(mutex);return browser;}
+};
+class CloseNativeWindow final : public CefTask {
+public:explicit CloseNativeWindow(HWND window):window(window){}void Execute() override{if(IsWindow(window))DestroyWindow(window);}
+private:HWND window;IMPLEMENT_REFCOUNTING(CloseNativeWindow);
 };
 class BrowserClient final : public CefClient,public CefAudioHandler,public CefLifeSpanHandler,public CefLoadHandler,public CefDisplayHandler,public CefPermissionHandler {
 public:
@@ -32,7 +37,7 @@ public:
     void OnAudioStreamStopped(CefRefPtr<CefBrowser>) override{std::array<float,9600> zeros{};const float* data[]={zeros.data(),zeros.data()};state->music.push(data,2,static_cast<int>(zeros.size()));}
     void OnAudioStreamError(CefRefPtr<CefBrowser>,const CefString& message) override{std::lock_guard<std::mutex> lock(state->mutex);state->problem=juce::String::fromUTF8(message.ToString().c_str());}
     void OnAfterCreated(CefRefPtr<CefBrowser> b) override{{std::lock_guard<std::mutex> lock(state->mutex);state->browser=b;}if(state->closing)b->GetHost()->CloseBrowser(true);}
-    bool DoClose(CefRefPtr<CefBrowser>) override{return true;}
+    bool DoClose(CefRefPtr<CefBrowser> browser) override{CefPostTask(TID_UI,new CloseNativeWindow(browser->GetHost()->GetWindowHandle()));return true;}
     void OnBeforeClose(CefRefPtr<CefBrowser>) override{{std::lock_guard<std::mutex> lock(state->mutex);state->browser=nullptr;}state->closed.signal();}
     bool OnBeforePopup(CefRefPtr<CefBrowser> b,CefRefPtr<CefFrame>,int,const CefString& url,const CefString&,WindowOpenDisposition,bool gesture,const CefPopupFeatures&,CefWindowInfo&,CefRefPtr<CefClient>&,CefBrowserSettings&,CefRefPtr<CefDictionaryValue>&,bool*) override{if(gesture&&url.ToString().rfind("https://",0)==0)b->GetMainFrame()->LoadURL(url);return true;}
     void OnAddressChange(CefRefPtr<CefBrowser>,CefRefPtr<CefFrame> frame,const CefString& url) override{if(!frame->IsMain())return;const auto value=juce::String::fromUTF8(url.ToString().c_str());const juce::URL parsed(value);const auto song=parsed.getDomain()+parsed.getSubPath()+"?"+parsed.getParameterValues().joinIntoString("&");{std::lock_guard<std::mutex> lock(state->mutex);state->url=value;if(song==state->lastSong)return;state->lastSong=song;}state->music.beginSong();}
@@ -69,4 +74,4 @@ juce::String YouTubeBrowser::address() const{std::lock_guard<std::mutex> lock(im
 juce::String YouTubeBrowser::error() const{std::lock_guard<std::mutex> lock(impl->state->mutex);return impl->state->problem;}
 bool YouTubeBrowser::advertisement() const{return impl->state->ad.load();}
 std::uint64_t YouTubeBrowser::capturedFrames() const{return impl->state->captured.load();}
-void YouTubeBrowser::runAudioProbe(){if(auto b=impl->state->get())b->GetMainFrame()->ExecuteJavaScript("(()=>{document.body.innerHTML='<h1>Native browser audio probe</h1>';let a=new AudioContext({sampleRate:48000}),o=a.createOscillator(),g=a.createGain();o.frequency.value=220;g.gain.value=.15;o.connect(g).connect(a.destination);o.start();a.resume();window.__probe=a;})()",b->GetMainFrame()->GetURL(),0);}
+void YouTubeBrowser::runAudioProbe(){if(auto b=impl->state->get()){const auto html=juce::String("<html><body style='background:#10151e;color:white'><h1>Native browser audio probe</h1><script>let a=new AudioContext({sampleRate:48000}),o=a.createOscillator(),g=a.createGain();o.frequency.value=220;g.gain.value=.15;o.connect(g).connect(a.destination);o.start();a.resume();</script></body></html>");b->GetMainFrame()->LoadURL(("data:text/html;charset=utf-8,"+juce::URL::addEscapeChars(html,true)).toStdString());}}

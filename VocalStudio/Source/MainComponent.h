@@ -41,6 +41,7 @@ public:
     void stop();
     void save();
     void status(const juce::String&);
+    juce::String userStatus() const{return currentStatus;}
     bool isBusy() const noexcept {return busy;}
     bool canEdit() const {return !busy&&!engine.isPlaying()&&!engine.isRecording();}
     void refreshTracks();
