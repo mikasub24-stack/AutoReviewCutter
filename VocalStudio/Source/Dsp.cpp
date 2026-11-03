@@ -61,7 +61,8 @@ void VocalChain::setParameters(const VocalParameters& value) noexcept {
     delaySamples=static_cast<std::size_t>(rate*std::clamp(p.delayMs,40.0f,1500.0f)/1000);
     for(auto& c:channels) { c.high.configure(Biquad::highPass,rate,p.highPassHz,.707);c.warmth.configure(Biquad::lowShelf,rate,240,.707,p.warmthDb);c.presence.configure(Biquad::peak,rate,3200,.8,p.presenceDb);c.ess.configure(Biquad::bandPass,rate,std::min(6800.0,rate*.35),1.1);c.tame.configure(Biquad::lowPass,rate,14000-9000*p.deharsh,.707); }
 }
-void VocalChain::process(float& left, float& right) noexcept {
+void VocalChain::process(float& left,float& right) noexcept {processDry(left,right);processAmbience(left,right);}
+void VocalChain::processDry(float& left, float& right) noexcept {
     if(p.bypass) return;
     float x[2]={left*preGain,right*preGain}, ess[2]={0,0};
     for(int i=0;i<2;++i) { auto& c=channels[static_cast<std::size_t>(i)];x[i]=c.presence.tick(c.warmth.tick(c.high.tick(x[i])));ess[i]=c.ess.tick(x[i]); }
@@ -77,12 +78,16 @@ void VocalChain::process(float& left, float& right) noexcept {
     const float essPeak=std::max(std::abs(ess[0]),std::abs(ess[1]));
     essEnvelope=std::max(essPeak,essRelease*essEnvelope);
     const float deEss=std::clamp((essEnvelope-.035f)*6,0.0f,.85f)*p.deEss;
+    for(int i=0;i<2;++i){auto& channel=channels[static_cast<std::size_t>(i)];float value=(x[i]-ess[i]*deEss)*compression*makeup;value=value*(1-p.deharsh*.5f)+channel.tame.tick(value)*p.deharsh*.5f;if(i==0)left=value;else right=value;}
+}
+void VocalChain::processAmbience(float& left,float& right) noexcept {
+    if(p.bypass)return;
+    const float signal[2]={left,right};
     constexpr double combTimes[4]={.0297,.0371,.0411,.0437};
     constexpr double allpassTimes[2]={.005,.0017};
     float wet[2]={0,0},echoWet[2]={0,0},drySignal[2]={0,0};
     for(int i=0;i<2;++i) {
-        auto& c=channels[static_cast<std::size_t>(i)];float dry=(x[i]-ess[i]*deEss)*compression*makeup;
-        dry=dry*(1-p.deharsh*.5f)+c.tame.tick(dry)*p.deharsh*.5f;drySignal[i]=dry;
+        auto& c=channels[static_cast<std::size_t>(i)];float dry=signal[i];drySignal[i]=dry;
         const float echo=c.echo.tap(delaySamples);c.echo.push(dry+echo*p.delayFeedback);echoWet[i]=echo;
         const float excitation=preDelaySamples>0?c.preDelay.tap(preDelaySamples):dry;c.preDelay.push(dry);
         float room=0;

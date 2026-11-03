@@ -119,7 +119,7 @@ private:
     std::unique_ptr<juce::AudioPluginInstance> plugin;
     juce::AudioBuffer<float> vocalBus,musicBus,monoInput;
     juce::MidiBuffer midi;
-    vocal::VocalChain playbackFx,monitorFx;
+    vocal::VocalChain playbackFx,monitorFx,vocalAmbience;
     vocal::Limiter limiter;
     std::array<vocal::Delay,2> musicDelay;
     juce::File sessionDirectory,recordFile;

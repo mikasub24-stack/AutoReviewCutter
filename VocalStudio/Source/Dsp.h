@@ -43,6 +43,8 @@ public:
     void reset() noexcept;
     void setParameters(const VocalParameters&) noexcept;
     void process(float& left, float& right) noexcept;
+    void processDry(float& left,float& right) noexcept;
+    void processAmbience(float& left,float& right) noexcept;
     float gainReductionDb() const noexcept { return reduction; }
 private:
     struct Channel {
