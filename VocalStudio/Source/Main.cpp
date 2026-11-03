@@ -4,7 +4,7 @@ int runStudioSelfTests(const juce::String& commandLine);
 class VocalStudioApplication final : public juce::JUCEApplication {
 public:
     const juce::String getApplicationName() override {return "VocalStudio";}
-    const juce::String getApplicationVersion() override {return "1.0.0";}
+    const juce::String getApplicationVersion() override {return "1.1.0";}
     bool moreThanOneInstanceAllowed() override {return false;}
     void initialise(const juce::String& commandLine) override {
         if(commandLine.contains("--self-test")){const int code=runStudioSelfTests(commandLine);setApplicationReturnValue(code);quit();return;}

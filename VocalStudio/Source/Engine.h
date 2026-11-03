@@ -3,6 +3,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Dsp.h"
 #include "Pitch.h"
+#include "VoiceFit.h"
+#include "PluginTone.h"
 #include <atomic>
 #include <functional>
 #include <memory>
@@ -36,6 +38,7 @@ public:
     void addTrack(std::unique_ptr<StudioTrack>);
     void removeTrack(int index);
     void replaceTrack(int,std::unique_ptr<StudioTrack>);
+    void replaceTracks(std::vector<std::pair<int,std::unique_ptr<StudioTrack>>>);
     juce::Result analyseTrack(int,vocal::PitchAnalysis&,std::atomic<bool>&,std::atomic<float>&);
     juce::Result renderPitchTrack(int,const vocal::PitchOptions&,std::unique_ptr<StudioTrack>&,std::atomic<bool>&,std::atomic<float>&);
     juce::Result restoreOriginalTrack(int,std::unique_ptr<StudioTrack>&);
@@ -55,6 +58,17 @@ public:
     juce::Result exportMix(const juce::File&,std::atomic<bool>& cancel,std::atomic<float>& progress);
     juce::Result installPlugin(std::unique_ptr<juce::AudioPluginInstance>);
     void removePlugin();
+    vocal::VoiceProfile voiceProfile;
+    PluginToneLink toneLink;
+    int songTonic=-1;bool songMinor=false;
+    juce::String songKeySource,toneLinkStatus;
+    bool isPluginBypassed() const noexcept {return pluginBypassed.load();}
+    bool isAntaresActive() const;
+    void setPluginBypassed(bool);
+    juce::Result setSongKey(int tonic,bool minor,const juce::String& source);
+    juce::Result sendSongKey();
+    void scanToneLink();
+    int effectivePluginLatency() const noexcept {return pluginBypassed.load()?0:pluginLatency.load();}
     juce::AudioPluginInstance* pluginInstance() const noexcept {return plugin.get();}
     juce::String pluginName() const {return plugin ? plugin->getName() : juce::String::fromUTF8("VST3: chưa chọn");}
     juce::StringArray inputNames() const;
@@ -92,7 +106,7 @@ private:
     std::atomic<double> sampleRate{48000},pluginTailSeconds{0};
     std::atomic<int> currentBlock{256},driverInputLatency{0},driverOutputLatency{0},pluginLatency{0};
     std::atomic<juce::int64> positionFrames{0};
-    std::atomic<bool> playing{false},recording{false};
+    std::atomic<bool> playing{false},recording{false},pluginBypassed{false};
     juce::TimeSliceThread diskThread{"Vocal recording writer"};
     std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> writer;
     std::atomic<juce::AudioFormatWriter::ThreadedWriter*> activeWriter{nullptr};

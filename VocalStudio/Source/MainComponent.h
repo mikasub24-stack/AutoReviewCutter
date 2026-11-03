@@ -25,6 +25,7 @@ private:
     double originalStart=0,originalIn=0,originalOut=0;
     float mouseStart=0;
 };
+struct SongFitPlan {vocal::SongFit fit;std::vector<int> beats;std::vector<juce::String> beatTokens;int melody=-1,tonic=-1;bool minor=false;juce::String melodyToken;vocal::VoiceProfile profile;};
 class StudioMain final : public juce::Component,private juce::Timer,private juce::ScrollBar::Listener,public juce::FileDragAndDropTarget {
 public:
     StudioMain();
@@ -47,6 +48,17 @@ public:
     void prepareToClose(std::function<void()>);
     void loadDemo();
     void showVocalTools();
+    void learnVoiceFromSelected();
+    void recordVoiceSample();
+    void planSongFit(int beat,int melody,bool allBacking);
+    void applySongFitPlan();
+    void loadVoicePreference();
+    void setComfortableRange(double low,double high);
+    void finishCalibration(bool success);
+    void chooseAntaresPlugin(){choosePlugin();}
+    void openAntaresEditor(){showPlugin();}
+    std::shared_ptr<SongFitPlan> fitPlan;
+    juce::String fitStatus;
     void analyseSelected();
     void applyPitch(const vocal::PitchOptions&);
     void restorePitch();
@@ -81,7 +93,9 @@ private:
     std::deque<std::pair<juce::File,bool>> importQueue;
     std::atomic<bool> cancelExport{false};
     std::atomic<float> exportProgress{0};
-    bool busy=false,exporting=false,closing=false;
+    bool busy=false,exporting=false,closing=false,calibrating=false;
+    double calibrationDeadline=0;
+    std::vector<bool> calibrationMutes;
     int autosaveTicks=0;
     float shownInput=0,shownOutput=0;
     juce::String currentStatus;
