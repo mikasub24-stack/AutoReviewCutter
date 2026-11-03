@@ -152,7 +152,7 @@ juce::var StudioEngine::projectState() const {
     auto* profile=new juce::DynamicObject();profile->setProperty("valid",voiceProfile.valid);profile->setProperty("low",voiceProfile.lowMidi);profile->setProperty("high",voiceProfile.highMidi);profile->setProperty("median",voiceProfile.medianMidi);profile->setProperty("seconds",voiceProfile.voicedSeconds);state->setProperty("voiceProfile",juce::var(profile));
     state->setProperty("toneLink",toneLink.state());state->setProperty("songTonic",songTonic);state->setProperty("songMinor",songMinor);state->setProperty("songKeySource",songKeySource);state->setProperty("pluginBypassed",pluginBypassed.load());state->setProperty("keyHold",heldForUnknownKey);
     if(plugin){juce::PluginDescription description;plugin->fillInPluginDescription(description);auto* slot=new juce::DynamicObject();slot->setProperty("description",description.createXml()->toString());juce::MemoryBlock bytes;plugin->getStateInformation(bytes);slot->setProperty("state",bytes.toBase64Encoding());state->setProperty("plugin",juce::var(slot));}
-    if(activeWriter.load()) {state->setProperty("recoveringTake",recordFile.getFullPathName());state->setProperty("recoveringStart",recordStart);}
+    if(activeWriter.load()) {state->setProperty("recoveringTake",recordFile.getFullPathName());state->setProperty("recoveringStart",recordStart);state->setProperty("recoveringCalibration",calibrationInputOnly.load());}
     return juce::var(state);
 }
 juce::Result StudioEngine::saveProject(const juce::File& file){if(file.getParentDirectory().createDirectory().failed())return juce::Result::fail(juce::String::fromUTF8("Không tạo được thư mục dự án."));juce::TemporaryFile temp(file);if(!temp.getFile().replaceWithText(juce::JSON::toString(projectState(),true)))return juce::Result::fail(juce::String::fromUTF8("Không ghi được dự án tạm."));if(!temp.overwriteTargetFileWithTemporary())return juce::Result::fail(juce::String::fromUTF8("Không cập nhật được dự án. Dữ liệu cũ được giữ nguyên."));return juce::Result::ok();}
@@ -175,7 +175,7 @@ juce::Result StudioEngine::loadProject(const juce::File& file){
         if(pending==interrupted){recovery=recoverRecording(interrupted,recovered);if(recovery.failed())return recovery;}
         std::unique_ptr<StudioTrack> take;recovery=readTrack(recovered,true,take);if(recovery.failed())return recovery;
         const double start=static_cast<double>(state["recoveringStart"]);if(!std::isfinite(start)||std::abs(start)>86400)return juce::Result::fail(juce::String::fromUTF8("Vị trí bản thu khôi phục không hợp lệ."));
-        take->start=start;take->name=juce::String::fromUTF8("RECOVERED · ")+recovered.getFileNameWithoutExtension();loaded.push_back(std::move(take));
+        take->start=start;const bool calibration=static_cast<bool>(state["recoveringCalibration"]);take->mute=calibration;take->name=(calibration?juce::String::fromUTF8("[Mẫu đo giọng] "):juce::String::fromUTF8("RECOVERED · "))+recovered.getFileNameWithoutExtension();loaded.push_back(std::move(take));
     }
     std::unique_ptr<juce::AudioPluginInstance> next;std::pair<int,int> nextChannels{2,2};
     juce::MemoryBlock pluginState;

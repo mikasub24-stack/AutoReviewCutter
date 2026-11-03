@@ -23,7 +23,7 @@
 
 ### Đo quãng giọng của bạn
 
-Mở **Vang / Tone / Chỉnh phô → Theo giọng tôi**. Bấm **Thu mẫu giọng 20 giây** và hát ngân từ thấp đến cao trong vùng bạn thấy thoải mái. Ứng dụng lấy WAV micro gốc, tạm bỏ qua beat, vang và Antares trong đường kiểm âm; không sửa trạng thái mute của dự án. Bấm Dừng được kết thúc sớm. Mẫu phải có ít nhất 2 giây có giọng rõ và nhiều nốt cách nhau tối thiểu 4 bán âm; mẫu nhiễu/vỡ nhiều hoặc chỉ một nốt không đủ để đo quãng. Có thể chọn một track vocal của chính bạn và bấm **Dùng vocal tôi đã chọn**, hoặc tự đặt nốt thấp/cao rồi lưu. Hồ sơ chỉ lưu trên máy và trong dự án, không gửi lên mạng.
+Mở **Vang / Tone / Chỉnh phô → Theo giọng tôi**. Bấm **Thu mẫu giọng 20 giây** và hát ngân từ thấp đến cao trong vùng bạn thấy thoải mái. Ứng dụng lấy WAV micro gốc, tạm bỏ qua beat, vang và Antares trong đường kiểm âm; không sửa trạng thái mute của dự án. Bấm Dừng được kết thúc sớm. Track mẫu đo được đặt tên riêng và mute mặc định để không phát lẫn vào bản nhạc, kể cả khi khôi phục sau gián đoạn; WAV vẫn giữ để bạn nghe đối chiếu. Mẫu phải có ít nhất 2 giây có giọng rõ và nhiều nốt cách nhau tối thiểu 4 bán âm; mẫu nhiễu/vỡ nhiều hoặc chỉ một nốt không đủ để đo quãng. Có thể chọn một track vocal của chính bạn và bấm **Dùng vocal tôi đã chọn**, hoặc tự đặt nốt thấp/cao rồi lưu. Hồ sơ chỉ lưu trên máy và trong dự án, không gửi lên mạng.
 
 ### Nâng/hạ bài theo quãng giọng, không theo nốt bass
 
