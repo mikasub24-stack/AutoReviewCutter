@@ -13,8 +13,8 @@ jobs:
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
-      SOURCE_SHA: ecc62b3ed09972904e10be074186b71d27e307f0
-      SOURCE_RUN: '41605943975'
+      SOURCE_SHA: 4f69dc090c66af167001c8fc0b2319b28564e167
+      SOURCE_RUN: '41616664063'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,23 +36,23 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item release/build/vocal/Testing/Temporary/LastTest.log release/dist/VocalStudio-Verification.log
-          $files = @('release/dist/VocalStudio-1.0.0-Setup.exe','release/dist/VocalStudio-1.0.0-Windows.zip','release/dist/VocalStudio-1.0.0-Source.zip','release/dist/VocalStudio-preview.jpg','release/dist/VocalStudio-FX.jpg','release/dist/VocalStudio-Tone.jpg','release/dist/VocalStudio-Verification.log','release/dist/InstalledSelfTest.json','release/build/vocal/EngineSelfTest.json')
+          $files = @('release/dist/VocalStudio-1.1.0-Setup.exe','release/dist/VocalStudio-1.1.0-Windows.zip','release/dist/VocalStudio-1.1.0-Source.zip','release/dist/VocalStudio-preview.jpg','release/dist/VocalStudio-FX.jpg','release/dist/VocalStudio-Tone.jpg','release/dist/VocalStudio-VoiceFit.jpg','release/dist/VocalStudio-Antares.jpg','release/dist/VocalStudio-Verification.log','release/dist/InstalledSelfTest.json','release/build/vocal/EngineSelfTest.json')
           $sums = foreach ($file in $files) { $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant(); "$hash  $([IO.Path]::GetFileName($file))" }
           $sums | Set-Content release/dist/SHA256SUMS.txt -Encoding ascii
           $notes = @"
-          Bản thử nghiệm Vocal Studio 1.0.0 cho Windows x64, tập trung thu hát và mix vocal cá nhân với sound card rời + micro.
+          Vocal Studio 1.1.0 cho Windows x64 — thu và mix vocal cá nhân với sound card rời + micro.
 
-          Thu mono WAV 24-bit gốc; nhập beat; timeline kéo/cắt clip; gain/pan/mute/solo; VST3; lưu/mở/khôi phục phiên; xuất stereo WAV 24-bit. Hỗ trợ ASIO khi cài driver chính hãng.
+          MỚI: Theo giọng tôi. Thu mẫu giọng 20 giây, dùng vocal của chính bạn hoặc đặt vùng thoải mái bằng tay. So với vocal mẫu/humming theo tone gốc của bài, đề xuất đổi beat ±6 bán âm và chọn quãng tám hát. Đổi đồng thời các beat/stem chưa mute, giữ tempo và WAV gốc. Không lấy nốt bass của beat làm quãng hát, không nhận là đã khớp khi bài vượt vùng đo.
 
-          Menu Vang / Vocal FX có 16 núm: EQ, compressor, de-esser, làm dịu gắt, reverb mix/decay/pre-delay/damping/stereo width và echo mix/time/feedback. Giữ đuôi vang khi xuất.
+          MỚI: Antares Key/Scale. Tự nhận diện 12 nốt và Major/Natural Minor qua nhãn tham số VST3, hoặc học giá trị từ plugin bạn đang dùng. Gửi tone sau dò/chuyển beat và đọc lại xác nhận. Nếu tone bài mới chưa rõ hoặc gửi không được xác nhận, app giữ bypass thay vì dùng tone bài trước; xác nhận mới chỉ tự bật lại bypass do cơ chế giữ, không ghi đè bypass bạn tự chọn. Mapping lưu theo ID và định danh/phiên bản plugin; không đoán thứ tự núm, không gửi mapping thiếu/sai. Hỗ trợ cập nhật điều khiển công khai khi dừng transport dù plugin không cho automation liên tục, có đọc lại xác nhận. Không kèm Antares hoặc giấy phép. Khi plugin không công khai Key/Scale, host không thể cưỡng ép gửi.
 
-          Menu Tone / Chỉnh phô: dò cao độ vocal và gợi ý giọng trưởng/thứ từ vocal/beat; nâng/hạ ±12 semitone và ±50 cent giữ tempo/thời lượng; chỉnh phô giọng đơn theo thang âm đầu ra, tự dò ưu tiên beat; giữ formant, mức độ/tốc độ/vùng bỏ qua, xử lý clip nhẹ. Tạo WAV mới và có nút Về bản gốc, kể cả sau khi mở lại dự án.
+          GIẢM MÉO: giữ formant dựa trên cao độ đo được của clip; chặn chỉnh phô hai lần khi Antares đang hoạt động; host bypass để nghe đối chiếu và bỏ cả trễ plugin; hỗ trợ bus mono/stereo, không cộng đôi mức khi trộn về mono; đo giọng bằng micro gốc, bỏ qua beat/vang/Antares mà không sửa mute đã lưu; mẫu đo được giữ riêng và mute mặc định, kể cả khôi phục sau gián đoạn. Sửa clip nhẹ vẫn có giới hạn; vỡ nặng/overload analog không khôi phục hoàn toàn.
 
-          Đã kiểm thử native Windows: DSP, cao độ có họa âm, giọng trưởng/thứ, hợp âm đa âm, nâng/hạ tone, chỉnh phô, formant/stereo, số mẫu, phục hồi bản gốc sau save/load, clip nhẹ, echo dài, VST3 có độ trễ và ứng dụng sau khi cài. Có ảnh chụp giao diện thật và log kiểm chứng.
+          Giữ các chức năng 1.0: WAV 24-bit gốc, ASIO, timeline, EQ/compressor/de-esser/reverb/echo 16 núm, VST3, dò tone/chỉnh phô sau thu, chuyển ±12 bán âm và ±50 cent giữ tempo, phục hồi bản gốc và dự án, xuất WAV stereo có đủ đuôi vang.
 
-          Chỉnh phô và nâng/hạ chạy sau thu; FX/EQ/vang/VST3 kiểm âm được lúc hát. Dò tone có điểm phù hợp và lựa chọn tay, không bảo đảm đúng mọi bản nhạc hoặc bài chuyển giọng. Clip nhẹ không phục hồi được âm đã mất do vỡ nặng. Chưa thử trực tiếp sound card/micro của người dùng; đây là công cụ thu/mix vocal cá nhân, chưa thay toàn bộ Cubase.
+          Đã kiểm thử Windows: DSP/Pitch/VoiceFit/Engine, 12 Key và 2 scale có thứ tự xáo trộn qua VST3 fixture thật, guard mapping/double tune, bypass/PDC, lưu/khôi phục range và mapping, bộ cài. Có log, ảnh giao diện chạy thật, mã nguồn và checksum. Chưa thử bản Antares có giấy phép và sound card/micro của người dùng; không khẳng định mọi phiên bản Antares hỗ trợ cùng tham số.
 
-          Cài Setup.exe hoặc giải nén Windows.zip. Mở Sound card, chọn ASIO và ngõ micro; bắt đầu với 48 kHz / 256 samples. Xem README.md để dùng kiểm âm, chỉnh gain và lưu phiên.
+          Bắt đầu: cài Setup.exe hoặc giải nén Windows.zip → Sound card: chọn ASIO/input micro → Vang / Tone / Chỉnh phô → Theo giọng tôi → đo giọng/chọn vocal mẫu và beat → xem đề xuất → Antares Key/Scale: nạp/ghép plugin. Bật Kiểm âm FX và dùng tai nghe để hát qua Antares. Xem README trong gói để tránh kiểm âm kép, đặt gain và hiểu giới hạn dò tone.
 
           Mã nguồn đã build: $env:SOURCE_SHA
           Kiểm chứng: https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN
@@ -60,7 +60,7 @@ jobs:
           "@
           $notes | Set-Content release/notes.md -Encoding utf8
           $files += 'release/dist/SHA256SUMS.txt'
-          gh release create vocal-studio-v1.0.0 @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Vocal Studio 1.0.0 · Windows preview' --notes-file release/notes.md --prerelease --latest=false
+          gh release create vocal-studio-v1.1.0 @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Vocal Studio 1.1.0 · Windows preview' --notes-file release/notes.md --prerelease --latest=false
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
       - name: Export publication source graph for workspace
         shell: pwsh
