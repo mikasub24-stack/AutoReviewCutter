@@ -120,7 +120,7 @@ private:
     juce::File sessionDirectory,recordFile;
     double recordStart=0;
     float currentMaster=1,smoothing=.001f;
-    bool callbackAttached=false,offline=false,testMode=false;
+    bool callbackAttached=false,offline=false,testMode=false,heldForUnknownKey=false;
     std::atomic<bool> suspending{false};
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StudioEngine)
 };
