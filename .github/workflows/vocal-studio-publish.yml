@@ -13,8 +13,8 @@ jobs:
     timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
-      SOURCE_SHA: 767723801d4b564da4f693e6feb5271b8cddb65b
-      SOURCE_RUN: '41746266475'
+      SOURCE_SHA: 509546fe0620cb5bf61dada049a5ead5b9d80e2a
+      SOURCE_RUN: '41879875919'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,21 +41,23 @@ jobs:
         run: |
           Copy-Item release/build/vocal/Testing/Temporary/LastTest.log release/dist/VocalStudio-Verification.log
           Copy-Item release/BrowserSelfTest.json release/dist/BrowserSelfTest.json
-          $files = @('release/dist/VocalStudio-1.4.1-Setup.exe','release/dist/VocalStudio-1.4.1-Windows.zip','release/dist/VocalStudio-1.4.1-Source.zip','release/dist/VocalStudio-preview.jpg','release/dist/VocalStudio-Polish.jpg','release/dist/VocalStudio-AutoEQ.jpg','release/dist/VocalStudio-Studio.jpg','release/dist/BrowserSelfTest.json','release/dist/InstalledBrowserSelfTest.json','release/dist/VocalStudio-FX.jpg','release/dist/VocalStudio-Tone.jpg','release/dist/VocalStudio-VoiceFit.jpg','release/dist/VocalStudio-Antares.jpg','release/dist/VocalStudio-Verification.log','release/dist/InstalledSelfTest.json','release/build/vocal/EngineSelfTest.json')
+          $files = @('release/dist/VocalStudio-1.5.0-Setup.exe','release/dist/VocalStudio-1.5.0-Windows.zip','release/dist/VocalStudio-1.5.0-Source.zip','release/dist/VocalStudio-preview.jpg','release/dist/VocalStudio-Polish.jpg','release/dist/VocalStudio-FixAutoTune.jpg','release/dist/VocalStudio-AutoEQ.jpg','release/dist/VocalStudio-Studio.jpg','release/dist/BrowserSelfTest.json','release/dist/InstalledBrowserSelfTest.json','release/dist/VocalStudio-FX.jpg','release/dist/VocalStudio-Tone.jpg','release/dist/VocalStudio-VoiceFit.jpg','release/dist/VocalStudio-Antares.jpg','release/dist/VocalStudio-Verification.log','release/dist/InstalledSelfTest.json','release/build/vocal/EngineSelfTest.json')
           $sums = foreach ($file in $files) { $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant(); "$hash  $([IO.Path]::GetFileName($file))" }
           $sums | Set-Content release/dist/SHA256SUMS.txt -Encoding ascii
           $notes = @"
-          Vocal Studio 1.4.1 Windows x64 — sửa tầng khuếch tán reverb trên bản 1.4.
+          Vocal Studio 1.5.0 Windows x64 — nút Fix méo Auto-Tune và bảng báo cáo/hoàn tác.
 
-          Sửa công thức hồi tiếp của hai tầng all-pass: chỉ khuếch tán pha/đuôi vang, không tăng mức theo tần số ngoài ý muốn. Bản trước dùng mẫu trễ thay cho đầu ra all-pass trong nhánh hồi tiếp. Mức/màu reverb có thể khác sau sửa; nghe lại và chỉnh lượng Reverb theo ý. Không thêm latency, giữ đường EQ/dynamics → Antares → ambience, chỉ trên vocal.
+          Màn hình hát có Fix méo Auto-Tune → Áp dụng · Kéo nhẹ hơn. Dừng phát/thu/nghe bản thu; nạp VST3, ghép và chọn/dò đúng tone bài trước. Tool xác nhận Key/Scale hiện tại (đã theo số bán âm của nhạc ở chế độ YouTube), rồi đặt Retune tối thiểu 35 ms, Humanize tối thiểu 50%, Flex-Tune tối thiểu 20%, bật Formant nếu plugin công khai các điều khiển/đơn vị/nhãn rõ. Giữ mức retune/humanize/flex đã nhẹ hơn; không đổi Input Type/quãng giọng, Transpose hay Formant Shift. Không tự bật plugin đang bypass.
 
-          Kiểm thử mới: đáp ứng xung bảo toàn năng lượng; biên độ ổn định 73/220/1000/3500/8000 Hz tại 44,1/48/96 kHz; reset sạch đuôi. Test mới thất bại với công thức cũ, đạt với công thức sửa. Chạy lại 7 bộ CTest, native/Chromium audio và bản cài đặt; kèm ảnh chạy thật, log/JSON, mã nguồn và checksum.
+          Nếu không xác minh được Retune theo ms thì không chỉnh nhóm tham số kéo giọng. Tùy chọn không hỗ trợ giữ nguyên và báo rõ. Đọc lại giá trị sau khi chỉnh, trả nhóm tham số về trước nếu plugin không xác nhận. Có Hoàn tác trong phiên hiện tại, không ghi đè nếu người dùng đã chỉnh tiếp trong plugin; thay/nạp lại plugin/dự án bỏ lịch sử hoàn tác. Thiết lập đã áp dụng được lưu trong project qua trạng thái VST3. File thu không đổi. Đây là preset khởi đầu giảm kiểu kéo gắt, không đảm bảo hết mọi méo và không cứu clipping.
 
-          Giữ tính năng 1.4: cân câu hát nhỏ/to, dịu gắt động, vang né giọng, preset Studio giữ EQ riêng/Antares, xuất riêng WAV vocal PCM stereo 24-bit có FX và đuôi vang từ micro gốc. Giữ AutoEQ A/B, YouTube trong app, đổi từng nửa cung giữ tempo và gửi Key/Scale tới VST3 đã ghép. Xuất vocal không kèm YouTube/beat; dùng thiết lập plugin hiện tại, chưa tái tạo lịch sử automation/đổi key khi thu. Bản thu khô và nguồn/lịch sử được giữ nguyên.
+          Kèm ảnh giao diện chạy thật VocalStudio-preview.jpg và VocalStudio-FixAutoTune.jpg, Source ZIP riêng chứa VocalStudio/CMakeLists.txt + source + docs để mở/build độc lập với game trong cùng repo/nhánh vocal-studio. App Windows chạy riêng, không cần mở mã nguồn hoặc dự án Chùa Việt.
 
-          UPod Pro: Windows Audio/WASAPI 48 kHz, tai nghe qua card, Mic with DSP OFF và Mixing OFF; tắt Direct Out/Direct Out+DSP khi nghe FX phần mềm. Giảm gain vật lý nếu clip. Antares và giấy phép không kèm; plugin phải công khai/xác nhận Key/Scale phù hợp.
+          Kiểm thử: 7 bộ CTest, thêm actual VST3 fixture kiểm tra retune theo ms với thang phi tuyến, humanize/flex/formant, giữ tone sau đổi, giữ thiết lập nhẹ hơn, undo/manual-edit/bypass/transport guard và từ chối plugin không hỗ trợ; giữ toàn bộ kiểm thử DSP/reverb, pitch, raw recording, project, vocal-only export, Chromium audio và installer. Antares thương mại không kèm; chưa kiểm thử đúng phiên bản có giấy phép trên máy người dùng/UPod Pro thật, không cam kết chất lượng tương đương clip TikTok.
 
-          Đây là bản sửa thuật toán để người dùng nghe thử và phản hồi. Chưa kiểm chứng bằng giọng thật/UPod Pro/Antares có giấy phép của người dùng; kiểm thử phần mềm không chứng minh chất lượng tương đương clip TikTok hay đạt chuẩn phát hành. Không thể phục hồi hoàn toàn âm đã vỡ tại đầu vào.
+          Giữ YouTube trong app, ±½ cung mỗi lần giữ tempo, AutoEQ A/B, preset Studio, vang né giọng và WAV vocal có FX. Chỉ một tuner realtime trên vocal; không thể tự gỡ Auto-Tune đã in sẵn vào file, dùng micro/WAV gốc. Dò tone có thể nhầm Major/Minor hoặc bài chuyển giọng; kiểm tra/chọn tay khi cần. Xuất dùng trạng thái plugin/key hiện tại, không tái tạo lịch sử automation chưa ghi.
+
+          UPod Pro: Windows Audio/WASAPI 48 kHz, Mic with DSP OFF, Mixing OFF; tai nghe qua card, tắt Direct Out/Direct Out+DSP khi nghe FX phần mềm. Giảm gain vật lý nếu mic clip.
 
           Source đã build: $env:SOURCE_SHA
           Actions: https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN
@@ -63,7 +65,7 @@ jobs:
           "@
           $notes | Set-Content release/notes.md -Encoding utf8
           $files += 'release/dist/SHA256SUMS.txt'
-          gh release create vocal-studio-v1.4.1 @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Vocal Studio 1.4.1 · Sửa khuếch tán reverb' --notes-file release/notes.md --prerelease --latest=false
+          gh release create vocal-studio-v1.5.0 @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Vocal Studio 1.5.0 · Fix méo Auto-Tune' --notes-file release/notes.md --prerelease --latest=false
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
       - name: Export publication source graph for workspace
         shell: pwsh
