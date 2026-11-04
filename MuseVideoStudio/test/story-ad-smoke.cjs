@@ -67,10 +67,10 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.match(await page.locator('#storyCharLabel').textContent(), /Người mẫu/);
     assert.match(await page.locator('#storyRefPaste').textContent(), /ảnh sản phẩm/);
     assert.match(await page.locator('#storyRefInfo').textContent(), /Chưa chọn ảnh sản phẩm/);
-    assert.match(await page.locator('#storyInfo').textContent(), /Tạo quảng cáo từ ảnh/);
+    assert.match(await page.locator('#storyInfo').textContent(), /các cảnh quay hiện ngay bên dưới/);
     // Ảnh sản phẩm lên đầu, rồi khung quảng cáo (có ô Tỉ lệ), rồi mới tới ô lời quảng cáo.
     const top = async sel => (await page.locator(sel).boundingBox()).y;
-    assert.ok(await top('#storyRefs') < await top('#adQuick') && await top('#adQuick') < await top('#storyScript'), 'thứ tự: ảnh → tạo quảng cáo → lời');
+    assert.ok(await top('#storyRefs') < await top('#adTemplate') && await top('#adTemplate') < await top('#adQuick') && await top('#adQuick') < await top('#storyScenes'), 'thứ tự: ảnh → mẫu → nút → các cảnh');
     assert.equal(await page.locator('#adBox #storyAspect').count(), 1, 'ô Tỉ lệ nằm trong khung quảng cáo');
     assert.equal(await page.locator('.adMore').evaluate(e => e.open), false, 'thông tin thêm để Muse viết lời được thu gọn');
     assert.equal(await page.locator('#adTone option').count(), 5);
@@ -78,9 +78,32 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.locator('#adLength').inputValue(), '30');
     assert.equal(await page.locator('#adCamera .chip').count(), 9);
     assert.equal(await page.locator('#adLook .chip').count(), 6);
+    // Mặc định: mẫu đầu tiên đã chọn và điền sẵn các ô; máy quay/phong cách/lời đọc cất trong «Tùy chỉnh thêm».
+    const pressed = box => page.locator(`#${box} .chip[aria-pressed=true]`).allTextContents();
+    assert.deepEqual(await pressed('adTemplate'), ['Giới thiệu sản phẩm']);
+    assert.equal(await page.locator('#adTone').inputValue(), 'expert');
+    assert.equal(await page.locator('#adCamera .chip[aria-pressed=true]').count(), 2);
+    assert.deepEqual(await pressed('adLook'), ['Quảng cáo TVC']);
+    for (const sel of ['#adCamera', '#adLook', '#adProduct', '#adWrite', '#storyScript', '#storyOptionsRow', '#storyAnalyze', '#storySplit', '#storyMuse']) assert.equal(await page.locator(sel).isHidden(), true, sel + ' phải được cất khi chưa mở «Tùy chỉnh thêm»');
+    for (const sel of ['#adTemplate', '#adLength', '#storyAspect', '#adQuick', '#storyInfo', '#storyScenes']) assert.equal(await page.locator(sel).evaluate(e => e.getClientRects().length > 0 || e.id === 'storyScenes'), true, sel);
+    // Chế độ kể chuyện không bị ảnh hưởng: ô câu chuyện luôn hiện.
+    await page.locator('#modeStory').click();
+    assert.equal(await page.locator('#storyScript').isVisible(), true); assert.equal(await page.locator('#storyAnalyze').isVisible(), true);
+    await page.locator('#modeAd').click();
+    assert.equal(await page.locator('#storyScript').isHidden(), true);
+    // Mở «Tùy chỉnh thêm» thì hiện ra; để mở cho các bước sau.
+    await page.evaluate(() => { document.querySelector('.adMore').open = true; });
+    await page.locator('#storyScript').waitFor({ state: 'visible' });
+    for (const sel of ['#adCamera', '#adProduct', '#storyAnalyze', '#storySplit', '#storyOptionsRow']) assert.equal(await page.locator(sel).isVisible(), true, sel);
+    await page.evaluate(() => { document.querySelector('.adMore').open = false; });
+    await page.locator('#storyScript').waitFor({ state: 'hidden' });
+    await page.evaluate(() => { document.querySelector('.adMore').open = true; });
+    await page.locator('#storyScript').waitFor({ state: 'visible' });
 
     // 3. Chọn máy quay (tối đa 3) và phong cách.
     const chip = (box, text) => page.locator(`#${box} .chip:has-text("${text}")`);
+    for (const t of await pressed('adCamera')) await chip('adCamera', t).click();
+    assert.equal(await page.locator('#adCamera .chip[aria-pressed=true]').count(), 0, 'bỏ hết máy quay của mẫu');
     for (const t of ['Cận cảnh chi tiết', 'Xoay quanh', 'Từ trên cao']) await chip('adCamera', t).click();
     assert.equal(await page.locator('#adCamera .chip[aria-pressed=true]').count(), 3);
     await chip('adCamera', 'Lia ngang').click();
@@ -95,9 +118,9 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await chip('adLook', 'Điện ảnh').click();
     assert.equal(await page.locator('#adLook .chip[aria-pressed=true]').count(), 0, 'bấm lại thì bỏ chọn');
     await chip('adLook', 'Review đời thường').click();
+    assert.equal(await page.locator('#storyScenes .draftRow').count(), 0, 'chưa có ảnh thì chưa tự tạo cảnh');
 
     // 4. Thiếu tên sản phẩm → báo, không gọi Muse.
-    await page.evaluate(() => { document.querySelector('.adMore').open = true; });
     await page.locator('#adWrite').click();
     assert.match(await page.locator('#toast').textContent(), /Nhập tên sản phẩm trước/);
     assert.equal((await called('storyAdWrite')).length, 0);
@@ -112,6 +135,10 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await page.locator('#adLength').selectOption('45');
     await page.locator('#storyRefs').click();
     assert.match(await page.locator('#storyRefInfo').textContent(), /Ảnh sản phẩm: aqua\.png — gắn vào mọi cảnh/);
+    // Ảnh vào là ra cảnh luôn (45 giây = 5 cảnh × 9 giây), không cần bấm gì.
+    await page.waitForFunction(() => document.querySelectorAll('#storyScenes .draftRow').length === 5);
+    assert.equal(await page.locator('#adQuick').textContent(), 'Tạo lại cảnh');
+    assert.equal((await called('storyAnalyze')).length, 0, 'tự tạo cảnh không gọi Muse');
     await page.locator('#adWrite').click();
     await page.waitForFunction(() => document.getElementById('adWrite').disabled);
     assert.equal(await page.locator('#adWrite').textContent(), 'Muse đang viết…');
@@ -126,7 +153,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.match(await page.locator('#storyInfo').textContent(), /Muse đã viết lời quảng cáo\. Đọc và sửa/);
     const write = (await called('storyAdWrite')).at(-1).data;
     assert.equal(write.reference, true); assert.equal(write.seconds, 10); assert.equal(write.aspect, '16:9');
-    assert.deepEqual(write.ad, { product: 'Bình giữ nhiệt Aqua 500ml', points: 'Giữ nóng 12 giờ\nNắp chống tràn', audience: 'Dân văn phòng', offer: '', cta: 'Bấm vào giỏ hàng để xem chi tiết', tone: 'warm', length: 45, camera: ['macro', 'orbit'], look: 'ugc', template: '' });
+    assert.deepEqual(write.ad, { product: 'Bình giữ nhiệt Aqua 500ml', points: 'Giữ nóng 12 giờ\nNắp chống tràn', audience: 'Dân văn phòng', offer: '', cta: 'Bấm vào giỏ hàng để xem chi tiết', tone: 'warm', length: 45, camera: ['macro', 'orbit'], look: 'ugc', template: 'intro' });
     assert.equal(dialogs.length, 0, 'ô trống thì không hỏi xác nhận');
 
     // 6. Viết lại khi ô đã có chữ → hỏi xác nhận, thay lời, xóa cảnh cũ.
@@ -179,7 +206,6 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
 
     // 9b. Mẫu quảng cáo dựng sẵn + «Tạo quảng cáo từ ảnh»: chỉ cần ảnh sản phẩm, không cần lời.
     await page.evaluate(() => { document.getElementById('storyPanel').open = true; });
-    const pressed = box => page.locator(`#${box} .chip[aria-pressed=true]`).allTextContents();
     assert.equal(await page.locator('#adTemplate .chip').count(), 6);
     await page.locator('#adTemplate .chip:has-text("Review sản phẩm")').click();
     assert.equal(await page.locator('#adTone').inputValue(), 'warm'); assert.equal(await page.locator('#adLength').inputValue(), '30');
@@ -189,8 +215,8 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.deepEqual(await pressed('adCamera'), ['Tiến sát', 'Quay chậm']); assert.deepEqual(await pressed('adLook'), ['Tươi sáng, trẻ trung']);
     assert.deepEqual(await pressed('adTemplate'), ['Khuyến mãi nhanh'], 'chỉ một mẫu được chọn');
     await page.locator('#adTemplate .chip:has-text("Khuyến mãi nhanh")').click();
-    assert.deepEqual(await pressed('adTemplate'), [], 'bấm lại thì bỏ mẫu');
-    assert.equal(await page.locator('#adLength').inputValue(), '15', 'bỏ mẫu không đổi các ô đã điền');
+    assert.deepEqual(await pressed('adTemplate'), ['Khuyến mãi nhanh'], 'luôn có một mẫu: bấm lại vẫn giữ');
+    assert.equal(await page.locator('#adLength').inputValue(), '15');
     await page.locator('#adTemplate .chip:has-text("Cao cấp, tinh tế")').click();
     assert.deepEqual(await pressed('adCamera'), ['Lùi xa', 'Xoay quanh', 'Quay chậm']);
     // Chưa có ảnh → nhắc, không tạo gì.
@@ -199,8 +225,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.match(await page.locator('#toast').textContent(), /Chọn ảnh sản phẩm trước/);
     assert.equal(await page.locator('#storyScenes .draftRow').count(), 0);
     await page.locator('#storyRefs').click();
-    // 30 giây = 5 cảnh × 6 giây; không có lời đọc, không bị nhắc «prompt mẫu»; số giây cố định.
-    await page.locator('#adQuick').click();
+    // Chọn ảnh là cảnh tự ra: 30 giây = 5 cảnh × 6 giây; không có lời đọc, không bị nhắc «prompt mẫu»; số giây cố định.
     await page.waitForFunction(() => document.querySelectorAll('#storyScenes .draftRow').length === 5);
     assert.deepEqual(await page.locator('#storyScenes .draftRow strong').allTextContents(), ['Cảnh 1 · 6 giây', 'Cảnh 2 · 6 giây', 'Cảnh 3 · 6 giây', 'Cảnh 4 · 6 giây', 'Cảnh 5 · 6 giây']);
     assert.match(await page.locator('#storyInfo').textContent(), /Đã tạo 5 cảnh quảng cáo từ ảnh sản phẩm \(mẫu «Cao cấp, tinh tế»\)\. Không có lời đọc nên video giữ tiếng động của clip/);
@@ -214,7 +239,6 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.doesNotMatch(await page.locator('#storyCheck').textContent(), /prompt mẫu|Chưa khớp/);
     // 15 giây = 3 cảnh × 5 giây.
     await page.locator('#adLength').selectOption('15');
-    await page.locator('#adQuick').click();
     await page.waitForFunction(() => document.querySelectorAll('#storyScenes .draftRow').length === 3);
     assert.deepEqual(await page.locator('#storyScenes .draftRow strong').allTextContents(), ['Cảnh 1 · 5 giây', 'Cảnh 2 · 5 giây', 'Cảnh 3 · 5 giây']);
     // Thêm lời đọc vào một cảnh → số giây của cảnh đó tính theo lời.
@@ -222,6 +246,39 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.locator('#storyScenes .draftRow strong').nth(0).textContent(), 'Cảnh 1 · 3 giây');
     await page.locator('#storyScenes .draftRow').nth(0).locator('textarea').nth(0).fill('');
     assert.equal(await page.locator('#storyScenes .draftRow strong').nth(0).textContent(), 'Cảnh 1 · 5 giây', 'xóa lời thì về số giây của mẫu');
+    // Đã sửa tay một cảnh → đổi tùy chọn KHÔNG tự ghi đè; chỉ báo, bấm «Tạo lại cảnh» mới thay (có hỏi).
+    await page.locator('#storyScenes .draftRow').nth(0).locator('textarea').nth(1).fill('Cảnh do tôi sửa tay');
+    await page.locator('#adLength').selectOption('30');
+    await page.waitForFunction(() => /Đã đổi tùy chọn\. Bấm «Tạo lại cảnh»/.test(document.getElementById('storyInfo').textContent));
+    await page.waitForTimeout(400);
+    assert.equal(await page.locator('#storyScenes .draftRow').count(), 3);
+    assert.equal(await page.locator('#storyScenes .draftRow').nth(0).locator('textarea').nth(1).inputValue(), 'Cảnh do tôi sửa tay');
+    dialogs.length = 0;
+    await page.locator('#adQuick').click();
+    await page.waitForFunction(() => document.querySelectorAll('#storyScenes .draftRow').length === 5);
+    assert.equal(dialogs.length, 1); assert.match(dialogs[0], /Tạo lại sẽ thay các cảnh đang có, kể cả phần bạn đã sửa/);
+    assert.doesNotMatch(await page.locator('#storyScenes .draftRow').nth(0).locator('textarea').nth(1).inputValue(), /do tôi sửa tay/);
+    // Chưa sửa gì thì nút «Tạo lại cảnh» không hỏi; đổi lại 15 giây → 3 cảnh tự cập nhật.
+    dialogs.length = 0;
+    await page.locator('#adQuick').click();
+    assert.equal(dialogs.length, 0);
+    await page.locator('#adLength').selectOption('15');
+    await page.waitForFunction(() => document.querySelectorAll('#storyScenes .draftRow').length === 3);
+    // Bỏ ảnh → các cảnh tự tạo (chưa sửa) biến mất; chọn lại ảnh → hiện lại.
+    await page.locator('#storyRefsClear').click();
+    await page.waitForFunction(() => document.querySelectorAll('#storyScenes .draftRow').length === 0);
+    assert.equal(await page.locator('#adQuick').textContent(), 'Tạo quảng cáo từ ảnh');
+    await page.locator('#storyRefs').click();
+    await page.waitForFunction(() => document.querySelectorAll('#storyScenes .draftRow').length === 3);
+    // Đổi mẫu cũng tự tạo lại ngay (chưa sửa): Cao cấp, 15 giây vẫn 3 cảnh nhưng prompt đổi theo mẫu.
+    const before = await page.locator('#storyScenes .draftRow').nth(0).locator('textarea').nth(1).inputValue();
+    await page.locator('#adTemplate .chip:has-text("Mở hộp, nhìn kỹ")').click();
+    await page.waitForFunction(() => document.getElementById('adLength').value === '30' && document.querySelectorAll('#storyScenes .draftRow').length === 5);
+    assert.match(await page.locator('#storyInfo').textContent(), /mẫu «Mở hộp, nhìn kỹ»/);
+    await page.locator('#adTemplate .chip:has-text("Cao cấp, tinh tế")').click();
+    await page.locator('#adLength').selectOption('15');
+    await page.waitForFunction(() => document.querySelectorAll('#storyScenes .draftRow').length === 3);
+    assert.equal(await page.locator('#storyScenes .draftRow').nth(0).locator('textarea').nth(1).inputValue(), before, 'cùng mẫu + cùng tùy chọn → cùng prompt');
     // Thêm vào hàng đợi: không lời, đúng số giây, ảnh sản phẩm gắn vào mọi cảnh.
     await page.evaluate(() => { window.s.active = false; window.s.paused = true; window.push(); });
     const startsBefore = (await called('start')).length;
@@ -249,6 +306,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.locator('#adPoints').inputValue(), 'Giữ nóng 12 giờ\nNắp chống tràn');
     assert.equal(await page.locator('#adTone').inputValue(), 'premium');
     assert.equal(await page.locator('#adLength').inputValue(), '15', 'độ dài chọn gần nhất được nhớ');
+    assert.equal(await page.locator('#storyScript').isHidden(), true, 'mở lại app thì «Tùy chỉnh thêm» đóng, ô lời được cất');
     assert.deepEqual(await page.locator('#adTemplate .chip[aria-pressed=true]').allTextContents(), ['Cao cấp, tinh tế']);
     assert.deepEqual(await page.locator('#adCamera .chip[aria-pressed=true]').allTextContents(), ['Lùi xa', 'Xoay quanh', 'Quay chậm']);
     assert.deepEqual(await page.locator('#adLook .chip[aria-pressed=true]').allTextContents(), ['Sang trọng']);
@@ -267,12 +325,12 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.deepEqual(await page.locator('#adCamera .chip').allTextContents(), ['Macro close-up', 'Dolly in', 'Pull back', 'Orbit', 'Pan', 'Top-down', 'Slow motion', 'Handheld', 'Static']);
     assert.deepEqual(await page.locator('#adTemplate .chip').allTextContents(), ['Product intro', 'Product review', 'Problem → solution', 'Quick promo', 'Unboxing', 'Premium']);
     assert.equal(await page.locator('#adQuick').textContent(), 'Create ad from photo');
-    assert.match(await page.locator('.adMore summary').textContent(), /Add details so Muse writes a narration \(optional\)/);
+    assert.match(await page.locator('.adMore summary').textContent(), /More options: product name, camera, look, narration \(optional\)/);
     assert.deepEqual(await page.locator('#adLook .chip').allTextContents(), ['TV commercial', 'Cinematic', 'Everyday review (UGC)', 'Minimal, plain background', 'Bright and young', 'Luxury']);
     assert.equal(await page.locator('#adTone option').first().textContent(), 'Enthusiastic, persuasive');
     assert.match(await page.locator('#storyRefInfo').textContent(), /No product image chosen/);
     assert.equal(await page.locator('#adProduct').getAttribute('placeholder'), 'e.g. Aqua 500 ml thermos bottle');
-    assert.match(await page.locator('#storyScript').getAttribute('placeholder'), /^Optional\. For a voice and subtitles, click “Muse writes the ad script”/);
+    assert.match(await page.locator('#storyScript').getAttribute('placeholder'), /^Optional\. For a voice and subtitles, open “More options” and click “Muse writes the ad script”/);
     // Đang viết (kể cả khi giao diện vừa tải lại): nút và tiến độ đúng, có dịch tiếng Anh.
     await page.evaluate(() => { window.s.story.analyze = { busy: true, kind: 'write', progress: 'Viết lời quảng cáo · Muse đang viết…', part: 0, parts: 1, error: '' }; window.push(); });
     await page.waitForFunction(() => document.getElementById('adWrite').disabled);
@@ -288,6 +346,6 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.locator('#storyHead').textContent(), '1. Story');
     assert.equal(await page.locator('#storyRefs').textContent(), 'Choose character image');
     assert.deepEqual(errors, []);
-    console.log('PASS: product-ad mode — photo-first layout, 6 ready-made templates (fill tone/length/camera/look), photo-only «Tạo quảng cáo từ ảnh» (3–6 fixed-length shots, no narration, queued with the product image), mode switch and texts, camera/look chips (max 3 cameras), product fields persisted, Muse ad-script request data + busy state + errors, overwrite confirm, quick-split ad prompt, ad data only in ad mode, product image on every scene, English labels. Mock IPC; Muse replies are canned by the test, not the real Muse.');
+    console.log('PASS: product-ad mode — photo-first layout, 6 ready-made templates (fill tone/length/camera/look), photo in → shots appear at once and follow template/length/camera/look changes unless edited by hand («Tạo lại cảnh» asks first); extra options folded away; (3–6 fixed-length shots, no narration, queued with the product image), mode switch and texts, camera/look chips (max 3 cameras), product fields persisted, Muse ad-script request data + busy state + errors, overwrite confirm, quick-split ad prompt, ad data only in ad mode, product image on every scene, English labels. Mock IPC; Muse replies are canned by the test, not the real Muse.');
   } finally { await browser.close(); server.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

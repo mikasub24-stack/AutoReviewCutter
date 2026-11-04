@@ -307,3 +307,8 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .adMore { margin-top: 14px; padding: 10px 12px; border: 1px solid #2e3b52; border-radius: 8px; background: #101a28; }
 .adMore > summary { cursor: pointer; font-size: 12px; color: #cbd7e9; }
 .adMore .hint { margin: 8px 0; }
+.adMore .adWide { margin: 10px 0 4px; }
+.adWide input { margin: 7px 0 0; }
+.adMore .adVoice { margin: 14px 0 8px; padding-top: 12px; border-top: 1px solid #2e3b52; }
+/* Chế độ quảng cáo: phần kịch bản/nhân vật chỉ hiện khi mở «Tùy chỉnh thêm» */
+#storyCompose.adMode:not(.adOpen) .scriptPart { display: none; }

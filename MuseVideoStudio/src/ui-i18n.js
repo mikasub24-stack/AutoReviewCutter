@@ -19,17 +19,20 @@ Phân tích bằng Muse|Analyze with Muse
 Dán thủ công (dự phòng)|Paste manually (backup)
 Dừng phân tích|Stop analysis
 Quảng cáo sản phẩm|Product ad
-Thả ảnh sản phẩm ở trên, chọn mẫu rồi bấm «Tạo quảng cáo từ ảnh»: mỗi mẫu có sẵn các cảnh quay, không cần viết gì. Muốn có lời đọc thì mở phần thông tin bên dưới để Muse viết lời quảng cáo.|Drop the product photo above, pick a template and click “Create ad from photo”: every template comes with ready-made shots, nothing to write. For a narration, open the details below and let Muse write the ad script.
+Thả ảnh sản phẩm ở trên rồi chọn mẫu: các cảnh quay hiện ngay bên dưới, không cần viết gì.|Drop the product photo above and pick a template: the shots appear right below, nothing to write.
 Tên sản phẩm (không bắt buộc)|Product name (optional)
 Tạo quảng cáo từ ảnh|Create ad from photo
-Thêm thông tin để Muse viết lời đọc (không bắt buộc)|Add details so Muse writes a narration (optional)
-Muse chỉ dùng thông tin bạn nhập, không tự bịa tính năng hay giá. Lời viết xong hiện ở ô lời quảng cáo bên dưới để bạn sửa, rồi bấm «Phân tích bằng Muse» để chia cảnh có giọng đọc và phụ đề.|Muse only uses what you enter and does not invent features or prices. The finished script appears in the ad script box below for you to edit; then click “Analyze with Muse” to split scenes with a voice and subtitles.
+Tùy chỉnh thêm: tên sản phẩm, máy quay, phong cách, lời đọc (không bắt buộc)|More options: product name, camera, look, narration (optional)
+Tạo lại cảnh|Regenerate shots
+Tạo lại sẽ thay các cảnh đang có, kể cả phần bạn đã sửa. Tiếp tục?|Regenerating replaces the current scenes, including your edits. Continue?
+Đã đổi tùy chọn. Bấm «Tạo lại cảnh» để áp dụng (sẽ thay các cảnh đang có).|Options changed. Click “Regenerate shots” to apply them (this replaces the current scenes).
+Muốn có lời đọc và phụ đề? Điền thông tin dưới đây để Muse viết lời quảng cáo. Muse chỉ dùng thông tin bạn nhập, không tự bịa tính năng hay giá. Lời viết xong hiện ở ô lời quảng cáo bên dưới để bạn sửa, rồi bấm «Phân tích bằng Muse» để chia cảnh có giọng đọc và phụ đề.|Want a voice and subtitles? Fill in the details below so Muse writes the ad script. Muse only uses what you enter and does not invent features or prices. The finished script appears in the ad script box below for you to edit; then click “Analyze with Muse” to split scenes with a voice and subtitles.
 1. Lời quảng cáo (không bắt buộc)|1. Ad script (optional)
-Không bắt buộc. Muốn có giọng đọc và phụ đề thì bấm «Muse viết lời quảng cáo» ở phần thông tin phía trên, hoặc tự dán lời quảng cáo vào đây. Giọng đọc sẽ đọc đúng nguyên văn lời này.|Optional. For a voice and subtitles, click “Muse writes the ad script” in the details above, or paste your own script here. The voice reads this text exactly as written.
-Thả ảnh sản phẩm, chọn mẫu rồi bấm «Tạo quảng cáo từ ảnh». Muốn có lời đọc thì viết lời quảng cáo rồi bấm «Phân tích bằng Muse».|Drop the product photo, pick a template and click “Create ad from photo”. For a narration, write the ad script and click “Analyze with Muse”.
+Không bắt buộc. Muốn có giọng đọc và phụ đề thì mở «Tùy chỉnh thêm» rồi bấm «Muse viết lời quảng cáo», hoặc tự dán lời quảng cáo vào đây. Giọng đọc sẽ đọc đúng nguyên văn lời này.|Optional. For a voice and subtitles, open “More options” and click “Muse writes the ad script”, or paste your own script here. The voice reads this text exactly as written.
+Thả ảnh sản phẩm, chọn mẫu: các cảnh quay hiện ngay bên dưới. Muốn có lời đọc thì mở «Tùy chỉnh thêm», viết lời quảng cáo rồi bấm «Phân tích bằng Muse».|Drop the product photo and pick a template: the shots appear right below. For a narration, open “More options”, write the ad script and click “Analyze with Muse”.
 Chọn ảnh sản phẩm trước.|Choose a product image first.
 Chưa có lời quảng cáo. Bấm «Muse viết lời quảng cáo» hoặc dán lời vào ô.|There is no ad script yet. Click “Muse writes the ad script” or paste one into the box.
-Mẫu quảng cáo (chọn một mẫu để điền sẵn giọng điệu, độ dài, máy quay và phong cách)|Ad template (pick one to pre-fill tone, length, camera and look)
+Mẫu quảng cáo|Ad template
 Giới thiệu sản phẩm|Product intro
 Review sản phẩm|Product review
 Vấn đề → giải pháp|Problem → solution

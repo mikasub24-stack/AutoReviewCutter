@@ -34,7 +34,13 @@
   let mode = saved.mode === 'ad' ? 'ad' : 'story';
   let adCamera = (Array.isArray(saved.adCamera) ? saved.adCamera : []).filter(id => AD.AD_CAMERA.some(c => c.id === id)).slice(0, AD.AD_MAX_CAMERA);
   let adLook = AD.AD_LOOK.some(l => l.id === saved.adLook) ? saved.adLook : '';
-  let adTemplate = AD.AD_TEMPLATES.some(t => t.id === saved.adTemplate) ? saved.adTemplate : '';
+  // Luôn có một mẫu đang chọn (mặc định mẫu đầu tiên) để thả ảnh vào là ra cảnh ngay.
+  let adTemplate = (AD.AD_TEMPLATES.find(t => t.id === saved.adTemplate) || AD.AD_TEMPLATES[0]).id;
+  if (!AD.AD_TEMPLATES.some(t => t.id === saved.adTemplate)) {
+    const t = AD.AD_TEMPLATES[0];
+    adCamera = [...t.camera]; adLook = t.look; $('adTone').value = t.tone; $('adLength').value = String(t.length);
+    Object.assign(saved, { adTemplate, adTone: t.tone, adLength: String(t.length), adCamera, adLook }); persist();
+  }
   const isAd = () => mode === 'ad';
   const adFields = () => ({ product: $('adProduct').value, points: $('adPoints').value, audience: $('adAudience').value, offer: $('adOffer').value, cta: $('adCta').value, tone: $('adTone').value, length: Number($('adLength').value), camera: [...adCamera], look: adLook, template: adTemplate });
   const options = () => ({ seconds: plan().MAX_SECONDS, reference: refs.length > 0, aspect: $('storyAspect').value, style: $('storyStyle').value, character: $('storyCharacter').value, ...(isAd() ? { ad: adFields() } : {}) });
@@ -99,6 +105,8 @@
       row.append(body); box.append(row);
     });
     $('storySceneCount').textContent = scenes.length ? `${scenes.length} cảnh` : '';
+    $('adQuick').textContent = scenes.length ? 'Tạo lại cảnh' : 'Tạo quảng cáo từ ảnh';
+    $('adQuick').className = scenes.length ? 'secondary' : 'primary';
     $('storyCommit').disabled = $('storyCreate').disabled = !scenes.length;
     refreshChecks();
   }
@@ -136,20 +144,46 @@
     if (busy && a.progress) $('storyInfo').textContent = a.progress;
   }
   // Quảng cáo nhanh từ ảnh: cảnh quay dựng sẵn theo mẫu, không cần lời đọc hay Muse.
-  function quickAd() {
+  // Cảnh tự tạo được ghi dấu (autoSnap); đổi ảnh/mẫu/độ dài… thì tạo lại ngay, trừ khi người dùng đã sửa hoặc xóa cảnh.
+  let autoSnap = '', autoTimer = 0;
+  const sceneSig = () => JSON.stringify(scenes.map(s => [s.title, s.voiceover || '', s.prompt || '']));
+  const pristine = () => !scenes.length || sceneSig() === autoSnap;
+  function buildAd(manual) {
     if (!refs.length) return toast('Chọn ảnh sản phẩm trước.');
     try {
       scenes = plan().planAdShots(options());
+      autoSnap = sceneSig();
       renderScenes();
       const template = plan().AD_TEMPLATES.find(t => t.id === adTemplate);
       $('storyInfo').textContent = `Đã tạo ${scenes.length} cảnh quảng cáo từ ảnh sản phẩm (${template ? 'mẫu «' + template.label + '»' : 'mẫu chung'}). Không có lời đọc nên video giữ tiếng động của clip. Xem lại prompt rồi bấm Tạo clip.`;
-      $('storyScenes').scrollIntoView({ block: 'start', behavior: 'smooth' });
+      if (manual) $('storyScenes').scrollIntoView({ block: 'start', behavior: 'smooth' });
     } catch (e) { toast(e.message); }
+  }
+  function quickAd() {
+    if (!refs.length) return toast('Chọn ảnh sản phẩm trước.');
+    if (!pristine() && !confirm('Tạo lại sẽ thay các cảnh đang có, kể cả phần bạn đã sửa. Tiếp tục?')) return;
+    clearTimeout(autoTimer);
+    buildAd(true);
+  }
+  function autoAd(delay = 250) {
+    clearTimeout(autoTimer);
+    if (!isAd() || !refs.length) return;
+    autoTimer = setTimeout(() => {
+      if (!isAd() || !refs.length || analyzing || writing) return;
+      if (!pristine()) { $('storyInfo').textContent = 'Đã đổi tùy chọn. Bấm «Tạo lại cảnh» để áp dụng (sẽ thay các cảnh đang có).'; return; }
+      buildAd(false);
+    }, delay);
+  }
+  // Đổi ảnh sản phẩm: tạo lại cảnh; bỏ ảnh thì xóa các cảnh tự tạo chưa sửa.
+  function refsChanged() {
+    refInfo();
+    if (refs.length) autoAd(60);
+    else if (isAd() && autoSnap && scenes.length && sceneSig() === autoSnap) { clearTimeout(autoTimer); scenes = []; autoSnap = ''; renderScenes(); }
   }
   // Muse viết lời quảng cáo từ thông tin sản phẩm; kết quả vào ô lời quảng cáo để người dùng sửa.
   async function writeAd() {
     if (analyzing || writing) return;
-    if (!$('adProduct').value.trim()) { $('adProduct').focus(); return toast('Nhập tên sản phẩm trước.'); }
+    if (!$('adProduct').value.trim()) { $('adMore').open = true; $('adProduct').focus(); return toast('Nhập tên sản phẩm trước.'); }
     if ($('storyScript').value.trim() && !confirm('Ô lời quảng cáo đang có chữ. Viết mới sẽ thay toàn bộ và xóa các cảnh đã chia. Tiếp tục?')) return;
     writing = true; renderAnalyze();
     try {
@@ -178,15 +212,12 @@
   function chip(item, on, click) {
     const b = el('button', 'chip', item.label); b.type = 'button'; b.setAttribute('aria-pressed', String(on)); b.onclick = click; return b;
   }
-  // Chọn mẫu: điền sẵn giọng điệu, độ dài, máy quay, phong cách (vẫn sửa tay được); chọn lại mẫu đó thì bỏ mẫu, giữ nguyên các ô.
+  // Chọn mẫu: điền sẵn giọng điệu, độ dài, máy quay, phong cách (vẫn sửa tay được) rồi tạo lại cảnh.
   function pickTemplate(t) {
-    if (adTemplate === t.id) adTemplate = '';
-    else {
-      adTemplate = t.id; adCamera = [...t.camera]; adLook = t.look;
-      $('adTone').value = t.tone; $('adLength').value = String(t.length);
-      Object.assign(saved, { adTone: t.tone, adLength: String(t.length), adCamera, adLook });
-    }
-    saved.adTemplate = adTemplate; persist(); renderChips();
+    adTemplate = t.id; adCamera = [...t.camera]; adLook = t.look;
+    $('adTone').value = t.tone; $('adLength').value = String(t.length);
+    Object.assign(saved, { adTemplate, adTone: t.tone, adLength: String(t.length), adCamera, adLook });
+    persist(); renderChips(); autoAd();
   }
   function renderChips() {
     $('adTemplate').replaceChildren(...AD.AD_TEMPLATES.map(t => chip(t, adTemplate === t.id, () => pickTemplate(t))));
@@ -194,20 +225,20 @@
       if (adCamera.includes(c.id)) adCamera = adCamera.filter(id => id !== c.id);
       else if (adCamera.length >= AD.AD_MAX_CAMERA) return toast(`Chọn tối đa ${AD.AD_MAX_CAMERA} chuyển động máy quay.`);
       else adCamera = [...adCamera, c.id];
-      saved.adCamera = adCamera; persist(); renderChips();
+      saved.adCamera = adCamera; persist(); renderChips(); autoAd();
     })));
-    $('adLook').replaceChildren(...AD.AD_LOOK.map(l => chip(l, adLook === l.id, () => { adLook = adLook === l.id ? '' : l.id; saved.adLook = adLook; persist(); renderChips(); })));
+    $('adLook').replaceChildren(...AD.AD_LOOK.map(l => chip(l, adLook === l.id, () => { adLook = adLook === l.id ? '' : l.id; saved.adLook = adLook; persist(); renderChips(); autoAd(); })));
   }
   // Chữ khác nhau giữa hai chế độ (viết sẵn tiếng Việt để bản dịch giao diện tự áp dụng).
   const MODE_TEXT = [
     ['storyHead', 'text', '1. Câu chuyện', '1. Lời quảng cáo (không bắt buộc)'],
-    ['storyScript', 'placeholder', 'Chỉ cần dán nguyên câu chuyện. Muse tự đọc hiểu để chia cảnh và viết prompt hình; giọng đọc sẽ đọc đúng nguyên văn câu chuyện này.', 'Không bắt buộc. Muốn có giọng đọc và phụ đề thì bấm «Muse viết lời quảng cáo» ở phần thông tin phía trên, hoặc tự dán lời quảng cáo vào đây. Giọng đọc sẽ đọc đúng nguyên văn lời này.'],
+    ['storyScript', 'placeholder', 'Chỉ cần dán nguyên câu chuyện. Muse tự đọc hiểu để chia cảnh và viết prompt hình; giọng đọc sẽ đọc đúng nguyên văn câu chuyện này.', 'Không bắt buộc. Muốn có giọng đọc và phụ đề thì mở «Tùy chỉnh thêm» rồi bấm «Muse viết lời quảng cáo», hoặc tự dán lời quảng cáo vào đây. Giọng đọc sẽ đọc đúng nguyên văn lời này.'],
     ['storyCharLabel', 'text', 'Nhân vật chính (không bắt buộc)', 'Người mẫu / người dùng (không bắt buộc)'],
     ['storyCharacter', 'placeholder', 'Để trống nếu không cần. Ví dụ: Mai, bé gái tóc đen, áo dài trắng', 'Để trống nếu không cần. Ví dụ: cô gái 25 tuổi, tóc dài, áo sơ mi trắng'],
     ['storyRefs', 'text', 'Chọn ảnh nhân vật', 'Chọn ảnh sản phẩm'],
     ['storyRefPaste', 'text', 'Dán hoặc kéo ảnh nhân vật chính vào đây. Ảnh này gắn vào mọi cảnh để nhân vật giữ nguyên; nhân vật khác trong truyện do Muse nhận ra và mô tả cố định ở mọi cảnh.', 'Dán hoặc kéo ảnh sản phẩm vào đây (nên 1–2 ảnh rõ nét, nền sạch). Ảnh gắn vào mọi cảnh để sản phẩm giữ đúng hình dạng và màu sắc.']
   ];
-  const IDLE_INFO = ['Dán câu chuyện rồi bấm «Phân tích bằng Muse» (cần đã đăng nhập Muse tài khoản 1). Hoặc «Chia nhanh» ngay trên máy với prompt mẫu.', 'Thả ảnh sản phẩm, chọn mẫu rồi bấm «Tạo quảng cáo từ ảnh». Muốn có lời đọc thì viết lời quảng cáo rồi bấm «Phân tích bằng Muse».'];
+  const IDLE_INFO = ['Dán câu chuyện rồi bấm «Phân tích bằng Muse» (cần đã đăng nhập Muse tài khoản 1). Hoặc «Chia nhanh» ngay trên máy với prompt mẫu.', 'Thả ảnh sản phẩm, chọn mẫu: các cảnh quay hiện ngay bên dưới. Muốn có lời đọc thì mở «Tùy chỉnh thêm», viết lời quảng cáo rồi bấm «Phân tích bằng Muse».'];
   function applyMode(initial) {
     const ad = isAd();
     for (const [id, kind, story, adText] of MODE_TEXT) {
@@ -238,7 +269,7 @@
     event.preventDefault();
     const paths = [];
     for (const file of files.slice(0, 4)) { const saved_ = await call('pasteReference', { bytes: new Uint8Array(await file.arrayBuffer()), name: file.name }); if (saved_) paths.push(saved_); }
-    if (paths.length) { refs = paths; refInfo(); }
+    if (paths.length) { refs = paths; refsChanged(); }
   }
 
   /* ---------- thêm vào hàng đợi ---------- */
@@ -496,14 +527,17 @@
   $('modeStory').onclick = () => setMode('story'); $('modeAd').onclick = () => setMode('ad'); $('adWrite').onclick = writeAd; $('adQuick').onclick = quickAd;
   $('storySplit').onclick = split; $('storyAnalyze').onclick = analyze; $('storyAnalyzeStop').onclick = async () => { const r = await call('storyAnalyzeCancel'); if (r) render(r); };
   $('storyAsk').onclick = ask; $('storyCopy').onclick = copyInstruction; $('storyParse').onclick = parse;
-  $('storyRefs').onclick = async () => { const files = await call('images', { multiple: true }); if (files?.length) { refs = files; refInfo(); } };
-  $('storyRefsClear').onclick = () => { refs = []; refInfo(); };
+  $('storyRefs').onclick = async () => { const files = await call('images', { multiple: true }); if (files?.length) { refs = files; refsChanged(); } };
+  $('storyRefsClear').onclick = () => { refs = []; refsChanged(); };
   $('storyRefPaste').onpaste = pasteRefs; $('storyRefPaste').ondragover = e => e.preventDefault(); $('storyRefPaste').ondrop = pasteRefs;
   $('storyCommit').onclick = () => commit(false); $('storyCreate').onclick = () => commit(true);
   $('storyExport').onclick = exportVideo;
   $('storyStop').onclick = async () => { const r = await call('storyCancel'); if (r) render(r); };
   $('storyOpen').onclick = () => call('storyReveal');
   $('storyAspect').addEventListener('change', drawPreview);
+  for (const id of ['adLength', 'storyAspect']) $(id).addEventListener('change', () => autoAd());
+  for (const id of ['adProduct', 'storyStyle', 'storyCharacter']) $(id).addEventListener('input', () => autoAd(500));
+  $('adMore').addEventListener('toggle', () => $('storyCompose').classList.toggle('adOpen', $('adMore').open));
   renderChips(); applyMode(true); renderScenes(); drawPreview();
 
   window.storyUi = {
