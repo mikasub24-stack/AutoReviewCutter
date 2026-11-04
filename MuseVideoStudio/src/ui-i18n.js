@@ -165,6 +165,8 @@ Truyện|Story
 Tự edit: cảnh nào lời đọc ngắn hơn clip thì cắt phần thừa; lời dài hơn clip thì giữ khung cuối cho đọc hết. Prompt đã dặn Muse không cho nhân vật nói, chỉ có tiếng động.|Auto edit: if a scene's narration is shorter than its clip, the extra footage is cut; if it is longer, the last frame is held so it can finish. Prompts tell Muse that characters must not speak, only sound effects.
 Xuất MP4|Export MP4
 Mở video|Open video
+Video đã xuất|Exported video
+Không mở được video này ở đây. Bấm «Mở video» để mở thư mục chứa file.|This video cannot be opened here. Click “Open video” to show its folder.
 Đang xuất…|Exporting…
 Danh sách clip kể chuyện|Story clip workspace
 Clip kể chuyện lưu trong thư mục «KeChuyen» theo từng truyện, đánh số cảnh 001, 002, 003…|Story clips are saved in the “KeChuyen” folder per story, numbered by scene 001, 002, 003…

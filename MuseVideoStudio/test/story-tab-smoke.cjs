@@ -218,6 +218,22 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.locator('#storyOpen').isVisible(), true);
     await page.locator('#storyOpen').click(); assert.equal((await called('storyReveal')).length, 1);
 
+    // The exported video plays right here in the tab (no need to open the folder).
+    const player = page.locator('#storyVideo');
+    assert.equal(await player.isVisible(), true);
+    assert.equal(await player.getAttribute('src'), 'file:///C:/Videos/KeChuyen/Truyen-1/Truyen-1.mp4');
+    assert.equal(await player.evaluate(v => v.controls), true);
+    await page.waitForTimeout(500); // the fake file does not exist: let the browser's own load error settle first
+    await page.evaluate(() => document.getElementById('storyVideo').dispatchEvent(new Event('error')));
+    assert.equal(await page.locator('#storyVideoError').isVisible(), true, 'file lỗi → có báo');
+    await page.evaluate(() => document.getElementById('storyVideo').dispatchEvent(new Event('loadeddata')));
+    assert.equal(await page.locator('#storyVideoError').isHidden(), true, 'nạp được → ẩn báo');
+    // While exporting, the player is removed; the new file is loaded again when done (same name included).
+    await page.evaluate(() => { window.s.story.busy = true; window.s.story.progress = 'Đang dựng…'; window.push(); });
+    await page.waitForFunction(() => document.getElementById('storyVideo').hidden && !document.getElementById('storyVideo').hasAttribute('src'));
+    await page.evaluate(() => { window.s.story.busy = false; window.s.story.progress = ''; window.push(); });
+    await page.waitForFunction(() => !document.getElementById('storyVideo').hidden && document.getElementById('storyVideo').getAttribute('src') === 'file:///C:/Videos/KeChuyen/Truyen-1/Truyen-1.mp4');
+
     // Subtitle switch off: nothing is drawn, .srt-only still carries timings.
     await page.locator('#subOn').uncheck();
     await page.locator('#storyExport').click();

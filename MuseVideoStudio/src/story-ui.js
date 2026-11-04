@@ -16,7 +16,7 @@
     subOutline: ['subOutline', '#000000'], subPos: ['subPos', 'bottom'], storySfx: ['sfx', 'low'], storyName: ['name', '']
   };
   const CHECKS = { subOn: ['subOn', true], subSrt: ['subSrt', false], subBox: ['subBox', false] };
-  let saved = {}, scenes = [], refs = [], analyzing = false, writing = false, exporting = false, listening = false, voiceSignature = '', windowsAsked = false, lastStory = '';
+  let saved = {}, scenes = [], refs = [], analyzing = false, writing = false, exporting = false, listening = false, voiceSignature = '', windowsAsked = false, lastStory = '', lastVideo = '';
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { saved = {}; }
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch { /* không lưu được thì bỏ qua */ } };
 
@@ -521,6 +521,13 @@
     else if (story) line = `${story.total} cảnh đã sẵn sàng. Chọn giọng, phụ đề rồi bấm Xuất MP4.`;
     else line = 'Chưa có clip kể chuyện. Chia cảnh và bấm Tạo clip trước.';
     $('storyStatus').textContent = line;
+    // Xem video đã xuất ngay trong app. Đang xuất thì gỡ khung phát để lần sau nạp lại file mới (kể cả khi trùng tên).
+    const video = $('storyVideo'), videoFile = !busy && s.output ? s.output : '';
+    if (videoFile !== lastVideo) {
+      lastVideo = videoFile; video.pause(); $('storyVideoError').hidden = true;
+      if (videoFile) { video.src = localFileUrl(videoFile); video.hidden = false; }
+      else { video.removeAttribute('src'); video.load(); video.hidden = true; }
+    }
     if (story && story.id !== lastStory) { lastStory = story.id; }
   }
 
@@ -534,6 +541,8 @@
   $('storyExport').onclick = exportVideo;
   $('storyStop').onclick = async () => { const r = await call('storyCancel'); if (r) render(r); };
   $('storyOpen').onclick = () => call('storyReveal');
+  $('storyVideo').addEventListener('error', () => { if ($('storyVideo').getAttribute('src')) $('storyVideoError').hidden = false; });
+  $('storyVideo').addEventListener('loadeddata', () => { $('storyVideoError').hidden = true; });
   $('storyAspect').addEventListener('change', drawPreview);
   for (const id of ['adLength', 'storyAspect']) $(id).addEventListener('change', () => autoAd());
   for (const id of ['adProduct', 'storyStyle', 'storyCharacter']) $(id).addEventListener('input', () => autoAd(500));
