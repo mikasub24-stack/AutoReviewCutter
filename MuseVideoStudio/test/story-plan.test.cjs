@@ -531,3 +531,61 @@ test('quảng cáo: prompt mẫu (chia nhanh) có sản phẩm, máy quay, phong
   assert.doesNotMatch(bare, /quảng cáo|Sản phẩm/i, 'kể chuyện không lẫn chữ quảng cáo');
   assert.match(sp.planStory(adCopy, { seconds: 10, aspect: '16:9', ad: { product: '' } })[0].prompt, /Sản phẩm quảng cáo: sản phẩm trong ảnh tham chiếu/, 'chưa nhập tên thì gọi chung là sản phẩm trong ảnh');
 });
+
+test('quảng cáo: 6 mẫu dựng sẵn hợp lệ — giọng điệu, máy quay, phong cách, độ dài đều có thật; mỗi mẫu có 6 cảnh quay, cảnh cuối là khung đẹp nhất', () => {
+  assert.deepEqual(sp.AD_TEMPLATES.map(t => t.id), ['intro', 'review', 'problem', 'promo', 'unbox', 'premium']);
+  for (const t of sp.AD_TEMPLATES) {
+    assert.ok(t.label && t.en && t.structure, t.id);
+    assert.ok(sp.AD_TONE.some(x => x.id === t.tone), t.id + ' tone');
+    assert.ok(sp.AD_LOOK.some(x => x.id === t.look), t.id + ' look');
+    assert.ok(t.camera.length >= 1 && t.camera.length <= sp.AD_MAX_CAMERA && t.camera.every(c => sp.AD_CAMERA.some(x => x.id === c)), t.id + ' camera');
+    assert.ok(sp.AD_LENGTHS.includes(t.length), t.id + ' length');
+    assert.equal(t.shots.length, 6, t.id + ' shots');
+    assert.ok(t.shots.every(x => x.includes('{p}') || /tình huống/.test(x)), t.id + ' mỗi cảnh nhắc sản phẩm (trừ cảnh nêu tình huống)');
+    assert.match(t.shots.at(-1), /giữ yên|giữ lâu/, t.id + ' cảnh cuối giữ yên khung đẹp nhất');
+    assert.ok(t.shots.every(x => !/\d+\s*(?:%|giờ|ngày|tháng|năm|K|k|đ|đồng)/.test(x)), t.id + ' không bịa con số');
+  }
+  assert.equal(sp.options({ ad: { product: 'x', template: 'promo' } }).ad.template, 'promo');
+  assert.equal(sp.options({ ad: { product: 'x', template: 'zzz' } }).ad.template, '');
+});
+
+test('quảng cáo: mẫu đi vào câu lệnh viết lời (cấu trúc) và câu lệnh chia cảnh (tên kiểu)', () => {
+  const review = sp.buildAdScriptInstruction({ ad: { product: 'Áo thun', template: 'review' } }, { marker: 'ab12cd' });
+  assert.match(review, /2\. Cấu trúc theo kiểu «Review sản phẩm»: .*KHÔNG bịa trải nghiệm cá nhân, thời gian đã dùng hay kết quả/);
+  assert.doesNotMatch(review, /\(a\) 1–2 câu mở đầu/, 'có mẫu thì thay cấu trúc mặc định');
+  assert.match(sp.buildAdScriptInstruction({ ad: { product: 'Áo thun', template: 'promo' } }), /Không tạo áp lực giả như «chỉ còn vài suất»/);
+  assert.match(sp.buildAdScriptInstruction({ ad: { product: 'Áo thun' } }), /\(a\) 1–2 câu mở đầu/, 'không chọn mẫu thì giữ cấu trúc mặc định');
+  assert.match(sp.buildMuseInstruction(adCopy, { ...adBase, ad: { ...adBase.ad, template: 'premium' } }, { marker: 'ab12cd' }), /Kiểu quảng cáo: Cao cấp, tinh tế\nSản phẩm: Bình giữ nhiệt Aqua 500ml/);
+});
+
+test('quảng cáo nhanh từ ảnh: số cảnh và số giây theo độ dài, cảnh cuối là khung đẹp nhất, không lời đọc, prompt đủ luật', () => {
+  const plan = len => sp.planAdShots({ ad: { product: 'Bình giữ nhiệt Aqua', length: len, template: 'unbox', camera: ['top'], look: 'minimal' }, reference: true, aspect: '9:16' });
+  for (const [len, count, each] of [[15, 3, 5], [30, 5, 6], [45, 5, 9], [60, 6, 10]]) {
+    const shots = plan(len);
+    assert.equal(shots.length, count, len + ' giây');
+    assert.ok(shots.every(s => s.durationSeconds === each && s.fixedSeconds === each && s.shot === true), len + ' giây: mỗi cảnh ' + each);
+    assert.equal(shots.reduce((a, s) => a + s.durationSeconds, 0), len);
+    assert.deepEqual(shots.map(s => s.title), shots.map((_, i) => 'Cảnh ' + (i + 1)));
+    assert.match(shots.at(-1).visual, /Khung hình đẹp nhất của Bình giữ nhiệt Aqua/, 'cảnh cuối luôn là khung đẹp nhất');
+    assert.match(shots[0].visual, /Quay từ trên cao: hộp hoặc bao bì của Bình giữ nhiệt Aqua/, 'cảnh đầu là cảnh mở của mẫu');
+  }
+  const [first] = plan(30);
+  assert.equal(first.voiceover, ''); assert.equal(first.source, '');
+  assert.ok(!first.offline, 'cảnh quay của mẫu không bị coi là prompt mẫu cần Muse viết lại');
+  assert.match(first.prompt, /^Tạo video quảng cáo sản phẩm dài 6 giây, tỷ lệ 9:16/);
+  assert.match(first.prompt, /Sản phẩm quảng cáo: Bình giữ nhiệt Aqua\./);
+  assert.match(first.prompt, /Máy quay \(chọn hợp với cảnh\): góc quay từ trên cao/);
+  assert.match(first.prompt, /Phong cách quảng cáo: tối giản/);
+  assert.match(first.prompt, /như trong ảnh tham chiếu/);
+  assert.ok(first.prompt.includes(sp.NO_SPEECH));
+  assert.match(first.prompt, /Không thêm chữ, giá, phụ đề hay logo mới vào hình/);
+  // Không nhập tên → gọi chung là sản phẩm trong ảnh; không chọn mẫu → mẫu «Giới thiệu sản phẩm».
+  const generic = sp.planAdShots({ ad: { length: 15 }, reference: true });
+  assert.match(generic[0].visual, /^Mở đầu thu hút: sản phẩm trong ảnh tham chiếu hiện ra/);
+  assert.equal(generic.length, 3);
+  assert.ok(sp.lintScenes(generic, { ad: { length: 15 } }).every(w => w.length === 0), 'cảnh quay không có cảnh báo vô lý (thiếu lời, giây…)');
+  assert.throws(() => sp.planAdShots({ seconds: 10 }), /Chọn chế độ Quảng cáo sản phẩm/);
+  // Giá, ưu đãi, điểm nổi bật không bị vẽ vào prompt hình của cảnh quay nhanh.
+  const priced = sp.planAdShots({ ad: { product: 'x', offer: 'Giảm 20%', points: 'Giữ nóng 12 giờ' }, reference: true });
+  assert.ok(priced.every(s => !/Giảm 20%|12 giờ/.test(s.prompt)));
+});

@@ -19,8 +19,23 @@ Phân tích bằng Muse|Analyze with Muse
 Dán thủ công (dự phòng)|Paste manually (backup)
 Dừng phân tích|Stop analysis
 Quảng cáo sản phẩm|Product ad
-Nhập thông tin sản phẩm, Muse viết lời quảng cáo cho bạn sửa. Sau đó chia cảnh, tạo clip, giọng đọc, phụ đề và xuất MP4 như bình thường. Muse chỉ dùng thông tin bạn nhập, không tự bịa tính năng hay giá.|Enter the product details and Muse writes an ad script for you to edit. Then split scenes, create clips, voice, subtitles and export the MP4 as usual. Muse only uses what you enter and does not invent features or prices.
-Tên sản phẩm|Product name
+Thả ảnh sản phẩm ở trên, chọn mẫu rồi bấm «Tạo quảng cáo từ ảnh»: mỗi mẫu có sẵn các cảnh quay, không cần viết gì. Muốn có lời đọc thì mở phần thông tin bên dưới để Muse viết lời quảng cáo.|Drop the product photo above, pick a template and click “Create ad from photo”: every template comes with ready-made shots, nothing to write. For a narration, open the details below and let Muse write the ad script.
+Tên sản phẩm (không bắt buộc)|Product name (optional)
+Tạo quảng cáo từ ảnh|Create ad from photo
+Thêm thông tin để Muse viết lời đọc (không bắt buộc)|Add details so Muse writes a narration (optional)
+Muse chỉ dùng thông tin bạn nhập, không tự bịa tính năng hay giá. Lời viết xong hiện ở ô lời quảng cáo bên dưới để bạn sửa, rồi bấm «Phân tích bằng Muse» để chia cảnh có giọng đọc và phụ đề.|Muse only uses what you enter and does not invent features or prices. The finished script appears in the ad script box below for you to edit; then click “Analyze with Muse” to split scenes with a voice and subtitles.
+1. Lời quảng cáo (không bắt buộc)|1. Ad script (optional)
+Không bắt buộc. Muốn có giọng đọc và phụ đề thì bấm «Muse viết lời quảng cáo» ở phần thông tin phía trên, hoặc tự dán lời quảng cáo vào đây. Giọng đọc sẽ đọc đúng nguyên văn lời này.|Optional. For a voice and subtitles, click “Muse writes the ad script” in the details above, or paste your own script here. The voice reads this text exactly as written.
+Thả ảnh sản phẩm, chọn mẫu rồi bấm «Tạo quảng cáo từ ảnh». Muốn có lời đọc thì viết lời quảng cáo rồi bấm «Phân tích bằng Muse».|Drop the product photo, pick a template and click “Create ad from photo”. For a narration, write the ad script and click “Analyze with Muse”.
+Chọn ảnh sản phẩm trước.|Choose a product image first.
+Chưa có lời quảng cáo. Bấm «Muse viết lời quảng cáo» hoặc dán lời vào ô.|There is no ad script yet. Click “Muse writes the ad script” or paste one into the box.
+Mẫu quảng cáo (chọn một mẫu để điền sẵn giọng điệu, độ dài, máy quay và phong cách)|Ad template (pick one to pre-fill tone, length, camera and look)
+Giới thiệu sản phẩm|Product intro
+Review sản phẩm|Product review
+Vấn đề → giải pháp|Problem → solution
+Khuyến mãi nhanh|Quick promo
+Mở hộp, nhìn kỹ|Unboxing
+Cao cấp, tinh tế|Premium
 Ví dụ: Bình giữ nhiệt Aqua 500ml|e.g. Aqua 500 ml thermos bottle
 Người xem hướng tới|Target audience
 Ví dụ: dân văn phòng hay uống cà phê|e.g. office workers who drink coffee
@@ -60,13 +75,10 @@ Review đời thường|Everyday review (UGC)
 Tối giản, nền trơn|Minimal, plain background
 Tươi sáng, trẻ trung|Bright and young
 Sang trọng|Luxury
-1. Lời quảng cáo|1. Ad script
-Bấm «Muse viết lời quảng cáo» ở trên, hoặc tự dán lời quảng cáo vào đây. Giọng đọc sẽ đọc đúng nguyên văn lời này.|Click “Muse writes the ad script” above, or paste your own ad script here. The voice reads this text exactly as written.
 Người mẫu / người dùng (không bắt buộc)|Model / user (optional)
 Để trống nếu không cần. Ví dụ: cô gái 25 tuổi, tóc dài, áo sơ mi trắng|Leave empty if not needed. e.g. a 25-year-old woman with long hair in a white shirt
 Chọn ảnh sản phẩm|Choose product image
 Dán hoặc kéo ảnh sản phẩm vào đây (nên 1–2 ảnh rõ nét, nền sạch). Ảnh gắn vào mọi cảnh để sản phẩm giữ đúng hình dạng và màu sắc.|Paste or drop product images here (1–2 clear photos on a clean background work best). The image is attached to every scene so the product keeps its shape and colors.
-Nhập thông tin sản phẩm rồi bấm «Muse viết lời quảng cáo», hoặc dán lời quảng cáo có sẵn. Sau đó bấm «Phân tích bằng Muse» để chia cảnh.|Enter the product details and click “Muse writes the ad script”, or paste an existing script. Then click “Analyze with Muse” to split scenes.
 Chưa chọn ảnh sản phẩm. Nên thêm ảnh rõ nét để sản phẩm trong video giống thật.|No product image chosen. Add a clear photo so the product in the video looks like the real one.
 Muse đã viết lời quảng cáo. Đọc và sửa cho đúng ý, rồi bấm «Phân tích bằng Muse» để chia cảnh.|Muse wrote the ad script. Read and edit it, then click “Analyze with Muse” to split scenes.
 Nhập tên sản phẩm trước.|Enter the product name first.
@@ -515,6 +527,7 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
       [/^Đang dựng (\d+)\/(\d+) cảnh…$/,m=>'Building scene '+m[1]+'/'+m[2]+'…'],
       [/^(.+) \((nữ|nam)\) · (.+?)( ✓)?$/,m=>{const L={'Tiếng Việt':'Vietnamese','Tiếng Anh':'English','Tiếng Trung':'Chinese','Tiếng Nhật':'Japanese','Tiếng Hàn':'Korean','Tiếng Tây Ban Nha':'Spanish','Tiếng Pháp':'French','Tiếng Đức':'German','Tiếng Bồ Đào Nha':'Portuguese','Tiếng Ý':'Italian','Tiếng Nga':'Russian','Tiếng Thái':'Thai','Tiếng Indonesia':'Indonesian','Tiếng Hindi':'Hindi','Tiếng Ả Rập':'Arabic'};return m[1]+' ('+(m[2]==='nữ'?'female':'male')+') · '+(L[m[3]]||m[3])+(m[4]||'');}],
       [/^Ảnh nhân vật: (.+) — gắn vào mọi cảnh\.$/,m=>'Character image: '+m[1]+' — attached to every scene.'],
+      [/^Đã tạo (\d+) cảnh quảng cáo từ ảnh sản phẩm \((?:mẫu «(.+)»|mẫu chung)\)\. Không có lời đọc nên video giữ tiếng động của clip\. Xem lại prompt rồi bấm Tạo clip\.$/,m=>'Created '+m[1]+' ad shots from the product photo ('+(m[2]?'template “'+t(m[2])+'”':'generic template')+'). There is no narration, so the video keeps the clip sound. Check the prompts, then click Create clips.'],
       [/^Ảnh sản phẩm: (.+) — gắn vào mọi cảnh\.$/,m=>'Product image: '+m[1]+' — attached to every scene.'],
       [/^Chọn tối đa (\d+) chuyển động máy quay\.$/,m=>'Choose at most '+m[1]+' camera movements.'],
       [/^(.*)bấm «Muse viết lời quảng cáo» lại\.$/,m=>t(m[1]+'bấm Phân tích lại.').replace(/analy[sz]e again\.$/,'write the ad script again.')],

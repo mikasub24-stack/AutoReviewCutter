@@ -299,3 +299,11 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .chip:hover { border-color: #52647f; background: #24344a; }
 .chip[aria-pressed="true"] { border-color: #49d8ca; background: #17403f; color: #bff3ec; }
 .adWrite { margin-top: 14px; }
+#storyCompose.adMode { display: flex; flex-direction: column; }
+#storyCompose.adMode .storyModes { order: -5; align-self: flex-start; }
+#storyCompose.adMode #storyRefRow, #storyCompose.adMode #storyRefPaste, #storyCompose.adMode #storyRefInfo { order: -4; }
+#storyCompose.adMode .adBox { order: -3; }
+.adSlot label { margin: 0; font-size: 11px; color: #a9bad1; }
+.adMore { margin-top: 14px; padding: 10px 12px; border: 1px solid #2e3b52; border-radius: 8px; background: #101a28; }
+.adMore > summary { cursor: pointer; font-size: 12px; color: #cbd7e9; }
+.adMore .hint { margin: 8px 0; }

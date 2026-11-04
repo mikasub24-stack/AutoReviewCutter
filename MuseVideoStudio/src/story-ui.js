@@ -34,8 +34,9 @@
   let mode = saved.mode === 'ad' ? 'ad' : 'story';
   let adCamera = (Array.isArray(saved.adCamera) ? saved.adCamera : []).filter(id => AD.AD_CAMERA.some(c => c.id === id)).slice(0, AD.AD_MAX_CAMERA);
   let adLook = AD.AD_LOOK.some(l => l.id === saved.adLook) ? saved.adLook : '';
+  let adTemplate = AD.AD_TEMPLATES.some(t => t.id === saved.adTemplate) ? saved.adTemplate : '';
   const isAd = () => mode === 'ad';
-  const adFields = () => ({ product: $('adProduct').value, points: $('adPoints').value, audience: $('adAudience').value, offer: $('adOffer').value, cta: $('adCta').value, tone: $('adTone').value, length: Number($('adLength').value), camera: [...adCamera], look: adLook });
+  const adFields = () => ({ product: $('adProduct').value, points: $('adPoints').value, audience: $('adAudience').value, offer: $('adOffer').value, cta: $('adCta').value, tone: $('adTone').value, length: Number($('adLength').value), camera: [...adCamera], look: adLook, template: adTemplate });
   const options = () => ({ seconds: plan().MAX_SECONDS, reference: refs.length > 0, aspect: $('storyAspect').value, style: $('storyStyle').value, character: $('storyCharacter').value, ...(isAd() ? { ad: adFields() } : {}) });
   const plan = () => window.storyPlan;
   const dims = aspect => aspect === '9:16' ? [1080, 1920] : aspect === '1:1' ? [1080, 1080] : [1920, 1080];
@@ -57,7 +58,7 @@
       });
       const check = $('storyCheck'), script = $('storyScript').value;
       let result = null;
-      if (scenes.length && script.trim()) { try { result = plan().checkAgainstScript(script, scenes); } catch { result = null; } }
+      if (scenes.length && script.trim() && scenes.some(s => String(s.voiceover || '').trim())) { try { result = plan().checkAgainstScript(script, scenes); } catch { result = null; } }
       const lines = [];
       if (result && result.checked) lines.push(result.ok ? `✓ Lời các cảnh khớp ${Math.round(result.coverage * 100)}% kịch bản gốc, đủ và đúng thứ tự.` : '⚠ Chưa khớp kịch bản gốc:');
       if (result && !result.ok) lines.push(...result.issues.map(x => '• ' + x));
@@ -77,7 +78,8 @@
     } catch (e) { toast(e.message); }
   }
   // Giây mỗi cảnh tự tính theo lời kể của cảnh đó (3–10 giây), không nhập tay.
-  const secondsOf = scene => plan().sceneSeconds(scene.voiceover || scene.source || '', plan().MAX_SECONDS);
+  // Cảnh quay quảng cáo từ ảnh (không có lời đọc) giữ số giây cố định của mẫu; có lời đọc thì tính theo lời.
+  const secondsOf = scene => (scene.fixedSeconds && !String(scene.voiceover || scene.source || '').trim()) ? scene.fixedSeconds : plan().sceneSeconds(scene.voiceover || scene.source || '', plan().MAX_SECONDS);
   const headingText = (scene, index) => `${scene.title || 'Cảnh ' + (index + 1)} · ${secondsOf(scene)} giây`;
   function renderScenes() {
     const box = $('storyScenes');
@@ -114,7 +116,7 @@
   }
   async function analyze() {
     if (analyzing) return;
-    if (!$('storyScript').value.trim()) return toast('Dán câu chuyện trước.');
+    if (!$('storyScript').value.trim()) return toast(isAd() ? 'Chưa có lời quảng cáo. Bấm «Muse viết lời quảng cáo» hoặc dán lời vào ô.' : 'Dán câu chuyện trước.');
     analyzing = true; renderAnalyze();
     try {
       const result = await call('storyAnalyze', { script: $('storyScript').value, ...options() });
@@ -128,10 +130,21 @@
   function renderAnalyze() {
     const a = state?.story?.analyze || {}, busy = analyzing || writing || Boolean(a.busy);
     const writingNow = writing || (a.busy && a.kind === 'write');
-    $('storyAnalyze').disabled = busy; $('storySplit').disabled = busy; $('adWrite').disabled = busy; $('storyAnalyzeStop').hidden = !busy;
+    $('storyAnalyze').disabled = busy; $('storySplit').disabled = busy; $('adWrite').disabled = busy; $('adQuick').disabled = busy; $('storyAnalyzeStop').hidden = !busy;
     $('storyAnalyze').textContent = busy && !writingNow ? 'Muse đang phân tích…' : 'Phân tích bằng Muse';
     $('adWrite').textContent = writingNow ? 'Muse đang viết…' : 'Muse viết lời quảng cáo';
     if (busy && a.progress) $('storyInfo').textContent = a.progress;
+  }
+  // Quảng cáo nhanh từ ảnh: cảnh quay dựng sẵn theo mẫu, không cần lời đọc hay Muse.
+  function quickAd() {
+    if (!refs.length) return toast('Chọn ảnh sản phẩm trước.');
+    try {
+      scenes = plan().planAdShots(options());
+      renderScenes();
+      const template = plan().AD_TEMPLATES.find(t => t.id === adTemplate);
+      $('storyInfo').textContent = `Đã tạo ${scenes.length} cảnh quảng cáo từ ảnh sản phẩm (${template ? 'mẫu «' + template.label + '»' : 'mẫu chung'}). Không có lời đọc nên video giữ tiếng động của clip. Xem lại prompt rồi bấm Tạo clip.`;
+      $('storyScenes').scrollIntoView({ block: 'start', behavior: 'smooth' });
+    } catch (e) { toast(e.message); }
   }
   // Muse viết lời quảng cáo từ thông tin sản phẩm; kết quả vào ô lời quảng cáo để người dùng sửa.
   async function writeAd() {
@@ -165,7 +178,18 @@
   function chip(item, on, click) {
     const b = el('button', 'chip', item.label); b.type = 'button'; b.setAttribute('aria-pressed', String(on)); b.onclick = click; return b;
   }
+  // Chọn mẫu: điền sẵn giọng điệu, độ dài, máy quay, phong cách (vẫn sửa tay được); chọn lại mẫu đó thì bỏ mẫu, giữ nguyên các ô.
+  function pickTemplate(t) {
+    if (adTemplate === t.id) adTemplate = '';
+    else {
+      adTemplate = t.id; adCamera = [...t.camera]; adLook = t.look;
+      $('adTone').value = t.tone; $('adLength').value = String(t.length);
+      Object.assign(saved, { adTone: t.tone, adLength: String(t.length), adCamera, adLook });
+    }
+    saved.adTemplate = adTemplate; persist(); renderChips();
+  }
   function renderChips() {
+    $('adTemplate').replaceChildren(...AD.AD_TEMPLATES.map(t => chip(t, adTemplate === t.id, () => pickTemplate(t))));
     $('adCamera').replaceChildren(...AD.AD_CAMERA.map(c => chip(c, adCamera.includes(c.id), () => {
       if (adCamera.includes(c.id)) adCamera = adCamera.filter(id => id !== c.id);
       else if (adCamera.length >= AD.AD_MAX_CAMERA) return toast(`Chọn tối đa ${AD.AD_MAX_CAMERA} chuyển động máy quay.`);
@@ -176,14 +200,14 @@
   }
   // Chữ khác nhau giữa hai chế độ (viết sẵn tiếng Việt để bản dịch giao diện tự áp dụng).
   const MODE_TEXT = [
-    ['storyHead', 'text', '1. Câu chuyện', '1. Lời quảng cáo'],
-    ['storyScript', 'placeholder', 'Chỉ cần dán nguyên câu chuyện. Muse tự đọc hiểu để chia cảnh và viết prompt hình; giọng đọc sẽ đọc đúng nguyên văn câu chuyện này.', 'Bấm «Muse viết lời quảng cáo» ở trên, hoặc tự dán lời quảng cáo vào đây. Giọng đọc sẽ đọc đúng nguyên văn lời này.'],
+    ['storyHead', 'text', '1. Câu chuyện', '1. Lời quảng cáo (không bắt buộc)'],
+    ['storyScript', 'placeholder', 'Chỉ cần dán nguyên câu chuyện. Muse tự đọc hiểu để chia cảnh và viết prompt hình; giọng đọc sẽ đọc đúng nguyên văn câu chuyện này.', 'Không bắt buộc. Muốn có giọng đọc và phụ đề thì bấm «Muse viết lời quảng cáo» ở phần thông tin phía trên, hoặc tự dán lời quảng cáo vào đây. Giọng đọc sẽ đọc đúng nguyên văn lời này.'],
     ['storyCharLabel', 'text', 'Nhân vật chính (không bắt buộc)', 'Người mẫu / người dùng (không bắt buộc)'],
     ['storyCharacter', 'placeholder', 'Để trống nếu không cần. Ví dụ: Mai, bé gái tóc đen, áo dài trắng', 'Để trống nếu không cần. Ví dụ: cô gái 25 tuổi, tóc dài, áo sơ mi trắng'],
     ['storyRefs', 'text', 'Chọn ảnh nhân vật', 'Chọn ảnh sản phẩm'],
     ['storyRefPaste', 'text', 'Dán hoặc kéo ảnh nhân vật chính vào đây. Ảnh này gắn vào mọi cảnh để nhân vật giữ nguyên; nhân vật khác trong truyện do Muse nhận ra và mô tả cố định ở mọi cảnh.', 'Dán hoặc kéo ảnh sản phẩm vào đây (nên 1–2 ảnh rõ nét, nền sạch). Ảnh gắn vào mọi cảnh để sản phẩm giữ đúng hình dạng và màu sắc.']
   ];
-  const IDLE_INFO = ['Dán câu chuyện rồi bấm «Phân tích bằng Muse» (cần đã đăng nhập Muse tài khoản 1). Hoặc «Chia nhanh» ngay trên máy với prompt mẫu.', 'Nhập thông tin sản phẩm rồi bấm «Muse viết lời quảng cáo», hoặc dán lời quảng cáo có sẵn. Sau đó bấm «Phân tích bằng Muse» để chia cảnh.'];
+  const IDLE_INFO = ['Dán câu chuyện rồi bấm «Phân tích bằng Muse» (cần đã đăng nhập Muse tài khoản 1). Hoặc «Chia nhanh» ngay trên máy với prompt mẫu.', 'Thả ảnh sản phẩm, chọn mẫu rồi bấm «Tạo quảng cáo từ ảnh». Muốn có lời đọc thì viết lời quảng cáo rồi bấm «Phân tích bằng Muse».'];
   function applyMode(initial) {
     const ad = isAd();
     for (const [id, kind, story, adText] of MODE_TEXT) {
@@ -191,7 +215,9 @@
       if (kind === 'text') $(id).textContent = ad ? adText : story; else $(id).placeholder = ad ? adText : story;
     }
     $('modeStory').setAttribute('aria-pressed', String(!ad)); $('modeAd').setAttribute('aria-pressed', String(ad));
-    $('adBox').hidden = !ad;
+    $('adBox').hidden = !ad; $('storyCompose').classList.toggle('adMode', ad);
+    // Ô «Tỉ lệ» là một: ở chế độ quảng cáo nằm trong khung quảng cáo, ngược lại về chỗ cũ.
+    if (ad) $('adAspectSlot').append($('storyAspectLabel')); else if (!initial) $('storyOptionsRow').prepend($('storyAspectLabel'));
     refInfo();
     if (!initial || ad) { const a = state?.story?.analyze || {}; if (!analyzing && !writing && !a.busy) $('storyInfo').textContent = IDLE_INFO[ad ? 1 : 0]; }
   }
@@ -467,7 +493,7 @@
     if (story && story.id !== lastStory) { lastStory = story.id; }
   }
 
-  $('modeStory').onclick = () => setMode('story'); $('modeAd').onclick = () => setMode('ad'); $('adWrite').onclick = writeAd;
+  $('modeStory').onclick = () => setMode('story'); $('modeAd').onclick = () => setMode('ad'); $('adWrite').onclick = writeAd; $('adQuick').onclick = quickAd;
   $('storySplit').onclick = split; $('storyAnalyze').onclick = analyze; $('storyAnalyzeStop').onclick = async () => { const r = await call('storyAnalyzeCancel'); if (r) render(r); };
   $('storyAsk').onclick = ask; $('storyCopy').onclick = copyInstruction; $('storyParse').onclick = parse;
   $('storyRefs').onclick = async () => { const files = await call('images', { multiple: true }); if (files?.length) { refs = files; refInfo(); } };

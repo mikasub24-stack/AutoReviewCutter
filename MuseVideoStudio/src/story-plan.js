@@ -95,6 +95,69 @@
     { id: 'premium', label: 'Sang trọng, tinh tế', en: 'Premium', prompt: 'sang trọng, tinh tế, ít lời' }
   ];
   const AD_LENGTHS = [15, 30, 45, 60];
+  // Mẫu quảng cáo dựng sẵn: chọn một mẫu thì điền sẵn giọng điệu, độ dài, máy quay, phong cách; `structure` đi vào câu lệnh viết lời.
+  const AD_TEMPLATES = [
+    { id: 'intro', label: 'Giới thiệu sản phẩm', en: 'Product intro', tone: 'expert', length: 30, camera: ['dolly-in', 'macro'], look: 'tvc',
+      structure: 'Mở đầu bằng nhu cầu của người xem, rồi giới thiệu sản phẩm với 2–4 điểm nổi bật, kết bằng lời mời xem chi tiết.',
+      shots: [
+        "Mở đầu thu hút: {p} hiện ra từ nền mờ vào vùng sáng, nằm chính giữa khung hình, nền gọn sạch, ánh sáng studio mềm.",
+        "Toàn cảnh {p} đặt trên mặt bàn sạch, ánh sáng mềm làm rõ hình dạng và màu sắc đúng như ảnh tham chiếu.",
+        "Cận cảnh chi tiết, chất liệu và bề mặt của {p}, độ sâu trường ảnh nông, nền mờ.",
+        "Bàn tay nhẹ nhàng cầm {p} lên và xoay chậm để thấy các mặt của sản phẩm.",
+        "{p} đặt trong không gian sống phù hợp (bàn làm việc, kệ hoặc phòng khách), ánh sáng tự nhiên, bố cục gọn gàng.",
+        "Khung hình đẹp nhất của {p}: đặt chính giữa, ánh sáng điểm nhấn, nền sạch, giữ yên vài giây cho người xem nhớ sản phẩm."
+      ] },
+    { id: 'review', label: 'Review sản phẩm', en: 'Product review', tone: 'warm', length: 30, camera: ['handheld', 'macro'], look: 'ugc',
+      structure: 'Giọng thân mật như người quen giới thiệu: sản phẩm này là gì, điểm đáng chú ý nhất, ai hợp dùng, rồi mời xem chi tiết. KHÔNG bịa trải nghiệm cá nhân, thời gian đã dùng hay kết quả.',
+      shots: [
+        "Quay kiểu điện thoại cầm tay: người mẫu giơ {p} về phía ống kính, nhìn thẳng và mỉm cười thân thiện, bối cảnh trong nhà ánh sáng tự nhiên.",
+        "Cận cảnh {p} đặt trên bàn tay người dùng, máy quay cầm tay rung nhẹ tự nhiên.",
+        "Người mẫu xoay {p} trong tay, chỉ vào các chi tiết, nét mặt hào hứng.",
+        "{p} đặt trên bàn trong nhà cùng vài vật dụng đời thường xung quanh, quay từ góc nghiêng.",
+        "Người mẫu gật đầu hài lòng, đưa {p} lại gần ống kính.",
+        "Cận cảnh {p} trên tay người mẫu hướng về ống kính, nền mờ ấm cúng, giữ yên vài giây."
+      ] },
+    { id: 'problem', label: 'Vấn đề → giải pháp', en: 'Problem → solution', tone: 'hype', length: 30, camera: ['pull-back', 'dolly-in'], look: 'bright',
+      structure: 'Mở bằng một tình huống khó chịu quen thuộc liên quan tới nhu cầu của người xem, rồi sản phẩm là cách giải quyết, nêu các điểm nổi bật, kết bằng lời mời xem chi tiết. Không phóng đại tình huống.',
+      shots: [
+        "Một tình huống đời thường hơi bất tiện (người mẫu nhăn mặt, nhìn đồng hồ, bàn làm việc bừa bộn), không phóng đại.",
+        "{p} xuất hiện trong khung hình, ánh sáng sáng lên nhẹ nhàng, khung cảnh trở nên gọn gàng hơn.",
+        "Cận cảnh {p} với các chi tiết nổi bật, nền mờ, ánh sáng mềm.",
+        "Người mẫu cầm {p} lên với vẻ nhẹ nhõm, mỉm cười.",
+        "{p} nằm trong không gian sống đã gọn gàng, ánh sáng tự nhiên buổi sáng.",
+        "Khung hình đẹp nhất của {p}: đặt chính giữa, nền sạch, ánh sáng sáng và tươi, giữ yên vài giây."
+      ] },
+    { id: 'promo', label: 'Khuyến mãi nhanh', en: 'Quick promo', tone: 'fun', length: 15, camera: ['dolly-in', 'slow'], look: 'bright',
+      structure: 'Ngắn gọn: một câu thu hút, 1–2 điểm nổi bật, nhắc đúng giá / ưu đãi người dùng đưa (nếu có), rồi kêu gọi hành động. Không tạo áp lực giả như «chỉ còn vài suất» hay «sắp hết hàng».',
+      shots: [
+        "{p} xuất hiện bất ngờ giữa nền màu tươi, chuyển động năng động, nổi bật chính giữa khung hình.",
+        "Cận cảnh {p} thật nổi bật, ánh sáng rực rỡ, màu sắc đúng như ảnh tham chiếu.",
+        "Máy quay lướt nhanh quanh {p}, nhịp nhanh, vui mắt.",
+        "Người mẫu giơ {p} lên với vẻ vui tươi, nhìn thẳng vào ống kính.",
+        "{p} đặt cạnh vài vật dụng gọn gàng trên nền màu tươi, bố cục thoáng.",
+        "{p} đặt chính giữa nền màu tươi, chừa khoảng trống phía trên khung hình, giữ yên vài giây."
+      ] },
+    { id: 'unbox', label: 'Mở hộp, nhìn kỹ', en: 'Unboxing', tone: 'warm', length: 30, camera: ['top', 'macro', 'orbit'], look: 'minimal',
+      structure: 'Dẫn theo từng bước: mở hộp, nhìn bao bì, cầm sản phẩm lên, xem kỹ chất liệu và chi tiết, rồi nêu điểm nổi bật và mời xem chi tiết. Chỉ tả những gì có trong thông tin người dùng đưa.',
+      shots: [
+        "Quay từ trên cao: hộp hoặc bao bì của {p} đặt trên mặt bàn gọn gàng, bàn tay bắt đầu mở ra.",
+        "Bàn tay lấy {p} ra khỏi bao bì, nhẹ nhàng, rõ từng động tác.",
+        "Cận cảnh chất liệu và chi tiết của {p} ngay sau khi mở hộp, độ sâu trường ảnh nông.",
+        "{p} được xoay chậm trên mặt bàn để thấy các góc khác nhau.",
+        "{p} đặt cạnh bao bì, bố cục ngay ngắn, nhìn từ trên cao xuống.",
+        "Khung hình đẹp nhất của {p} bên cạnh bao bì, nền sạch, ánh sáng mềm, giữ yên vài giây."
+      ] },
+    { id: 'premium', label: 'Cao cấp, tinh tế', en: 'Premium', tone: 'premium', length: 30, camera: ['slow', 'orbit', 'pull-back'], look: 'luxury',
+      structure: 'Ít lời, câu ngắn, nhấn chất liệu và cảm giác sử dụng; không dùng từ rẻ, giảm sâu hay ép mua trừ khi người dùng đưa giá / ưu đãi. Kết nhẹ nhàng bằng lời mời.',
+      shots: [
+        "{p} nổi lên từ nền tối, ánh sáng điểm nhấn lướt chậm qua bề mặt.",
+        "Cận cảnh chất liệu và các đường nét của {p}, phản chiếu ánh sáng tinh tế, chuyển động rất chậm.",
+        "Máy quay xoay chậm quanh {p} đặt trên bệ tối, ánh sáng điểm nhấn.",
+        "Bàn tay nhẹ nhàng chạm vào {p}, cử chỉ chậm rãi, tinh tế.",
+        "{p} trong một không gian sang trọng, ánh đèn ấm, bố cục thoáng, ít vật thể.",
+        "Khung hình tĩnh của {p}: ánh sáng điểm nhấn, bóng đổ mềm, nền tối, giữ yên lâu."
+      ] }
+  ];
   const AD_MAX_CAMERA = 3;
   const adText = (value, max) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
   // null = không phải chế độ quảng cáo. Chuẩn hóa mọi trường để dữ liệu từ giao diện không làm hỏng prompt.
@@ -112,7 +175,8 @@
       tone: ids(AD_TONE).has(raw.tone) ? raw.tone : AD_TONE[0].id,
       length: AD_LENGTHS.includes(length) ? length : 30,
       camera,
-      look: ids(AD_LOOK).has(raw.look) ? raw.look : ''
+      look: ids(AD_LOOK).has(raw.look) ? raw.look : '',
+      template: ids(AD_TEMPLATES).has(raw.template) ? raw.template : ''
     };
   }
   const adPick = (list, id) => list.find(x => x.id === id);
@@ -228,8 +292,9 @@
   }
   const limitFor = (units, config) => budgetChars(config.seconds, detectLanguage(units.map(u => u.text).join(' ')));
 
-  function scenePrompt(voiceover, config, visual = '') {
-    const seconds = sceneSeconds(voiceover || visual, config.seconds);
+  // `fixed` = số giây cố định của cảnh không có lời đọc (cảnh quay quảng cáo từ ảnh).
+  function scenePrompt(voiceover, config, visual = '', fixed = 0) {
+    const seconds = fixed || sceneSeconds(voiceover || visual, config.seconds);
     const ad = config.ad;
     const camera = ad ? ad.camera.map(id => adPick(AD_CAMERA, id)?.prompt).filter(Boolean) : [];
     const look = ad ? (adPick(AD_LOOK, ad.look)?.prompt || '').replace(/^phong cách /, '') : '';
@@ -269,6 +334,25 @@
     return ranges.map(([a, b], index) => makeScene(index + 1, unitsText(units, a, b), '', config, [a, b]));
   }
 
+  /* Quảng cáo nhanh từ ảnh: không cần lời đọc hay Muse viết gì. Mỗi mẫu có sẵn danh sách cảnh quay; độ dài video quyết định số cảnh.
+     15 giây = 3 cảnh × 5 giây, 30 = 5 × 6, 45 = 5 × 9, 60 = 6 × 10. Cảnh cuối luôn là khung hình đẹp nhất của sản phẩm. */
+  function adShotPlan(length) {
+    return length <= 15 ? { count: 3, seconds: 5 } : length <= 30 ? { count: 5, seconds: 6 } : length <= 45 ? { count: 5, seconds: 9 } : { count: 6, seconds: 10 };
+  }
+  function planAdShots(input = {}) {
+    const config = options(input), ad = config.ad;
+    if (!ad) throw Error('Chọn chế độ Quảng cáo sản phẩm trước.');
+    const template = adPick(AD_TEMPLATES, ad.template) || AD_TEMPLATES[0];
+    const { count, seconds } = adShotPlan(ad.length);
+    const list = template.shots;
+    const picked = count >= list.length ? list : [...list.slice(0, count - 1), list[list.length - 1]];
+    const name = productName(ad);
+    return picked.map((text, index) => {
+      const visual = text.split('{p}').join(name);
+      return { title: `Cảnh ${index + 1}`, source: '', voiceover: '', visual, prompt: scenePrompt('', config, visual, seconds), durationSeconds: seconds, fixedSeconds: seconds, shot: true };
+    });
+  }
+
   const CONTEXT_CHARS = 12000;
   // Phần câu chuyện đưa kèm để Muse hiểu ngữ cảnh khi chỉ chia một đoạn.
   function contextText(script, units, first, last) {
@@ -282,6 +366,8 @@
     const camera = ad.camera.map(id => adPick(AD_CAMERA, id)?.prompt).filter(Boolean);
     const look = adPick(AD_LOOK, ad.look)?.prompt;
     const lines = [];
+    const template = adPick(AD_TEMPLATES, ad.template);
+    if (template) lines.push(`Kiểu quảng cáo: ${template.label}`);
     if (ad.product) lines.push(`Sản phẩm: ${ad.product}`);
     if (ad.points) lines.push('Điểm nổi bật:', ...ad.points.split('\n').map(x => '- ' + x));
     if (ad.audience) lines.push(`Người xem hướng tới: ${ad.audience}`);
@@ -300,12 +386,13 @@
     const chars = Math.round(ad.length * CHARS_PER_SECOND * 0.9);
     const lo = Math.round(chars * 0.85), hi = Math.round(chars * 1.05);
     const tone = adPick(AD_TONE, ad.tone).prompt;
+    const template = adPick(AD_TEMPLATES, ad.template);
     return [
       'Bạn là người viết lời quảng cáo cho video bán hàng ngắn. Hãy viết MỘT lời đọc (voice-over) cho sản phẩm ở cuối.',
       '',
       'QUY TẮC',
       `1. Độ dài: khoảng ${lo}–${hi} ký tự (đọc khoảng ${ad.length} giây). Câu ngắn, dễ đọc thành tiếng, mỗi câu một ý, mỗi câu không quá 110 ký tự.`,
-      '2. Cấu trúc: (a) 1–2 câu mở đầu thu hút ngay, nói đúng nhu cầu hoặc vấn đề của người xem; (b) 2–4 câu giới thiệu các điểm nổi bật, mỗi điểm một câu, dùng đúng thông tin ở cuối; (c) 1 câu kêu gọi hành động ở cuối.',
+      template ? `2. Cấu trúc theo kiểu «${template.label}»: ${template.structure} Dùng đúng thông tin ở cuối.` : '2. Cấu trúc: (a) 1–2 câu mở đầu thu hút ngay, nói đúng nhu cầu hoặc vấn đề của người xem; (b) 2–4 câu giới thiệu các điểm nổi bật, mỗi điểm một câu, dùng đúng thông tin ở cuối; (c) 1 câu kêu gọi hành động ở cuối.',
       '3. Chỉ dùng thông tin người dùng cung cấp. KHÔNG bịa tính năng, thông số, con số, thành phần, giá, khuyến mãi, chứng nhận, đánh giá hay số người dùng. Không dùng từ tuyệt đối hoặc khó kiểm chứng như «số 1», «tốt nhất», «100%», «cam kết», «khỏi hẳn». Không nói về chữa bệnh, giảm cân hay hiệu quả y tế. Không so sánh với sản phẩm hay thương hiệu khác. Không hứa kết quả.',
       ad.offer ? '4. Giá / ưu đãi: nhắc đúng nguyên văn thông tin người dùng đưa, một lần.' : '4. Người dùng không đưa giá hay ưu đãi nên KHÔNG nhắc đến giá, giảm giá hay quà tặng.',
       ad.cta ? `5. Câu kêu gọi hành động cuối cùng: dùng ý này, viết tự nhiên: «${ad.cta}».` : '5. Câu kêu gọi hành động cuối cùng: nhẹ nhàng, không ép (ví dụ mời xem chi tiết hoặc thử sản phẩm), không bịa kênh mua hàng.',
@@ -723,5 +810,5 @@
     return entries.map((entry, index) => `${index + 1}\n${srtTime(entry.start)} --> ${srtTime(entry.end)}\n${entry.text}\n`).join('\n');
   }
 
-  return { ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, MAX_SECONDS, MIN_SECONDS, sceneSeconds, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, buildMuseInstruction, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, subtitleChunks, srtTime, toSrt };
+  return { ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, MAX_SECONDS, MIN_SECONDS, sceneSeconds, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, buildMuseInstruction, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, subtitleChunks, srtTime, toSrt };
 });
