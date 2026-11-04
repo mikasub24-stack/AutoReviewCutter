@@ -25,3 +25,21 @@ juce::Result StudioEngine::setLiveSongKey(int tonic,bool minor){
     if(result.wasOk()){pluginBypassed=false;heldForUnknownKey=false;toneLinkStatus=u("Đã gửi Key/Scale: ")+juce::String(vocal::noteName(60+tonic))+(minor?" minor":" major");}
     else{pluginBypassed=true;heldForUnknownKey=true;toneLinkStatus=result.getErrorMessage();}return result;
 }
+
+juce::Result StudioEngine::fixTuneArtifacts(){
+    auto fail=[this](const juce::String& text){tuneFixStatus=text;return juce::Result::fail(text);};
+    if(isPlaying()||isRecording()||isEqListening())return fail(u("Dừng phát/thu/nghe bản thu trước khi Fix méo Auto-Tune."));
+    if(!plugin)return fail(u("Nạp Antares VST3 đã cài trên máy trước."));
+    if(isPluginBypassed())return fail(u("Antares đang bypass. Chọn tone đúng rồi bật plugin để nghe; Fix méo không tự bật plugin."));
+    if(songTonic<0||!toneLink.enabled||!toneLink.complete())return fail(u("Chưa rõ tone hoặc chưa ghép Key/Scale. Dò/chọn tone bài và ghép Antares trước; không đoán tone."));
+    if(!tuneUndo.empty())return fail(u("Đã có một lần Fix méo. Hoàn tác trước nếu muốn áp dụng lại."));
+    juce::Result result=juce::Result::ok();juce::String report;
+    withAudioStopped([&]{auto checked=applyPluginTone(*plugin,toneLink,songTonic,songMinor);if(checked.failed()){result=checked;return;}result=applyNaturalTuning(*plugin,tuneUndo,report);resetProcessing();});
+    tuneFixStatus=result.wasOk()?u("Đã xác nhận Key/Scale hiện tại và áp dụng kiểu kéo nhẹ. Không phải bộ cứu clipping.\n")+report+u("\nChỉ một tuner realtime trên vocal; tool đã chặn chỉnh phô offline khi Antares hoạt động. Vocal đã in Auto-Tune từ trước phải dùng WAV gốc. Nghe thử rồi Hoàn tác nếu không hợp."):result.getErrorMessage();
+    return result;
+}
+juce::Result StudioEngine::undoTuneArtifacts(){
+    if(isPlaying()||isRecording()||isEqListening())return juce::Result::fail(u("Dừng phát/thu/nghe bản thu trước khi hoàn tác."));
+    if(!plugin)return juce::Result::fail(u("Không còn plugin để hoàn tác."));
+    juce::Result result=juce::Result::ok();withAudioStopped([&]{result=undoNaturalTuning(*plugin,tuneUndo);if(result.wasOk()){tuneUndo.clear();resetProcessing();}});tuneFixStatus=result.wasOk()?u("Đã hoàn tác tham số Fix méo. Key/Scale vẫn theo bài hiện tại."):result.getErrorMessage();return result;
+}

@@ -7,7 +7,7 @@
 [Setup]
 AppId={{3BEE7FF2-E9DE-47C8-A770-B8D4E2E3AE1C}
 AppName=Vocal Studio
-AppVersion=1.4.1
+AppVersion=1.5.0
 AppPublisher=VocalStudio
 DefaultDirName={localappdata}\Programs\VocalStudio
 DefaultGroupName=Vocal Studio
@@ -16,7 +16,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
 OutputDir={#OutputDir}
-OutputBaseFilename=VocalStudio-1.4.1-Setup
+OutputBaseFilename=VocalStudio-1.5.0-Setup
 Compression=lzma2
 SolidCompression=yes
 CloseApplications=yes

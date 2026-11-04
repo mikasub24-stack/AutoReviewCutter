@@ -20,3 +20,43 @@ PluginToneLink discoverPluginTone(juce::AudioPluginInstance& plugin){PluginToneL
 }
 juce::Result applyPluginTone(juce::AudioPluginInstance& plugin,const PluginToneLink& link,int tonic,bool minor){if(tonic<0||tonic>11)return juce::Result::fail(u("Chưa có tone bài hợp lệ."));if(!link.enabled||!link.complete()||link.identity!=pluginToneIdentity(plugin))return juce::Result::fail(u("Chưa ghép đủ Key/Scale cho đúng plugin và phiên bản này."));auto* key=find(plugin,link.keyId);auto* scale=find(plugin,link.scaleId);if(!key||!scale)return juce::Result::fail(u("Plugin không công khai Key/Scale đã ghép. Không gửi giá trị đoán."));const float rootValue=link.notes[static_cast<std::size_t>(tonic)],scaleValue=minor?link.minor:link.major;
     const float oldRoot=key->getValue(),oldScale=scale->getValue();auto write=[](auto* p,float value){p->beginChangeGesture();p->setValueNotifyingHost(value);p->endChangeGesture();};write(scale,scaleValue);write(key,rootValue);if(std::abs(key->getValue()-rootValue)>.001f||std::abs(scale->getValue()-scaleValue)>.001f){write(scale,oldScale);write(key,oldRoot);return juce::Result::fail(u("Plugin không xác nhận Key/Scale. Đã trả về giá trị cũ."));}return juce::Result::ok();}
+
+namespace {
+using Parameter=juce::AudioPluginInstance::HostedParameter;
+juce::String compact(juce::String text){return text.toLowerCase().retainCharacters("abcdefghijklmnopqrstuvwxyz");}
+Parameter* uniqueControl(juce::AudioPluginInstance& plugin,const juce::StringArray& names){Parameter* found=nullptr;for(int i=0;i<plugin.getParameters().size();++i)if(auto* p=plugin.getHostedParameter(i))if(names.contains(compact(p->getName(256)))){if(found)return nullptr;found=p;}return found;}
+bool number(const juce::String& text,float& out){const auto s=text.trim();if(s.isEmpty()||!juce::String("0123456789+-.").containsChar(s[0]))return false;out=s.getFloatValue();return std::isfinite(out);}
+void writeControl(Parameter& p,float value){p.beginChangeGesture();p.setValueNotifyingHost(value);p.endChangeGesture();}
+bool numericTarget(Parameter& p,float minimum,bool milliseconds,float& result){
+    if(!valid(p.getValue()))return false;
+    const auto label=p.getLabel().toLowerCase();const auto current=p.getText(p.getValue(),128).toLowerCase();float now=0,low=0,high=0;
+    if(!number(current,now)||!number(p.getText(0,128),low)||!number(p.getText(1,128),high))return false;
+    if(milliseconds){if(!label.contains("ms")&&!current.contains("ms"))return false;}
+    else if(!label.contains("%")&&!current.contains("%")&&(std::abs(low)>.01f||std::abs(high-100)>.01f))return false;
+    // Never speed up an already gentle retune or reduce an existing humanize amount.
+    const float target=std::max(now,minimum);if(target>std::max(low,high)+.01f)return false;
+    result=p.getValueForText(juce::String(target,2)+(milliseconds?" ms":" %"));float decoded=0;
+    return valid(result)&&number(p.getText(result,128),decoded)&&std::abs(decoded-target)<.51f;
+}
+}
+juce::Result applyNaturalTuning(juce::AudioPluginInstance& plugin,std::vector<PluginTuneChange>& changes,juce::String& report){
+    changes.clear();report={};auto* retune=uniqueControl(plugin,{"retunespeed","retune"});float value=0;
+    if(!retune||!numericTarget(*retune,35,true,value))return juce::Result::fail(u("Không nhận diện chắc Retune Speed theo ms. Mở Antares và chỉnh Retune khoảng 35 ms hoặc chậm hơn; tool chưa đổi tham số nào."));
+    std::vector<PluginTuneChange> planned;
+    auto plan=[&](Parameter* p,float v){const float before=p->getValue();report+=p->getName(128)+": "+p->getText(before,128)+" → "+p->getText(v,128)+"\n";if(std::abs(before-v)>.00001f)planned.push_back({p->getParameterID(),before,v});};plan(retune,value);
+    for(const auto& spec:std::vector<std::pair<juce::StringArray,float>>{{{"humanize"},50},{{"flextune","flex"},20}}){auto* p=uniqueControl(plugin,spec.first);if(p&&numericTarget(*p,spec.second,false,value))plan(p,value);else report+=spec.first[0]+u(": không có/không xác minh được đơn vị; giữ nguyên, chỉnh trong Antares nếu có.\n");}
+    auto* formant=uniqueControl(plugin,{"formant","formantcorrection","formantpreservation","preserveformants"});bool mapped=false;
+    if(formant)for(const auto& text:juce::StringArray{"On","Enabled","True"}){const float v=formant->getValueForText(text);const auto back=compact(formant->getText(v,128));if(valid(v)&&(back=="on"||back=="enabled"||back=="true")){plan(formant,v);mapped=true;break;}}
+    if(!mapped)report+=u("Formant On: không có nhãn bật/tắt rõ; giữ nguyên. Không đổi Formant Shift/Input Type/Transpose.\n");
+    for(const auto& c:planned){auto* p=find(plugin,c.id);if(!p)return juce::Result::fail(u("Danh sách tham số plugin đã thay đổi; chưa áp dụng."));}
+    for(const auto& c:planned)writeControl(*find(plugin,c.id),c.after);
+    for(const auto& c:planned)if(!valid(find(plugin,c.id)->getValue())||std::abs(find(plugin,c.id)->getValue()-c.after)>.001f){for(const auto& old:planned)writeControl(*find(plugin,old.id),old.before);return juce::Result::fail(u("Plugin không xác nhận giá trị; đã trả tham số về trước khi áp dụng."));}
+    changes=std::move(planned);return juce::Result::ok();
+}
+juce::Result undoNaturalTuning(juce::AudioPluginInstance& plugin,const std::vector<PluginTuneChange>& changes){
+    if(changes.empty())return juce::Result::fail(u("Không có thay đổi Fix méo để hoàn tác."));
+    for(const auto& c:changes){auto* p=find(plugin,c.id);if(!p||!valid(p->getValue())||std::abs(p->getValue()-c.after)>.001f)return juce::Result::fail(u("Bạn đã đổi tham số trong plugin sau Fix méo; không ghi đè thay đổi mới. Chỉnh lại trong Antares."));}
+    for(const auto& c:changes)writeControl(*find(plugin,c.id),c.before);
+    for(const auto& c:changes)if(!valid(find(plugin,c.id)->getValue())||std::abs(find(plugin,c.id)->getValue()-c.before)>.001f){for(const auto& old:changes)writeControl(*find(plugin,old.id),old.after);return juce::Result::fail(u("Plugin không xác nhận hoàn tác; đã trả về trạng thái Fix méo."));}
+    return juce::Result::ok();
+}

@@ -74,6 +74,11 @@ public:
     juce::String songKeySource,toneLinkStatus;
     bool isPluginBypassed() const noexcept {return pluginBypassed.load();}
     bool isAntaresActive() const;
+    juce::Result fixTuneArtifacts();
+    juce::Result undoTuneArtifacts();
+    bool canUndoTuneArtifacts() const noexcept{return !tuneUndo.empty();}
+    juce::String tuneFixStatus;
+
     void setPluginBypassed(bool);
     juce::Result setSongKey(int tonic,bool minor,const juce::String& source);
     juce::Result sendSongKey();
@@ -111,6 +116,7 @@ public:
     void audioDeviceStopped() override;
     void audioDeviceError(const juce::String&) override;
 private:
+    std::vector<PluginTuneChange> tuneUndo;
     void prepare(double,int);
     void resetProcessing();
     void processChunk(const float*,float* const*,int,int,bool,bool);

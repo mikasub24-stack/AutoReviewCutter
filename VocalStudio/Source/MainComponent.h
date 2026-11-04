@@ -52,6 +52,7 @@ public:
     void showVocalTools();
     void showAutoEq();
     void showPolish();void exportVocal();
+    void showTuneFix();
     void listenAutoEq();void pauseMusicForEq();
     void recordAutoEq();void analyseAutoEq();void previewAutoEq(bool);void saveAutoEq();void loadAutoEq();void cancelAutoEq();
     vocal::EqRecommendation eqSuggestion;juce::String eqStatus;
@@ -104,7 +105,7 @@ private:
     juce::Label trackTitle,trackInfo,positionLabel,deviceLabel,statusLabel,pluginLabel,gainLabel,panLabel,masterLabel;
     std::array<std::unique_ptr<Knob>,10> knobs;
     std::unique_ptr<juce::FileChooser> chooser;
-    std::unique_ptr<juce::DocumentWindow> deviceWindow,pluginWindow,toolsWindow,eqWindow,polishWindow;
+    std::unique_ptr<juce::DocumentWindow> deviceWindow,pluginWindow,toolsWindow,eqWindow,polishWindow,tuneFixWindow;
     vocal::EqSettings eqBefore,eqRestore,eqLast;
     juce::String eqSession,eqSourceFile;int eqSource=-1;
     juce::File projectFile;

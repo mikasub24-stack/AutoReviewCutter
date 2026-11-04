@@ -2,6 +2,16 @@
 
 Ứng dụng Windows x64 để hát trên beat, thu micro qua sound card và mix vocal tại máy. Dự án nằm trong `VocalStudio/`, nhánh `vocal-studio`, không sửa Chùa Việt Online.
 
+## 1.5 · Fix méo Auto-Tune
+
+Nút **Fix méo Auto-Tune** ngay màn hình hát mở bảng có **Áp dụng · Kéo nhẹ hơn**, **Hoàn tác Fix méo**, **Mở Antares** và báo cáo từng tham số. Đây là giảm kiểu kéo nốt quá gắt, không phải phục hồi clipping và không bảo đảm hết mọi méo. Dừng thu/phát/nghe bản thu trước khi áp dụng. Nạp Antares VST3 có giấy phép, ghép Key/Scale và chờ dò/chọn tone đúng trước. Khi nâng/hạ nhạc trong YouTube, Key/Scale theo tone đầu ra như trước; nếu dò nhầm Major/Minor hoặc bài chuyển giọng thì chọn tay/kiểm tra lại. Không tự bật plugin bạn đã bypass.
+
+Tool gửi/đọc lại Key/Scale hiện tại, rồi chỉ chỉnh các tham số có tên và nhãn/đơn vị rõ: Retune Speed tối thiểu 35 ms (không tăng tốc nếu đã chậm hơn), Humanize tối thiểu 50%, Flex-Tune tối thiểu 20%, Formant On nếu có nhãn bật/tắt rõ. Đây là thiết lập khởi đầu để nghe thử, không phải preset chuẩn cho mọi giọng. Không đổi Input Type/quãng giọng, Transpose hay Formant Shift. Nếu không xác minh được Retune theo ms, không đổi nhóm tham số kéo giọng; tùy chọn không có thì giữ nguyên và ghi rõ trong báo cáo. Có thể mở Antares để chỉnh tay. Không đoán normalized value từ tên núm.
+
+Nếu plugin không đọc lại đúng giá trị, trả về trạng thái trước khi chỉnh nhóm tham số. Hoàn tác chỉ giữ trong phiên hiện tại, không ghi đè nếu bạn đã đổi các tham số đó trong Antares; thay/nạp lại plugin hay dự án sẽ bỏ lịch sử hoàn tác. Trạng thái plugin đã áp dụng được lưu bằng cơ chế lưu dự án hiện có. Không sửa file thu. Chỉ một tuner realtime trên vocal; guard chặn chỉnh phô offline khi Antares hoạt động đã có, nhưng không thể tự phát hiện/loại Auto-Tune đã in vào một file nhập sẵn — dùng WAV micro gốc.
+
+Mã nguồn tool nằm riêng trong `VocalStudio/` của repo hiện có và có ZIP Source độc lập trong release, không cần mở dự án game để chạy app. Cài Antares trên máy không tự nạp vào app: bấm **Chọn Antares VST3** một lần. Chưa kiểm chứng bản Antares có giấy phép trên máy người dùng; có kiểm thử VST3 fixture thật về ánh xạ đơn vị phi tuyến, readback, giữ tone, hoàn tác, guard và các đường thu/xuất trước đó.
+
 ## 1.4.1 · Sửa tầng khuếch tán reverb
 
 Sửa hồi tiếp all-pass trong hai tầng khuếch tán: tầng này chỉ trải pha/đuôi vang, không tự tăng mức theo tần số. Bản trước dùng mẫu trễ thay cho đầu ra all-pass trong nhánh hồi tiếp nên có thể nhuộm màu/tăng mức vang ngoài ý muốn. Giữ núm Reverb/Delay, preset, EQ riêng và đường Antares; màu/mức reverb có thể thay đổi do sửa lỗi. Không thêm latency. Kiểm thử đáp ứng xung bảo toàn năng lượng, biên độ ổn định ở 73–8000 Hz tại 44,1/48/96 kHz và reset sạch đuôi, cùng các kiểm thử thu/xuất hiện có. Đây là sửa thuật toán, chưa thay thế nghe thử trên mic/phòng thật.

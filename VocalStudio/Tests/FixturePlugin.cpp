@@ -5,7 +5,7 @@
 class PublicStaticChoice final : public juce::AudioParameterChoice {public:using juce::AudioParameterChoice::AudioParameterChoice;bool isAutomatable() const noexcept override{return false;}};
 class Fixture final : public juce::AudioProcessor {
 public:
-    Fixture():AudioProcessor(BusesProperties().withInput("Input",juce::AudioChannelSet::stereo(),true).withOutput("Output",juce::AudioChannelSet::stereo(),true)){setLatencySamples(64);root=new PublicStaticChoice("rootKey","Key",juce::StringArray{"A","Bb","B","C","Db","D","Eb","E","F","Gb","G","Ab"},3);scale=new PublicStaticChoice("tuneScale","Scale",juce::StringArray{"Chromatic","Minor","Major"},2);probe=new juce::AudioParameterBool("liveProbe","Live Probe",false);addParameter(probe);addParameter(root);addParameter(scale);addParameter(new juce::AudioParameterChoice("presetDistractor","Preset",juce::StringArray{"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"},0));}
+    Fixture():AudioProcessor(BusesProperties().withInput("Input",juce::AudioChannelSet::stereo(),true).withOutput("Output",juce::AudioChannelSet::stereo(),true)){setLatencySamples(64);root=new PublicStaticChoice("rootKey","Key",juce::StringArray{"A","Bb","B","C","Db","D","Eb","E","F","Gb","G","Ab"},3);scale=new PublicStaticChoice("tuneScale","Scale",juce::StringArray{"Chromatic","Minor","Major"},2);probe=new juce::AudioParameterBool("liveProbe","Live Probe",false);retune=new juce::AudioParameterFloat("retune", "Retune Speed",juce::NormalisableRange<float>(0,400,.1f,.4f),0,"ms");humanize=new juce::AudioParameterFloat("humanize","Humanize",0,100,0);flex=new juce::AudioParameterFloat("flex","Flex-Tune",0,100,0);formant=new juce::AudioParameterBool("formant","Formant",false);addParameter(retune);addParameter(humanize);addParameter(flex);addParameter(formant);addParameter(probe);addParameter(root);addParameter(scale);addParameter(new juce::AudioParameterChoice("presetDistractor","Preset",juce::StringArray{"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"},0));}
     const juce::String getName() const override{return "VocalStudio Test Gain";}
     void prepareToPlay(double,int) override {reset();}
     void releaseResources() override{}
@@ -22,10 +22,11 @@ public:
     void setCurrentProgram(int) override{}
     const juce::String getProgramName(int) override{return {};}
     void changeProgramName(int,const juce::String&) override{}
-    void getStateInformation(juce::MemoryBlock& b) override {juce::MemoryOutputStream out(b,false);out.writeFloat(gain);out.writeInt(root->getIndex());out.writeInt(scale->getIndex());}
-    void setStateInformation(const void* data,int size) override{if(size>=12){juce::MemoryInputStream in(data,static_cast<std::size_t>(size),false);gain=in.readFloat();*root=juce::jlimit(0,11,in.readInt());*scale=juce::jlimit(0,2,in.readInt());}}
+    void getStateInformation(juce::MemoryBlock& b) override {juce::MemoryOutputStream out(b,false);out.writeFloat(gain);out.writeInt(root->getIndex());out.writeInt(scale->getIndex());out.writeFloat(retune->get());out.writeFloat(humanize->get());out.writeFloat(flex->get());out.writeBool(formant->get());}
+    void setStateInformation(const void* data,int size) override{if(size>=12){juce::MemoryInputStream in(data,static_cast<std::size_t>(size),false);gain=in.readFloat();*root=juce::jlimit(0,11,in.readInt());*scale=juce::jlimit(0,2,in.readInt());if(size>=25){*retune=in.readFloat();*humanize=in.readFloat();*flex=in.readFloat();*formant=in.readBool();}}}
 private:
-    juce::AudioParameterBool* probe=nullptr;
+    juce::AudioParameterFloat *retune=nullptr,*humanize=nullptr,*flex=nullptr;
+    juce::AudioParameterBool *formant=nullptr,*probe=nullptr;
     juce::AudioParameterChoice* root=nullptr;juce::AudioParameterChoice* scale=nullptr;
     std::array<std::array<float,64>,2> memory{};std::size_t cursor=0;float gain=.5f;
 };
