@@ -13,8 +13,8 @@ jobs:
     timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
-      SOURCE_SHA: 8d254d98897dd2bec9457f988a0eab9877963e4e
-      SOURCE_RUN: '41666829039'
+      SOURCE_SHA: 837b4cd95539d8e2c6e47dc7cf6ac8928639406b
+      SOURCE_RUN: '41744762810'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,31 +41,31 @@ jobs:
         run: |
           Copy-Item release/build/vocal/Testing/Temporary/LastTest.log release/dist/VocalStudio-Verification.log
           Copy-Item release/BrowserSelfTest.json release/dist/BrowserSelfTest.json
-          $files = @('release/dist/VocalStudio-1.3.0-Setup.exe','release/dist/VocalStudio-1.3.0-Windows.zip','release/dist/VocalStudio-1.3.0-Source.zip','release/dist/VocalStudio-preview.jpg','release/dist/VocalStudio-AutoEQ.jpg','release/dist/VocalStudio-Studio.jpg','release/dist/BrowserSelfTest.json','release/dist/InstalledBrowserSelfTest.json','release/dist/VocalStudio-FX.jpg','release/dist/VocalStudio-Tone.jpg','release/dist/VocalStudio-VoiceFit.jpg','release/dist/VocalStudio-Antares.jpg','release/dist/VocalStudio-Verification.log','release/dist/InstalledSelfTest.json','release/build/vocal/EngineSelfTest.json')
+          $files = @('release/dist/VocalStudio-1.4.0-Setup.exe','release/dist/VocalStudio-1.4.0-Windows.zip','release/dist/VocalStudio-1.4.0-Source.zip','release/dist/VocalStudio-preview.jpg','release/dist/VocalStudio-Polish.jpg','release/dist/VocalStudio-AutoEQ.jpg','release/dist/VocalStudio-Studio.jpg','release/dist/BrowserSelfTest.json','release/dist/InstalledBrowserSelfTest.json','release/dist/VocalStudio-FX.jpg','release/dist/VocalStudio-Tone.jpg','release/dist/VocalStudio-VoiceFit.jpg','release/dist/VocalStudio-Antares.jpg','release/dist/VocalStudio-Verification.log','release/dist/InstalledSelfTest.json','release/build/vocal/EngineSelfTest.json')
           $sums = foreach ($file in $files) { $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant(); "$hash  $([IO.Path]::GetFileName($file))" }
           $sums | Set-Content release/dist/SHA256SUMS.txt -Encoding ascii
           $notes = @"
-          Vocal Studio 1.3.0 Windows x64 — hát một bài, phân tích micro khô và nghe A/B EQ riêng.
+          Vocal Studio 1.4.0 Windows x64 — tăng cường xử lý riêng giọng và xuất WAV vocal có FX để hát thử/đối chiếu.
 
-          Mới: Hát 1 bài → Cân EQ. Thu khi hát YouTube, bấm Dừng để phân tích; hoặc chọn vocal của chính bạn trong Studio. Phân tích từ WAV micro gốc, tối đa 12 đoạn 5 giây trải đều bài. Đề xuất low-cut giữ nền giọng thấp, độ ấm, giảm chói và de-esser với mức chỉnh nhẹ; chưa áp dụng cho tới khi bạn nghe B. Mẫu quá ngắn, ít giọng rõ, tiếng ù đều, nhiễu không có giọng hoặc clip nhiều bị từ chối. Đây là gợi ý theo thống kê bản thu, không phải học một EQ chuẩn phát hành hay sao chép giọng ca sĩ.
+          Mới: Vocal studio → Áp dụng preset Studio. Giữ EQ riêng/input gain và cấu hình Antares; chọn compressor vừa, reverb nhẹ/pre-delay và delay nhỏ, bật ba bước xử lý mới. Cân câu nhỏ/to chậm trước compressor (tối đa +4/−6 dB ở 100%, không nâng gain dưới ngưỡng detector −40 dBFS); dịu gắt động quanh 3,5 kHz; reverb/delay lùi khi hát và trả đuôi khi ngắt câu. Điều chỉnh độc lập 0–100%, có bật/tắt ba bước để so. Thay lượng có làm mượt; không thêm lookahead. Không xử lý các bước này lên nhạc YouTube/beat.
 
-          Nghe bản thu A/B phát riêng WAV micro gốc qua FX hiện tại, không nghe lẫn mic trực tiếp hoặc track khác, không sửa mute/solo dự án. YouTube được tạm dừng lúc nghe lại. A/B chỉ thay EQ/de-esser và gain bù mức ước tính tối đa ±3 dB; giữ compressor, vang và Antares. Lưu B làm EQ riêng mới xác nhận preset; đóng cửa sổ/Về EQ đang lưu bỏ phần nghe thử chưa lưu. Autosave không biến B nghe thử thành EQ đã chấp nhận sau khi mở lại dự án. WAV gốc được giữ nguyên.
+          Mới: Xuất WAV vocal có FX. Thu micro/chọn track vocal, dừng rồi xuất: lấy WAV gốc qua EQ/dynamics/Antares/vang hiện tại, bù latency, đủ đuôi vang, lưu PCM stereo 24-bit. Không kèm YouTube/track khác, không phụ thuộc mute/solo timeline và không ghi đè nguồn gốc/lịch sử. Có tiến độ/hủy ngay trong bảng; hủy giữ file đích cũ. Nghe thành phẩm này để phản hồi, phân biệt với nút Thu vẫn lưu micro khô. Muốn mix với beat của bạn hoặc giữ pitch offline đang chọn, dùng Xuất WAV Studio như trước. Key/Scale/plugin dùng thiết lập hiện tại; lịch sử đổi key/automation lúc thu chưa được tái tạo tự động.
 
-          EQ đã lưu nằm trên máy, có thể nạp cho phiên khác. Đo lại khi đổi micro, khoảng cách hoặc phòng. Không đổi nốt/kéo giọng cao bằng EQ; dùng Antares/công cụ pitch cho phần đó. Không tự tách được beat hoặc DSP đã trộn từ phần cứng; không phục hồi hoàn toàn giọng vỡ analog và không cam kết chất lượng phát hành sau một lần hát.
+          Giữ AutoEQ 1.3: hát một bài, đề xuất EQ nhẹ từ micro khô, nghe A/B riêng nguồn gốc và chỉ lưu B khi chấp nhận; preset tại máy, WAV không đổi. Giữ YouTube trong tool, đổi từng nửa cung giữ tempo, gửi Key/Scale cho Antares VST3 đã ghép; không cần cáp âm thanh ảo/tiện ích. Antares và giấy phép không kèm; plugin cần công khai/xác nhận tham số. Dự án cũ mặc định ba bước mới bằng 0, giữ tiếng cũ tới khi bạn bật.
 
-          Giữ tính năng 1.2: YouTube ngay trong tool; −½ cung / +½ cung đổi một bán âm mỗi lần, giữ tốc độ; Về tone gốc; tự dò tone nhạc gốc và gửi Key/Scale cho Antares VST3 đã ghép. Vang ẩn, Reverb/Delay và menu FX, Studio nâng cao thu/mix/xuất WAV. Không cần cáp âm thanh ảo/tiện ích. Tab Chrome/Edge bên ngoài không đi qua bộ đổi tone. Video YouTube cần mạng, có thể yêu cầu xác minh/đăng nhập hoặc codec/DRM không có trong CEF.
+          UPod Pro: Windows Audio/WASAPI 48 kHz; Mic with DSP OFF, Mixing OFF; tai nghe qua card, tắt Direct Out/Direct Out+DSP khi nghe FX phần mềm. Card USB 16-bit; WAV 24-bit không nâng độ phân giải ADC. Chỉnh gain vật lý để tránh clip. Cân mức không phải khử ồn; không thể tái tạo hoàn toàn âm đã vỡ.
 
-          UPod Pro: Windows Audio/WASAPI 48 kHz, đúng ngõ micro; Mic with DSP OFF, Mixing OFF; dùng tai nghe, tắt Direct Out/Direct Out+DSP khi nghe FX phần mềm. Chọn một lần rồi lưu lại. Không bắt cài ASIO hãng không có. Thu giọng lưu micro khô, không ghi nhạc YouTube vào WAV gốc. Antares/giấy phép phải có sẵn; plugin cần công khai và xác nhận Key/Scale.
+          Kiểm thử Windows: 7 bộ CTest, gồm cân chênh mức câu hát, sai số hài trên tín hiệu đều, giữ trầm/giảm dải gắt, nền nhỏ lúc nghỉ, duck/đuôi vang, bypass và chuyển lượng; vocal-only export bỏ backing/mute/solo, bảo vệ WAV gốc/lịch sử và file đích khi hủy; giữ EQ riêng, save/load bước mới và tương thích dự án cũ; toàn bộ AutoEQ/Pitch/VoiceFit/LiveMusic/Engine/VST3 fixture/Chromium/installer trước đó. Kèm source ZIP, ảnh chạy thật, log/JSON và checksum.
 
-          Đã kiểm thử Windows: 6 bộ CTest (AutoEQ, DSP, Pitch, LiveMusic, VoiceFit, Engine); phản ứng với tăng bass/tăng chói, thay đổi âm lượng, chặn im lặng/nhiễu/ù đều/clip, hủy tác vụ; phát A/B chỉ nghe nguồn gốc; lưu EQ đã chấp nhận trong khi vẫn nghe preview; round-trip dự án; VST3 fixture đổi 12 Key/Scale lúc thu; Chromium audio và bản cài. Có ảnh giao diện thật, JSON/log/checksum. Chưa thử giọng thật, UPod Pro hoặc Antares có giấy phép của người dùng.
+          Đây là bản cải thiện để người dùng hát thử và phản hồi. Kiểm thử tín hiệu không xác nhận chất lượng tương đương clip TikTok, không chứng nhận âm thanh đạt chuẩn phát hành. Chưa nghe thử giọng thật/UPod Pro/Antares có giấy phép của người dùng. Cần nghe A/B theo bài, cách hát, mic và phòng; không tự sao chép giọng hay chuỗi plugin từ bản mix tham chiếu.
 
           Source đã build: $env:SOURCE_SHA
           Actions: https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN
-          Source ứng dụng AGPL-3.0-or-later; kèm source ZIP và dependency ghim phiên bản. Phân tích giọng/preset/bản thu nằm trên máy; trình duyệt không được cấp quyền micro/camera.
+          Source ứng dụng AGPL-3.0-or-later; dependency ghim phiên bản. Phân tích/preset/bản thu nằm trên máy; trình duyệt không được cấp quyền micro/camera.
           "@
           $notes | Set-Content release/notes.md -Encoding utf8
           $files += 'release/dist/SHA256SUMS.txt'
-          gh release create vocal-studio-v1.3.0 @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Vocal Studio 1.3.0 · EQ giọng tôi' --notes-file release/notes.md --prerelease --latest=false
+          gh release create vocal-studio-v1.4.0 @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Vocal Studio 1.4.0 · Vocal studio và WAV có FX' --notes-file release/notes.md --prerelease --latest=false
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
       - name: Export publication source graph for workspace
         shell: pwsh
