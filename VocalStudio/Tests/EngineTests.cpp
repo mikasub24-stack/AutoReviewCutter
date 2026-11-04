@@ -34,6 +34,10 @@ int runStudioSelfTests(const juce::String& commandLine){
             parameter("Humanize")->setValueNotifyingHost(.8f);check(engine.undoTuneArtifacts().failed()&&std::abs(parameter("Humanize")->getValue()-.8f)<.001f,"undo never overwrites subsequent manual edits");
             parameter("Humanize")->setValueNotifyingHost(.5f);check(engine.undoTuneArtifacts().wasOk()&&!engine.canUndoTuneArtifacts(),"undo accepted after restoring fix snapshot");
             check(std::abs(parameter("Retune Speed")->getValue()-oldRetune)<.001f&&parameter("Formant")->getValue()<.01f,"undo restores original tuning controls");
+            check(engine.fixTuneArtifacts().wasOk(),"fix before immediate project save");
+            check(engine.saveProject(project).wasOk()&&engine.loadProject(project).wasOk(),"save/load immediately after fix");
+            check(!engine.canUndoTuneArtifacts()&&std::abs(parameter("Retune Speed")->getText(parameter("Retune Speed")->getValue(),128).getFloatValue()-35)<.51f&&parameter("Humanize")->getValue()>.49f,"plugin fix settings persist; undo snapshot cannot cross plugin reload");
+            parameter("Retune Speed")->setValueNotifyingHost(oldRetune);parameter("Humanize")->setValueNotifyingHost(0);parameter("Flex-Tune")->setValueNotifyingHost(0);parameter("Formant")->setValueNotifyingHost(0);
             parameter("Retune Speed")->setValueNotifyingHost(parameter("Retune Speed")->getValueForText("80 ms"));parameter("Humanize")->setValueNotifyingHost(.8f);
             check(engine.fixTuneArtifacts().wasOk(),"apply over already gentle tuning");
             check(parameter("Retune Speed")->getText(parameter("Retune Speed")->getValue(),128).getFloatValue()>79&&parameter("Humanize")->getValue()>.79f,"never accelerate gentle retune or reduce existing humanize");
