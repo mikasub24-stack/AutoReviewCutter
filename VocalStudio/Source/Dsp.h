@@ -12,6 +12,7 @@ struct VocalParameters {
     float inputDb = 0, highPassHz = 80, warmthDb = -2, presenceDb = 2;
     float thresholdDb = -18, ratio = 3, makeupDb = 2, deEss = .35f;
     float reverb = .10f, delay = .04f, delayMs = 240;
+    float leveling=0,dynamicTame=0,reverbDuck=0;
     float decaySeconds=1.2f,preDelayMs=20,damping=.65f,width=1,delayFeedback=.27f,deharsh=0;
 };
 VocalParameters preset(int index) noexcept;
@@ -48,7 +49,7 @@ public:
     float gainReductionDb() const noexcept { return reduction; }
 private:
     struct Channel {
-        Biquad high, warmth, presence, ess, tame;
+        Biquad high, warmth, presence, ess, tame, harsh;
         Delay echo,preDelay;
         std::array<Delay, 4> comb;
         std::array<float, 4> damping {};
@@ -58,6 +59,9 @@ private:
     VocalParameters p;
     double rate = 48000;
     float envelope = 0, essEnvelope = 0, compression = 1, reduction = 0;
+    float levelPower=0,levelDb=0,harshPower=0,harshGain=0,roomPower=0;
+    float levelAmount=0,tameAmount=0,duckAmount=0,controlRate=.001f;
+    float powerRate=.001f,levelUp=.001f,levelDown=.001f,tameAttack=.001f,tameRelease=.001f,roomAttack=.001f,roomRelease=.001f;
     float preGain = 1, makeup = 1, attack = .99f, release = .999f, essRelease = .999f;
     std::size_t delaySamples = 1,preDelaySamples=1;
     std::array<float,4> roomFeedback{};

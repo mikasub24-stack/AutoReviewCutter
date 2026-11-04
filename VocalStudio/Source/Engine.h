@@ -57,7 +57,7 @@ public:
     double effectTailSeconds() const noexcept;
     juce::Result startRecording(const juce::File& directory);
     juce::Result finishRecording(juce::File& completed,double& startSeconds);
-    juce::Result exportMix(const juce::File&,std::atomic<bool>& cancel,std::atomic<float>& progress);
+    juce::Result exportMix(const juce::File&,std::atomic<bool>& cancel,std::atomic<float>& progress,int vocalIndex=-1);
     juce::Result installPlugin(std::unique_ptr<juce::AudioPluginInstance>);
     void removePlugin();
     std::shared_ptr<vocal::LiveMusic> liveMusic=std::make_shared<vocal::LiveMusic>();
@@ -87,6 +87,7 @@ public:
     double latencyMs() const noexcept;
     juce::String deviceSummary() const;
     void selectPreset(int index);
+    void studioPolish();
     void setSessionDirectory(juce::File dir) {sessionDirectory=std::move(dir);}
     const juce::File& session() const noexcept {return sessionDirectory;}
     juce::Result saveProject(const juce::File&,const vocal::EqSettings* storedEq=nullptr);
@@ -99,6 +100,7 @@ public:
     std::atomic<bool> monitor{false},fxBypass{false},latencyCompensation{true};
     std::atomic<int> inputChannel{0},recordingFault{0};
     std::atomic<float> inputDb{0},highPass{80},warmth{-2},presence{2},threshold{-18},ratio{3},makeup{2},deEss{.35f},reverb{.10f},delay{.04f},delayMs{240},masterDb{-3},manualOffsetMs{0};
+    std::atomic<float> leveling{0},dynamicTame{0},reverbDuck{0};
     std::atomic<float> decaySeconds{1.2f},preDelayMs{20},damping{.65f},width{1},delayFeedback{.27f},deharsh{0};
     std::atomic<float> inputPeak{0},outputPeak{0},inputRms{0},gainReduction{0};
     std::atomic<bool> inputClipped{false},inputPresent{false};

@@ -2,6 +2,20 @@
 
 Ứng dụng Windows x64 để hát trên beat, thu micro qua sound card và mix vocal tại máy. Dự án nằm trong `VocalStudio/`, nhánh `vocal-studio`, không sửa Chùa Việt Online.
 
+## 1.4 · Vocal studio và xuất riêng giọng có FX
+
+Bấm **Vocal studio · Mượt giọng → Áp dụng preset Studio**. Preset giữ EQ riêng/input gain và thiết lập Antares, chọn compressor vừa, reverb nhẹ có pre-delay, delay nhỏ và bật ba bước mới chỉ trên vocal:
+
+- **Cân câu nhỏ/to:** bộ cân mức chậm trước compressor; ở 100% giới hạn +4/−6 dB, ngừng nâng mức dưới ngưỡng detector −40 dBFS. Giúp câu nhỏ rõ hơn, không đổi nốt/quãng giọng; không phải bộ khử ồn và không sửa clip analog.
+- **Dịu gắt động:** giảm có điều kiện dải quanh 3,5 kHz khi nổi lên, giữ vùng thấp. Khác với việc cắt tối toàn bộ giọng liên tục; giảm lượng nếu thấy mất độ rõ.
+- **Vang né giọng:** hạ return reverb/delay khi hát, trả đuôi vang khi ngắt câu. Reverb/delay vẫn đặt sau Antares. Ba bước không thêm lookahead; độ trễ vẫn phụ thuộc driver/plugin.
+
+Các thanh chỉnh độc lập từ 0–100%. **Bật/Tắt ba bước mới** dùng để so sánh chính ba bước; EQ, compressor, vang và Antares hiện tại vẫn giữ. Preset Studio có chỉnh compressor/vang nên đọc thông tin trước khi áp dụng. Dự án cũ mặc định ba lượng mới bằng 0; không tự đổi tiếng khi mở lại. Thiết lập được lưu trong dự án.
+
+**Xuất WAV vocal có FX:** thu micro hoặc chọn một track vocal trong Studio, dừng thu, rồi xuất. Chức năng lấy WAV micro gốc (kể cả khi track đã qua chỉnh pitch), áp dụng EQ/dynamics/Antares/reverb/delay hiện tại, bù latency và giữ đuôi vang, lưu PCM WAV stereo 24-bit. Không có nhạc YouTube/track khác, không chịu mute/solo timeline, không sửa WAV gốc. Nếu muốn xuất mix với beat của bạn hoặc giữ bản pitch offline đang chọn, dùng Xuất WAV trong Studio như trước. Bài đổi key hoặc đã đổi thiết lập Antares trong lúc thu cần kiểm tra/chia đoạn trước khi render; xuất dùng trạng thái plugin hiện tại, không tái tạo lịch sử automation chưa được ghi. Có hủy và bảo vệ file nguồn/đích cũ.
+
+Bản này cải thiện bộ xử lý và thêm đường xuất thành phẩm vocal để nghe đối chiếu. Chưa nghe thử giọng người dùng/UPod Pro/Antares có giấy phép; kiểm thử tín hiệu và phần mềm không chứng minh thành phẩm tương đương clip tham chiếu. Không tự sao chép chất giọng từ TikTok, không đảm bảo một preset tạo ngay chất lượng phát hành. Hát thử, nghe A/B và chỉnh theo mic, cách hát, phòng và bài cụ thể.
+
 ## 1.3 · Hát một bài → Cân EQ riêng
 
 Màn hình hát có **Hát 1 bài → Cân EQ**. Mở bài YouTube như bình thường, vào bảng này và bấm **Thu bài để cân EQ**. Hát vài câu có cả trầm/cao/mạnh (nên từ 10 giây; có thể hát cả bài), rồi bấm **Dừng thu → Phân tích**. Bản micro gốc được giữ nguyên và đặt tên riêng, mute trong timeline để không phát lẫn. Có thể chọn một track vocal của chính bạn ở Studio rồi bấm **Phân tích vocal đang chọn**. Nếu track đã xử lý, phân tích/nghe A/B dùng WAV gốc theo lịch sử track.

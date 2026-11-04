@@ -15,7 +15,7 @@ public:
 private:
     StudioMain& owner;YouTubeBrowser browser;
     juce::TextEditor search;
-    juce::TextButton open,back,home,down,up,reset,advanced,devices,fx,antares,loadPlugin,mic,record,softReverb,autoEq;
+    juce::TextButton open,back,home,down,up,reset,advanced,devices,fx,antares,loadPlugin,mic,record,softReverb,autoEq,polish;
     juce::Label title,offset,key,musicLabel,micLabel,reverbLabel,delayLabel;
     juce::TextEditor status;
     juce::Viewport sidebar;juce::Component controls;
