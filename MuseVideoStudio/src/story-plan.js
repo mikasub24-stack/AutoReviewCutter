@@ -66,12 +66,64 @@
     return Math.min(cap, Math.max(MIN_SECONDS, need));
   }
 
+  /* ---------- chế độ quảng cáo sản phẩm (affiliate) ---------- */
+  // `prompt` là câu đưa vào prompt gửi Muse; `label` / `en` là chữ trên nút chọn.
+  const AD_CAMERA = [
+    { id: 'macro', label: 'Cận cảnh chi tiết', en: 'Macro close-up', prompt: 'cận cảnh chi tiết (macro) chất liệu, kết cấu và các chi tiết của sản phẩm' },
+    { id: 'dolly-in', label: 'Tiến sát', en: 'Dolly in', prompt: 'máy quay tiến chậm về phía sản phẩm (dolly in)' },
+    { id: 'pull-back', label: 'Lùi xa', en: 'Pull back', prompt: 'máy quay lùi ra từ từ để lộ toàn cảnh (pull back)' },
+    { id: 'orbit', label: 'Xoay quanh', en: 'Orbit', prompt: 'máy quay xoay chậm quanh sản phẩm (orbit) để thấy nhiều góc' },
+    { id: 'pan', label: 'Lia ngang', en: 'Pan', prompt: 'máy quay lia ngang thật mượt (pan)' },
+    { id: 'top', label: 'Từ trên cao', en: 'Top-down', prompt: 'góc quay từ trên cao nhìn xuống (top-down / flycam)' },
+    { id: 'slow', label: 'Quay chậm', en: 'Slow motion', prompt: 'chuyển động quay chậm (slow motion) ở khoảnh khắc nổi bật' },
+    { id: 'handheld', label: 'Cầm tay', en: 'Handheld', prompt: 'máy quay cầm tay tự nhiên như người thật quay (handheld)' },
+    { id: 'static', label: 'Cố định', en: 'Static', prompt: 'máy quay cố định trên chân máy, khung hình vững' }
+  ];
+  const AD_LOOK = [
+    { id: 'tvc', label: 'Quảng cáo TVC', en: 'TV commercial', prompt: 'phong cách quảng cáo TVC cao cấp: ánh sáng studio mềm, nền gọn sạch, sản phẩm nổi bật, màu sắc sang và nhất quán' },
+    { id: 'cinematic', label: 'Điện ảnh', en: 'Cinematic', prompt: 'phong cách điện ảnh: ánh sáng tương phản nhẹ, chiều sâu trường ảnh nông, tông màu ấm' },
+    { id: 'ugc', label: 'Review đời thường', en: 'UGC review', prompt: 'phong cách review đời thường (UGC): như quay bằng điện thoại, ánh sáng tự nhiên, bối cảnh thật trong nhà, người dùng bình thường' },
+    { id: 'minimal', label: 'Tối giản, nền trơn', en: 'Minimal', prompt: 'phong cách tối giản: nền trơn một màu, ít vật thể, sản phẩm là trung tâm' },
+    { id: 'bright', label: 'Tươi sáng, trẻ trung', en: 'Bright & young', prompt: 'phong cách tươi sáng, trẻ trung: màu rực, ánh sáng tự nhiên, năng động' },
+    { id: 'luxury', label: 'Sang trọng', en: 'Luxury', prompt: 'phong cách sang trọng: tông tối ấm, ánh sáng điểm nhấn, vật liệu bóng, chuyển động chậm và tinh tế' }
+  ];
+  const AD_TONE = [
+    { id: 'hype', label: 'Hào hứng, thuyết phục', en: 'Enthusiastic', prompt: 'hào hứng, thuyết phục nhưng không phóng đại' },
+    { id: 'warm', label: 'Thân mật, chân thành', en: 'Warm & sincere', prompt: 'thân mật, chân thành như người quen giới thiệu' },
+    { id: 'expert', label: 'Chuyên gia, đáng tin', en: 'Expert', prompt: 'điềm tĩnh, rõ ràng, đáng tin như người am hiểu' },
+    { id: 'fun', label: 'Vui nhộn, trẻ trung', en: 'Fun & young', prompt: 'vui nhộn, trẻ trung, gần gũi' },
+    { id: 'premium', label: 'Sang trọng, tinh tế', en: 'Premium', prompt: 'sang trọng, tinh tế, ít lời' }
+  ];
+  const AD_LENGTHS = [15, 30, 45, 60];
+  const AD_MAX_CAMERA = 3;
+  const adText = (value, max) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+  // null = không phải chế độ quảng cáo. Chuẩn hóa mọi trường để dữ liệu từ giao diện không làm hỏng prompt.
+  function adOptions(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const ids = list => new Set(list.map(x => x.id));
+    const camera = [...new Set((Array.isArray(raw.camera) ? raw.camera : []).map(String))].filter(id => ids(AD_CAMERA).has(id)).slice(0, AD_MAX_CAMERA);
+    const length = Number(raw.length);
+    return {
+      product: adText(raw.product, 120),
+      points: String(raw.points || '').replace(/\r\n?/g, '\n').split('\n').map(line => adText(line, 240)).filter(Boolean).slice(0, 12).join('\n'),
+      audience: adText(raw.audience, 160),
+      offer: adText(raw.offer, 160),
+      cta: adText(raw.cta, 160),
+      tone: ids(AD_TONE).has(raw.tone) ? raw.tone : AD_TONE[0].id,
+      length: AD_LENGTHS.includes(length) ? length : 30,
+      camera,
+      look: ids(AD_LOOK).has(raw.look) ? raw.look : ''
+    };
+  }
+  const adPick = (list, id) => list.find(x => x.id === id);
+  const productName = ad => (ad && ad.product) || 'sản phẩm trong ảnh tham chiếu';
+
   function options(input = {}) {
     const seconds = Number(input.seconds ?? MAX_SECONDS);
     if (!Number.isFinite(seconds) || seconds < 3 || seconds > MAX_SECONDS) throw Error(`Muse chỉ tạo clip tối đa ${MAX_SECONDS} giây: chọn mỗi cảnh từ 3 đến ${MAX_SECONDS} giây.`);
     const aspect = input.aspect || '16:9';
     if (!ASPECTS.includes(aspect)) throw Error('Chọn tỷ lệ 16:9, 9:16 hoặc 1:1.');
-    return { seconds, aspect, style: String(input.style || '').trim(), character: String(input.character || '').trim(), reference: Boolean(input.reference) };
+    return { seconds, aspect, style: String(input.style || '').trim(), character: String(input.character || '').trim(), reference: Boolean(input.reference), ad: adOptions(input.ad) };
   }
 
   // Toàn bộ văn bản người dùng dán chính là lời đọc: không tách nhãn, không bỏ chữ.
@@ -178,22 +230,27 @@
 
   function scenePrompt(voiceover, config, visual = '') {
     const seconds = sceneSeconds(voiceover || visual, config.seconds);
+    const ad = config.ad;
+    const camera = ad ? ad.camera.map(id => adPick(AD_CAMERA, id)?.prompt).filter(Boolean) : [];
+    const look = ad ? (adPick(AD_LOOK, ad.look)?.prompt || '').replace(/^phong cách /, '') : '';
     return [
-      `Tạo video dài ${seconds} giây, tỷ lệ ${config.aspect}, thể hiện đúng cảnh dưới đây.`,
+      `Tạo video ${ad ? 'quảng cáo sản phẩm ' : ''}dài ${seconds} giây, tỷ lệ ${config.aspect}, thể hiện đúng cảnh dưới đây.`,
       '',
       visual ? 'HÌNH ẢNH THEO KỊCH BẢN (làm đúng như mô tả):' : '',
       visual || '',
-      voiceover ? 'NỘI DUNG CẢNH (lời kể, chỉ để hiểu cảnh; nhân vật không nói):' : '',
+      voiceover ? (ad ? 'NỘI DUNG CẢNH (lời quảng cáo, chỉ để hiểu cảnh; không ai nói):' : 'NỘI DUNG CẢNH (lời kể, chỉ để hiểu cảnh; nhân vật không nói):') : '',
       voiceover || '',
       '',
-      config.character ? `Nhân vật: ${config.character}` : '',
+      ad ? `Sản phẩm quảng cáo: ${productName(ad)}. Sản phẩm hiện rõ, là trung tâm chú ý của khung hình.` : '',
+      config.character ? `${ad ? 'Người mẫu' : 'Nhân vật'}: ${config.character}` : '',
       config.style ? `Phong cách hình ảnh: ${config.style}` : '',
-      ...(config.reference ? ['Nhân vật chính giữ đúng khuôn mặt, trang phục và thiết kế như trong ảnh tham chiếu, ở mọi cảnh.'] : []),
-      `Chỉ một khoảnh khắc liên tục trong ${seconds} giây, không chuyển cảnh; thể hiện đúng người, nơi chốn, thời gian, hành động và nét mặt được nêu.`,
-      'Chuyển động: tự nhiên, mượt; không tự thêm nhân vật, sự kiện hay địa điểm, không bỏ chi tiết quan trọng.',
-      'Máy quay: khung hình rõ ràng, chuyển động nhẹ hoặc cố định.',
+      look ? `Phong cách quảng cáo: ${look}.` : '',
+      ...(config.reference ? [ad ? 'Sản phẩm giữ đúng hình dạng, màu sắc, chất liệu và bao bì như trong ảnh tham chiếu; không đổi sang sản phẩm khác.' : 'Nhân vật chính giữ đúng khuôn mặt, trang phục và thiết kế như trong ảnh tham chiếu, ở mọi cảnh.'] : []),
+      `Chỉ một khoảnh khắc liên tục trong ${seconds} giây, không chuyển cảnh; thể hiện đúng ${ad ? 'sản phẩm, bối cảnh, hành động và cảm xúc' : 'người, nơi chốn, thời gian, hành động và nét mặt'} được nêu.`,
+      ad ? 'Chuyển động: tự nhiên, mượt; không thêm tính năng, chi tiết hay công dụng mà sản phẩm không có.' : 'Chuyển động: tự nhiên, mượt; không tự thêm nhân vật, sự kiện hay địa điểm, không bỏ chi tiết quan trọng.',
+      camera.length ? `Máy quay (chọn hợp với cảnh): ${camera.join('; ')}.` : 'Máy quay: khung hình rõ ràng, chuyển động nhẹ hoặc cố định.',
       NO_SPEECH,
-      'Không chèn chữ, phụ đề hoặc logo vào hình.'
+      ad ? 'Không thêm chữ, giá, phụ đề hay logo mới vào hình (nhãn thật trên sản phẩm giữ nguyên như ảnh).' : 'Không chèn chữ, phụ đề hoặc logo vào hình.'
     ].filter((line, index, lines) => line !== '' || (index > 0 && lines[index - 1] !== '')).join('\n');
   }
 
@@ -220,6 +277,78 @@
     return (first > 1 ? '… ' : '') + unitsText(units, Math.max(1, first - 12), Math.min(units.length, last + 6)) + (last < units.length ? ' …' : '');
   }
 
+  // Khối thông tin quảng cáo gắn cuối câu lệnh chia cảnh (chỉ những mục người dùng đã điền).
+  function adBlock(ad) {
+    const camera = ad.camera.map(id => adPick(AD_CAMERA, id)?.prompt).filter(Boolean);
+    const look = adPick(AD_LOOK, ad.look)?.prompt;
+    const lines = [];
+    if (ad.product) lines.push(`Sản phẩm: ${ad.product}`);
+    if (ad.points) lines.push('Điểm nổi bật:', ...ad.points.split('\n').map(x => '- ' + x));
+    if (ad.audience) lines.push(`Người xem hướng tới: ${ad.audience}`);
+    if (ad.offer) lines.push(`Giá / ưu đãi (chỉ để hiểu, không vẽ chữ giá lên hình): ${ad.offer}`);
+    if (camera.length) lines.push(`Chuyển động máy quay đã chọn: ${camera.join('; ')}`);
+    if (look) lines.push(`Phong cách quảng cáo: ${look}`);
+    return lines.length ? ['', 'THÔNG TIN QUẢNG CÁO (do người dùng cung cấp):', ...lines] : [];
+  }
+
+  /* Câu lệnh nhờ Muse VIẾT lời quảng cáo (voice-over) cho sản phẩm. Người dùng sửa lại rồi mới chia cảnh.
+     ctx: { marker } – dòng cuối câu lệnh MSEND<marker>, dòng cuối trả lời MSDONE<marker>. */
+  function buildAdScriptInstruction(input = {}, ctx = {}) {
+    const config = options(input), ad = config.ad;
+    if (!ad || !ad.product) throw Error('Nhập tên sản phẩm trước khi nhờ Muse viết lời quảng cáo.');
+    const marker = ctx.marker ? String(ctx.marker) : '';
+    const chars = Math.round(ad.length * CHARS_PER_SECOND * 0.9);
+    const lo = Math.round(chars * 0.85), hi = Math.round(chars * 1.05);
+    const tone = adPick(AD_TONE, ad.tone).prompt;
+    return [
+      'Bạn là người viết lời quảng cáo cho video bán hàng ngắn. Hãy viết MỘT lời đọc (voice-over) cho sản phẩm ở cuối.',
+      '',
+      'QUY TẮC',
+      `1. Độ dài: khoảng ${lo}–${hi} ký tự (đọc khoảng ${ad.length} giây). Câu ngắn, dễ đọc thành tiếng, mỗi câu một ý, mỗi câu không quá 110 ký tự.`,
+      '2. Cấu trúc: (a) 1–2 câu mở đầu thu hút ngay, nói đúng nhu cầu hoặc vấn đề của người xem; (b) 2–4 câu giới thiệu các điểm nổi bật, mỗi điểm một câu, dùng đúng thông tin ở cuối; (c) 1 câu kêu gọi hành động ở cuối.',
+      '3. Chỉ dùng thông tin người dùng cung cấp. KHÔNG bịa tính năng, thông số, con số, thành phần, giá, khuyến mãi, chứng nhận, đánh giá hay số người dùng. Không dùng từ tuyệt đối hoặc khó kiểm chứng như «số 1», «tốt nhất», «100%», «cam kết», «khỏi hẳn». Không nói về chữa bệnh, giảm cân hay hiệu quả y tế. Không so sánh với sản phẩm hay thương hiệu khác. Không hứa kết quả.',
+      ad.offer ? '4. Giá / ưu đãi: nhắc đúng nguyên văn thông tin người dùng đưa, một lần.' : '4. Người dùng không đưa giá hay ưu đãi nên KHÔNG nhắc đến giá, giảm giá hay quà tặng.',
+      ad.cta ? `5. Câu kêu gọi hành động cuối cùng: dùng ý này, viết tự nhiên: «${ad.cta}».` : '5. Câu kêu gọi hành động cuối cùng: nhẹ nhàng, không ép (ví dụ mời xem chi tiết hoặc thử sản phẩm), không bịa kênh mua hàng.',
+      `6. Giọng điệu: ${tone}.`,
+      '7. Chỉ viết lời đọc: không tiêu đề, không đánh số, không nhãn như «Mở đầu:», không chỉ dẫn hình ảnh hay âm thanh, không emoji, không hashtag, không ký hiệu markdown, không ghi chú trong ngoặc.',
+      '8. Viết bằng tiếng Việt, trừ khi thông tin sản phẩm bên dưới viết bằng ngôn ngữ khác thì dùng ngôn ngữ đó.',
+      '',
+      'Trả lời đúng khuôn sau, KHÔNG viết thêm câu dẫn hay giải thích:',
+      'KỊCH BẢN:',
+      '<lời đọc quảng cáo>',
+      marker ? `(dòng cuối cùng của trả lời chỉ gồm đúng một từ: MSDONE${marker})` : '',
+      '',
+      'THÔNG TIN SẢN PHẨM (do người dùng cung cấp):',
+      `Sản phẩm: ${ad.product}`,
+      ad.points ? ['Điểm nổi bật:', ...ad.points.split('\n').map(x => '- ' + x)].join('\n') : 'Điểm nổi bật: (người dùng chưa nêu: chỉ nói những điều chắc chắn từ tên sản phẩm, không bịa)',
+      ad.audience ? `Người xem hướng tới: ${ad.audience}` : '',
+      ad.offer ? `Giá / ưu đãi: ${ad.offer}` : '',
+      marker ? `MSEND${marker}` : ''
+    ].filter((line, index, lines) => line !== '' || (index > 0 && lines[index - 1] !== '' && index < lines.length - 1)).join('\n');
+  }
+
+  // Lấy lời quảng cáo từ trả lời của Muse: bỏ lời dẫn, mốc xong, nhãn, chỉ dẫn trong ngoặc, emoji, hashtag, ký hiệu markdown.
+  const AD_HEAD = /^[\t ]*(?:#{1,6}[\t ]*)?(?:\*\*|__)?[\t ]*(?:kịch bản|kich ban|lời đọc|lời quảng cáo|script|voice-?over)[\t ]*(?:\*\*|__)?[\t ]*[:：][\t ]*(?:\*\*|__)?(.*)$/i;
+  const AD_LABEL = /^(?:hook|mở đầu|mở bài|thân bài|điểm nổi bật|lợi ích|kêu gọi(?: hành động)?|cta|kết(?: thúc| bài)?)[^:：\n]{0,20}[:：]\s*/i;
+  function scriptFromReply(reply) {
+    let lines = String(reply || '').replace(/\r\n?/g, '\n').split('\n').filter(line => !/MS(?:DONE|END)[0-9a-f]+/i.test(line));
+    const at = lines.findIndex(line => AD_HEAD.test(line));
+    if (at >= 0) lines = [lines[at].match(AD_HEAD)[1], ...lines.slice(at + 1)];
+    const out = [];
+    for (const raw of lines) {
+      // Tiêu đề markdown («## Mở đầu») và dòng chỉ có một nhãn in đậm («**Kết**») là nhãn, không phải lời đọc.
+      if (/^[\t ]*#{1,6}[\t ]/.test(raw) || /^[\t ]*(?:\*\*|__)[^*_]{1,30}(?:\*\*|__)[\t ]*$/.test(raw) && !/[.!?…]/.test(raw)) continue;
+      let line = raw.replace(/\*\*|__/g, '').replace(/^[\t ]*(?:#{1,6}[\t ]*|[-•][\t ]+|\*[\t ]+|\d+[.)][\t ]+)/, '').trim();
+      line = line.replace(/\p{Extended_Pictographic}\uFE0F?/gu, '').replace(/(?:^|\s)#[\p{L}\p{N}_]+/gu, '').trim();
+      if (!line || /^[\[(（].*[\])）]$/.test(line) || /^[-=*_~]{3,}$/.test(line)) continue;
+      line = line.replace(AD_LABEL, '').replace(/^["“«]\s*(.*?)\s*["”»]$/, '$1').trim();
+      if (line) out.push(line);
+    }
+    const text = out.join('\n');
+    if (count(text) < 20) throw Error('Muse chưa viết lời quảng cáo. Bấm viết lại.');
+    return text;
+  }
+
   /* Câu lệnh gửi cho Muse: đọc hiểu cả câu chuyện, gom các câu đánh số thành cảnh, viết prompt hình.
      ctx: { units, ranges: [[từ, đến]…] (mặc định cả truyện), cast, part, parts, marker } */
   function buildMuseInstruction(script, input = {}, ctx = {}) {
@@ -234,25 +363,27 @@
     const numbered = list => list.map(u => `[${u.n}] (${u.seconds} giây) ${u.text}`);
     const first = picked[0].n, last = picked[picked.length - 1].n;
     const partNote = ctx.parts > 1 ? ` Đây là phần ${ctx.part}/${ctx.parts} của câu chuyện.` : '';
+    const ad = config.ad;
     return [
-      `Bạn là đạo diễn hình ảnh cho video kể chuyện. Mỗi cảnh sẽ được AI tạo thành MỘT video ngắn, dài tối đa ${s} giây, và mỗi lần tạo đều tốn lượt, nên hình ảnh, hành động và nét mặt phải đúng ngay từ lần đầu.`,
+      ad ? `Bạn là đạo diễn hình ảnh cho video QUẢNG CÁO sản phẩm bán hàng. Mỗi cảnh sẽ được AI tạo thành MỘT video ngắn, dài tối đa ${s} giây, và mỗi lần tạo đều tốn lượt, nên sản phẩm, hành động và bố cục phải đúng ngay từ lần đầu.` : `Bạn là đạo diễn hình ảnh cho video kể chuyện. Mỗi cảnh sẽ được AI tạo thành MỘT video ngắn, dài tối đa ${s} giây, và mỗi lần tạo đều tốn lượt, nên hình ảnh, hành động và nét mặt phải đúng ngay từ lần đầu.`,
       '',
-      `BƯỚC 1 – ĐỌC HIỂU: đọc kỹ toàn bộ câu chuyện${whole ? ' ở cuối' : ' ở phần NGỮ CẢNH'} để nắm nhân vật, bối cảnh, thời điểm, diễn biến, cảm xúc và ý nghĩa của từng câu.${partNote}`,
+      `BƯỚC 1 – ĐỌC HIỂU: đọc kỹ toàn bộ ${ad ? 'lời quảng cáo' : 'câu chuyện'}${whole ? ' ở cuối' : ' ở phần NGỮ CẢNH'} để nắm nhân vật, bối cảnh, thời điểm, diễn biến, cảm xúc và ý nghĩa của từng câu.${partNote}`,
       `BƯỚC 2 – CHIA CẢNH: ${whole ? '' : 'chỉ chia các câu ở phần CÁC CÂU CẦN CHIA CẢNH; phần còn lại chỉ để hiểu. '}Gom các câu đánh số LIÊN TIẾP thành cảnh, đủ mọi câu, đúng thứ tự, không bỏ sót, không lặp. Số trong ngoặc là số giây đọc câu đó; tổng của mỗi cảnh không quá ${budget} giây. Độ dài video của cảnh tự theo lời kể: tổng số giây các câu chia cho 0,9, làm tròn lên (tối thiểu ${MIN_SECONDS}, tối đa ${s} giây); cảnh ngắn thì video ngắn, không kéo dài cho đủ ${s} giây. KHÔNG chép lại lời: chỉ ghi số câu, giọng đọc sẽ đọc đúng nguyên văn các câu đó.`,
       'BƯỚC 3 – VIẾT PROMPT cho từng cảnh theo quy tắc dưới đây.',
       '',
       'QUY TẮC',
       `1. Mỗi cảnh chỉ là MỘT khoảnh khắc liên tục trong độ dài video của cảnh: một địa điểm, một nhóm nhân vật, tối đa 2–3 hành động nối tiếp; KHÔNG nhảy thời gian, KHÔNG đổi địa điểm, KHÔNG cắt cảnh trong cùng video. Các câu liên tiếp mà đổi địa điểm hoặc nhảy thời gian thì tách thành cảnh khác.`,
       `2. PROMPT thể hiện đúng điều các câu của cảnh nói: ai, ở đâu, lúc nào, làm gì, theo thứ tự thời gian, chia mốc theo đúng độ dài video của cảnh (video 5 giây: 0–2 giây…, 2–5 giây…; video ${s} giây: 0–3 giây…, 3–7 giây…, 7–${s} giây…), kèm nét mặt, ánh mắt, cử chỉ, tư thế, cảm xúc, ánh sáng và góc máy. Dùng từ cụ thể, không mơ hồ.`,
-      '3. Không bịa thêm nhân vật, vật thể hay sự kiện; không đổi kết cục; không bỏ hành động quan trọng. Suy nghĩ, cảm xúc hay ý trừu tượng thì thể hiện bằng nét mặt, cử chỉ hoặc vật cụ thể có trong câu.',
+      ad ? '3. Không bịa tính năng, thông số, công dụng, thành phần, chứng nhận hay kết quả mà lời quảng cáo không nói; không cảnh so sánh với sản phẩm khác; không cảnh «trước/sau» hay minh họa chữa bệnh, giảm cân, hiệu quả y tế. Ý trừu tượng thì thể hiện bằng hình cụ thể (người dùng thoải mái, sản phẩm đang được dùng).' : '3. Không bịa thêm nhân vật, vật thể hay sự kiện; không đổi kết cục; không bỏ hành động quan trọng. Suy nghĩ, cảm xúc hay ý trừu tượng thì thể hiện bằng nét mặt, cử chỉ hoặc vật cụ thể có trong câu.',
       '4. Mỗi cảnh được tạo video riêng nên PROMPT phải tự đủ ý: nhắc lại tên, ngoại hình, trang phục và bối cảnh của nhân vật theo cùng một cách ở mọi cảnh; không viết «như cảnh trước».',
-      ...[config.reference ? '5. NHÂN VẬT: nhận ra MỌI nhân vật trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Nhân vật chính là người ở ảnh tham chiếu đính kèm: giữ đúng khuôn mặt, tóc, trang phục trong ảnh, không tự đổi. Mỗi nhân vật khác được chốt MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó. Trong PROMPT của mỗi cảnh, gọi từng người xuất hiện trong khung hình bằng đúng tên/vai đó kèm mô tả cố định, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.' : '5. NHÂN VẬT: nhận ra các nhân vật CÓ MẶT trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Mỗi nhân vật được chốt MỘT mô tả cố định, ngắn gọn (tuổi, vóc dáng, tóc, trang phục) ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó; chi tiết truyện không nói thì chọn đơn giản, không bịa thêm. Nếu người dùng đã mô tả nhân vật chính (ở cuối) thì dùng đúng mô tả đó. Chỉ mô tả người XUẤT HIỆN trong khung hình của cảnh, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.'],
-      '6. Nhân vật tuyệt đối không nói, không hát, không mấp máy môi: lời thoại trong truyện thể hiện bằng cử chỉ và nét mặt. Lời kể do người đọc, không phải nhân vật.',
-      `7. Không chèn chữ, phụ đề hay logo vào hình${config.style ? `; phong cách hình ảnh: ${config.style}` : ''}${config.reference ? '; nhân vật chính giữ đúng như ảnh tham chiếu' : ''}; tỷ lệ ${config.aspect}.`,
-      '8. Viết PROMPT cùng ngôn ngữ với câu chuyện, riêng câu cuối của PROMPT luôn là đúng câu tiếng Anh này: ' + NO_SPEECH,
+      ...[ad ? (config.reference ? '5. SẢN PHẨM: ảnh tham chiếu đính kèm là sản phẩm thật. Giữ đúng hình dạng, tỷ lệ, màu sắc, chất liệu, bao bì và nhãn như trong ảnh; không đổi, không thêm bộ phận, không đổi sang sản phẩm khác. Sản phẩm phải HIỆN RÕ ở mọi cảnh (đang được dùng hoặc trưng bày). Ở dòng NHÂN VẬT ghi mô tả cố định của sản phẩm theo ảnh và, nếu có người mẫu hay người dùng, MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) dùng y nguyên ở mọi cảnh có người đó. Người chỉ được nhắc đến mà không có mặt thì KHÔNG vẽ vào hình.' : '5. SẢN PHẨM: chưa có ảnh tham chiếu nên chỉ mô tả sản phẩm theo thông tin ở cuối, đơn giản và nhất quán (hình dạng, màu sắc, chất liệu) ở mọi cảnh; không bịa chi tiết mà thông tin không nói. Sản phẩm phải HIỆN RÕ ở mọi cảnh (đang được dùng hoặc trưng bày). Ở dòng NHÂN VẬT ghi mô tả cố định của sản phẩm và, nếu có người mẫu hay người dùng, MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) dùng y nguyên ở mọi cảnh có người đó. Người chỉ được nhắc đến mà không có mặt thì KHÔNG vẽ vào hình.') : config.reference ? '5. NHÂN VẬT: nhận ra MỌI nhân vật trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Nhân vật chính là người ở ảnh tham chiếu đính kèm: giữ đúng khuôn mặt, tóc, trang phục trong ảnh, không tự đổi. Mỗi nhân vật khác được chốt MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó. Trong PROMPT của mỗi cảnh, gọi từng người xuất hiện trong khung hình bằng đúng tên/vai đó kèm mô tả cố định, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.' : '5. NHÂN VẬT: nhận ra các nhân vật CÓ MẶT trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Mỗi nhân vật được chốt MỘT mô tả cố định, ngắn gọn (tuổi, vóc dáng, tóc, trang phục) ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó; chi tiết truyện không nói thì chọn đơn giản, không bịa thêm. Nếu người dùng đã mô tả nhân vật chính (ở cuối) thì dùng đúng mô tả đó. Chỉ mô tả người XUẤT HIỆN trong khung hình của cảnh, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.'],
+      ad ? '6. Người trong cảnh tuyệt đối không nói, không hát, không mấp máy môi; cảm xúc thể hiện bằng cử chỉ và nét mặt. Lời quảng cáo do người đọc, không phải người trong cảnh.' : '6. Nhân vật tuyệt đối không nói, không hát, không mấp máy môi: lời thoại trong truyện thể hiện bằng cử chỉ và nét mặt. Lời kể do người đọc, không phải nhân vật.',
+      ad ? `7. Không thêm chữ, giá, phụ đề hay logo vào hình (nhãn thật trên sản phẩm giữ nguyên như ảnh)${config.style ? `; phong cách hình ảnh: ${config.style}` : ''}; tỷ lệ ${config.aspect}.` : `7. Không chèn chữ, phụ đề hay logo vào hình${config.style ? `; phong cách hình ảnh: ${config.style}` : ''}${config.reference ? '; nhân vật chính giữ đúng như ảnh tham chiếu' : ''}; tỷ lệ ${config.aspect}.`,
+      '8. Viết PROMPT cùng ngôn ngữ với ' + (ad ? 'lời quảng cáo' : 'câu chuyện') + ', riêng câu cuối của PROMPT luôn là đúng câu tiếng Anh này: ' + NO_SPEECH,
+      ...(ad ? ['9. Nhịp quảng cáo: cảnh đầu phải thu hút ngay trong 1–2 giây đầu; các cảnh giữa cho thấy rõ từng điểm nổi bật bằng hình cụ thể (sản phẩm đang được dùng, cận cảnh chi tiết); cảnh cuối là khung hình đẹp nhất của sản phẩm. Mỗi cảnh chọn chuyển động máy quay hợp với cảnh trong danh sách đã chọn (nếu có) và ghi rõ trong PROMPT.'] : []),
       '',
       'Trả lời đúng khuôn sau, KHÔNG viết thêm câu dẫn hay giải thích:',
-      ...(ctx.cast ? [] : ['NHÂN VẬT: <mọi nhân vật trong truyện, mỗi người một mục: tên/vai – tuổi, vóc dáng, tóc, trang phục cố định' + (config.reference ? '; nhân vật chính ghi «theo ảnh tham chiếu»' : '') + '>']),
+      ...(ctx.cast ? [] : [ad ? 'NHÂN VẬT: <sản phẩm: mô tả cố định' + (config.reference ? ' theo ảnh tham chiếu' : '') + '; người mẫu nếu có: tuổi, vóc dáng, tóc, trang phục cố định>' : 'NHÂN VẬT: <mọi nhân vật trong truyện, mỗi người một mục: tên/vai – tuổi, vóc dáng, tóc, trang phục cố định' + (config.reference ? '; nhân vật chính ghi «theo ảnh tham chiếu»' : '') + '>']),
       'CẢNH 1',
       `CÂU: <số câu đầu>-<số câu cuối> (ví dụ 1-3; một câu thì chỉ ghi số đó)`,
       'PROMPT: <mô tả hình ảnh theo quy tắc trên>',
@@ -261,9 +392,10 @@
       'PROMPT: …',
       `(cứ thế đến câu số ${last}${marker ? `; dòng cuối cùng của trả lời chỉ gồm đúng một từ: MSDONE${marker}` : ''})`,
       ctx.cast ? `\nNHÂN VẬT ĐÃ CHỐT (dùng y nguyên trong mọi PROMPT; người mới xuất hiện ở phần này thì bổ sung thêm vào dòng NHÂN VẬT): ${ctx.cast}` : '',
-      config.character ? `\nNhân vật chính (người dùng mô tả): ${config.character}` : '',
+      config.character ? `\n${ad ? 'Người mẫu' : 'Nhân vật chính'} (người dùng mô tả): ${config.character}` : '',
+      ...(ad ? adBlock(ad) : []),
       '',
-      ...(whole ? ['CÂU CHUYỆN (đã đánh số câu):'] : ['NGỮ CẢNH – câu chuyện (chỉ để hiểu, KHÔNG viết cảnh cho phần này):', contextText(script, units, first, last), '', 'CÁC CÂU CẦN CHIA CẢNH:']),
+      ...(whole ? [ad ? 'LỜI QUẢNG CÁO (đã đánh số câu):' : 'CÂU CHUYỆN (đã đánh số câu):'] : ['NGỮ CẢNH – ' + (ad ? 'lời quảng cáo' : 'câu chuyện') + ' (chỉ để hiểu, KHÔNG viết cảnh cho phần này):', contextText(script, units, first, last), '', 'CÁC CÂU CẦN CHIA CẢNH:']),
       ...numbered(picked),
       marker ? `MSEND${marker}` : ''
     ].filter((line, index, lines) => line !== '' || (index > 0 && lines[index - 1] !== '' && index < lines.length - 1)).join('\n');
@@ -591,5 +723,5 @@
     return entries.map((entry, index) => `${index + 1}\n${srtTime(entry.start)} --> ${srtTime(entry.end)}\n${entry.text}\n`).join('\n');
   }
 
-  return { ASPECTS, MAX_SECONDS, MIN_SECONDS, sceneSeconds, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, buildMuseInstruction, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, subtitleChunks, srtTime, toSrt };
+  return { ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, MAX_SECONDS, MIN_SECONDS, sceneSeconds, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, buildMuseInstruction, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, subtitleChunks, srtTime, toSrt };
 });

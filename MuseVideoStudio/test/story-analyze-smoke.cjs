@@ -30,6 +30,7 @@ const PAGE = `<!doctype html><meta charset="utf-8"><style>#log{white-space:pre-w
 
 const tale = 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng, em dắt trâu ra đồng. Một hôm, em nhặt được chiếc hộp gỗ cũ bên bờ nước, bên trong là một chiếc chìa khóa nhỏ. Em hoảng hốt nhìn quanh, rồi mỉm cười. Bà Ba từ xa gọi em về ăn cơm.';
 const cfg = { seconds: 10, aspect: '16:9', character: 'Mai, bé gái tóc đen' };
+const adCfg = { seconds: 10, aspect: '9:16', ad: { product: 'Bình giữ nhiệt Aqua 500ml', points: 'Giữ nóng 12 giờ\nNắp chống tràn', audience: 'Dân văn phòng', cta: 'Bấm vào giỏ hàng để xem chi tiết', tone: 'warm', length: 30, camera: ['macro', 'orbit'], look: 'ugc' } };
 
 // «Muse» giả: đọc yêu cầu, gom câu đánh số theo số giây, viết prompt, kết thúc bằng mốc MSDONE.
 function brain(behavior = {}) {
@@ -39,6 +40,12 @@ function brain(behavior = {}) {
     const done = (text.match(/MSDONE([0-9a-f]{6})/) || [])[1];
     asked.push({ text, units: units.map(u => u.n), hasCast: /NHÂN VẬT ĐÃ CHỐT/.test(text), done });
     if (behavior.onAsk) await behavior.onAsk(asked.length);
+    // Yêu cầu VIẾT lời quảng cáo (chế độ quảng cáo): trả lời có lời dẫn, nhãn, emoji, hashtag, ngoặc ghi chú như Muse thật hay làm.
+    if (/THÔNG TIN SẢN PHẨM/.test(text)) {
+      asked.at(-1).adScript = true;
+      if (behavior.adReply) return behavior.adReply(asked.filter(a => a.adScript).length, done);
+      return ['Dạ, đây là kịch bản bạn cần:', 'KỊCH BẢN:', 'Sáng nào cũng lạnh tay? 😍', '(nhạc nền nhẹ)', 'Bình Aqua giữ nóng 12 giờ. #binhgiunhiet', 'Mở đầu: Nắp chống tràn, bỏ vào túi thoải mái.', 'Bấm vào giỏ hàng để xem chi tiết.', `MSDONE${done}`].join('\n');
+    }
     if (behavior.garbage) return 'Xin lỗi, mình không hiểu yêu cầu này.';
     let list = units;
     if (behavior.skip && asked.length === 1) list = units.filter(u => !behavior.skip.includes(u.n));
@@ -229,6 +236,82 @@ function brain(behavior = {}) {
       analyzer.cancel(); await first.catch(() => {});
       await assert.rejects(analyzer.run({ script: '   ', options: cfg }), /Dán kịch bản/);
       await page.close(); ok('không chạy trùng; kịch bản rỗng báo lỗi');
+    }
+    // 13. Chế độ quảng cáo: Muse VIẾT lời quảng cáo từ thông tin sản phẩm; kết quả sạch, chỉ gửi một lần.
+    const AD_SCRIPT = 'Sáng nào cũng lạnh tay?\nBình Aqua giữ nóng 12 giờ.\nNắp chống tràn, bỏ vào túi thoải mái.\nBấm vào giỏ hàng để xem chi tiết.';
+    {
+      const { page, analyzer, museBrain, progress } = await session({});
+      const running = analyzer.writeScript({ options: adCfg });
+      await new Promise(r => setTimeout(r, 120));
+      assert.equal(analyzer.status().busy, true);
+      assert.equal(analyzer.status().kind, 'write');
+      const r = await running;
+      assert.equal(r.script, AD_SCRIPT, 'bỏ lời dẫn, nhãn, emoji, hashtag, ghi chú trong ngoặc, mốc MSDONE');
+      assert.equal(museBrain.asked.length, 1);
+      const text = museBrain.asked[0].text;
+      assert.match(text, /Sản phẩm: Bình giữ nhiệt Aqua 500ml/);
+      assert.match(text, /- Giữ nóng 12 giờ\n- Nắp chống tràn/);
+      assert.match(text, /Bấm vào giỏ hàng để xem chi tiết/);
+      assert.match(text, /KHÔNG nhắc đến giá/, 'không đưa giá thì dặn Muse không nhắc giá');
+      assert.match(text, /MSEND[0-9a-f]{6}$/);
+      assert.equal(await page.inputValue('#box'), '', 'ô chat trống sau khi gửi');
+      assert.ok(progress.some(p => /^Viết lời quảng cáo · Muse đang viết/.test(p)), 'tiến độ: ' + progress.join(' | '));
+      assert.equal(analyzer.status().busy, false);
+      assert.equal(await page.evaluate(() => window.stopClicks), 0);
+      await page.close(); ok('quảng cáo: Muse viết lời, kết quả được làm sạch');
+    }
+    // 14. Muse trả lời rỗng lần đầu → hỏi lại một lần rồi lấy được lời.
+    {
+      const { page, analyzer, museBrain } = await session({ adReply: (n, done) => (n === 1 ? `MSDONE${done}` : `KỊCH BẢN:\n${AD_SCRIPT}\nMSDONE${done}`) });
+      const r = await analyzer.writeScript({ options: adCfg });
+      assert.equal(r.script, AD_SCRIPT);
+      assert.equal(museBrain.asked.filter(a => a.adScript).length, 2);
+      await page.close(); ok('quảng cáo: trả lời rỗng thì hỏi lại một lần');
+    }
+    // 14b. Rỗng cả hai lần → báo lỗi rõ, nhả trạng thái bận.
+    {
+      const { page, analyzer } = await session({ adReply: (n, done) => `MSDONE${done}` });
+      await assert.rejects(analyzer.writeScript({ options: adCfg }), /Muse chưa viết lời quảng cáo/);
+      assert.equal(analyzer.status().busy, false);
+      await page.close(); ok('quảng cáo: Muse không viết được thì báo lỗi, không treo');
+    }
+    // 15. Thiếu tên sản phẩm → báo ngay, không mở Muse, không gửi gì.
+    {
+      const { page, analyzer, museBrain } = await session({});
+      await assert.rejects(analyzer.writeScript({ options: { ...adCfg, ad: { ...adCfg.ad, product: '  ' } } }), /Nhập tên sản phẩm/);
+      await assert.rejects(analyzer.writeScript({ options: cfg }), /Nhập tên sản phẩm/, 'không ở chế độ quảng cáo cũng không viết được');
+      assert.equal(museBrain.asked.length, 0);
+      assert.equal(await page.evaluate(() => window.sent.length), 0);
+      await page.close(); ok('quảng cáo: thiếu tên sản phẩm thì không gửi gì cho Muse');
+    }
+    // 16. Chuỗi đầy đủ: viết lời → chia cảnh. Lời giữ nguyên văn; yêu cầu chia cảnh mang thông tin sản phẩm, máy quay, phong cách.
+    {
+      const { page, analyzer, museBrain } = await session({});
+      const written = await analyzer.writeScript({ options: adCfg });
+      const r = await analyzer.run({ script: written.script, options: { ...adCfg, reference: true } });
+      assert.equal(r.scenes.map(s => s.voiceover).join(' '), written.script.replace(/\n/g, ' '));
+      const ask = museBrain.asked.at(-1).text;
+      assert.match(ask, /QUẢNG CÁO sản phẩm/);
+      assert.match(ask, /ảnh tham chiếu đính kèm là sản phẩm thật/);
+      assert.match(ask, /Chuyển động máy quay đã chọn: cận cảnh chi tiết \(macro\)/);
+      assert.match(ask, /Phong cách quảng cáo: phong cách review đời thường/);
+      assert.match(ask, /Sản phẩm: Bình giữ nhiệt Aqua 500ml/);
+      assert.ok(r.scenes.every(s => !s.offline && s.prompt.includes(plan.NO_SPEECH)));
+      await page.close(); ok('quảng cáo: viết lời rồi chia cảnh, lời đúng nguyên văn');
+    }
+    // 17. Đang viết thì không chạy phân tích trùng; hủy được.
+    {
+      const { page, analyzer } = await session({}, { reply: 20000 }, p => p.evaluate(() => { window.mode.streamMs = 4000; }));
+      const first = analyzer.writeScript({ options: adCfg });
+      const settled = first.then(() => 'done', e => e.name);
+      await new Promise(r => setTimeout(r, 300));
+      await assert.rejects(analyzer.run({ script: tale, options: cfg }), /đang phân tích/);
+      await assert.rejects(analyzer.writeScript({ options: adCfg }), /đang làm việc/);
+      analyzer.cancel();
+      assert.equal(await settled, 'AbortError');
+      assert.equal(analyzer.status().busy, false);
+      assert.equal(analyzer.status().error, '');
+      await page.close(); ok('quảng cáo: không chạy trùng; hủy được');
     }
   } finally { await browser.close(); }
   console.log(`PASS: ${passed} story analysis scenarios against a fake Muse chat page (not the real Muse).`);

@@ -426,3 +426,108 @@ test('mô tả nhân vật và ảnh tham chiếu chỉ xuất hiện khi có d�
   assert.match(full, /Nhân vật: Mai, bé gái/);
   assert.match(full, /như trong ảnh tham chiếu/);
 });
+
+/* ---------- chế độ quảng cáo sản phẩm ---------- */
+const adBase = { seconds: 10, aspect: '9:16', ad: { product: 'Bình giữ nhiệt Aqua 500ml', points: 'Giữ nóng 12 giờ\nNắp chống tràn\n\nInox 304', audience: 'Dân văn phòng', offer: 'Giảm 20% đến hết tuần', cta: 'Bấm vào giỏ hàng để xem chi tiết', tone: 'warm', length: 30, camera: ['macro', 'orbit'], look: 'ugc' } };
+const adCopy = 'Sáng nào cũng lạnh tay? Bình Aqua giữ nóng 12 giờ. Nắp chống tràn thật tiện. Bấm vào giỏ hàng để xem chi tiết.';
+
+test('quảng cáo: options chuẩn hóa dữ liệu từ giao diện; không có ad thì là chế độ kể chuyện', () => {
+  assert.equal(sp.options({}).ad, null);
+  assert.equal(sp.options({ ad: 'x' }).ad, null);
+  const ad = sp.options({ ad: { product: '  Bình   giữ nhiệt ', points: 'a\r\n\r\n  b  \n' + 'c'.repeat(500), camera: ['macro', 'macro', 'nope', 'orbit', 'pan', 'top'], look: 'zzz', tone: 'zzz', length: 99 } }).ad;
+  assert.equal(ad.product, 'Bình giữ nhiệt');
+  assert.deepEqual(ad.points.split('\n').map(x => x.length), [1, 1, 240], 'bỏ dòng trống, cắt dòng quá dài');
+  assert.deepEqual(ad.camera, ['macro', 'orbit', 'pan'], 'bỏ trùng và mã lạ, tối đa 3');
+  assert.equal(ad.look, ''); assert.equal(ad.tone, 'hype'); assert.equal(ad.length, 30);
+  assert.equal(sp.options({ ad: { product: 'x', length: '45' } }).ad.length, 45);
+  assert.ok(sp.AD_CAMERA.length === 9 && sp.AD_LOOK.length === 6 && sp.AD_TONE.length === 5 && sp.AD_LENGTHS.join() === '15,30,45,60');
+  assert.ok([...sp.AD_CAMERA, ...sp.AD_LOOK, ...sp.AD_TONE].every(x => x.id && x.label && x.en && x.prompt), 'mỗi lựa chọn có tên, tên tiếng Anh và câu đưa vào prompt');
+});
+
+test('quảng cáo: câu lệnh nhờ Muse VIẾT lời có đủ thông tin, luật không bịa, khuôn trả lời và mốc', () => {
+  assert.throws(() => sp.buildAdScriptInstruction({ ad: { product: '  ' } }), /Nhập tên sản phẩm/);
+  assert.throws(() => sp.buildAdScriptInstruction({}), /Nhập tên sản phẩm/);
+  const text = sp.buildAdScriptInstruction(adBase, { marker: 'ab12cd' });
+  assert.match(text, /Sản phẩm: Bình giữ nhiệt Aqua 500ml/);
+  assert.match(text, /Điểm nổi bật:\n- Giữ nóng 12 giờ\n- Nắp chống tràn\n- Inox 304/);
+  assert.match(text, /Người xem hướng tới: Dân văn phòng/);
+  assert.match(text, /Giá \/ ưu đãi: Giảm 20% đến hết tuần/);
+  assert.match(text, /nhắc đúng nguyên văn thông tin người dùng đưa/);
+  assert.match(text, /«Bấm vào giỏ hàng để xem chi tiết»/);
+  assert.match(text, /thân mật, chân thành/);
+  assert.match(text, /khoảng 321–397 ký tự \(đọc khoảng 30 giây\)/);
+  assert.match(text, /KHÔNG bịa tính năng, thông số, con số, thành phần, giá, khuyến mãi, chứng nhận/);
+  assert.match(text, /Không nói về chữa bệnh, giảm cân hay hiệu quả y tế/);
+  assert.match(text, /Không so sánh với sản phẩm hay thương hiệu khác/);
+  assert.match(text, /\nKỊCH BẢN:\n/);
+  assert.match(text, /dòng cuối cùng của trả lời chỉ gồm đúng một từ: MSDONEab12cd/);
+  assert.match(text, /MSENDab12cd$/);
+  // Không nhập giá → dặn Muse không nhắc giá; không nhập kêu gọi → câu mời nhẹ; không điểm nổi bật → không bịa.
+  const lean = sp.buildAdScriptInstruction({ ad: { product: 'Áo thun cotton' } }, { marker: 'ab12cd' });
+  assert.match(lean, /KHÔNG nhắc đến giá, giảm giá hay quà tặng/);
+  assert.doesNotMatch(lean, /Giá \/ ưu đãi:/);
+  assert.match(lean, /nhẹ nhàng, không ép/);
+  assert.match(lean, /Điểm nổi bật: \(người dùng chưa nêu/);
+  assert.doesNotMatch(lean, /Người xem hướng tới/);
+  // Độ dài mục tiêu đổi theo lựa chọn.
+  assert.match(sp.buildAdScriptInstruction({ ad: { product: 'x', length: 60 } }), /khoảng 643–794 ký tự \(đọc khoảng 60 giây\)/);
+  assert.match(sp.buildAdScriptInstruction({ ad: { product: 'x', length: 15 } }), /khoảng 161–198 ký tự \(đọc khoảng 15 giây\)/);
+});
+
+test('quảng cáo: lấy lời từ trả lời của Muse — bỏ lời dẫn, nhãn, emoji, hashtag, ghi chú, mốc; từ chối trả lời rỗng', () => {
+  const reply = 'Dạ, đây là kịch bản:\n\n**KỊCH BẢN:**\n## Mở đầu\nSáng nào cũng lạnh tay? 😍\n(nhạc nền nhẹ)\n[Cảnh bình bốc khói]\n- Bình Aqua giữ nóng 12 giờ. #binhgiunhiet\n2) Mở đầu: Nắp chống tràn thật tiện.\n---\n“Bấm vào giỏ hàng để xem chi tiết.”\nMSDONEab12cd';
+  assert.equal(sp.scriptFromReply(reply), 'Sáng nào cũng lạnh tay?\nBình Aqua giữ nóng 12 giờ.\nNắp chống tràn thật tiện.\nBấm vào giỏ hàng để xem chi tiết.');
+  assert.equal(sp.scriptFromReply('KỊCH BẢN: Một câu quảng cáo đủ dài để dùng được.\nMSDONEab12cd'), 'Một câu quảng cáo đủ dài để dùng được.', 'lời nằm cùng dòng với nhãn');
+  assert.equal(sp.scriptFromReply('Câu một của quảng cáo đủ dài.\nCâu hai cũng đủ dài nhé.'), 'Câu một của quảng cáo đủ dài.\nCâu hai cũng đủ dài nhé.', 'không có nhãn vẫn lấy cả trả lời');
+  assert.equal(sp.scriptFromReply('Lời đọc: Một câu quảng cáo đủ dài để dùng được.'), 'Một câu quảng cáo đủ dài để dùng được.');
+  assert.throws(() => sp.scriptFromReply('KỊCH BẢN:\nMSDONEab12cd'), /Muse chưa viết lời quảng cáo/);
+  assert.throws(() => sp.scriptFromReply(''), /Muse chưa viết lời quảng cáo/);
+  assert.throws(() => sp.scriptFromReply('Ngắn quá\n😍 #tag'), /Muse chưa viết lời quảng cáo/);
+});
+
+test('quảng cáo: câu lệnh chia cảnh có luật sản phẩm, máy quay, phong cách, nhịp quảng cáo; kể chuyện không bị đổi', () => {
+  const ask = sp.buildMuseInstruction(adCopy, { ...adBase, reference: true }, { marker: 'ab12cd' });
+  assert.match(ask, /đạo diễn hình ảnh cho video QUẢNG CÁO sản phẩm bán hàng/);
+  assert.match(ask, /LỜI QUẢNG CÁO \(đã đánh số câu\):/);
+  assert.match(ask, /^\[1\] \(/m);
+  assert.match(ask, /5\. SẢN PHẨM: ảnh tham chiếu đính kèm là sản phẩm thật\. Giữ đúng hình dạng, tỷ lệ, màu sắc, chất liệu, bao bì và nhãn/);
+  assert.match(ask, /Sản phẩm phải HIỆN RÕ ở mọi cảnh/);
+  assert.match(ask, /không cảnh «trước\/sau» hay minh họa chữa bệnh, giảm cân, hiệu quả y tế/);
+  assert.match(ask, /không cảnh so sánh với sản phẩm khác/);
+  assert.match(ask, /7\. Không thêm chữ, giá, phụ đề hay logo vào hình \(nhãn thật trên sản phẩm giữ nguyên như ảnh\); tỷ lệ 9:16\./);
+  assert.match(ask, /9\. Nhịp quảng cáo: cảnh đầu phải thu hút/);
+  assert.match(ask, /^NHÂN VẬT: <sản phẩm: mô tả cố định theo ảnh tham chiếu; người mẫu nếu có/m);
+  assert.match(ask, /THÔNG TIN QUẢNG CÁO \(do người dùng cung cấp\):\nSản phẩm: Bình giữ nhiệt Aqua 500ml\nĐiểm nổi bật:\n- Giữ nóng 12 giờ/);
+  assert.match(ask, /Giá \/ ưu đãi \(chỉ để hiểu, không vẽ chữ giá lên hình\): Giảm 20% đến hết tuần/);
+  assert.match(ask, /Chuyển động máy quay đã chọn: cận cảnh chi tiết \(macro\)[^\n]*; máy quay xoay chậm quanh sản phẩm/);
+  assert.match(ask, /Phong cách quảng cáo: phong cách review đời thường \(UGC\)/);
+  assert.match(ask, /MSENDab12cd$/);
+  assert.doesNotMatch(ask, /video kể chuyện|nhận ra MỌI nhân vật|CÂU CHUYỆN \(đã đánh số câu\)/);
+  // Không có ảnh → mô tả sản phẩm theo chữ, không nhắc ảnh tham chiếu.
+  const noRef = sp.buildMuseInstruction(adCopy, adBase, { marker: 'ab12cd' });
+  assert.match(noRef, /5\. SẢN PHẨM: chưa có ảnh tham chiếu/);
+  assert.doesNotMatch(noRef, /ảnh tham chiếu đính kèm/);
+  assert.doesNotMatch(noRef, /theo ảnh tham chiếu/);
+  // Người mẫu do người dùng mô tả.
+  assert.match(sp.buildMuseInstruction(adCopy, { ...adBase, character: 'cô gái 25 tuổi, tóc dài' }, { marker: 'ab12cd' }), /Người mẫu \(người dùng mô tả\): cô gái 25 tuổi, tóc dài/);
+  // Chế độ kể chuyện y như cũ.
+  const story = sp.buildMuseInstruction(adCopy, { seconds: 10, aspect: '16:9' }, { marker: 'ab12cd' });
+  assert.match(story, /video kể chuyện/);
+  assert.doesNotMatch(story, /QUẢNG CÁO|THÔNG TIN QUẢNG CÁO|Nhịp quảng cáo/);
+});
+
+test('quảng cáo: prompt mẫu (chia nhanh) có sản phẩm, máy quay, phong cách, ảnh sản phẩm và vẫn cấm tiếng', () => {
+  const [scene] = sp.planStory(adCopy, { ...adBase, reference: true });
+  assert.match(scene.prompt, /^Tạo video quảng cáo sản phẩm dài \d+ giây, tỷ lệ 9:16/);
+  assert.match(scene.prompt, /Sản phẩm quảng cáo: Bình giữ nhiệt Aqua 500ml\. Sản phẩm hiện rõ/);
+  assert.match(scene.prompt, /Máy quay \(chọn hợp với cảnh\): cận cảnh chi tiết \(macro\)[^\n]*; máy quay xoay chậm quanh sản phẩm \(orbit\)/);
+  assert.match(scene.prompt, /Phong cách quảng cáo: review đời thường \(UGC\)/);
+  assert.match(scene.prompt, /Sản phẩm giữ đúng hình dạng, màu sắc, chất liệu và bao bì như trong ảnh tham chiếu; không đổi sang sản phẩm khác/);
+  assert.match(scene.prompt, /Không thêm chữ, giá, phụ đề hay logo mới vào hình/);
+  assert.ok(scene.prompt.includes(sp.NO_SPEECH));
+  assert.doesNotMatch(scene.prompt, /Giảm 20%/, 'giá không bị vẽ vào prompt hình');
+  assert.equal(scene.voiceover, adCopy, 'lời đọc vẫn đúng nguyên văn');
+  const bare = sp.planStory(adCopy, { seconds: 10, aspect: '16:9' })[0].prompt;
+  assert.doesNotMatch(bare, /quảng cáo|Sản phẩm/i, 'kể chuyện không lẫn chữ quảng cáo');
+  assert.match(sp.planStory(adCopy, { seconds: 10, aspect: '16:9', ad: { product: '' } })[0].prompt, /Sản phẩm quảng cáo: sản phẩm trong ảnh tham chiếu/, 'chưa nhập tên thì gọi chung là sản phẩm trong ảnh');
+});

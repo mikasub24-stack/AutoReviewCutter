@@ -21,11 +21,11 @@ const transient = error => error?.code === 'MUSE_DOM_TIMEOUT' || /Execution cont
 
 function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSettings, delay, notify = () => {}, isBusy = () => false, ensureAllowed = async () => {}, timing = {} }) {
   const t = { idle: IDLE_WAIT_MS, composer: COMPOSER_WAIT_MS, echo: ECHO_WAIT_MS, reply: REPLY_WAIT_MS, stable: STABLE_MS, poll: 1500, ...timing };
-  const state = { busy: false, progress: '', error: '', part: 0, parts: 0 };
+  const state = { busy: false, kind: '', progress: '', error: '', part: 0, parts: 0 };
   let controller = null;
 
   const say = (progress, extra = {}) => { Object.assign(state, { progress }, extra); notify(); };
-  const status = () => ({ busy: state.busy, progress: state.progress, error: state.error, part: state.part, parts: state.parts });
+  const status = () => ({ busy: state.busy, kind: state.kind, progress: state.progress, error: state.error, part: state.part, parts: state.parts });
   const check = signal => { if (signal.aborted) throw Object.assign(Error('Đã dừng phân tích.'), { name: 'AbortError' }); };
   const wait = async (ms, signal) => { const end = Date.now() + ms; while (Date.now() < end) { check(signal); await delay(Math.min(250, end - Date.now())); } check(signal); };
   const call = (muse, fn, arg, signal) => { check(signal); return dom(muse, fn, arg); };
@@ -126,7 +126,7 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
     await ensureAllowed();
     controller = new AbortController();
     const signal = controller.signal;
-    Object.assign(state, { busy: true, error: '', progress: 'Đang mở Muse…', part: 0, parts: ranges.length });
+    Object.assign(state, { busy: true, kind: 'analyze', error: '', progress: 'Đang mở Muse…', part: 0, parts: ranges.length });
     notify();
     const notes = [];
     try {
@@ -206,8 +206,47 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
     }
   }
 
+  // Chế độ quảng cáo: nhờ Muse VIẾT lời quảng cáo từ thông tin sản phẩm. Kết quả đưa vào ô kịch bản để người dùng sửa.
+  async function writeScript({ options: input = {} }) {
+    if (state.busy) throw Error('Muse đang làm việc. Chờ xong hoặc bấm Dừng.');
+    const config = plan.options(input);
+    plan.buildAdScriptInstruction(config);   // báo lỗi thiếu tên sản phẩm trước khi mở Muse
+    if (isBusy()) throw Error('Dừng hàng đợi và các thao tác trình duyệt trước khi nhờ Muse viết lời quảng cáo.');
+    await ensureAllowed();
+    controller = new AbortController();
+    const signal = controller.signal;
+    const label = 'Viết lời quảng cáo';
+    Object.assign(state, { busy: true, kind: 'write', error: '', progress: 'Đang mở Muse…', part: 0, parts: 1 });
+    notify();
+    try {
+      await openMuse(0);
+      check(signal);
+      const muse = getMuse(0);
+      if (!muse) throw infra('Chưa mở được Muse tài khoản 1.');
+      let script = '';
+      for (let attempt = 0; attempt < 2 && !script; attempt++) {
+        const marker = randomBytes(3).toString('hex');
+        say(`${label} · chuẩn bị yêu cầu…`);
+        let reply;
+        try { reply = await ask(muse, plan.buildAdScriptInstruction(config, { marker }), marker, signal, label); }
+        catch (e) { if (!e.infra || attempt) throw e; await wait(2000, signal); continue; }
+        try { script = plan.scriptFromReply(reply); }
+        catch (e) { if (attempt) throw e; }
+      }
+      say('Muse đã viết xong lời quảng cáo');
+      return { script };
+    } catch (error) {
+      if (error.name !== 'AbortError') error.message = String(error.message).replace('bấm Phân tích lại.', 'bấm «Muse viết lời quảng cáo» lại.');
+      state.error = error.name === 'AbortError' ? '' : error.message;
+      throw error;
+    } finally {
+      state.busy = false; controller = null;
+      notify();
+    }
+  }
+
   function cancel() { controller?.abort(); }
-  return { run, cancel, status, chunkRanges, get busy() { return state.busy; } };
+  return { run, writeScript, cancel, status, chunkRanges, get busy() { return state.busy; } };
 }
 
 module.exports = { createStoryAnalyzer };

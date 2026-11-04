@@ -283,3 +283,19 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .storyTag[hidden] { display: none; }
 .storyCheck.bad { border-left-color: #e0b252; background: #3a2f12; color: #f1d28a; }
 .storyCheck button { margin-top: 6px; }
+
+/* Chế độ quảng cáo sản phẩm */
+.storyModes { display: inline-flex; gap: 3px; padding: 3px; margin-bottom: 14px; border: 1px solid #34445f; border-radius: 10px; background: #101b2a; }
+.modeBtn { padding: 8px 16px; font-size: 12px; font-weight: 500; color: #a9bad1; border-radius: 8px; }
+.modeBtn[aria-pressed="true"] { background: #1f3b43; border-color: #2f6b68; color: #bff3ec; }
+.adBox { margin: 0 0 16px; padding: 14px; border: 1px solid #2e3b52; border-radius: 10px; background: #121d2c; }
+.adBox[hidden] { display: none; }
+.adIntro { margin: 0 0 4px; font-size: 11px; line-height: 1.5; }
+.adWide { margin: 4px 0 12px; font-size: 11px; color: #a9bad1; }
+.adWide textarea { margin: 7px 0 0; min-height: 84px; }
+.adGroup { margin: 10px 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip { padding: 6px 12px; font-size: 11px; border: 1px solid #34445f; border-radius: 999px; background: #1b283a; color: #c9d6ea; }
+.chip:hover { border-color: #52647f; background: #24344a; }
+.chip[aria-pressed="true"] { border-color: #49d8ca; background: #17403f; color: #bff3ec; }
+.adWrite { margin-top: 14px; }

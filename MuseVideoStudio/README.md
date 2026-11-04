@@ -1,10 +1,10 @@
 Continue in 1.1.6 resubmits unfinished scenes with new attempt IDs, ignoring tentative send flags and old receipts. Completed files are kept. The sidebar now displays the actual application version.
 
-# Muse Video Studio V1 · 1.2.0 · Windows
+# Muse Video Studio V1 · 1.3.0 · Windows
 
 ## Bản cài đặt Windows
 
-Tải `MuseVideoStudio-1.2.0-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
+Tải `MuseVideoStudio-1.3.0-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
 
 Build riêng: `node tools/build-installer.cjs` trên Windows. Workflow installer kiểm thử cài đặt, shortcut, mở app, một cửa sổ chính và gỡ cài đặt trước khi thêm Setup.exe vào release hiện tại.
 
@@ -141,6 +141,18 @@ Nối MP4 tùy chọn cần FFmpeg/ffprobe trên máy (chưa đóng kèm): chọ
 Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. Các kiểm tra `node test/submit-diagnostics-smoke.cjs`, `node test/cards-smoke.cjs`, `node test/muse-tracker-smoke.cjs`, `node test/download-capture-smoke.cjs` xác minh thẻ video, gắn kết quả theo prompt và tải/cancel tệp video thật từ máy chủ cục bộ; smoke tải cần FFmpeg hoặc MUSE_VIDEO_FIXTURE. Test UI và browser smoke cần Chromium; đặt CHROMIUM_PATH nếu khác /usr/bin/chromium. `node test/attachment-ready-smoke.cjs` kiểm tra readiness ảnh trên DOM fixture thật. FFmpeg smoke riêng: `npm run test:merge`.
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
+
+## Update 1.3.0
+
+- Tab **Kể chuyện** có thêm chế độ **Quảng cáo sản phẩm** (làm video bán hàng / affiliate). Nút chuyển chế độ nằm đầu khung «Câu chuyện & nhân vật»; chế độ Kể chuyện giữ nguyên như 1.2.0.
+- Nhập **tên sản phẩm**, **điểm nổi bật** (mỗi dòng một ý), người xem hướng tới, giá/ưu đãi (không bắt buộc), câu kêu gọi hành động, giọng điệu (5 kiểu) và độ dài video (15/30/45/60 giây). Bấm **Muse viết lời quảng cáo**: tool mở Muse tài khoản 1, gửi thông tin vào khung chat, chờ Muse viết xong rồi đưa lời vào ô lời quảng cáo cho bạn **sửa tay**. Bạn cũng có thể bỏ qua bước này và dán lời quảng cáo có sẵn.
+- Luật gửi Muse khi viết lời: chỉ dùng thông tin bạn nhập; không bịa tính năng, thông số, con số, thành phần, giá, khuyến mãi, chứng nhận, đánh giá; không dùng từ tuyệt đối («số 1», «tốt nhất», «100%»); không nói chữa bệnh, giảm cân, hiệu quả y tế; không so sánh với sản phẩm khác; không nhắc giá nếu bạn không nhập giá. Đây là **lời dặn gửi cho Muse**, không phải bộ lọc: Muse vẫn có thể viết sai, bạn cần đọc lại lời trước khi dùng, và người đăng quảng cáo chịu trách nhiệm về nội dung.
+- Sau đó dùng đúng luồng cũ: **Phân tích bằng Muse** chia lời thành cảnh và viết prompt hình (hoặc «Chia nhanh» với prompt mẫu) → tạo clip → giọng đọc → phụ đề → tự dựng → **Xuất MP4**. Giọng đọc và phụ đề luôn đọc đúng nguyên văn lời quảng cáo đang có trong ô.
+- Ở chế độ này prompt hình có thêm luật quảng cáo: sản phẩm hiện rõ ở mọi cảnh và giữ đúng hình dạng/màu/bao bì như **ảnh sản phẩm** (ảnh bạn chọn được gắn vào mọi cảnh, như ảnh nhân vật ở chế độ Kể chuyện); cảnh đầu thu hút, cảnh cuối là khung đẹp nhất của sản phẩm; không cảnh so sánh, «trước/sau» hay minh họa y tế; không vẽ chữ, giá, logo mới lên hình; người trong cảnh không nói.
+- Chọn sẵn **chuyển động máy quay** (tối đa 3 trong 9: cận cảnh, tiến sát, lùi xa, xoay quanh, lia ngang, từ trên cao, quay chậm, cầm tay, cố định) và **phong cách quảng cáo** (TVC, điện ảnh, review đời thường, tối giản, tươi sáng, sang trọng); lựa chọn được ghi vào prompt gửi Muse và vào prompt mẫu. Ô «Nhân vật chính» đổi thành «Người mẫu / người dùng» (không bắt buộc).
+- Mọi ô và lựa chọn của chế độ quảng cáo được nhớ khi mở lại app; có đủ tiếng Việt và tiếng Anh.
+- **Chưa có ở bản này**: chữ giá / logo / nút kêu gọi chạy trên video (tool chủ động không vẽ chữ lên hình), nhạc nền riêng, thử đồ lên người mẫu, thư viện sản phẩm. Muốn có chữ hoặc logo thì thêm bằng phần mềm dựng khác sau khi xuất MP4.
+- **Chưa thử với Muse thật**, tài khoản thật, điện thoại thật, Windows thật. Đã kiểm bằng: test đơn vị (câu lệnh, đọc lời Muse viết, luật chuẩn hóa), trang chat Muse giả dựng bằng Chromium thật (`test/story-analyze-smoke.cjs`: gửi, chờ viết dần, làm sạch lời, hỏi lại khi trả lời rỗng, thiếu tên sản phẩm, đang bận, hủy) và giao diện giả (`test/story-ad-smoke.cjs`). **Chưa biết**: Muse có làm đúng độ dài clip ghi trong prompt không, Muse nhận tối đa bao nhiêu ảnh sản phẩm mỗi lần tạo, sản phẩm trong video có giống ảnh thật tới đâu, và Muse có tuân thủ các luật «không bịa» trên hay không.
 
 ## Update 1.2.0
 

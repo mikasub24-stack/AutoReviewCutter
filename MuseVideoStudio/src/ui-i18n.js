@@ -18,6 +18,64 @@ Chia nhanh (không dùng Muse)|Quick split (without Muse)
 Phân tích bằng Muse|Analyze with Muse
 Dán thủ công (dự phòng)|Paste manually (backup)
 Dừng phân tích|Stop analysis
+Quảng cáo sản phẩm|Product ad
+Nhập thông tin sản phẩm, Muse viết lời quảng cáo cho bạn sửa. Sau đó chia cảnh, tạo clip, giọng đọc, phụ đề và xuất MP4 như bình thường. Muse chỉ dùng thông tin bạn nhập, không tự bịa tính năng hay giá.|Enter the product details and Muse writes an ad script for you to edit. Then split scenes, create clips, voice, subtitles and export the MP4 as usual. Muse only uses what you enter and does not invent features or prices.
+Tên sản phẩm|Product name
+Ví dụ: Bình giữ nhiệt Aqua 500ml|e.g. Aqua 500 ml thermos bottle
+Người xem hướng tới|Target audience
+Ví dụ: dân văn phòng hay uống cà phê|e.g. office workers who drink coffee
+Giá / ưu đãi (không bắt buộc)|Price / offer (optional)
+Ví dụ: giảm 20% đến hết tuần|e.g. 20% off until the end of the week
+Kêu gọi hành động|Call to action
+Ví dụ: Bấm vào giỏ hàng để xem chi tiết|e.g. Tap the cart to see the details
+Điểm nổi bật (mỗi dòng một ý)|Selling points (one per line)
+Mỗi dòng một ý. Ví dụ: Giữ nóng 12 giờ|One idea per line. e.g. Keeps drinks hot for 12 hours
+Giọng điệu|Tone
+Độ dài video|Video length
+Chuyển động máy quay (chọn tối đa 3)|Camera movement (choose up to 3)
+Phong cách quảng cáo|Ad look
+Muse viết lời quảng cáo|Muse writes the ad script
+Muse đang viết…|Muse is writing…
+Hào hứng, thuyết phục|Enthusiastic, persuasive
+Thân mật, chân thành|Warm, sincere
+Chuyên gia, đáng tin|Expert, trustworthy
+Vui nhộn, trẻ trung|Fun, young
+Sang trọng, tinh tế|Premium, refined
+15 giây|15 seconds
+30 giây|30 seconds
+45 giây|45 seconds
+60 giây|60 seconds
+Cận cảnh chi tiết|Macro close-up
+Tiến sát|Dolly in
+Lùi xa|Pull back
+Xoay quanh|Orbit
+Lia ngang|Pan
+Từ trên cao|Top-down
+Quay chậm|Slow motion
+Cầm tay|Handheld
+Cố định|Static
+Quảng cáo TVC|TV commercial
+Điện ảnh|Cinematic
+Review đời thường|Everyday review (UGC)
+Tối giản, nền trơn|Minimal, plain background
+Tươi sáng, trẻ trung|Bright and young
+Sang trọng|Luxury
+1. Lời quảng cáo|1. Ad script
+Bấm «Muse viết lời quảng cáo» ở trên, hoặc tự dán lời quảng cáo vào đây. Giọng đọc sẽ đọc đúng nguyên văn lời này.|Click “Muse writes the ad script” above, or paste your own ad script here. The voice reads this text exactly as written.
+Người mẫu / người dùng (không bắt buộc)|Model / user (optional)
+Để trống nếu không cần. Ví dụ: cô gái 25 tuổi, tóc dài, áo sơ mi trắng|Leave empty if not needed. e.g. a 25-year-old woman with long hair in a white shirt
+Chọn ảnh sản phẩm|Choose product image
+Dán hoặc kéo ảnh sản phẩm vào đây (nên 1–2 ảnh rõ nét, nền sạch). Ảnh gắn vào mọi cảnh để sản phẩm giữ đúng hình dạng và màu sắc.|Paste or drop product images here (1–2 clear photos on a clean background work best). The image is attached to every scene so the product keeps its shape and colors.
+Nhập thông tin sản phẩm rồi bấm «Muse viết lời quảng cáo», hoặc dán lời quảng cáo có sẵn. Sau đó bấm «Phân tích bằng Muse» để chia cảnh.|Enter the product details and click “Muse writes the ad script”, or paste an existing script. Then click “Analyze with Muse” to split scenes.
+Chưa chọn ảnh sản phẩm. Nên thêm ảnh rõ nét để sản phẩm trong video giống thật.|No product image chosen. Add a clear photo so the product in the video looks like the real one.
+Muse đã viết lời quảng cáo. Đọc và sửa cho đúng ý, rồi bấm «Phân tích bằng Muse» để chia cảnh.|Muse wrote the ad script. Read and edit it, then click “Analyze with Muse” to split scenes.
+Nhập tên sản phẩm trước.|Enter the product name first.
+Ô lời quảng cáo đang có chữ. Viết mới sẽ thay toàn bộ và xóa các cảnh đã chia. Tiếp tục?|The ad script box already has text. Writing a new one replaces it and clears the split scenes. Continue?
+Muse đã viết xong lời quảng cáo|Muse finished writing the ad script
+Nhập tên sản phẩm trước khi nhờ Muse viết lời quảng cáo.|Enter the product name before asking Muse to write the ad script.
+Muse chưa viết lời quảng cáo. Bấm viết lại.|Muse did not write an ad script. Click write again.
+Muse đang làm việc. Chờ xong hoặc bấm Dừng.|Muse is busy. Wait until it finishes or click Stop.
+Dừng hàng đợi và các thao tác trình duyệt trước khi nhờ Muse viết lời quảng cáo.|Stop the queue and browser actions before asking Muse to write the ad script.
 prompt mẫu|template prompt
 Prompt này do tool ghép từ lời kể, chưa qua Muse|This prompt was assembled by the tool from the narration, not written by Muse
 Muse đang phân tích…|Muse is analyzing…
@@ -441,7 +499,7 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
       [/^(\d+) cảnh$/,m=>m[1]+' scenes'],
 [/^Đã chia (\d+) cảnh, độ dài mỗi cảnh tự tính theo lời kể \(3–(\d+) giây\)\. Xem lại lời đọc và prompt, rồi bấm Tạo clip\.$/,m=>'Split into '+m[1]+' scenes; each scene length is set automatically from its narration (3–'+m[2]+' seconds). Review the narration and prompts, then click Create clips.'],
       [/^Muse đã chia (\d+) cảnh\.(?: (.+?))? Xem lại lời đọc và prompt, rồi bấm Tạo clip\.$/,m=>'Muse split the story into '+m[1]+' scenes.'+(m[2]?' '+m[2].replace(/Phần (\d+)\/(\d+): Muse trả lời không đúng khuôn, dùng chia nhanh cho đoạn này\./g,'Part $1/$2: Muse’s reply was not in the expected format; quick split used for this part.').replace(/(\d+) cảnh dùng prompt mẫu do Muse chưa viết đúng; xem lại hoặc bấm Phân tích lại\./g,'$1 scene(s) use a template prompt because Muse did not write one properly; review them or analyze again.'):'')+' Review the narration and prompts, then click Create clips.'],
-      [/^(?:Phần (\d+)\/(\d+)|Phân tích) · (.+)$/,m=>{const head=m[1]?'Part '+m[1]+'/'+m[2]:'Analysis',tail=[[/^chuẩn bị yêu cầu…$/,()=>'preparing the request…'],[/^Muse còn đang xử lý việc trước, chờ rảnh rồi mới gửi…$/,()=>'Muse is still busy with earlier work; waiting until it is free…'],[/^chờ ô chat Muse \(đăng nhập nếu cần\)…$/,()=>'waiting for the Muse chat box (sign in if needed)…'],[/^đang gửi cho Muse…$/,()=>'sending to Muse…'],[/^Muse đang viết(?: \(đã (\d+) cảnh\))?…$/,x=>'Muse is writing'+(x[1]?' ('+x[1]+' scene(s) so far)':'')+'…'],[/^hỏi lại Muse (\d+) đoạn còn thiếu…$/,x=>'asking Muse again about '+x[1]+' missing part(s)…'],[/^xong (\d+) cảnh$/,x=>'done: '+x[1]+' scene(s)']];for(const [re,fn] of tail){const x=m[3].match(re);if(x)return head+' · '+fn(x);}return head+' · '+m[3];}],
+      [/^(?:Phần (\d+)\/(\d+)|Phân tích|Viết lời quảng cáo) · (.+)$/,m=>{const head=m[1]?'Part '+m[1]+'/'+m[2]:/^Viết/.test(key)?'Writing the ad script':'Analysis',tail=[[/^chuẩn bị yêu cầu…$/,()=>'preparing the request…'],[/^Muse còn đang xử lý việc trước, chờ rảnh rồi mới gửi…$/,()=>'Muse is still busy with earlier work; waiting until it is free…'],[/^chờ ô chat Muse \(đăng nhập nếu cần\)…$/,()=>'waiting for the Muse chat box (sign in if needed)…'],[/^đang gửi cho Muse…$/,()=>'sending to Muse…'],[/^Muse đang viết(?: \(đã (\d+) cảnh\))?…$/,x=>'Muse is writing'+(x[1]?' ('+x[1]+' scene(s) so far)':'')+'…'],[/^hỏi lại Muse (\d+) đoạn còn thiếu…$/,x=>'asking Muse again about '+x[1]+' missing part(s)…'],[/^xong (\d+) cảnh$/,x=>'done: '+x[1]+' scene(s)']];for(const [re,fn] of tail){const x=m[3].match(re);if(x)return head+' · '+fn(x);}return head+' · '+m[3];}],
       [/^Muse đã chia (\d+) cảnh$/,m=>'Muse split the story into '+m[1]+' scenes'],
       [/^⚠ (\d+) cảnh đang dùng prompt mẫu \(chưa qua Muse\): cảnh (.+)\. Bấm «Phân tích bằng Muse» để Muse viết prompt hình đúng truyện, hoặc tự sửa prompt\.$/,m=>'⚠ '+m[1]+' scene(s) use a template prompt (not written by Muse): scene '+m[2]+'. Click “Analyze with Muse” so Muse writes picture prompts that match the story, or edit the prompts yourself.'],
       [/^Muse đã chia (\d+) cảnh\. Xem phần đối chiếu với kịch bản bên dưới rồi bấm Tạo clip\.$/,m=>'Muse split the story into '+m[1]+' scenes. Check the comparison with the script below, then click Create clips.'],
@@ -457,6 +515,10 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
       [/^Đang dựng (\d+)\/(\d+) cảnh…$/,m=>'Building scene '+m[1]+'/'+m[2]+'…'],
       [/^(.+) \((nữ|nam)\) · (.+?)( ✓)?$/,m=>{const L={'Tiếng Việt':'Vietnamese','Tiếng Anh':'English','Tiếng Trung':'Chinese','Tiếng Nhật':'Japanese','Tiếng Hàn':'Korean','Tiếng Tây Ban Nha':'Spanish','Tiếng Pháp':'French','Tiếng Đức':'German','Tiếng Bồ Đào Nha':'Portuguese','Tiếng Ý':'Italian','Tiếng Nga':'Russian','Tiếng Thái':'Thai','Tiếng Indonesia':'Indonesian','Tiếng Hindi':'Hindi','Tiếng Ả Rập':'Arabic'};return m[1]+' ('+(m[2]==='nữ'?'female':'male')+') · '+(L[m[3]]||m[3])+(m[4]||'');}],
       [/^Ảnh nhân vật: (.+) — gắn vào mọi cảnh\.$/,m=>'Character image: '+m[1]+' — attached to every scene.'],
+      [/^Ảnh sản phẩm: (.+) — gắn vào mọi cảnh\.$/,m=>'Product image: '+m[1]+' — attached to every scene.'],
+      [/^Chọn tối đa (\d+) chuyển động máy quay\.$/,m=>'Choose at most '+m[1]+' camera movements.'],
+      [/^(.*)bấm «Muse viết lời quảng cáo» lại\.$/,m=>t(m[1]+'bấm Phân tích lại.').replace(/analy[sz]e again\.$/,'write the ad script again.')],
+      [/^Thêm (\d+) cảnh và chạy toàn bộ clip kể chuyện đang chờ\?.*cùng ảnh sản phẩm\.$/,m=>'Add '+m[1]+' scenes and run all pending story clips? This may use Muse credits. The reviewed prompts are sent exactly as shown, with the product image.'],
       [/^Thêm (\d+) cảnh và chạy toàn bộ clip kể chuyện đang chờ\?.*$/,m=>'Add '+m[1]+' scenes and run all pending story clips? This may use Muse credits. The reviewed prompts are sent exactly as shown, with the character image.'],
       [/^Còn (\d+) cảnh chưa xong\. Chạy hàng đợi cho xong rồi xuất\.$/,m=>m[1]+' scene(s) are not finished. Finish the queue, then export.'],
       [/^Còn (\d+) cảnh chưa có clip\. Chạy hàng đợi cho xong rồi xuất MP4\.$/,m=>m[1]+' scene(s) have no clip yet. Finish the queue, then export MP4.'],
