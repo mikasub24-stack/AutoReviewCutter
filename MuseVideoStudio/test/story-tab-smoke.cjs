@@ -69,6 +69,9 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.locator('#editorPanel').isVisible(), false);
     assert.equal(await page.locator('#outputTools').isVisible(), false);
     assert.equal(await page.locator('#folderPath').textContent(), 'C:\\Videos\\KeChuyen');
+    // Each story clip can be watched on its card as soon as it is downloaded (before any export).
+    assert.deepEqual(await page.locator('.card video.resultVideo').evaluateAll(l => l.map(v => v.getAttribute('src') + '|' + v.controls)), ['file:///C:/Videos/KeChuyen/Truyen-1/001.mp4|true', 'file:///C:/Videos/KeChuyen/Truyen-1/002.mp4|true', 'file:///C:/Videos/KeChuyen/Truyen-1/003.mp4|true']);
+    assert.equal(await page.locator('.card .mediaLabel:has-text("Video đã tải")').count(), 3);
     assert.match(await page.locator('#summary').textContent(), /^3 \/ 3 clip đã lưu$/);
     assert.equal(await page.locator('.card .cardActions button:has-text("Đưa về sửa")').first().isHidden(), true, 'cảnh kể chuyện không có nút đưa về sửa');
 
