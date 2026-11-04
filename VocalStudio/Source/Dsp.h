@@ -33,6 +33,7 @@ public:
     void reset() noexcept;
     float tap(std::size_t samples) const noexcept;
     void push(float sample) noexcept;
+    float diffuse(float sample,std::size_t samples) noexcept;
     std::size_t capacity() const noexcept { return data.size(); }
 private:
     std::vector<float> data;

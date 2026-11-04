@@ -43,6 +43,13 @@ void Delay::prepare(double sr, double seconds) { data.assign(std::max<std::size_
 void Delay::reset() noexcept { std::fill(data.begin(),data.end(),0.0f);cursor=0; }
 float Delay::tap(std::size_t n) const noexcept { if(data.empty()) return 0; n=std::clamp<std::size_t>(n,1,data.size()-1);return data[(cursor+data.size()-n)%data.size()]; }
 void Delay::push(float x) noexcept { if(data.empty())return;data[cursor]=std::isfinite(x)?x:0;cursor=(cursor+1)%data.size(); }
+// Schroeder all-pass: store x + g*y, not x + g*delayed.
+// The latter adds frequency-dependent gain instead of only diffusing phase.
+float Delay::diffuse(float sample,std::size_t samples) noexcept {
+    const float output=tap(samples)-.5f*sample;
+    push(sample+.5f*output);
+    return output;
+}
 void VocalChain::prepare(double sr) {
     rate=std::clamp(sr,8000.0,384000.0);
     for(auto& c:channels) { c.echo.prepare(rate,2.01);c.preDelay.prepare(rate,.15);for(auto& d:c.comb)d.prepare(rate,.06);for(auto& d:c.allpass)d.prepare(rate,.009); }
@@ -102,7 +109,7 @@ void VocalChain::processAmbience(float& left,float& right) noexcept {
         const float excitation=preDelaySamples>0?c.preDelay.tap(preDelaySamples):dry;c.preDelay.push(dry);
         float room=0;
         for(std::size_t j=0;j<4;++j) {const auto n=static_cast<std::size_t>(rate*(combTimes[j]+i*.0013));const float v=c.comb[j].tap(n);c.damping[j]=(1-p.damping)*v+p.damping*c.damping[j];c.comb[j].push(excitation+c.damping[j]*roomFeedback[j]);room+=v*.25f;}
-        for(std::size_t j=0;j<2;++j) {const auto n=static_cast<std::size_t>(rate*(allpassTimes[j]+i*.00013));const float delayed=c.allpass[j].tap(n);const float v=delayed-room*.5f;c.allpass[j].push(room+delayed*.5f);room=v;}
+        for(std::size_t j=0;j<2;++j) {const auto n=static_cast<std::size_t>(rate*(allpassTimes[j]+i*.00013));room=c.allpass[j].diffuse(room,n);}
         wet[i]=room;
     }
     const float middle=(wet[0]+wet[1])*.5f,side=(wet[0]-wet[1])*.5f*p.width;

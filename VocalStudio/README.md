@@ -2,6 +2,10 @@
 
 Ứng dụng Windows x64 để hát trên beat, thu micro qua sound card và mix vocal tại máy. Dự án nằm trong `VocalStudio/`, nhánh `vocal-studio`, không sửa Chùa Việt Online.
 
+## 1.4.1 · Sửa tầng khuếch tán reverb
+
+Sửa hồi tiếp all-pass trong hai tầng khuếch tán: tầng này chỉ trải pha/đuôi vang, không tự tăng mức theo tần số. Bản trước dùng mẫu trễ thay cho đầu ra all-pass trong nhánh hồi tiếp nên có thể nhuộm màu/tăng mức vang ngoài ý muốn. Giữ núm Reverb/Delay, preset, EQ riêng và đường Antares; màu/mức reverb có thể thay đổi do sửa lỗi. Không thêm latency. Kiểm thử đáp ứng xung bảo toàn năng lượng, biên độ ổn định ở 73–8000 Hz tại 44,1/48/96 kHz và reset sạch đuôi, cùng các kiểm thử thu/xuất hiện có. Đây là sửa thuật toán, chưa thay thế nghe thử trên mic/phòng thật.
+
 ## 1.4 · Vocal studio và xuất riêng giọng có FX
 
 Bấm **Vocal studio · Mượt giọng → Áp dụng preset Studio**. Preset giữ EQ riêng/input gain và thiết lập Antares, chọn compressor vừa, reverb nhẹ có pre-delay, delay nhỏ và bật ba bước mới chỉ trên vocal:
