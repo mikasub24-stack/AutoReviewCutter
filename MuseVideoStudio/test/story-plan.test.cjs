@@ -589,3 +589,11 @@ test('quảng cáo nhanh từ ảnh: số cảnh và số giây theo độ dài,
   const priced = sp.planAdShots({ ad: { product: 'x', offer: 'Giảm 20%', points: 'Giữ nóng 12 giờ' }, reference: true });
   assert.ok(priced.every(s => !/Giảm 20%|12 giờ/.test(s.prompt)));
 });
+
+test('truyện dài không bị giới hạn số cảnh: chia nhanh vẫn đủ chữ, đúng thứ tự', () => {
+  const sentences = Array.from({ length: 900 }, (_, i) => `Câu số ${i + 1}: bà Mai đi chợ từ sáng sớm để mua rau cho cả nhà ăn.`);
+  const scenes = sp.planStory(sentences.join(' '), {});
+  assert.ok(scenes.length > 400, 'số cảnh ' + scenes.length);
+  assert.equal(scenes.map(s => s.voiceover).join(' '), sentences.join(' '));
+  assert.ok(scenes.every(s => sp.estimateSeconds(s.voiceover) <= 10));
+});

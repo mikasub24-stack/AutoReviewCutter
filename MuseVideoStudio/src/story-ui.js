@@ -107,30 +107,37 @@
     $('storySceneCount').textContent = scenes.length ? `${scenes.length} cảnh` : '';
     $('adQuick').textContent = scenes.length ? 'Tạo lại cảnh' : 'Tạo quảng cáo từ ảnh';
     $('adQuick').className = scenes.length ? 'secondary' : 'primary';
+    renderAnalyze();
     $('storyCommit').disabled = $('storyCreate').disabled = !scenes.length;
     refreshChecks();
-  }
-  function split() {
-    try {
-      scenes = plan().planStory($('storyScript').value, options());
-      renderScenes();
-      $('storyInfo').textContent = `Đã chia ${scenes.length} cảnh, độ dài mỗi cảnh tự tính theo lời kể (3–${plan().MAX_SECONDS} giây). Xem lại lời đọc và prompt, rồi bấm Tạo clip.`;
-    } catch (e) { toast(e.message); }
   }
   async function copyInstruction() {
     const value = $('storyInstruction').value;
     try { await navigator.clipboard.writeText(value); toast('Đã sao chép yêu cầu. Dán vào khung chat Muse.'); }
     catch { $('storyInstruction').select(); toast('Nhấn Ctrl+C để sao chép yêu cầu rồi dán vào chat Muse.'); }
   }
-  async function analyze() {
+  // Lượt phân tích dừng giữa chừng (Muse lỗi/không trả lời): giữ các cảnh Muse đã chia, nhớ chỗ dừng và nhân vật đã chốt để làm tiếp.
+  // App không tự chia thay Muse.
+  let resume = null;   // { script, from, cast }
+  const canResume = () => Boolean(resume && scenes.length && $('storyScript').value === resume.script);
+  async function analyze(fromStart) {
     if (analyzing) return;
-    if (!$('storyScript').value.trim()) return toast(isAd() ? 'Chưa có lời quảng cáo. Bấm «Muse viết lời quảng cáo» hoặc dán lời vào ô.' : 'Dán câu chuyện trước.');
+    const script = $('storyScript').value;
+    if (!script.trim()) return toast(isAd() ? 'Chưa có lời quảng cáo. Bấm «Muse viết lời quảng cáo» hoặc dán lời vào ô.' : 'Dán câu chuyện trước.');
+    if (fromStart && scenes.length && !confirm('Phân tích lại từ đầu sẽ thay toàn bộ các cảnh đang có. Tiếp tục?')) return;
+    const resuming = !fromStart && canResume(), before = resuming ? scenes : [];
     analyzing = true; renderAnalyze();
     try {
-      const result = await call('storyAnalyze', { script: $('storyScript').value, ...options() });
+      const result = await call('storyAnalyze', { script, ...options(), ...(resuming ? { resume: { from: resume.from, cast: resume.cast } } : {}) });
       if (result?.scenes?.length) {
-        scenes = result.scenes; renderScenes();
-        $('storyInfo').textContent = `Muse đã chia ${scenes.length} cảnh.${result.notes?.length ? ' ' + result.notes.join(' ') : ''} Xem lại lời đọc và prompt, rồi bấm Tạo clip.`;
+        scenes = [...before, ...result.scenes].map((s, i) => ({ ...s, title: `Cảnh ${i + 1}` }));
+        renderScenes();
+        const stop = result.incomplete;
+        resume = stop ? { script, from: stop.from, cast: result.cast || (resuming ? resume.cast : '') } : null;
+        $('storyInfo').textContent = stop
+          ? `Muse đã chia ${scenes.length} cảnh, dừng ở câu ${stop.from}/${stop.total}. ${stop.message} Bấm «Phân tích tiếp» để Muse làm tiếp từ đó (giữ nguyên các cảnh đã có).`
+          : `Muse đã chia ${scenes.length} cảnh.${result.notes?.length ? ' ' + result.notes.join(' ') : ''} Xem lại lời đọc và prompt, rồi bấm Tạo clip.`;
+        if (stop) toast(`Muse dừng ở câu ${stop.from}/${stop.total}. Bấm «Phân tích tiếp» để làm tiếp.`);
       }
     } finally { analyzing = false; renderAnalyze(); }
   }
@@ -138,8 +145,8 @@
   function renderAnalyze() {
     const a = state?.story?.analyze || {}, busy = analyzing || writing || Boolean(a.busy);
     const writingNow = writing || (a.busy && a.kind === 'write');
-    $('storyAnalyze').disabled = busy; $('storySplit').disabled = busy; $('adWrite').disabled = busy; $('adQuick').disabled = busy; $('storyAnalyzeStop').hidden = !busy;
-    $('storyAnalyze').textContent = busy && !writingNow ? 'Muse đang phân tích…' : 'Phân tích bằng Muse';
+    $('storyAnalyze').disabled = busy; $('storyAnalyzeAgain').hidden = busy || !canResume(); $('adWrite').disabled = busy; $('adQuick').disabled = busy; $('storyAnalyzeStop').hidden = !busy;
+    $('storyAnalyze').textContent = busy && !writingNow ? 'Muse đang phân tích…' : canResume() ? 'Phân tích tiếp' : 'Phân tích bằng Muse';
     $('adWrite').textContent = writingNow ? 'Muse đang viết…' : 'Muse viết lời quảng cáo';
     if (busy && a.progress) $('storyInfo').textContent = a.progress;
   }
@@ -190,7 +197,7 @@
       const result = await call('storyAdWrite', options());
       if (result?.script) {
         $('storyScript').value = result.script; saved.script = result.script; persist();
-        scenes = []; renderScenes();
+        scenes = []; resume = null; renderScenes();
         $('storyInfo').textContent = 'Muse đã viết lời quảng cáo. Đọc và sửa cho đúng ý, rồi bấm «Phân tích bằng Muse» để chia cảnh.';
       }
     } finally { writing = false; renderAnalyze(); }
@@ -238,7 +245,7 @@
     ['storyRefs', 'text', 'Chọn ảnh nhân vật', 'Chọn ảnh sản phẩm'],
     ['storyRefPaste', 'text', 'Dán hoặc kéo ảnh nhân vật chính vào đây. Ảnh này gắn vào mọi cảnh để nhân vật giữ nguyên; nhân vật khác trong truyện do Muse nhận ra và mô tả cố định ở mọi cảnh.', 'Dán hoặc kéo ảnh sản phẩm vào đây (nên 1–2 ảnh rõ nét, nền sạch). Ảnh gắn vào mọi cảnh để sản phẩm giữ đúng hình dạng và màu sắc.']
   ];
-  const IDLE_INFO = ['Dán câu chuyện rồi bấm «Phân tích bằng Muse» (cần đã đăng nhập Muse tài khoản 1). Hoặc «Chia nhanh» ngay trên máy với prompt mẫu.', 'Thả ảnh sản phẩm, chọn mẫu: các cảnh quay hiện ngay bên dưới. Muốn có lời đọc thì mở «Tùy chỉnh thêm», viết lời quảng cáo rồi bấm «Phân tích bằng Muse».'];
+  const IDLE_INFO = ['Dán câu chuyện rồi bấm «Phân tích bằng Muse» (cần đã đăng nhập Muse tài khoản 1). Muse đọc hiểu cả truyện rồi mới chia cảnh và viết prompt hình.', 'Thả ảnh sản phẩm, chọn mẫu: các cảnh quay hiện ngay bên dưới. Muốn có lời đọc thì mở «Tùy chỉnh thêm», viết lời quảng cáo rồi bấm «Phân tích bằng Muse».'];
   function applyMode(initial) {
     const ad = isAd();
     for (const [id, kind, story, adText] of MODE_TEXT) {
@@ -532,7 +539,8 @@
   }
 
   $('modeStory').onclick = () => setMode('story'); $('modeAd').onclick = () => setMode('ad'); $('adWrite').onclick = writeAd; $('adQuick').onclick = quickAd;
-  $('storySplit').onclick = split; $('storyAnalyze').onclick = analyze; $('storyAnalyzeStop').onclick = async () => { const r = await call('storyAnalyzeCancel'); if (r) render(r); };
+  $('storyAnalyze').onclick = () => analyze(false); $('storyAnalyzeAgain').onclick = () => analyze(true); $('storyScript').addEventListener('input', renderAnalyze);
+  $('storyAnalyzeStop').onclick = async () => { const r = await call('storyAnalyzeCancel'); if (r) render(r); };
   $('storyAsk').onclick = ask; $('storyCopy').onclick = copyInstruction; $('storyParse').onclick = parse;
   $('storyRefs').onclick = async () => { const files = await call('images', { multiple: true }); if (files?.length) { refs = files; refsChanged(); } };
   $('storyRefsClear').onclick = () => { refs = []; refsChanged(); };

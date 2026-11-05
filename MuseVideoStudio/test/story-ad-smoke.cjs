@@ -84,7 +84,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.locator('#adTone').inputValue(), 'expert');
     assert.equal(await page.locator('#adCamera .chip[aria-pressed=true]').count(), 2);
     assert.deepEqual(await pressed('adLook'), ['Quảng cáo TVC']);
-    for (const sel of ['#adCamera', '#adLook', '#adProduct', '#adWrite', '#storyScript', '#storyOptionsRow', '#storyAnalyze', '#storySplit', '#storyMuse']) assert.equal(await page.locator(sel).isHidden(), true, sel + ' phải được cất khi chưa mở «Tùy chỉnh thêm»');
+    for (const sel of ['#adCamera', '#adLook', '#adProduct', '#adWrite', '#storyScript', '#storyOptionsRow', '#storyAnalyze', '#storyMuse']) assert.equal(await page.locator(sel).isHidden(), true, sel + ' phải được cất khi chưa mở «Tùy chỉnh thêm»');
     for (const sel of ['#adTemplate', '#adLength', '#storyAspect', '#adQuick', '#storyInfo', '#storyScenes']) assert.equal(await page.locator(sel).evaluate(e => e.getClientRects().length > 0 || e.id === 'storyScenes'), true, sel);
     // Chế độ kể chuyện không bị ảnh hưởng: ô câu chuyện luôn hiện.
     await page.locator('#modeStory').click();
@@ -94,7 +94,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     // Mở «Tùy chỉnh thêm» thì hiện ra; để mở cho các bước sau.
     await page.evaluate(() => { document.querySelector('.adMore').open = true; });
     await page.locator('#storyScript').waitFor({ state: 'visible' });
-    for (const sel of ['#adCamera', '#adProduct', '#storyAnalyze', '#storySplit', '#storyOptionsRow']) assert.equal(await page.locator(sel).isVisible(), true, sel);
+    for (const sel of ['#adCamera', '#adProduct', '#storyAnalyze', '#storyOptionsRow']) assert.equal(await page.locator(sel).isVisible(), true, sel);
     await page.evaluate(() => { document.querySelector('.adMore').open = false; });
     await page.locator('#storyScript').waitFor({ state: 'hidden' });
     await page.evaluate(() => { document.querySelector('.adMore').open = true; });
@@ -144,7 +144,8 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.locator('#adWrite').textContent(), 'Muse đang viết…');
     assert.equal(await page.locator('#storyAnalyze').isDisabled(), true);
     assert.equal(await page.locator('#storyAnalyze').textContent(), 'Phân tích bằng Muse', 'đang viết lời thì nút phân tích không báo «đang phân tích»');
-    assert.equal(await page.locator('#storySplit').isDisabled(), true);
+    assert.equal(await page.locator('#storyAnalyzeAgain').isHidden(), true);
+    assert.equal(await page.locator('#storySplit').count(), 0, 'không có nút chia nhanh');
     assert.equal(await page.locator('#storyAnalyzeStop').isVisible(), true);
     assert.match(await page.locator('#storyInfo').textContent(), /Viết lời quảng cáo · Muse đang viết/);
     await page.waitForFunction(() => !document.getElementById('adWrite').disabled);
@@ -158,24 +159,13 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
 
     // 6. Viết lại khi ô đã có chữ → hỏi xác nhận, thay lời, xóa cảnh cũ.
     await page.locator('#storyScript').fill(await page.evaluate(() => window.AD_SCRIPT) + ' Sửa tay thêm một câu.');
-    await page.locator('#storySplit').click();
-    assert.ok(await page.locator('#storyScenes .draftRow').count() >= 1);
+    await page.locator('#adQuick').click();
+    await page.waitForFunction(() => document.querySelectorAll('#storyScenes .draftRow').length >= 1);
     await page.locator('#adWrite').click();
     await page.waitForFunction(() => document.getElementById('storyScript').value === window.AD_SCRIPT);
     assert.equal(dialogs.length, 1);
     assert.match(dialogs[0], /đang có chữ\. Viết mới sẽ thay toàn bộ và xóa các cảnh đã chia/);
     assert.equal(await page.locator('#storyScenes .draftRow').count(), 0, 'lời mới → cảnh cũ bị xóa');
-
-    // 7. Chia nhanh trong chế độ quảng cáo: prompt mẫu mang thông tin sản phẩm, máy quay, phong cách, ảnh sản phẩm.
-    await page.locator('#storySplit').click();
-    const quick = await page.locator('#storyScenes .draftRow').nth(0).locator('textarea').nth(1).inputValue();
-    assert.match(quick, /^Tạo video quảng cáo sản phẩm dài \d+ giây, tỷ lệ 16:9/);
-    assert.match(quick, /Sản phẩm quảng cáo: Bình giữ nhiệt Aqua 500ml/);
-    assert.match(quick, /Máy quay \(chọn hợp với cảnh\): cận cảnh chi tiết \(macro\)[^\n]*; máy quay xoay chậm quanh sản phẩm/);
-    assert.match(quick, /Phong cách quảng cáo: review đời thường \(UGC\)/);
-    assert.match(quick, /Sản phẩm giữ đúng hình dạng, màu sắc, chất liệu và bao bì như trong ảnh tham chiếu/);
-    assert.doesNotMatch(quick, /Nhân vật chính giữ đúng khuôn mặt/);
-    assert.match(quick, /Audio: no speech/);
 
     // 8. Phân tích bằng Muse: gửi kèm thông tin quảng cáo; ở chế độ kể chuyện thì KHÔNG gửi.
     await page.locator('#storyAnalyze').click();
@@ -346,6 +336,6 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.locator('#storyHead').textContent(), '1. Story');
     assert.equal(await page.locator('#storyRefs').textContent(), 'Choose character image');
     assert.deepEqual(errors, []);
-    console.log('PASS: product-ad mode — photo-first layout, 6 ready-made templates (fill tone/length/camera/look), photo in → shots appear at once and follow template/length/camera/look changes unless edited by hand («Tạo lại cảnh» asks first); extra options folded away; (3–6 fixed-length shots, no narration, queued with the product image), mode switch and texts, camera/look chips (max 3 cameras), product fields persisted, Muse ad-script request data + busy state + errors, overwrite confirm, quick-split ad prompt, ad data only in ad mode, product image on every scene, English labels. Mock IPC; Muse replies are canned by the test, not the real Muse.');
+    console.log('PASS: product-ad mode — photo-first layout, 6 ready-made templates (fill tone/length/camera/look), photo in → shots appear at once and follow template/length/camera/look changes unless edited by hand («Tạo lại cảnh» asks first); extra options folded away; (3–6 fixed-length shots, no narration, queued with the product image), mode switch and texts, camera/look chips (max 3 cameras), product fields persisted, Muse ad-script request data + busy state + errors, overwrite confirm, ad data only in ad mode, product image on every scene, English labels. Mock IPC; Muse replies are canned by the test, not the real Muse.');
   } finally { await browser.close(); server.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

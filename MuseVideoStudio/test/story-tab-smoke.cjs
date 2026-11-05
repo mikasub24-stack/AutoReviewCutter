@@ -38,7 +38,9 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
             s.story.analyze = { busy: false, progress: 'Muse đã chia 2 cảnh', part: 1, parts: 1, error: '' };
             listener(structuredClone(s));
             const units = data.script.split(/(?<=[.!?])\s+/);
-            return { scenes: [{ title: 'Cảnh 1', source: units.slice(0, 2).join(' '), voiceover: units.slice(0, 2).join(' '), visual: '', prompt: 'Mai dắt trâu qua cánh đồng lúc bình minh, mỉm cười.\nAudio: no speech, no dialogue, no singing, no narration, no lip movement - characters stay silent with mouths closed.', durationSeconds: 10, units: [1, 2] }, { title: 'Cảnh 2', source: units.slice(2).join(' '), voiceover: units.slice(2).join(' '), visual: '', prompt: 'Chú cá vàng nhảy lên thuyền, Mai ngạc nhiên đưa tay đón.\nAudio: no speech, no dialogue, no singing, no narration, no lip movement - characters stay silent with mouths closed.', durationSeconds: 10, units: [3, 4], offline: true }], cast: 'Mai – theo ảnh', notes: ['1 cảnh dùng prompt mẫu do Muse chưa viết đúng; xem lại hoặc bấm Phân tích lại.'] };
+            const result = { scenes: [{ title: 'Cảnh 1', source: units.slice(0, 2).join(' '), voiceover: units.slice(0, 2).join(' '), visual: '', prompt: 'Mai dắt trâu qua cánh đồng lúc bình minh, mỉm cười.\nAudio: no speech, no dialogue, no singing, no narration, no lip movement - characters stay silent with mouths closed.', durationSeconds: 10, units: [1, 2] }, { title: 'Cảnh 2', source: units.slice(2).join(' '), voiceover: units.slice(2).join(' '), visual: '', prompt: 'Chú cá vàng nhảy lên thuyền, Mai ngạc nhiên đưa tay đón.\nAudio: no speech, no dialogue, no singing, no narration, no lip movement - characters stay silent with mouths closed.', durationSeconds: 10, units: [3, 4] }].filter(sc => sc.voiceover.trim()), cast: 'Mai – theo ảnh', notes: [] };
+            if (window.analyzeStop && !data.resume) { result.scenes = result.scenes.slice(0, 1); result.incomplete = { from: 3, total: units.length, message: 'Muse chưa chia đúng đoạn từ câu 3.' }; }
+            return result;
           }
           if (name === 'storyAnalyzeCancel') { s.story.analyze = { busy: false, progress: '', part: 0, parts: 0, error: '' }; }
           if (name === 'images') return ['C:\\Refs\\mai.png'];
@@ -75,10 +77,12 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.match(await page.locator('#summary').textContent(), /^3 \/ 3 clip đã lưu$/);
     assert.equal(await page.locator('.card .cardActions button:has-text("Đưa về sửa")').first().isHidden(), true, 'cảnh kể chuyện không có nút đưa về sửa');
 
-    // Script → quick split → character image → create clips.
+    // Script → Muse analysis → character image → create clips.
     await page.locator('#storyScript').fill('Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng Mai dậy sớm ra bến đón đò.\n\nMột hôm có chú cá vàng nhảy lên thuyền. Mai thả cá về sông và cá hứa sẽ giúp cô một điều ước.');
     await page.locator('#storyCharacter').fill('Mai, bé gái tóc đen');
-    await page.locator('#storySplit').click();
+    assert.equal(await page.locator('#storySplit').count(), 0, 'không còn nút «Chia nhanh»: chỉ Muse đọc hiểu rồi mới chia cảnh');
+    await page.locator('#storyAnalyze').click();
+    await page.waitForFunction(() => document.querySelectorAll('#storyScenes .draftRow').length >= 2 && !document.getElementById('storyAnalyze').disabled);
     const sceneCount = await page.locator('#storyScenes .draftRow').count();
     assert.ok(sceneCount >= 2, 'cảnh ' + sceneCount);
     assert.match(await page.locator('#storySceneCount').textContent(), /^\d+ cảnh$/);
@@ -115,9 +119,6 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     // Hiểu kịch bản: đối chiếu lời với kịch bản gốc, sửa một chạm, soát từng cảnh, giới hạn 10 giây, đa ngôn ngữ.
     await page.evaluate(() => { document.getElementById('storyPanel').open = true; document.getElementById('storyMuse').open = true; });
     await page.locator('#storyScript').fill('Mai ra bến sông lúc bình minh. Cá vàng nhảy lên thuyền. Mai thả cá về sông.');
-    await page.locator('#storySplit').click();
-    await page.waitForFunction(() => /khớp 100% kịch bản gốc[\s\S]*prompt mẫu/.test(document.getElementById('storyCheck').textContent));
-    assert.match(await page.locator('#storyCheck').textContent(), /3 cảnh đang dùng prompt mẫu \(chưa qua Muse\)|\d+ cảnh đang dùng prompt mẫu/, 'chia nhanh: nhắc rõ prompt mẫu chưa qua Muse');
     // Muse chép «LỜI» và bỏ sót một câu → app tự căn lời về nguyên văn truyện, câu bị bỏ thành cảnh mẫu.
     await page.locator('#storyReply').fill('CẢNH 1\nLỜI: Mai ra bến sông lúc bình minh.\nPROMPT: Cô bé Mai đứng trên bến sông lúc bình minh, sương mỏng, mặt mỉm cười nhìn mặt nước.\n\nCẢNH 2\nLỜI: Mai thả cá về sông.\nPROMPT: Mai cúi xuống thả cá vàng xuống nước, nét mặt dịu dàng, mặt nước gợn sóng.');
     await page.locator('#storyParse').click();
@@ -144,8 +145,8 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.match(await page.locator('#storyCheck').textContent(), /1 cảnh cần xem lại trước khi tạo/);
     // Giây mỗi cảnh tự tính theo lời kể, không còn ô nhập tay.
     assert.equal(await page.locator('#storySeconds').count(), 0, 'không còn ô Giây / cảnh');
-    await page.locator('#storyScript').fill('Mai ra bến. Cá vàng nhảy lên thuyền, Mai thả cá về sông và mỉm cười thật lâu cùng bà.'); await page.locator('#storySplit').click();
-    await page.waitForFunction(() => /độ dài mỗi cảnh tự tính theo lời kể/.test(document.getElementById('storyInfo').textContent));
+    await page.locator('#storyScript').fill('Mai ra bến. Cá vàng nhảy lên thuyền, Mai thả cá về sông và mỉm cười thật lâu cùng bà.'); await page.locator('#storyAnalyze').click();
+    await page.waitForFunction(() => /^Muse đã chia \d+ cảnh\./.test(document.getElementById('storyInfo').textContent) && !document.getElementById('storyAnalyze').disabled);
     const secs = async () => (await page.locator('#storyScenes .draftRow strong').allTextContents()).map(t => Number(/· (\d+) giây/.exec(t)?.[1]));
     const first = await secs();
     assert.ok(first.length >= 1 && first.every(n => n >= 3 && n <= 10), 'giây trong khoảng 3–10: ' + first);
@@ -155,13 +156,15 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.ok((await secs())[0] > 3, 'sửa lời dài ra thì giây tăng');
     // Đa ngôn ngữ: kịch bản tiếng Anh chọn giọng tiếng Anh trước; kịch bản tiếng Trung chia theo chữ Hán.
     await page.locator('#storyScript').fill('Every morning, Tom rowed out to the middle of the lake. One day, a golden fish jumped into his boat.');
-    await page.locator('#storySplit').click();
+    await page.locator('#storyAnalyze').click();
+    await page.waitForFunction(() => !document.getElementById('storyAnalyze').disabled && document.querySelectorAll('#storyScenes .draftRow').length >= 1);
     assert.deepEqual(await page.locator('#storyScenes .draftRow textarea:nth-of-type(1)').evaluateAll(list => list.map(t => t.value)), ['Every morning, Tom rowed out to the middle of the lake. One day, a golden fish jumped into his boat.']);
     await page.locator('#storyEngine').selectOption('edge');
     await page.locator('#storyVoice').evaluate(e => { e.dispatchEvent(new Event('change')); });
     assert.match(await page.locator('#storyVoice option').first().textContent(), /Aria.*Tiếng Anh ✓/, 'kịch bản tiếng Anh: giọng tiếng Anh đứng đầu');
     await page.locator('#storyScript').fill('小明划船到湖中央等待日出。有一天，一条金鱼跳进了他的船里，请求他放它回去。小明轻轻地把金鱼放回水中。金鱼绕着小船转了三圈才消失。');
-    await page.locator('#storySplit').click();
+    await page.locator('#storyAnalyze').click();
+    await page.waitForFunction(() => !document.getElementById('storyAnalyze').disabled && document.querySelectorAll('#storyScenes .draftRow').length >= 1);
     assert.ok(await page.locator('#storyScenes .draftRow').count() >= 1);
     assert.equal((await page.locator('#storyScenes .draftRow textarea:nth-of-type(1)').evaluateAll(list => list.map(t => t.value))).join(''), '小明划船到湖中央等待日出。有一天，一条金鱼跳进了他的船里，请求他放它回去。小明轻轻地把金鱼放回水中。金鱼绕着小船转了三圈才消失。');
     await page.locator('#storyScript').fill('');
@@ -290,22 +293,51 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await page.locator('#storyAnalyze').click();
     await page.waitForFunction(() => document.getElementById('storyAnalyze').disabled && !document.getElementById('storyAnalyzeStop').hidden);
     assert.equal(await page.locator('#storyAnalyze').textContent(), 'Muse is analyzing…');
-    assert.equal(await page.locator('#storySplit').isDisabled(), true, 'đang phân tích thì không chia nhanh');
     assert.match(await page.locator('#storyInfo').textContent(), /Part 1\/1 · Muse is writing \(2 scene\(s\) so far\)…/);
     await page.waitForFunction(() => !document.getElementById('storyAnalyze').disabled);
     assert.equal(await page.locator('#storyAnalyzeStop').isHidden(), true);
     assert.equal(await page.locator('#storyScenes .draftRow').count(), 2);
-    assert.match(await page.locator('#storyInfo').textContent(), /Muse split the story into 2 scenes\. 1 scene\(s\) use a template prompt because Muse did not write one properly/);
-    await page.waitForFunction(() => /scene 2\. Click “Analyze with Muse”/.test(document.getElementById('storyCheck').textContent));
-    assert.match(await page.locator('#storyCheck').textContent(), /scene 2\. Click “Analyze with Muse”/);
-    assert.equal(await page.locator('#storyScenes .draftRow .storyTag').nth(1).textContent(), 'template prompt');
-    assert.equal(await page.locator('#storyScenes .draftRow .storyTag').nth(0).isVisible(), false);
+    assert.match(await page.locator('#storyInfo').textContent(), /^Muse split the story into 2 scenes\. Review the narration and prompts, then click Create clips\.$/);
+    assert.equal(await page.locator('#storyScenes .storyTag:visible').count(), 0, 'kết quả của Muse không có cảnh «prompt mẫu»');
+    assert.equal(await page.locator('#storyAnalyze').textContent(), 'Analyze with Muse');
+    assert.equal(await page.locator('#storyAnalyzeAgain').isHidden(), true);
     const analyze = (await called('storyAnalyze')).at(-1).data;
     assert.equal(analyze.seconds, 10); assert.equal(analyze.aspect, '16:9'); assert.match(analyze.script, /^Ngày xưa/); assert.equal(analyze.character, 'Mai, bé gái tóc đen');
+    assert.equal('resume' in analyze, false, 'lần đầu không gửi vị trí làm tiếp');
+    // Muse dừng giữa chừng: giữ cảnh đã chia, nút thành «Phân tích tiếp» (không tự chia nhanh); làm tiếp gửi chỗ dừng + nhân vật.
+    await page.evaluate(() => { window.analyzeStop = true; window.analyzeDelay = 200; });
+    await page.locator('#storyAnalyze').click();
+    await page.waitForFunction(() => document.getElementById('storyAnalyze').textContent === 'Continue analysis');
+    assert.equal(await page.locator('#storyScenes .draftRow').count(), 1);
+    assert.match(await page.locator('#storyInfo').textContent(), /^Muse split 1 scene\(s\) and stopped at sentence 3\/\d+\. Muse did not split the part from sentence 3 correctly\. Click “Continue analysis” so Muse carries on from there/);
+    assert.equal(await page.locator('#storyScenes .storyTag:visible').count(), 0);
+    assert.equal(await page.locator('#storyAnalyzeAgain').isVisible(), true);
+    assert.equal(await page.locator('#storyAnalyzeAgain').textContent(), 'Analyze again from the start');
+    await page.evaluate(() => { window.analyzeStop = false; });
+    await page.locator('#storyAnalyze').click();
+    await page.waitForFunction(() => document.getElementById('storyAnalyze').textContent === 'Analyze with Muse' && !document.getElementById('storyAnalyze').disabled);
+    assert.equal(await page.locator('#storyScenes .draftRow').count(), 3, 'cảnh đã có được giữ, cảnh mới nối tiếp');
+    assert.deepEqual(await page.evaluate(() => window.storyUi.scenes.map(sc => sc.title)), ['Cảnh 1', 'Cảnh 2', 'Cảnh 3'], 'đánh số lại liên tục sau khi nối');
+    assert.deepEqual((await called('storyAnalyze')).at(-1).data.resume, { from: 3, cast: 'Mai – theo ảnh' });
+    assert.equal(await page.locator('#storyAnalyzeAgain').isHidden(), true);
+    // Sửa truyện sau khi dừng → không còn làm tiếp được; «Phân tích lại từ đầu» hỏi trước rồi thay hết, không gửi vị trí cũ.
+    await page.evaluate(() => { window.analyzeStop = true; });
+    await page.locator('#storyAnalyze').click();
+    await page.waitForFunction(() => document.getElementById('storyAnalyze').textContent === 'Continue analysis');
+    await page.locator('#storyScript').fill(await page.locator('#storyScript').inputValue() + ' Thêm một câu nữa.');
+    assert.equal(await page.locator('#storyAnalyze').textContent(), 'Analyze with Muse', 'sửa truyện thì hết làm tiếp');
+    await page.locator('#storyScript').fill(analyze.script);
+    assert.equal(await page.locator('#storyAnalyze').textContent(), 'Continue analysis', 'trả lại đúng truyện thì làm tiếp được');
+    await page.evaluate(() => { window.analyzeStop = false; });
+    await page.locator('#storyAnalyzeAgain').click();
+    await page.waitForFunction(() => !document.getElementById('storyAnalyze').disabled && document.querySelectorAll('#storyScenes .draftRow').length === 2);
+    assert.equal('resume' in (await called('storyAnalyze')).at(-1).data, false, 'làm lại từ đầu không gửi vị trí cũ');
+    assert.equal(await page.locator('#storyAnalyze').textContent(), 'Analyze with Muse');
+    const analyzeCalls = (await called('storyAnalyze')).length;
     await page.locator('#storyScript').fill(''); await page.locator('#storyAnalyze').click();
     assert.match(await page.locator('#toast').textContent(), /Paste the story first/);
-    assert.equal((await called('storyAnalyze')).length, 1, 'không gửi Muse khi chưa có truyện');
+    assert.equal((await called('storyAnalyze')).length, analyzeCalls, 'không gửi Muse khi chưa có truyện');
     assert.deepEqual(errors, []);
-    console.log('PASS: story tab — own jobs/counts/folder, quick split + Muse reply parsing (no-speech rule kept), character image on every scene, free voice setup/listen/clone with consent, subtitles on/off + .srt + PNG captions, auto-edit report, export errors, persistence, English labels.');
+    console.log('PASS: story tab — own jobs/counts/folder, Muse analysis + pasted Muse reply parsing (no-speech rule kept), no quick split, character image on every scene, free voice setup/listen/clone with consent, subtitles on/off + .srt + PNG captions, auto-edit report, export errors, persistence, English labels.');
   } finally { await browser.close(); server.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

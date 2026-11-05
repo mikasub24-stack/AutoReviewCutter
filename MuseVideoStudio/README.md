@@ -1,10 +1,10 @@
 Continue in 1.1.6 resubmits unfinished scenes with new attempt IDs, ignoring tentative send flags and old receipts. Completed files are kept. The sidebar now displays the actual application version.
 
-# Muse Video Studio V1 · 1.3.0 · Windows
+# Muse Video Studio V1 · 1.3.1 · Windows
 
 ## Bản cài đặt Windows
 
-Tải `MuseVideoStudio-1.3.0-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
+Tải `MuseVideoStudio-1.3.1-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
 
 Build riêng: `node tools/build-installer.cjs` trên Windows. Workflow installer kiểm thử cài đặt, shortcut, mở app, một cửa sổ chính và gỡ cài đặt trước khi thêm Setup.exe vào release hiện tại.
 
@@ -141,6 +141,13 @@ Nối MP4 tùy chọn cần FFmpeg/ffprobe trên máy (chưa đóng kèm): chọ
 Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. Các kiểm tra `node test/submit-diagnostics-smoke.cjs`, `node test/cards-smoke.cjs`, `node test/muse-tracker-smoke.cjs`, `node test/download-capture-smoke.cjs` xác minh thẻ video, gắn kết quả theo prompt và tải/cancel tệp video thật từ máy chủ cục bộ; smoke tải cần FFmpeg hoặc MUSE_VIDEO_FIXTURE. Test UI và browser smoke cần Chromium; đặt CHROMIUM_PATH nếu khác /usr/bin/chromium. `node test/attachment-ready-smoke.cjs` kiểm tra readiness ảnh trên DOM fixture thật. FFmpeg smoke riêng: `npm run test:merge`.
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
+
+## Update 1.3.1
+
+- **Tab Kể chuyện: chỉ Muse đọc hiểu truyện rồi mới chia cảnh, không còn «chia nhanh» và không còn giới hạn số cảnh.** Lỗi trước đó: bấm «Phân tích bằng Muse» với truyện dài báo «Kịch bản tạo hơn 100 cảnh…» mà chưa hỏi Muse, vì app chạy thử «chia nhanh» trên máy để đếm cảnh. Đã bỏ bước đó, bỏ nút «Chia nhanh (không dùng Muse)» ở tab này, và bỏ việc app tự chia thay Muse khi Muse trả lời hỏng/ngừng giữa chừng. Muse nhận truyện nguyên văn và được hỏi theo từng lượt nhỏ (khoảng 8 cảnh mỗi lượt). Việc đánh số câu để hỏi Muse vẫn làm trên máy, nhưng không chia cảnh.
+- **Muse ngừng giữa chừng thì làm tiếp được**: app giữ các cảnh Muse đã chia, báo dừng ở câu nào, nút đổi thành **Phân tích tiếp** (làm tiếp từ câu đó, giữ nhân vật đã chốt và các cảnh đã có). **Phân tích lại từ đầu** (có hỏi xác nhận) thay hết. Sửa chữ trong ô truyện thì không làm tiếp được nữa. Câu nào Muse bỏ sót, hỏi lại vẫn không được thì dừng tại câu đó chứ không chèn cảnh «prompt mẫu». Nếu Muse trả lời sai khuôn ngay lượt đầu thì báo lỗi và không có cảnh nào.
+- **Bỏ giới hạn ở tab Tạo video / Tạo ảnh**: không còn chặn «hơn 100 cảnh» khi chia kịch bản thô thành prompt và không còn chặn «hơn 500 prompt» khi nhập danh sách prompt. «Chia nhanh» kịch bản thô chỉ còn ở hai tab này (khi bạn đã có prompt sẵn).
+- **Chưa thử**: Muse thật với truyện rất dài. Mỗi lượt hỏi vẫn gửi kèm cả câu chuyện để Muse hiểu ngữ cảnh, nên truyện càng dài thì tin nhắn gửi vào khung chat Muse càng dài; chưa biết khung chat Muse thật nhận tối đa bao nhiêu chữ. Nếu Muse từ chối hoặc cắt, tool báo lỗi và cho làm tiếp, không tự cắt truyện. Cũng chưa thử hàng trăm cảnh trong hàng đợi, dựng và xuất MP4 trên máy thật. Đã kiểm bằng trang chat Muse giả (truyện 170 câu, hơn 100 cảnh: hỏi đủ từng câu đúng một lần, đúng thứ tự, không chia nhanh trước; dừng giữa chừng và làm tiếp), giao diện giả và test đơn vị.
 
 ## Update 1.3.0
 

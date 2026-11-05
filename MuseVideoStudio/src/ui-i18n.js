@@ -13,8 +13,12 @@ Ví dụ: hoạt hình màu nước|e.g. watercolor animation
 Chọn ảnh nhân vật|Choose character image
 Dán hoặc kéo ảnh nhân vật chính vào đây. Ảnh này gắn vào mọi cảnh để nhân vật giữ nguyên; nhân vật khác trong truyện do Muse nhận ra và mô tả cố định ở mọi cảnh.|Paste or drop the main character image here. It is attached to every scene so the character stays consistent; Muse recognizes the other characters in the story and gives each a fixed description in every scene.
 Chưa chọn ảnh nhân vật.|No character image chosen.
-Dán câu chuyện rồi bấm «Phân tích bằng Muse» (cần đã đăng nhập Muse tài khoản 1). Hoặc «Chia nhanh» ngay trên máy với prompt mẫu.|Paste the story, then click “Analyze with Muse” (you must be signed in to Muse account 1). Or use “Quick split” on this computer with template prompts.
-Chia nhanh (không dùng Muse)|Quick split (without Muse)
+Dán câu chuyện rồi bấm «Phân tích bằng Muse» (cần đã đăng nhập Muse tài khoản 1). Muse đọc hiểu cả truyện rồi mới chia cảnh và viết prompt hình.|Paste the story, then click “Analyze with Muse” (you must be signed in to Muse account 1). Muse reads and understands the whole story first, then splits the scenes and writes the picture prompts.
+Phân tích lại từ đầu|Analyze again from the start
+Phân tích tiếp|Continue analysis
+Phân tích lại từ đầu sẽ thay toàn bộ các cảnh đang có. Tiếp tục?|Analyzing again from the start replaces all the current scenes. Continue?
+Muse trả lời không đúng khuôn (không thấy số câu và prompt cho từng cảnh).|Muse replied in the wrong format (no sentence numbers and prompts per scene).
+Không làm tiếp được vì vị trí dừng không khớp kịch bản. Bấm phân tích lại từ đầu.|Cannot continue because the stopping point does not match the script. Analyze again from the start.
 Phân tích bằng Muse|Analyze with Muse
 Dán thủ công (dự phòng)|Paste manually (backup)
 Dừng phân tích|Stop analysis
@@ -104,7 +108,7 @@ Chat Muse đang bận quá lâu. Chờ Muse xong việc hiện tại rồi bấm
 Chưa thấy ô chat Muse. Đăng nhập Muse tài khoản 1 trong cửa sổ Muse rồi bấm Phân tích lại.|The Muse chat box was not found. Sign in to Muse account 1 in the Muse window, then analyze again.
 Chưa bấm được nút Gửi của Muse.|Could not click Muse's Send button.
 Không thấy yêu cầu hiện trong chat Muse. Mở cửa sổ Muse tài khoản 1 xem Muse có nhận tin nhắn không.|The request did not appear in the Muse chat. Open the Muse account 1 window and check whether Muse received the message.
-Muse trả lời quá lâu. Thử lại hoặc dùng «Chia nhanh».|Muse took too long to reply. Try again or use “Quick split”.
+Muse trả lời quá lâu. Thử lại.|Muse took too long to reply. Try again.
 Đã dừng phân tích.|Analysis stopped.
 Muse đang phân tích câu chuyện. Chờ xong hoặc bấm Dừng phân tích.|Muse is analyzing the story. Wait for it to finish or click Stop analysis.
 Muse đang phân tích. Chờ xong hoặc bấm Dừng.|Muse is analyzing. Wait for it to finish or click Stop.
@@ -514,8 +518,10 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
       [/^Thêm (\d+) prompt và chạy toàn bộ tác vụ đang chờ\?.*$/,m=>'Add '+m[1]+' prompts and run all pending scenes? This may use Muse credits. Exact reviewed prompts and scene references will be sent.'],
       [/^Dán ảnh tại đây cho (.+)$/,m=>'Paste references here for '+m[1]],
       [/^(\d+) cảnh$/,m=>m[1]+' scenes'],
-[/^Đã chia (\d+) cảnh, độ dài mỗi cảnh tự tính theo lời kể \(3–(\d+) giây\)\. Xem lại lời đọc và prompt, rồi bấm Tạo clip\.$/,m=>'Split into '+m[1]+' scenes; each scene length is set automatically from its narration (3–'+m[2]+' seconds). Review the narration and prompts, then click Create clips.'],
-      [/^Muse đã chia (\d+) cảnh\.(?: (.+?))? Xem lại lời đọc và prompt, rồi bấm Tạo clip\.$/,m=>'Muse split the story into '+m[1]+' scenes.'+(m[2]?' '+m[2].replace(/Phần (\d+)\/(\d+): Muse trả lời không đúng khuôn, dùng chia nhanh cho đoạn này\./g,'Part $1/$2: Muse’s reply was not in the expected format; quick split used for this part.').replace(/(\d+) cảnh dùng prompt mẫu do Muse chưa viết đúng; xem lại hoặc bấm Phân tích lại\./g,'$1 scene(s) use a template prompt because Muse did not write one properly; review them or analyze again.'):'')+' Review the narration and prompts, then click Create clips.'],
+      [/^Muse đã chia (\d+) cảnh\.(?: (.+?))? Xem lại lời đọc và prompt, rồi bấm Tạo clip\.$/,m=>'Muse split the story into '+m[1]+' scenes.'+(m[2]?' '+m[2]:'')+' Review the narration and prompts, then click Create clips.'],
+      [/^Muse đã chia (\d+) cảnh, dừng ở câu (\d+)\/(\d+)\. (.+) Bấm «Phân tích tiếp» để Muse làm tiếp từ đó \(giữ nguyên các cảnh đã có\)\.$/,m=>'Muse split '+m[1]+' scene(s) and stopped at sentence '+m[2]+'/'+m[3]+'. '+m[4].replace(/^Muse chưa chia đúng đoạn từ câu (\d+)\.$/,'Muse did not split the part from sentence $1 correctly.').replace(/^Muse trả lời không đúng khuôn \(không thấy số câu và prompt cho từng cảnh\)\.$/,'Muse replied in the wrong format (no sentence numbers and prompts per scene).').replace(/^Muse trả lời quá lâu\. Thử lại\.$/,'Muse took too long to reply. Try again.')+' Click “Continue analysis” so Muse carries on from there (the existing scenes are kept).'],
+      [/^Muse dừng ở câu (\d+)\/(\d+)\. Bấm «Phân tích tiếp» để làm tiếp\.$/,m=>'Muse stopped at sentence '+m[1]+'/'+m[2]+'. Click “Continue analysis” to carry on.'],
+      [/^Muse chưa chia được đoạn bắt đầu từ câu (\d+)\.$/,m=>'Muse could not split the part starting at sentence '+m[1]+'.'],
       [/^(?:Phần (\d+)\/(\d+)|Phân tích|Viết lời quảng cáo) · (.+)$/,m=>{const head=m[1]?'Part '+m[1]+'/'+m[2]:/^Viết/.test(key)?'Writing the ad script':'Analysis',tail=[[/^chuẩn bị yêu cầu…$/,()=>'preparing the request…'],[/^Muse còn đang xử lý việc trước, chờ rảnh rồi mới gửi…$/,()=>'Muse is still busy with earlier work; waiting until it is free…'],[/^chờ ô chat Muse \(đăng nhập nếu cần\)…$/,()=>'waiting for the Muse chat box (sign in if needed)…'],[/^đang gửi cho Muse…$/,()=>'sending to Muse…'],[/^Muse đang viết(?: \(đã (\d+) cảnh\))?…$/,x=>'Muse is writing'+(x[1]?' ('+x[1]+' scene(s) so far)':'')+'…'],[/^hỏi lại Muse (\d+) đoạn còn thiếu…$/,x=>'asking Muse again about '+x[1]+' missing part(s)…'],[/^xong (\d+) cảnh$/,x=>'done: '+x[1]+' scene(s)']];for(const [re,fn] of tail){const x=m[3].match(re);if(x)return head+' · '+fn(x);}return head+' · '+m[3];}],
       [/^Muse đã chia (\d+) cảnh$/,m=>'Muse split the story into '+m[1]+' scenes'],
       [/^⚠ (\d+) cảnh đang dùng prompt mẫu \(chưa qua Muse\): cảnh (.+)\. Bấm «Phân tích bằng Muse» để Muse viết prompt hình đúng truyện, hoặc tự sửa prompt\.$/,m=>'⚠ '+m[1]+' scene(s) use a template prompt (not written by Muse): scene '+m[2]+'. Click “Analyze with Muse” so Muse writes picture prompts that match the story, or edit the prompts yourself.'],

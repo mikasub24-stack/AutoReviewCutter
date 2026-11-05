@@ -8,7 +8,6 @@
   const ASPECTS = ['16:9', '9:16', '1:1'];
   // Muse chỉ tạo clip tối đa 10 giây, nên mỗi cảnh không được dài hơn.
   const MAX_SECONDS = 10;
-  const MAX_SCENES = 100;
   // Tiếng Việt đọc bình thường khoảng 14–15 ký tự mỗi giây.
   const CHARS_PER_SECOND = 14;
   const count = value => Array.from(String(value || '')).length;
@@ -330,7 +329,6 @@
     if (typeof script !== 'string' || !script.trim()) throw Error('Dán kịch bản trước khi chia cảnh.');
     const units = storyUnits(script, config);
     const ranges = groupRanges(units, 1, units.length, limitFor(units, config));
-    if (ranges.length > MAX_SCENES) throw Error('Kịch bản tạo hơn 100 cảnh. Hãy chia thành nhiều lượt hoặc tăng giới hạn ký tự mỗi cảnh.');
     return ranges.map(([a, b], index) => makeScene(index + 1, unitsText(units, a, b), '', config, [a, b]));
   }
 

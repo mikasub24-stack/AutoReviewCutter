@@ -4,7 +4,6 @@
   else root.scriptPlanner = factory();
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  const MAX_SCENES = 100;
   const count = value => Array.from(value).length;
   const sceneHeading = /^[\t ]*(?:#{1,6}[\t ]*)?(\[(?:Cảnh|Scene)[\t ]+\d+[A-Za-z]?\]|(?:Cảnh|Scene)[\t ]+\d+[A-Za-z]?(?=[\t :：.\-–—]|$))/gim;
 
@@ -123,7 +122,6 @@
     if (typeof script !== 'string' || !script.trim()) throw Error('Dán kịch bản trước khi chia cảnh.');
     const config = settings(options);
     const text = script.replace(/\r\n?/g, '\n').trim();
-    if (count(text.replace(/\s/g, '')) > MAX_SCENES * config.maxChars) throw Error('Kịch bản tạo hơn 100 cảnh. Hãy chia thành nhiều lượt hoặc tăng giới hạn ký tự mỗi cảnh.');
     let sections = config.mode === 'auto' ? explicitSections(text) : null;
     if (!sections) {
       sections = (config.mode === 'sentences' ? [text] : text.split(/\n[\t ]*\n+/))
@@ -137,7 +135,6 @@
         // source appears once; a heading already present in it is not repeated.
         scenes.push({ title, source, prompt: prompt(source, config) });
       });
-      if (scenes.length > MAX_SCENES) throw Error('Kịch bản tạo hơn 100 cảnh. Hãy chia thành nhiều lượt hoặc tăng giới hạn ký tự mỗi cảnh.');
     }
     return scenes;
   }

@@ -77,12 +77,14 @@ test('duration, aspect and style are included without claiming translation or an
   assert.ok(scenes[0].prompt.includes(scenes[0].source));
 });
 
-test('empty, invalid settings and more than 100 scenes produce actionable errors', () => {
+test('empty and invalid settings produce actionable errors; the number of scenes is not limited', () => {
   assert.throws(()=>planScript('  '),/Dán kịch bản/);
   assert.throws(()=>planScript('Một cảnh.',{mode:'ai'}),/cách chia cảnh/);
   assert.throws(()=>planScript('Một cảnh.',{seconds:0}),/Thời lượng/);
   assert.throws(()=>planScript('Một cảnh.',{maxChars:0}),/Giới hạn/);
-  assert.throws(()=>planScript(Array.from({length:101},(_,i)=>`Cảnh ${i + 1}: Nội dung.`).join('\n')),/hơn 100 cảnh/);
+  const many=planScript(Array.from({length:350},(_,i)=>`Cảnh ${i + 1}: Nội dung.`).join('\n'));
+  assert.equal(many.length,350);
+  assert.ok(many.every((scene,index)=>scene.source.includes(`Nội dung.`)&&scene.title.includes(String(index+1))));
 });
 
 test('UMD browser export works without CommonJS or network access', () => {

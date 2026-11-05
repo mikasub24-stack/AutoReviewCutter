@@ -83,7 +83,7 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
         }
         if (Date.now() - sentAt > t.reply) {
           if (seen && last) return last;
-          throw infra('Muse trả lời quá lâu. Thử lại hoặc dùng «Chia nhanh».');
+          throw infra('Muse trả lời quá lâu. Thử lại.');
         }
         await wait(t.poll, signal);
       }
@@ -114,14 +114,19 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
     return ranges;
   }
 
-  async function run({ script, options: input = {} }) {
+  // `resume` = { from, cast }: làm tiếp từ câu `from` (sau khi một lượt trước đó dừng giữa chừng), giữ nhân vật đã chốt.
+  async function run({ script, options: input = {}, resume = null }) {
     if (state.busy) throw Error('Muse đang phân tích. Chờ xong hoặc bấm Dừng.');
     const config = plan.options(input);
     if (typeof script !== 'string' || !script.trim()) throw Error('Dán kịch bản trước khi nhờ Muse đọc.');
     const units = plan.storyUnits(script, config);
-    const ranges = chunkRanges(units, config);
-    const estimate = plan.planStory(script, config).length;
-    if (estimate > 100) throw Error('Kịch bản tạo hơn 100 cảnh. Hãy chia thành nhiều lượt.');
+    let ranges = chunkRanges(units, config), startCast = '';
+    if (resume) {
+      const at = Number(resume.from);
+      if (!Number.isInteger(at) || at < 1 || at > units.length) throw Error('Không làm tiếp được vì vị trí dừng không khớp kịch bản. Bấm phân tích lại từ đầu.');
+      ranges = ranges.filter(([, to]) => to >= at).map(([a, b]) => [Math.max(a, at), b]);
+      startCast = String(resume.cast || '').slice(0, 4000);
+    }
     if (isBusy()) throw Error('Dừng hàng đợi và các thao tác trình duyệt trước khi nhờ Muse phân tích.');
     await ensureAllowed();
     controller = new AbortController();
@@ -134,7 +139,7 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
       check(signal);
       const muse = getMuse(0);
       if (!muse) throw infra('Chưa mở được Muse tài khoản 1.');
-      let cast = '';
+      let cast = startCast, stop = null;
       const all = [];
       for (let i = 0; i < ranges.length; i++) {
         const [from, to] = ranges[i];
@@ -146,7 +151,7 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
             const instruction = plan.buildMuseInstruction(script, config, { units, ranges: list, cast, part: i + 1, parts: ranges.length, marker, ...extra });
             return ask(muse, instruction, marker, signal, label);
           };
-          let scenes = null, failed = false;
+          let scenes = null;
           for (let attempt = 0; attempt < 2 && !scenes; attempt++) {
             let reply;
             try { reply = await ask1([[from, to]]); }
@@ -157,7 +162,8 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
               if (got.cast) cast = got.cast;
               scenes = got.scenes;
             } catch (e) {
-              if (attempt) { failed = true; notes.push(`${label}: Muse trả lời không đúng khuôn, dùng chia nhanh cho đoạn này.`); scenes = plan.assembleScenes(units, [], config, { from, to }); }
+              // Không tự chia thay Muse: trả lời hỏng hai lần thì dừng lượt này (các phần đã xong được giữ để làm tiếp).
+              if (attempt) throw Error('Muse trả lời không đúng khuôn (không thấy số câu và prompt cho từng cảnh).');
             }
           }
           // Câu Muse bỏ sót hoặc chia sai (cảnh mẫu) → hỏi lại đúng những câu đó, tối đa 3 đoạn mỗi phần.
@@ -167,7 +173,7 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
             const run = runs.at(-1);
             if (run && run.end === index - 1) { run.end = index; run.to = scene.units[1]; } else runs.push({ from: scene.units[0], to: scene.units[1], start: index, end: index });
           });
-          if (!failed && runs.length) {
+          if (runs.length) {
             say(`${label} · hỏi lại Muse ${Math.min(runs.length, 3)} đoạn còn thiếu…`);
             for (const run of runs.slice(0, 3).reverse()) {
               try {
@@ -177,26 +183,32 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
                 if (got.scenes.length) scenes.splice(run.start, run.end - run.start + 1, ...got.scenes);
               } catch (e) {
                 if (e.name === 'AbortError') throw e;
-                if (e.infra) { notes.push(`${label}: Muse không trả lời khi hỏi lại các câu còn thiếu, giữ prompt mẫu cho những câu đó.`); break; }
-                /* trả lời hỏng: giữ cảnh mẫu */
+                if (e.infra) break;   // Muse không trả lời: dừng ở câu còn thiếu, ngay bên dưới
+                /* trả lời hỏng: thử đoạn khác */
               }
             }
+          }
+          // Câu nào Muse vẫn chưa chia đúng thì KHÔNG tự chia thay Muse: giữ các cảnh đúng phía trước, dừng tại câu đó để làm tiếp.
+          const missing = scenes.findIndex(s => s.offline);
+          if (missing !== -1) {
+            const at = scenes[missing].units?.[0] || from;
+            all.push(...scenes.slice(0, missing));
+            if (!all.length) throw Error(`Muse chưa chia được đoạn bắt đầu từ câu ${at}.`);
+            stop = { from: at, message: `Muse chưa chia đúng đoạn từ câu ${at}.` };
+            break;
           }
           all.push(...scenes);
           say(`${label} · xong ${all.length} cảnh`);
         } catch (e) {
-          // Đã có ít nhất một phần xong thì giữ lại, phần còn lại dùng chia nhanh thay vì mất hết.
+          // Đã có ít nhất một phần xong thì giữ lại và dừng tại đầu phần lỗi để làm tiếp; chưa có gì thì báo lỗi.
           if (e.name === 'AbortError' || !all.length) throw e;
-          notes.push(`${label}: ${e.message} Các phần còn lại dùng chia nhanh.`);
-          for (let j = i; j < ranges.length; j++) all.push(...plan.assembleScenes(units, [], config, { from: ranges[j][0], to: ranges[j][1] }));
+          stop = { from: ranges[i][0], message: e.message };
           break;
         }
       }
       const final = all.map((scene, index) => ({ ...scene, title: `Cảnh ${index + 1}` }));
-      const offline = final.filter(s => s.offline).length;
-      if (offline) notes.push(`${offline} cảnh dùng prompt mẫu do Muse chưa viết đúng; xem lại hoặc bấm Phân tích lại.`);
-      say(`Muse đã chia ${final.length} cảnh`);
-      return { scenes: final, cast, notes };
+      say(stop ? `Muse đã chia ${final.length} cảnh, dừng ở câu ${stop.from}` : `Muse đã chia ${final.length} cảnh`);
+      return { scenes: final, cast, notes, ...(stop ? { incomplete: { from: stop.from, total: units.length, message: stop.message } } : {}) };
     } catch (error) {
       state.error = error.name === 'AbortError' ? '' : error.message;
       throw error;

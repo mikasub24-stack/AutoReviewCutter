@@ -37,7 +37,6 @@
         result=blocks.map((x,i)=>entry(x,`Prompt ${i+1}`,''));
       }
     }
-    if(result.length>500)throw Error('Có hơn 500 prompt. Hãy chia thành các lượt nhỏ hơn.');
     return result;
   }
   return {importPrompts};

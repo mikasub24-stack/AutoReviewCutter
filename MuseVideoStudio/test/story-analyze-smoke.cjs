@@ -134,6 +134,20 @@ function brain(behavior = {}) {
       assert.ok(r.scenes.every(s => plan.estimateSeconds(s.voiceover) <= 10));
       await page.close(); ok('truyện dài: nhiều lượt, nhân vật chốt chuyển tiếp, đủ chữ đúng thứ tự');
     }
+    // 3b. Truyện RẤT dài (hơn 100 cảnh theo thời lượng): không giới hạn; Muse vẫn được hỏi từng lượt, app không chia nhanh trước.
+    {
+      const long = Array.from({ length: 170 }, (_, i) => `Câu số ${i + 1}: Mai đi qua cánh đồng ${i + 1} và nhìn về phía con sông xa, nơi gió thổi nhẹ.`).join(' ');
+      assert.ok(plan.planStory(long, cfg).length > 100, 'truyện thử phải hơn 100 cảnh');
+      const { page, analyzer, museBrain } = await session({}, { reply: 20000 });
+      // Trước khi Muse đọc, app không được tự chia cảnh: nếu gọi chia nhanh thì test này hỏng.
+      const quickSplit = plan.planStory; plan.planStory = () => { throw Error('chia nhanh chạy trước khi Muse phân tích'); };
+      let r; try { r = await analyzer.run({ script: long, options: cfg }); } finally { plan.planStory = quickSplit; }
+      assert.deepEqual(museBrain.asked.flatMap(a => a.units), Array.from({ length: 170 }, (_, i) => i + 1), 'mỗi câu được hỏi đúng một lần');
+      assert.ok(museBrain.asked.length > 10, 'nhiều lượt: ' + museBrain.asked.length);
+      assert.equal(r.scenes.map(s => s.voiceover).join(' '), long);
+      assert.ok(r.scenes.length > 100 && r.scenes.every(s => !s.offline));
+      await page.close(); ok('truyện hơn 100 cảnh: không bị chặn, Muse phân tích từng lượt, đủ chữ đúng thứ tự');
+    }
     // 4. Muse quên mốc kết thúc → app chờ chữ ổn định rồi dùng.
     {
       const { page, analyzer } = await session({ noDone: true });
@@ -149,15 +163,14 @@ function brain(behavior = {}) {
       assert.ok(r.scenes.every(s => /Mô tả hình cho cảnh/.test(s.prompt)));
       await page.close(); ok('Muse chép LỜI: vẫn đọc đúng nguyên văn truyện');
     }
-    // 6. Muse trả lời linh tinh hai lần → dùng chia nhanh cho đoạn đó, có ghi chú, vẫn đủ lời.
+    // 6. Muse trả lời linh tinh hai lần → dừng và báo rõ; app KHÔNG tự chia cảnh thay Muse.
     {
       const { page, analyzer, museBrain } = await session({ garbage: true });
-      const r = await analyzer.run({ script: tale, options: cfg });
+      await assert.rejects(analyzer.run({ script: tale, options: cfg }), /Muse trả lời không đúng khuôn/);
       assert.equal(museBrain.asked.length, 2, 'thử lại một lần');
-      assert.equal(r.scenes.map(s => s.voiceover).join(' '), tale);
-      assert.ok(r.scenes.every(s => s.offline));
-      assert.match(r.notes.join(' '), /dùng chia nhanh/);
-      await page.close(); ok('Muse trả lời không đúng khuôn: dùng chia nhanh, vẫn đủ lời');
+      assert.equal(analyzer.status().busy, false);
+      assert.match(analyzer.status().error, /không đúng khuôn/);
+      await page.close(); ok('Muse trả lời không đúng khuôn: báo lỗi, không tự chia thay Muse');
     }
     // 7. Chat Muse đang bận (còn nút Dừng) → chờ rảnh mới gửi.
     {
@@ -203,29 +216,47 @@ function brain(behavior = {}) {
       assert.ok(await page.evaluate(() => window.stopClicks) >= 1, 'đã bấm Dừng trên Muse');
       await page.close(); ok('hủy phân tích: dừng Muse đang viết');
     }
-    // 11b. Phần sau Muse ngừng nhận tin → giữ phần đã xong, phần còn lại dùng chia nhanh (không mất hết).
+    // 11b. Phần sau Muse ngừng nhận tin → giữ phần Muse đã chia (không có cảnh chia nhanh), nhớ chỗ dừng; làm tiếp từ đó đủ truyện.
     {
       const long = Array.from({ length: 40 }, (_, i) => `Câu số ${i + 1}: Mai đi qua cánh đồng ${i + 1} và nhìn về phía con sông xa.`).join(' ');
       let target;
-      const { page, analyzer, museBrain } = await session({ onAsk: n => n === 1 && target.evaluate(() => { window.mode.ignoreSend = true; }) }, { echo: 500, reply: 20000 });
-      target = page;
-      const r = await analyzer.run({ script: long, options: cfg });
-      assert.equal(r.scenes.map(s => s.voiceover).join(' '), long, 'vẫn đủ lời dù Muse ngừng giữa chừng');
-      assert.ok(r.scenes.some(s => !s.offline) && r.scenes.some(s => s.offline), 'phần đầu do Muse, phần sau là chia nhanh');
-      assert.ok(r.scenes.findIndex(s => s.offline) > 0 && r.scenes.slice(r.scenes.findIndex(s => s.offline)).every(s => s.offline), 'các cảnh mẫu nằm liền ở cuối');
-      assert.match(r.notes.join(' '), /Các phần còn lại dùng chia nhanh/);
-      await page.close(); ok('Muse ngừng nhận tin ở phần sau: giữ phần đã xong, phần còn lại chia nhanh');
+      const first = await session({ onAsk: n => n === 1 && target.evaluate(() => { window.mode.ignoreSend = true; }) }, { echo: 500, reply: 20000 });
+      target = first.page;
+      const r = await first.analyzer.run({ script: long, options: cfg });
+      assert.ok(r.incomplete && r.incomplete.total === 40 && r.incomplete.from > 1 && r.incomplete.from <= 40, 'dừng giữa chừng: ' + JSON.stringify(r.incomplete));
+      assert.match(r.incomplete.message, /Không thấy yêu cầu hiện trong chat Muse/);
+      assert.ok(r.scenes.length > 0 && r.scenes.every(s => !s.offline), 'chỉ có cảnh do Muse chia, không có cảnh chia nhanh');
+      assert.equal(r.scenes.at(-1).units[1], r.incomplete.from - 1, 'các cảnh đã có kết thúc ngay trước chỗ dừng');
+      assert.match(r.cast, /Bà Ba/, 'nhân vật đã chốt được trả về để làm tiếp');
+      await first.page.close();
+      // Làm tiếp khi Muse ổn: bắt đầu đúng ở chỗ dừng, mang theo nhân vật đã chốt, ghép lại đủ truyện.
+      const second = await session({}, { reply: 20000 });
+      const r2 = await second.analyzer.run({ script: long, options: cfg, resume: { from: r.incomplete.from, cast: r.cast } });
+      assert.equal(second.museBrain.asked[0].units[0], r.incomplete.from);
+      assert.ok(second.museBrain.asked.every(a => a.hasCast), 'nhân vật đã chốt đi theo mọi lượt khi làm tiếp');
+      assert.equal(r2.incomplete, undefined);
+      assert.equal([...r.scenes, ...r2.scenes].map(s => s.voiceover).join(' '), long, 'ghép hai lượt vẫn đủ truyện đúng thứ tự');
+      await second.page.close(); ok('Muse ngừng giữa chừng: giữ phần Muse đã chia, làm tiếp từ chỗ dừng, không chia nhanh');
     }
-    // 11c. Hỏi lại câu thiếu mà Muse không nhận tin → giữ cảnh mẫu, không mất kết quả.
+    // 11c. Hỏi lại câu thiếu mà Muse không nhận tin → giữ các cảnh đúng phía trước, dừng tại câu thiếu (không có cảnh mẫu).
     {
       let target;
-      const { page, analyzer, museBrain } = await session({ skip: [3], onAsk: n => n === 1 && target.evaluate(() => { window.mode.ignoreSend = true; }) }, { echo: 500 });
+      const { page, analyzer } = await session({ skip: [3], onAsk: n => n === 1 && target.evaluate(() => { window.mode.ignoreSend = true; }) }, { echo: 500 });
       target = page;
       const r = await analyzer.run({ script: tale, options: cfg });
-      assert.equal(r.scenes.map(s => s.voiceover).join(' '), tale);
-      assert.deepEqual(r.scenes.map(s => Boolean(s.offline)), [false, true, false]);
-      assert.match(r.notes.join(' '), /không trả lời khi hỏi lại/);
-      await page.close(); ok('hỏi lại câu thiếu thất bại: giữ cảnh mẫu, không mất kết quả');
+      assert.equal(r.incomplete.from, 3);
+      assert.deepEqual(r.scenes.map(s => s.units), [[1, 2]]);
+      assert.ok(r.scenes.every(s => !s.offline));
+      assert.equal(r.scenes.map(s => s.voiceover).join(' '), plan.storyUnits(tale, cfg).slice(0, 2).map(u => u.text).join(' '));
+      await page.close(); ok('hỏi lại câu thiếu thất bại: dừng tại câu thiếu, không tự chia thay Muse');
+    }
+    // 11d. Làm tiếp với vị trí dừng sai → báo rõ, không gọi Muse.
+    {
+      const { page, analyzer, museBrain } = await session({});
+      await assert.rejects(analyzer.run({ script: tale, options: cfg, resume: { from: 99, cast: '' } }), /Không làm tiếp được/);
+      await assert.rejects(analyzer.run({ script: tale, options: cfg, resume: { from: 0, cast: '' } }), /Không làm tiếp được/);
+      assert.equal(museBrain.asked.length, 0); assert.equal(analyzer.status().busy, false);
+      await page.close(); ok('làm tiếp với vị trí sai: báo rõ, không hỏi Muse');
     }
     // 12. Đang bận thì không chạy hai lần; kịch bản rỗng báo lỗi.
     {
