@@ -41,6 +41,7 @@ $installer = Start-Process -FilePath $Setup -ArgumentList "/D=$InstallRoot" -Pas
 $deadline = (Get-Date).AddSeconds(120)
 $finished = $false
 $seenPages = [System.Collections.Generic.HashSet[string]]::new()
+$missingRun = 0
 while ((Get-Date) -lt $deadline -and -not $finished) {
   $ids = @($installer.Id) + @(Get-Process | Where-Object { $_.ProcessName -like 'MuseVideoStudio*-Setup' } | ForEach-Object { $_.Id })
   foreach ($window in [MuseInstallerUI]::Windows()) {
@@ -53,7 +54,12 @@ while ((Get-Date) -lt $deadline -and -not $finished) {
       $name = [MuseInstallerUI]::Text($button).Replace('&','').Trim()
       if ($name -match '^(Finish|Ho\u00e0n t\u1ea5t|K\u1ebft th\u00fac)$') {
         $run = @($buttons | Where-Object { [MuseInstallerUI]::Text($_) -match 'Muse Video Studio' })
-        if ($run.Count -ne 1) { throw 'Finish page must offer Run Muse Video Studio.' }
+        # The Run checkbox is laid out a moment after the Finish button appears; wait for it (up to ~12 s) instead of failing on the race.
+        if ($run.Count -ne 1) {
+          $missingRun++
+          if ($missingRun -gt 20) { throw 'Finish page must offer Run Muse Video Studio.' }
+          break
+        }
         if (-not [MuseInstallerUI]::Checked($run[0])) { throw 'Run after installation must be selected by default.' }
         [MuseInstallerUI]::Click($button)
         $finished = $true
