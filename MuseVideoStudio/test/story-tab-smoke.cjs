@@ -38,7 +38,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
             s.story.analyze = { busy: false, progress: 'Muse đã chia 2 cảnh', part: 1, parts: 1, error: '' };
             listener(structuredClone(s));
             const units = data.script.split(/(?<=[.!?])\s+/);
-            const result = { scenes: [{ title: 'Cảnh 1', source: units.slice(0, 2).join(' '), voiceover: units.slice(0, 2).join(' '), visual: '', prompt: 'Mai dắt trâu qua cánh đồng lúc bình minh, mỉm cười.\nAudio: no speech, no dialogue, no singing, no narration, no lip movement - characters stay silent with mouths closed.', durationSeconds: 10, units: [1, 2] }, { title: 'Cảnh 2', source: units.slice(2).join(' '), voiceover: units.slice(2).join(' '), visual: '', prompt: 'Chú cá vàng nhảy lên thuyền, Mai ngạc nhiên đưa tay đón.\nAudio: no speech, no dialogue, no singing, no narration, no lip movement - characters stay silent with mouths closed.', durationSeconds: 10, units: [3, 4] }].filter(sc => sc.voiceover.trim()), cast: 'Mai – theo ảnh', notes: [] };
+            const result = { scenes: [{ title: 'Cảnh 1', source: units.slice(0, 2).join(' '), voiceover: units.slice(0, 2).join(' '), visual: '', prompt: 'Mai dắt trâu qua cánh đồng lúc bình minh, mỉm cười.\nAudio: no speech, no dialogue, no singing, no narration, no lip movement - characters stay silent with mouths closed.', durationSeconds: 10, units: [1, 2] }, { title: 'Cảnh 2', source: units.slice(2).join(' '), voiceover: units.slice(2).join(' '), visual: '', prompt: 'Chú cá vàng nhảy lên thuyền, Mai ngạc nhiên đưa tay đón.\nAudio: no speech, no dialogue, no singing, no narration, no lip movement - characters stay silent with mouths closed.', durationSeconds: 10, units: [3, 4] }].filter(sc => sc.voiceover.trim()), cast: 'Mai – theo ảnh', understanding: { summary: 'Mai dắt trâu, thả cá vàng về sông.', approach: 'Truyện kể nhẹ nhàng; dựng đúng diễn biến.', setting: 'Làng ven sông, buổi sáng.' }, notes: [] };
             if (window.analyzeStop && !data.resume) { result.scenes = result.scenes.slice(0, 1); result.incomplete = { from: 3, total: units.length, message: 'Muse chưa chia đúng đoạn từ câu 3.' }; }
             return result;
           }
@@ -299,6 +299,12 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.locator('#storyScenes .draftRow').count(), 2);
     assert.match(await page.locator('#storyInfo').textContent(), /^Muse split the story into 2 scenes\. Review the narration and prompts, then click Create clips\.$/);
     assert.equal(await page.locator('#storyScenes .storyTag:visible').count(), 0, 'kết quả của Muse không có cảnh «prompt mẫu»');
+    // Khung «Muse hiểu bài thế này»: hiện tóm tắt, cách minh họa, nhân vật, bối cảnh để người dùng thấy ngay chỗ Muse hiểu sai.
+    assert.equal(await page.locator('#storyUnderstand').isVisible(), true);
+    assert.equal(await page.locator('#storyUnderstand > summary').textContent(), 'This is how Muse understood the text');
+    await page.locator('#storyUnderstand > summary').click();
+    assert.deepEqual(await page.locator('#storyUnderstandBody h4').allTextContents(), ['Summary', 'How to illustrate it', 'Characters', 'Setting']);
+    assert.deepEqual(await page.locator('#storyUnderstandBody p').allTextContents(), ['Mai dắt trâu, thả cá vàng về sông.', 'Truyện kể nhẹ nhàng; dựng đúng diễn biến.', 'Mai – theo ảnh', 'Làng ven sông, buổi sáng.']);
     assert.equal(await page.locator('#storyAnalyze').textContent(), 'Analyze with Muse');
     assert.equal(await page.locator('#storyAnalyzeAgain').isHidden(), true);
     const analyze = (await called('storyAnalyze')).at(-1).data;
@@ -318,7 +324,8 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await page.waitForFunction(() => document.getElementById('storyAnalyze').textContent === 'Analyze with Muse' && !document.getElementById('storyAnalyze').disabled);
     assert.equal(await page.locator('#storyScenes .draftRow').count(), 3, 'cảnh đã có được giữ, cảnh mới nối tiếp');
     assert.deepEqual(await page.evaluate(() => window.storyUi.scenes.map(sc => sc.title)), ['Cảnh 1', 'Cảnh 2', 'Cảnh 3'], 'đánh số lại liên tục sau khi nối');
-    assert.deepEqual((await called('storyAnalyze')).at(-1).data.resume, { from: 3, cast: 'Mai – theo ảnh' });
+    assert.deepEqual((await called('storyAnalyze')).at(-1).data.resume, { from: 3, cast: 'Mai – theo ảnh', understanding: { summary: 'Mai dắt trâu, thả cá vàng về sông.', approach: 'Truyện kể nhẹ nhàng; dựng đúng diễn biến.', setting: 'Làng ven sông, buổi sáng.' } }, 'làm tiếp mang theo chỗ dừng, nhân vật và phần Muse đã hiểu');
+    assert.equal(await page.locator('#storyUnderstand').isVisible(), true);
     assert.equal(await page.locator('#storyAnalyzeAgain').isHidden(), true);
     // Sửa truyện sau khi dừng → không còn làm tiếp được; «Phân tích lại từ đầu» hỏi trước rồi thay hết, không gửi vị trí cũ.
     await page.evaluate(() => { window.analyzeStop = true; });

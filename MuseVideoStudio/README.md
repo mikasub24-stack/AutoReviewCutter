@@ -1,10 +1,10 @@
 Continue in 1.1.6 resubmits unfinished scenes with new attempt IDs, ignoring tentative send flags and old receipts. Completed files are kept. The sidebar now displays the actual application version.
 
-# Muse Video Studio V1 · 1.3.1 · Windows
+# Muse Video Studio V1 · 1.3.2 · Windows
 
 ## Bản cài đặt Windows
 
-Tải `MuseVideoStudio-1.3.1-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
+Tải `MuseVideoStudio-1.3.2-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
 
 Build riêng: `node tools/build-installer.cjs` trên Windows. Workflow installer kiểm thử cài đặt, shortcut, mở app, một cửa sổ chính và gỡ cài đặt trước khi thêm Setup.exe vào release hiện tại.
 
@@ -141,6 +141,13 @@ Nối MP4 tùy chọn cần FFmpeg/ffprobe trên máy (chưa đóng kèm): chọ
 Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. Các kiểm tra `node test/submit-diagnostics-smoke.cjs`, `node test/cards-smoke.cjs`, `node test/muse-tracker-smoke.cjs`, `node test/download-capture-smoke.cjs` xác minh thẻ video, gắn kết quả theo prompt và tải/cancel tệp video thật từ máy chủ cục bộ; smoke tải cần FFmpeg hoặc MUSE_VIDEO_FIXTURE. Test UI và browser smoke cần Chromium; đặt CHROMIUM_PATH nếu khác /usr/bin/chromium. `node test/attachment-ready-smoke.cjs` kiểm tra readiness ảnh trên DOM fixture thật. FFmpeg smoke riêng: `npm run test:merge`.
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
+
+## Update 1.3.2
+
+- **Tab Kể chuyện: Muse đọc hiểu cả bài TRƯỚC khi chia cảnh, và hiểu cả bài nói / bình luận / châm biếm (không chỉ truyện kể).** Lỗi trước đó: lệnh gửi Muse viết cho truyện có nhân vật, nên với bài như «Tại sao có những người sống hai mặt…» (không có nhân vật, toàn ví von và ví dụ) Muse dựng cảnh sai ý. Nay có một lượt «Đọc hiểu» riêng: Muse ghi lại **tóm tắt**, **cách minh họa** (truyện kể hay bài nói/châm biếm, dựng ví dụ và ẩn dụ thế nào), **nhân vật/vai cố định** và **bối cảnh**. Phần này đi kèm MỌI lượt chia cảnh sau, kể cả truyện rất dài (đọc từng phần, phần sau cập nhật phần trước), và hiện ra trong khung **«Muse hiểu bài thế này»** ở mục 2 để bạn thấy ngay chỗ Muse hiểu sai. Làm tiếp («Phân tích tiếp») dùng lại phần đã hiểu. Chế độ quảng cáo giữ nguyên.
+- **Luật dựng cảnh mới cho bài nói/châm biếm**: dựng đúng tình huống câu đang nói với 2–3 vai cố định; bối cảnh đúng nơi bài nhắc (ví dụ «trong công ty» thì là văn phòng, không dùng chung một phòng khách); ý đối lập («trước mặt cười, sau lưng nói xấu») cho thấy ngay trong cảnh; ví von/nói quá không dựng theo nghĩa đen; chuyển động phải đổi rõ giữa các mốc thời gian, không đứng yên một dáng.
+- **Âm thanh**: lệnh gửi Muse và câu «Audio» trong prompt cấm mọi tiếng người, gồm cả ậm ờ, lẩm bẩm, thì thầm, cười thành tiếng (clip bạn gửi có tiếng ậm ờ). Hình thì vẫn được há miệng, cười, mấp máy như nói chuyện, nét mặt rõ — chỉ im lặng. Chat Muse dùng chung một cuộc trò chuyện nên mọi lệnh đều dặn Muse bỏ qua truyện/yêu cầu cũ phía trên.
+- **Chưa thử với Muse thật**: Muse có làm đúng khuôn «Đọc hiểu» không, hình do Muse dựng có đúng hơn không, và video có còn tiếng ậm ờ không (lệnh chỉ là lời dặn, mô hình tạo video có thể vẫn tự thêm tiếng). Nếu còn tiếng, đặt «Tiếng động gốc của clip» ở phần xuất MP4 thành **Tắt**. Đã kiểm bằng trang chat Muse giả (đọc hiểu một lượt/nhiều phần, đọc hiểu hỏng khuôn vẫn chia tiếp bằng Muse, làm tiếp), giao diện giả và test đơn vị.
 
 ## Update 1.3.1
 

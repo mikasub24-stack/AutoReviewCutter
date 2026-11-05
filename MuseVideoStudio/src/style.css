@@ -315,3 +315,6 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .adMore .adVoice { margin: 14px 0 8px; padding-top: 12px; border-top: 1px solid #2e3b52; }
 /* Chế độ quảng cáo: phần kịch bản/nhân vật chỉ hiện khi mở «Tùy chỉnh thêm» */
 #storyCompose.adMode:not(.adOpen) .scriptPart { display: none; }
+.storyUnderstand { margin: 0 0 12px; }
+.storyUnderstand h4 { margin: 10px 0 2px; font-size: 12px; color: #8fd8c8; font-weight: 600; }
+.storyUnderstand p { margin: 0; font-size: 13px; line-height: 1.5; white-space: pre-wrap; color: #dbe6f6; }

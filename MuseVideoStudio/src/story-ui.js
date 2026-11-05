@@ -87,8 +87,16 @@
   // Cảnh quay quảng cáo từ ảnh (không có lời đọc) giữ số giây cố định của mẫu; có lời đọc thì tính theo lời.
   const secondsOf = scene => (scene.fixedSeconds && !String(scene.voiceover || scene.source || '').trim()) ? scene.fixedSeconds : plan().sceneSeconds(scene.voiceover || scene.source || '', plan().MAX_SECONDS);
   const headingText = (scene, index) => `${scene.title || 'Cảnh ' + (index + 1)} · ${secondsOf(scene)} giây`;
+  // Muse đã hiểu bài thế nào (tóm tắt, cách minh họa, nhân vật/vai, bối cảnh): hiện để người dùng thấy ngay chỗ Muse hiểu sai.
+  let understood = null;   // { summary, approach, cast, setting }
+  function renderUnderstanding() {
+    const box = $('storyUnderstand'), rows = [['Tóm tắt', understood?.summary], ['Cách minh họa', understood?.approach], ['Nhân vật', understood?.cast], ['Bối cảnh', understood?.setting]].filter(r => r[1]);
+    box.hidden = !rows.length || !scenes.length;
+    $('storyUnderstandBody').replaceChildren(...rows.flatMap(([label, text]) => [el('h4', '', label), el('p', '', text)]));
+  }
   function renderScenes() {
     const box = $('storyScenes');
+    renderUnderstanding();
     box.replaceChildren(); warnBoxes = [];
     scenes.forEach((scene, index) => {
       const row = el('div', 'draftRow'), body = el('div', 'draftContent');
@@ -118,7 +126,7 @@
   }
   // Lượt phân tích dừng giữa chừng (Muse lỗi/không trả lời): giữ các cảnh Muse đã chia, nhớ chỗ dừng và nhân vật đã chốt để làm tiếp.
   // App không tự chia thay Muse.
-  let resume = null;   // { script, from, cast }
+  let resume = null;   // { script, from, cast, understanding }
   const canResume = () => Boolean(resume && scenes.length && $('storyScript').value === resume.script);
   async function analyze(fromStart) {
     if (analyzing) return;
@@ -128,12 +136,14 @@
     const resuming = !fromStart && canResume(), before = resuming ? scenes : [];
     analyzing = true; renderAnalyze();
     try {
-      const result = await call('storyAnalyze', { script, ...options(), ...(resuming ? { resume: { from: resume.from, cast: resume.cast } } : {}) });
+      const result = await call('storyAnalyze', { script, ...options(), ...(resuming ? { resume: { from: resume.from, cast: resume.cast, understanding: resume.understanding } } : {}) });
       if (result?.scenes?.length) {
         scenes = [...before, ...result.scenes].map((s, i) => ({ ...s, title: `Cảnh ${i + 1}` }));
+        const u = result.understanding || (resuming ? resume.understanding : null);
+        understood = u || result.cast ? { summary: u?.summary || '', approach: u?.approach || '', setting: u?.setting || '', cast: result.cast || (resuming ? resume.cast : '') || '' } : null;
         renderScenes();
         const stop = result.incomplete;
-        resume = stop ? { script, from: stop.from, cast: result.cast || (resuming ? resume.cast : '') } : null;
+        resume = stop ? { script, from: stop.from, cast: result.cast || (resuming ? resume.cast : ''), understanding: u || null } : null;
         $('storyInfo').textContent = stop
           ? `Muse đã chia ${scenes.length} cảnh, dừng ở câu ${stop.from}/${stop.total}. ${stop.message} Bấm «Phân tích tiếp» để Muse làm tiếp từ đó (giữ nguyên các cảnh đã có).`
           : `Muse đã chia ${scenes.length} cảnh.${result.notes?.length ? ' ' + result.notes.join(' ') : ''} Xem lại lời đọc và prompt, rồi bấm Tạo clip.`;

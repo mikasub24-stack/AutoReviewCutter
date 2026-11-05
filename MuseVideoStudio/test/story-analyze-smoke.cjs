@@ -34,11 +34,20 @@ const adCfg = { seconds: 10, aspect: '9:16', ad: { product: 'Bình giữ nhiệt
 
 // «Muse» giả: đọc yêu cầu, gom câu đánh số theo số giây, viết prompt, kết thúc bằng mốc MSDONE.
 function brain(behavior = {}) {
-  const asked = [];
+  const asked = [], understood = [];
   const fn = async text => {
+    // Yêu cầu ĐỌC HIỂU (trước khi chia cảnh): trả lời tóm tắt, cách minh họa, nhân vật, bối cảnh.
+    if (/^ĐỌC HIỂU/m.test(text) && /^BÀI ĐỌC/m.test(text)) {
+      const done0 = (text.match(/MSDONE([0-9a-f]{6})/) || [])[1];
+      const lines = text.split('\n').filter(l => /^\[\d+\] /.test(l));
+      understood.push({ text, sentences: lines.length, first: Number((lines[0].match(/^\[(\d+)\]/) || [])[1]), hasPrev: /ĐÃ HIỂU TỪ CÁC PHẦN TRƯỚC/.test(text), fresh: /BỎ QUA hết/.test(text) });
+      if (behavior.onUnderstand) await behavior.onUnderstand(understood.length);
+      if (behavior.garbage || behavior.understandGarbage) return 'Xin lỗi, mình không hiểu yêu cầu này.';
+      return ['TÓM TẮT: Mai sống ở làng ven sông, nhặt được hộp gỗ có chìa khóa, rồi bà Ba gọi về ăn cơm.', 'CÁCH MINH HỌA: Truyện kể nhẹ nhàng; dựng đúng diễn biến ở làng ven sông.', 'NHÂN VẬT: Mai – theo ảnh tham chiếu; Bà Ba – 60 tuổi, tóc bạc búi, áo bà ba nâu', 'BỐI CẢNH: Làng ven sông, buổi sáng.', ...(behavior.noDone ? [] : [`MSDONE${done0}`])].join('\n');
+    }
     const units = [...text.matchAll(/^\[(\d+)\] \(([\d.]+) giây\) (.+)$/gm)].map(m => ({ n: Number(m[1]), s: Number(m[2]), t: m[3] }));
     const done = (text.match(/MSDONE([0-9a-f]{6})/) || [])[1];
-    asked.push({ text, units: units.map(u => u.n), hasCast: /NHÂN VẬT ĐÃ CHỐT/.test(text), done });
+    asked.push({ text, units: units.map(u => u.n), hasCast: /NHÂN VẬT ĐÃ CHỐT/.test(text), hasUnderstanding: /HIỂU BIẾT VỀ CẢ BÀI/.test(text), fresh: /BỎ QUA hết/.test(text), done });
     if (behavior.onAsk) await behavior.onAsk(asked.length);
     // Yêu cầu VIẾT lời quảng cáo (chế độ quảng cáo): trả lời có lời dẫn, nhãn, emoji, hashtag, ngoặc ghi chú như Muse thật hay làm.
     if (/THÔNG TIN SẢN PHẨM/.test(text)) {
@@ -61,7 +70,7 @@ function brain(behavior = {}) {
     if (!behavior.noDone) lines.push(`MSDONE${done}`);
     return lines.join('\n');
   };
-  fn.asked = asked;
+  fn.asked = asked; fn.understood = understood;
   return fn;
 }
 
@@ -90,7 +99,15 @@ function brain(behavior = {}) {
     {
       const { page, analyzer, museBrain, progress } = await session({});
       const r = await analyzer.run({ script: tale, options: cfg });
+      assert.equal(museBrain.understood.length, 1, 'Muse đọc hiểu cả bài trước khi chia cảnh');
+      assert.equal(museBrain.understood[0].sentences, 5);
+      assert.ok(museBrain.understood[0].fresh && museBrain.asked[0].fresh, 'dặn Muse bỏ qua truyện/yêu cầu cũ trong cuộc trò chuyện');
       assert.equal(museBrain.asked.length, 1);
+      assert.equal(museBrain.asked[0].hasUnderstanding && museBrain.asked[0].hasCast, true, 'lượt chia cảnh mang theo phần đã hiểu và nhân vật đã chốt');
+      assert.match(museBrain.asked[0].text, /CÁCH MINH HỌA: Truyện kể nhẹ nhàng/);
+      assert.match(r.understanding.summary, /Mai sống ở làng ven sông/);
+      assert.match(r.understanding.approach, /dựng đúng diễn biến/);
+      assert.match(r.understanding.setting, /Làng ven sông/);
       assert.deepEqual(museBrain.asked[0].units, [1, 2, 3, 4, 5]);
       assert.match(museBrain.asked[0].text, /MSEND[0-9a-f]{6}$/);
       assert.equal(r.scenes.map(s => s.voiceover).join(' '), tale);
@@ -101,6 +118,7 @@ function brain(behavior = {}) {
       assert.equal(await page.evaluate(() => (globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')] || new Map()).size), 0, 'dọn mốc theo dõi trong trang');
       assert.equal(await page.inputValue('#box'), '', 'ô chat trống sau khi gửi');
       assert.ok(progress.some(p => /Muse đang viết/.test(p)) && progress.some(p => /xong 3 cảnh/.test(p)), 'có tiến độ: ' + progress.join(' | '));
+      assert.ok(progress.some(p => /^Đọc hiểu truyện · /.test(p)) && progress.some(p => p === 'Đọc hiểu truyện · xong'), 'tiến độ đọc hiểu: ' + progress.join(' | '));
       assert.equal(analyzer.status().busy, false);
       assert.equal(await page.evaluate(() => window.stopClicks), 0, 'không bấm Dừng khi chạy bình thường');
       await page.close(); ok('truyện ngắn: một lượt, lời đúng nguyên văn, prompt từ Muse');
@@ -125,8 +143,8 @@ function brain(behavior = {}) {
       assert.ok(museBrain.asked.length >= 3, 'số lượt ' + museBrain.asked.length);
       const asked = museBrain.asked.flatMap(a => a.units);
       assert.deepEqual(asked, Array.from({ length: 40 }, (_, i) => i + 1), 'mỗi câu được hỏi đúng một lần, đúng thứ tự');
-      assert.equal(museBrain.asked[0].hasCast, false);
-      assert.ok(museBrain.asked.slice(1).every(a => a.hasCast), 'nhân vật đã chốt đi theo các lượt sau');
+      assert.equal(museBrain.understood.length, 1, 'truyện vừa: đọc hiểu một lượt');
+      assert.ok(museBrain.asked.every(a => a.hasCast && a.hasUnderstanding), 'nhân vật đã chốt và phần đã hiểu đi theo MỌI lượt chia cảnh, kể cả lượt đầu');
       assert.ok(museBrain.asked.every(a => a.text.includes('Câu số 40:')), 'mỗi lượt đều kèm cả truyện làm ngữ cảnh');
       assert.equal(r.scenes.map(s => s.voiceover).join(' '), long);
       assert.ok(progress.some(p => /^Phần 2\/\d+ · /.test(p)));
@@ -144,6 +162,11 @@ function brain(behavior = {}) {
       let r; try { r = await analyzer.run({ script: long, options: cfg }); } finally { plan.planStory = quickSplit; }
       assert.deepEqual(museBrain.asked.flatMap(a => a.units), Array.from({ length: 170 }, (_, i) => i + 1), 'mỗi câu được hỏi đúng một lần');
       assert.ok(museBrain.asked.length > 10, 'nhiều lượt: ' + museBrain.asked.length);
+      assert.ok(museBrain.understood.length >= 2, 'bài dài: đọc hiểu theo từng phần ' + museBrain.understood.length);
+      assert.equal(museBrain.understood[0].hasPrev, false);
+      assert.ok(museBrain.understood.slice(1).every(u => u.hasPrev), 'phần sau cập nhật hiểu biết của phần trước');
+      assert.equal(museBrain.understood.reduce((n, u) => n + u.sentences, 0), 170, 'mỗi câu được đọc hiểu đúng một lần');
+      assert.ok(museBrain.asked.every(a => a.hasUnderstanding && a.hasCast), 'mọi lượt chia cảnh của bài dài đều mang phần đã hiểu');
       assert.equal(r.scenes.map(s => s.voiceover).join(' '), long);
       assert.ok(r.scenes.length > 100 && r.scenes.every(s => !s.offline));
       await page.close(); ok('truyện hơn 100 cảnh: không bị chặn, Muse phân tích từng lượt, đủ chữ đúng thứ tự');
@@ -168,6 +191,7 @@ function brain(behavior = {}) {
       const { page, analyzer, museBrain } = await session({ garbage: true });
       await assert.rejects(analyzer.run({ script: tale, options: cfg }), /Muse trả lời không đúng khuôn/);
       assert.equal(museBrain.asked.length, 2, 'thử lại một lần');
+      assert.equal(museBrain.understood.length, 2, 'đọc hiểu cũng chỉ thử lại một lần');
       assert.equal(analyzer.status().busy, false);
       assert.match(analyzer.status().error, /không đúng khuôn/);
       await page.close(); ok('Muse trả lời không đúng khuôn: báo lỗi, không tự chia thay Muse');
@@ -231,9 +255,11 @@ function brain(behavior = {}) {
       await first.page.close();
       // Làm tiếp khi Muse ổn: bắt đầu đúng ở chỗ dừng, mang theo nhân vật đã chốt, ghép lại đủ truyện.
       const second = await session({}, { reply: 20000 });
-      const r2 = await second.analyzer.run({ script: long, options: cfg, resume: { from: r.incomplete.from, cast: r.cast } });
+      assert.ok(r.understanding && r.understanding.summary && r.understanding.approach, 'phần đã hiểu được trả về để làm tiếp');
+      const r2 = await second.analyzer.run({ script: long, options: cfg, resume: { from: r.incomplete.from, cast: r.cast, understanding: r.understanding } });
+      assert.equal(second.museBrain.understood.length, 0, 'làm tiếp: không đọc hiểu lại, dùng phần đã hiểu');
       assert.equal(second.museBrain.asked[0].units[0], r.incomplete.from);
-      assert.ok(second.museBrain.asked.every(a => a.hasCast), 'nhân vật đã chốt đi theo mọi lượt khi làm tiếp');
+      assert.ok(second.museBrain.asked.every(a => a.hasCast && a.hasUnderstanding), 'nhân vật đã chốt và phần đã hiểu đi theo mọi lượt khi làm tiếp');
       assert.equal(r2.incomplete, undefined);
       assert.equal([...r.scenes, ...r2.scenes].map(s => s.voiceover).join(' '), long, 'ghép hai lượt vẫn đủ truyện đúng thứ tự');
       await second.page.close(); ok('Muse ngừng giữa chừng: giữ phần Muse đã chia, làm tiếp từ chỗ dừng, không chia nhanh');
@@ -257,6 +283,38 @@ function brain(behavior = {}) {
       await assert.rejects(analyzer.run({ script: tale, options: cfg, resume: { from: 0, cast: '' } }), /Không làm tiếp được/);
       assert.equal(museBrain.asked.length, 0); assert.equal(analyzer.status().busy, false);
       await page.close(); ok('làm tiếp với vị trí sai: báo rõ, không hỏi Muse');
+    }
+    // 11e. Đọc hiểu hỏng khuôn hai lần → không dừng cả phân tích: vẫn chia cảnh bằng Muse (kèm truyện làm ngữ cảnh), có ghi chú.
+    {
+      const { page, analyzer, museBrain } = await session({ understandGarbage: true });
+      const r = await analyzer.run({ script: tale, options: cfg });
+      assert.equal(museBrain.understood.length, 2);
+      assert.equal(r.understanding, null);
+      assert.equal(r.notes.length, 1);
+      assert.match(r.notes[0], /chưa đọc hiểu được cả bài/);
+      assert.equal(museBrain.asked[0].hasUnderstanding, false);
+      assert.equal(museBrain.asked[0].hasCast, false, 'không có nhân vật chốt từ bước đọc hiểu thì Muse tự chốt ở lượt chia cảnh');
+      assert.equal(r.scenes.map(s => s.voiceover).join(' '), tale);
+      assert.ok(r.scenes.every(s => !s.offline));
+      assert.match(r.cast, /Bà Ba/);
+      await page.close(); ok('đọc hiểu hỏng: vẫn chia cảnh bằng Muse, ghi chú rõ, không tự bịa');
+    }
+    // 11f. Bài nói / châm biếm (không phải truyện kể): yêu cầu đọc hiểu và chia cảnh đều dặn dựng TÌNH HUỐNG, vai cố định, không dựng ẩn dụ theo nghĩa đen.
+    {
+      const essay = ['TẠI SAO CÓ NHỮNG NGƯỜI SỐNG HAI MẶT NHƯNG MẶT NÀO CŨNG DÀY?', 'Trước mặt bạn, họ cười như vừa trúng số.', 'Sau lưng bạn, họ nói như thể bạn vừa đào mả tổ nhà họ lên.', 'Gặp thì tay bắt mặt mừng.', 'Quay lưng thì mồm bắt đầu tăng ca.', '"Sao mày lại nghĩ xấu về tao như thế?"', 'Ngọt đến mức kiến nghe xong cũng phải đi xét nghiệm tiểu đường.', 'Ví dụ trong công ty.', 'Có một người đồng nghiệp vừa được sếp khen.'].join('\n');
+      const { page, analyzer, museBrain } = await session({});
+      const r = await analyzer.run({ script: essay, options: cfg });
+      const read = museBrain.understood[0].text, split = museBrain.asked[0].text;
+      assert.match(read, /đây là truyện kể hay bài nói\/bình luận\/châm biếm/);
+      assert.match(read, /vai cố định/);
+      assert.match(read, /không dựng theo nghĩa đen/);
+      assert.match(split, /BÀI NÓI \/ BÌNH LUẬN \/ CHÂM BIẾM/);
+      assert.match(split, /dựng đúng TÌNH HUỐNG/);
+      assert.match(split, /bối cảnh phải đúng nơi bài nói tới/);
+      assert.match(split, /THAY ĐỔI rõ giữa các mốc/);
+      assert.match(split, /mở đầu bằng bối cảnh cụ thể/);
+      assert.equal(r.scenes.map(s => s.voiceover).join(' '), essay.replace(/\n/g, ' '));
+      await page.close(); ok('bài nói/châm biếm: yêu cầu dặn dựng tình huống, vai cố định, bối cảnh đúng nơi, chuyển động rõ');
     }
     // 12. Đang bận thì không chạy hai lần; kịch bản rỗng báo lỗi.
     {

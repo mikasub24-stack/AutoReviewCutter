@@ -12,7 +12,7 @@
   const CHARS_PER_SECOND = 14;
   const count = value => Array.from(String(value || '')).length;
   // Viết bằng tiếng Anh vì Muse hiểu ràng buộc âm thanh bằng tiếng Anh chắc hơn.
-  const NO_SPEECH = 'Audio: no speech, no dialogue, no singing, no narration, no lip movement - characters stay silent with mouths closed. Only natural sound effects and ambient sounds (wind, water, footsteps, object sounds) and soft background music.';
+  const NO_SPEECH = 'Audio: no speech, no dialogue, no singing, no narration, no mumbling, no murmuring, no whispering, no humming, no laughing out loud, no human voice or vocal sound of any kind - the voices are completely silent. Characters may still open their mouths, laugh, gossip, shout and show every facial expression and gesture visually, but with no sound at all. Only natural sound effects and ambient sounds (wind, water, footsteps, object sounds) and soft background music.';
 
   /* ---------- ngôn ngữ ---------- */
   const SCRIPTS = {
@@ -450,25 +450,26 @@
     const partNote = ctx.parts > 1 ? ` Đây là phần ${ctx.part}/${ctx.parts} của câu chuyện.` : '';
     const ad = config.ad;
     return [
-      ad ? `Bạn là đạo diễn hình ảnh cho video QUẢNG CÁO sản phẩm bán hàng. Mỗi cảnh sẽ được AI tạo thành MỘT video ngắn, dài tối đa ${s} giây, và mỗi lần tạo đều tốn lượt, nên sản phẩm, hành động và bố cục phải đúng ngay từ lần đầu.` : `Bạn là đạo diễn hình ảnh cho video kể chuyện. Mỗi cảnh sẽ được AI tạo thành MỘT video ngắn, dài tối đa ${s} giây, và mỗi lần tạo đều tốn lượt, nên hình ảnh, hành động và nét mặt phải đúng ngay từ lần đầu.`,
+      ad ? `Bạn là đạo diễn hình ảnh cho video QUẢNG CÁO sản phẩm bán hàng. Mỗi cảnh sẽ được AI tạo thành MỘT video ngắn, dài tối đa ${s} giây, và mỗi lần tạo đều tốn lượt, nên sản phẩm, hành động và bố cục phải đúng ngay từ lần đầu.` : `Bạn là đạo diễn hình ảnh cho video minh họa một bài đọc (truyện kể, tâm sự, bài nói, bình luận, châm biếm…). Mỗi cảnh sẽ được AI tạo thành MỘT video ngắn, dài tối đa ${s} giây, và mỗi lần tạo đều tốn lượt, nên hình ảnh, hành động và nét mặt phải đúng ngay từ lần đầu.`,
+      FRESH,
       '',
-      `BƯỚC 1 – ĐỌC HIỂU: đọc kỹ toàn bộ ${ad ? 'lời quảng cáo' : 'câu chuyện'}${whole ? ' ở cuối' : ' ở phần NGỮ CẢNH'} để nắm nhân vật, bối cảnh, thời điểm, diễn biến, cảm xúc và ý nghĩa của từng câu.${partNote}`,
+      `BƯỚC 1 – ĐỌC HIỂU: đọc kỹ toàn bộ ${ad ? 'lời quảng cáo' : 'câu chuyện'}${whole ? ' ở cuối' : ' ở phần NGỮ CẢNH'} để nắm ${ad ? 'nhân vật, bối cảnh, thời điểm, diễn biến, cảm xúc và ý nghĩa của từng câu' : 'đây là truyện kể hay bài nói/bình luận, giọng điệu (nghiêm túc, cảm động, hài, châm biếm), ai là nhân vật hoặc kiểu người được nói tới, bối cảnh, diễn biến hoặc các ví dụ, và ý nghĩa của từng câu'}.${partNote}`,
       `BƯỚC 2 – CHIA CẢNH: ${whole ? '' : 'chỉ chia các câu ở phần CÁC CÂU CẦN CHIA CẢNH; phần còn lại chỉ để hiểu. '}Gom các câu đánh số LIÊN TIẾP thành cảnh, đủ mọi câu, đúng thứ tự, không bỏ sót, không lặp. Số trong ngoặc là số giây đọc câu đó; tổng của mỗi cảnh không quá ${budget} giây. Độ dài video của cảnh tự theo lời kể: tổng số giây các câu chia cho 0,9, làm tròn lên (tối thiểu ${MIN_SECONDS}, tối đa ${s} giây); cảnh ngắn thì video ngắn, không kéo dài cho đủ ${s} giây. KHÔNG chép lại lời: chỉ ghi số câu, giọng đọc sẽ đọc đúng nguyên văn các câu đó.`,
       'BƯỚC 3 – VIẾT PROMPT cho từng cảnh theo quy tắc dưới đây.',
       '',
       'QUY TẮC',
       `1. Mỗi cảnh chỉ là MỘT khoảnh khắc liên tục trong độ dài video của cảnh: một địa điểm, một nhóm nhân vật, tối đa 2–3 hành động nối tiếp; KHÔNG nhảy thời gian, KHÔNG đổi địa điểm, KHÔNG cắt cảnh trong cùng video. Các câu liên tiếp mà đổi địa điểm hoặc nhảy thời gian thì tách thành cảnh khác.`,
-      `2. PROMPT thể hiện đúng điều các câu của cảnh nói: ai, ở đâu, lúc nào, làm gì, theo thứ tự thời gian, chia mốc theo đúng độ dài video của cảnh (video 5 giây: 0–2 giây…, 2–5 giây…; video ${s} giây: 0–3 giây…, 3–7 giây…, 7–${s} giây…), kèm nét mặt, ánh mắt, cử chỉ, tư thế, cảm xúc, ánh sáng và góc máy. Dùng từ cụ thể, không mơ hồ.`,
-      ad ? '3. Không bịa tính năng, thông số, công dụng, thành phần, chứng nhận hay kết quả mà lời quảng cáo không nói; không cảnh so sánh với sản phẩm khác; không cảnh «trước/sau» hay minh họa chữa bệnh, giảm cân, hiệu quả y tế. Ý trừu tượng thì thể hiện bằng hình cụ thể (người dùng thoải mái, sản phẩm đang được dùng).' : '3. Không bịa thêm nhân vật, vật thể hay sự kiện; không đổi kết cục; không bỏ hành động quan trọng. Suy nghĩ, cảm xúc hay ý trừu tượng thì thể hiện bằng nét mặt, cử chỉ hoặc vật cụ thể có trong câu.',
-      '4. Mỗi cảnh được tạo video riêng nên PROMPT phải tự đủ ý: nhắc lại tên, ngoại hình, trang phục và bối cảnh của nhân vật theo cùng một cách ở mọi cảnh; không viết «như cảnh trước».',
-      ...[ad ? (config.reference ? '5. SẢN PHẨM: ảnh tham chiếu đính kèm là sản phẩm thật. Giữ đúng hình dạng, tỷ lệ, màu sắc, chất liệu, bao bì và nhãn như trong ảnh; không đổi, không thêm bộ phận, không đổi sang sản phẩm khác. Sản phẩm phải HIỆN RÕ ở mọi cảnh (đang được dùng hoặc trưng bày). Ở dòng NHÂN VẬT ghi mô tả cố định của sản phẩm theo ảnh và, nếu có người mẫu hay người dùng, MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) dùng y nguyên ở mọi cảnh có người đó. Người chỉ được nhắc đến mà không có mặt thì KHÔNG vẽ vào hình.' : '5. SẢN PHẨM: chưa có ảnh tham chiếu nên chỉ mô tả sản phẩm theo thông tin ở cuối, đơn giản và nhất quán (hình dạng, màu sắc, chất liệu) ở mọi cảnh; không bịa chi tiết mà thông tin không nói. Sản phẩm phải HIỆN RÕ ở mọi cảnh (đang được dùng hoặc trưng bày). Ở dòng NHÂN VẬT ghi mô tả cố định của sản phẩm và, nếu có người mẫu hay người dùng, MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) dùng y nguyên ở mọi cảnh có người đó. Người chỉ được nhắc đến mà không có mặt thì KHÔNG vẽ vào hình.') : config.reference ? '5. NHÂN VẬT: nhận ra MỌI nhân vật trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Nhân vật chính là người ở ảnh tham chiếu đính kèm: giữ đúng khuôn mặt, tóc, trang phục trong ảnh, không tự đổi. Mỗi nhân vật khác được chốt MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó. Trong PROMPT của mỗi cảnh, gọi từng người xuất hiện trong khung hình bằng đúng tên/vai đó kèm mô tả cố định, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.' : '5. NHÂN VẬT: nhận ra các nhân vật CÓ MẶT trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Mỗi nhân vật được chốt MỘT mô tả cố định, ngắn gọn (tuổi, vóc dáng, tóc, trang phục) ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó; chi tiết truyện không nói thì chọn đơn giản, không bịa thêm. Nếu người dùng đã mô tả nhân vật chính (ở cuối) thì dùng đúng mô tả đó. Chỉ mô tả người XUẤT HIỆN trong khung hình của cảnh, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.'],
-      ad ? '6. Người trong cảnh tuyệt đối không nói, không hát, không mấp máy môi; cảm xúc thể hiện bằng cử chỉ và nét mặt. Lời quảng cáo do người đọc, không phải người trong cảnh.' : '6. Nhân vật tuyệt đối không nói, không hát, không mấp máy môi: lời thoại trong truyện thể hiện bằng cử chỉ và nét mặt. Lời kể do người đọc, không phải nhân vật.',
+      `2. PROMPT thể hiện đúng điều các câu của cảnh nói: ai, ở đâu, lúc nào, làm gì, theo thứ tự thời gian, chia mốc theo đúng độ dài video của cảnh (video 5 giây: 0–2 giây…, 2–5 giây…; video ${s} giây: 0–3 giây…, 3–7 giây…, 7–${s} giây…), kèm nét mặt, ánh mắt, cử chỉ, tư thế, cảm xúc, ánh sáng và góc máy. Dùng từ cụ thể, không mơ hồ. Mỗi mốc ứng với đúng điều của câu tương ứng theo thứ tự câu, có chuyển động cụ thể của người hoặc vật (ai làm gì, mặt và tay thay đổi thế nào); tư thế, nét mặt, vị trí hoặc hướng nhìn phải THAY ĐỔI rõ giữa các mốc, không đứng yên một dáng cả cảnh; không chèn hình chung chung hay cảnh không liên quan tới câu.`,
+      ad ? '3. Không bịa tính năng, thông số, công dụng, thành phần, chứng nhận hay kết quả mà lời quảng cáo không nói; không cảnh so sánh với sản phẩm khác; không cảnh «trước/sau» hay minh họa chữa bệnh, giảm cân, hiệu quả y tế. Ý trừu tượng thì thể hiện bằng hình cụ thể (người dùng thoải mái, sản phẩm đang được dùng).' : '3. TRUYỆN KỂ: không bịa thêm nhân vật, vật thể hay sự kiện; không đổi kết cục; không bỏ hành động quan trọng; suy nghĩ, cảm xúc hay ý trừu tượng thì thể hiện bằng nét mặt, cử chỉ hoặc vật cụ thể có trong câu. BÀI NÓI / BÌNH LUẬN / CHÂM BIẾM (nói về một kiểu người, một thói quen, một ý kiến, có ví dụ minh họa): dựng đúng TÌNH HUỐNG mà câu đang nói, bằng 1–3 vai cố định làm việc cụ thể trong bối cảnh đời thường (công ty, quán cà phê, nhà, đường phố); bối cảnh phải đúng nơi bài nói tới (ví dụ «trong công ty» → văn phòng có bàn làm việc, máy tính, đồng nghiệp), không dùng một căn phòng chung cho mọi cảnh; bài đã nêu ví dụ nào thì dựng đúng ví dụ đó, đúng thứ tự. Ý đối lập («trước mặt thân thiện, sau lưng nói xấu») thì cho thấy sự đối lập NGAY TRONG cảnh: cùng một người cười bắt tay người A, A vừa quay đi thì mặt đổi sang khinh bỉ và ghé sát tai người B, tay che miệng, mắt liếc về phía A (không có tiếng). Nói quá, ví von, ẩn dụ KHÔNG dựng theo nghĩa đen nếu phi lý hay đáng sợ: dựng tình huống thật đằng sau câu và thể hiện đúng ý bằng nét mặt, cử chỉ, đạo cụ cụ thể (có thể thêm MỘT chi tiết hài nhỏ hợp tinh thần câu). Câu mở bài, đặt câu hỏi, kết luận: dựng một hình ảnh chung nói lên đúng ý đó. Câu cảm thán rất ngắn: dựng phản ứng nét mặt, cử chỉ của người trong cảnh.',
+      '4. Mỗi cảnh được tạo video riêng nên PROMPT phải tự đủ ý: mở đầu bằng bối cảnh cụ thể (nơi nào, ánh sáng gì), rồi nhắc lại tên, ngoại hình, trang phục của nhân vật theo cùng một cách ở mọi cảnh; không viết «như cảnh trước».',
+      ...[ad ? (config.reference ? '5. SẢN PHẨM: ảnh tham chiếu đính kèm là sản phẩm thật. Giữ đúng hình dạng, tỷ lệ, màu sắc, chất liệu, bao bì và nhãn như trong ảnh; không đổi, không thêm bộ phận, không đổi sang sản phẩm khác. Sản phẩm phải HIỆN RÕ ở mọi cảnh (đang được dùng hoặc trưng bày). Ở dòng NHÂN VẬT ghi mô tả cố định của sản phẩm theo ảnh và, nếu có người mẫu hay người dùng, MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) dùng y nguyên ở mọi cảnh có người đó. Người chỉ được nhắc đến mà không có mặt thì KHÔNG vẽ vào hình.' : '5. SẢN PHẨM: chưa có ảnh tham chiếu nên chỉ mô tả sản phẩm theo thông tin ở cuối, đơn giản và nhất quán (hình dạng, màu sắc, chất liệu) ở mọi cảnh; không bịa chi tiết mà thông tin không nói. Sản phẩm phải HIỆN RÕ ở mọi cảnh (đang được dùng hoặc trưng bày). Ở dòng NHÂN VẬT ghi mô tả cố định của sản phẩm và, nếu có người mẫu hay người dùng, MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) dùng y nguyên ở mọi cảnh có người đó. Người chỉ được nhắc đến mà không có mặt thì KHÔNG vẽ vào hình.') : config.reference ? '5. NHÂN VẬT: nhận ra MỌI nhân vật trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Nhân vật chính là người ở ảnh tham chiếu đính kèm: giữ đúng khuôn mặt, tóc, trang phục trong ảnh, không tự đổi. Mỗi nhân vật khác được chốt MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó (bài nói/bình luận không có nhân vật tên riêng thì chốt 2–3 vai đại diện cho các kiểu người được nhắc). Trong PROMPT của mỗi cảnh, gọi từng người xuất hiện trong khung hình bằng đúng tên/vai đó kèm mô tả cố định, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.' : '5. NHÂN VẬT: nhận ra các nhân vật CÓ MẶT trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Mỗi nhân vật được chốt MỘT mô tả cố định, ngắn gọn (tuổi, vóc dáng, tóc, trang phục) ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó; chi tiết truyện không nói thì chọn đơn giản, không bịa thêm. Bài nói/bình luận không có nhân vật tên riêng thì chốt 2–3 VAI cố định đại diện cho các kiểu người được nhắc (ví dụ «người hay nói xấu», «người bị nói xấu», «đồng nghiệp»); khi bài gọi người nghe là «bạn» thì «bạn» là một vai cụ thể trong cảnh. Nếu người dùng đã mô tả nhân vật chính (ở cuối) thì dùng đúng mô tả đó. Chỉ mô tả người XUẤT HIỆN trong khung hình của cảnh, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.'],
+      ad ? '6. ÂM THANH: người trong cảnh tuyệt đối không phát ra tiếng người nào (không nói, hát, ậm ờ, thì thầm, cười thành tiếng); HÌNH ẢNH thì vẫn được mỉm cười, há miệng, ngạc nhiên, nét mặt và cử chỉ rõ ràng, chỉ là im lặng. Lời quảng cáo do người đọc, không phải người trong cảnh.' : '6. ÂM THANH: tuyệt đối KHÔNG có tiếng người nào — không nói, không hát, không lẩm bẩm, ậm ờ, thì thầm, không cười hay thở dài thành tiếng; lời thoại trong truyện và lời kể do người đọc, không phải nhân vật. HÌNH ẢNH thì vẫn thể hiện đầy đủ: nhân vật được há miệng, cười, ngạc nhiên, mấp máy miệng như đang nói, la hét, nét mặt và cử chỉ thật rõ — chỉ là im lặng, không có tiếng. Câu có lời thoại: cho thấy ai đang nói với ai, khẩu hình, nét mặt, cử chỉ, nhưng không tiếng.',
       ad ? `7. Không thêm chữ, giá, phụ đề hay logo vào hình (nhãn thật trên sản phẩm giữ nguyên như ảnh)${config.style ? `; phong cách hình ảnh: ${config.style}` : ''}; tỷ lệ ${config.aspect}.` : `7. Không chèn chữ, phụ đề hay logo vào hình${config.style ? `; phong cách hình ảnh: ${config.style}` : ''}${config.reference ? '; nhân vật chính giữ đúng như ảnh tham chiếu' : ''}; tỷ lệ ${config.aspect}.`,
       '8. Viết PROMPT cùng ngôn ngữ với ' + (ad ? 'lời quảng cáo' : 'câu chuyện') + ', riêng câu cuối của PROMPT luôn là đúng câu tiếng Anh này: ' + NO_SPEECH,
       ...(ad ? ['9. Nhịp quảng cáo: cảnh đầu phải thu hút ngay trong 1–2 giây đầu; các cảnh giữa cho thấy rõ từng điểm nổi bật bằng hình cụ thể (sản phẩm đang được dùng, cận cảnh chi tiết); cảnh cuối là khung hình đẹp nhất của sản phẩm. Mỗi cảnh chọn chuyển động máy quay hợp với cảnh trong danh sách đã chọn (nếu có) và ghi rõ trong PROMPT.'] : []),
       '',
       'Trả lời đúng khuôn sau, KHÔNG viết thêm câu dẫn hay giải thích:',
-      ...(ctx.cast ? [] : [ad ? 'NHÂN VẬT: <sản phẩm: mô tả cố định' + (config.reference ? ' theo ảnh tham chiếu' : '') + '; người mẫu nếu có: tuổi, vóc dáng, tóc, trang phục cố định>' : 'NHÂN VẬT: <mọi nhân vật trong truyện, mỗi người một mục: tên/vai – tuổi, vóc dáng, tóc, trang phục cố định' + (config.reference ? '; nhân vật chính ghi «theo ảnh tham chiếu»' : '') + '>']),
+      ...(ctx.cast ? ['(Chỉ khi có nhân vật MỚI xuất hiện ở phần này: thêm một dòng «NHÂN VẬT: …» ghi lại ĐỦ danh sách gồm cả người đã chốt; không thì bỏ qua dòng này.)'] : [ad ? 'NHÂN VẬT: <sản phẩm: mô tả cố định' + (config.reference ? ' theo ảnh tham chiếu' : '') + '; người mẫu nếu có: tuổi, vóc dáng, tóc, trang phục cố định>' : 'NHÂN VẬT: <mọi nhân vật trong truyện, mỗi người một mục: tên/vai – tuổi, vóc dáng, tóc, trang phục cố định' + (config.reference ? '; nhân vật chính ghi «theo ảnh tham chiếu»' : '') + '>']),
       'CẢNH 1',
       `CÂU: <số câu đầu>-<số câu cuối> (ví dụ 1-3; một câu thì chỉ ghi số đó)`,
       'PROMPT: <mô tả hình ảnh theo quy tắc trên>',
@@ -476,7 +477,8 @@
       'CÂU: …',
       'PROMPT: …',
       `(cứ thế đến câu số ${last}${marker ? `; dòng cuối cùng của trả lời chỉ gồm đúng một từ: MSDONE${marker}` : ''})`,
-      ctx.cast ? `\nNHÂN VẬT ĐÃ CHỐT (dùng y nguyên trong mọi PROMPT; người mới xuất hiện ở phần này thì bổ sung thêm vào dòng NHÂN VẬT): ${ctx.cast}` : '',
+      ctx.cast ? `\nNHÂN VẬT ĐÃ CHỐT (dùng y nguyên trong mọi PROMPT): ${ctx.cast}` : '',
+      ...(ctx.understanding ? ['', 'HIỂU BIẾT VỀ CẢ BÀI (đã đọc trước; chỉ để nắm mạch và cách minh họa, KHÔNG viết cảnh cho phần này; làm theo CÁCH MINH HỌA ở mọi cảnh):', understandingText(ctx.understanding)] : []),
       config.character ? `\n${ad ? 'Người mẫu' : 'Nhân vật chính'} (người dùng mô tả): ${config.character}` : '',
       ...(ad ? adBlock(ad) : []),
       '',
@@ -486,6 +488,93 @@
     ].filter((line, index, lines) => line !== '' || (index > 0 && lines[index - 1] !== '' && index < lines.length - 1)).join('\n');
   }
 
+
+  // Chat Muse dùng chung một cuộc trò chuyện nên có thể còn truyện/yêu cầu cũ ở phía trên: dặn Muse không để lẫn vào.
+  const FRESH = 'Cuộc trò chuyện này có thể còn truyện hoặc yêu cầu khác ở phía trên: BỎ QUA hết, chỉ làm với nội dung bên dưới, không lấy nhân vật hay chi tiết nào từ chỗ khác.';
+
+  /* ---------- Muse đọc hiểu cả bài TRƯỚC khi chia cảnh ----------
+     Muse đọc cả bài và ghi lại: tóm tắt, cách minh họa (truyện kể hay bài nói/bình luận, cách dựng ví dụ và ẩn dụ),
+     nhân vật/vai cố định, bối cảnh. Phần này được đưa kèm mọi lượt chia cảnh sau để hình minh họa bám đúng ý bài. */
+  const UNDERSTAND_CHARS = 12000;
+  const SUMMARY = /^(?:tóm tắt|tom tat|diễn biến|dien bien|summary)(?:\s*(?:truyện|chuyện|bài|nội dung))?$/i;
+  const APPROACH = /^(?:cách minh họa|cach minh hoa|kiểu và cách minh họa|cách dựng|cách thể hiện|minh họa|approach)$/i;
+  const SETTING = /^(?:bối cảnh|boi canh|setting|địa điểm|dia diem)(?:\s*(?:và|&)\s*thời gian)?$/i;
+
+  // Chia truyện thành các phần đọc hiểu, mỗi phần không quá UNDERSTAND_CHARS ký tự (cắt ở ranh giới câu).
+  function understandRanges(units) {
+    const ranges = [];
+    let start = 1, size = 0;
+    units.forEach((unit, index) => {
+      const len = Array.from(unit.text).length + 8;
+      if (index + 1 > start && size + len > UNDERSTAND_CHARS) { ranges.push([start, index]); start = index + 1; size = 0; }
+      size += len;
+    });
+    ranges.push([start, units.length]);
+    return ranges;
+  }
+
+  // understanding = {summary, approach, setting}; cast riêng.
+  function understandingText(u) {
+    return [u?.summary && `TÓM TẮT: ${u.summary}`, u?.approach && `CÁCH MINH HỌA: ${u.approach}`, u?.setting && `BỐI CẢNH: ${u.setting}`].filter(Boolean).join('\n');
+  }
+
+  function buildUnderstandInstruction(script, input = {}, ctx = {}) {
+    const config = options(input);
+    if (typeof script !== 'string' || !script.trim()) throw Error('Dán kịch bản trước khi nhờ Muse đọc.');
+    const units = ctx.units || storyUnits(script, config);
+    const [a, b] = ctx.range || [1, units.length];
+    const picked = units.slice(a - 1, b);
+    const parts = ctx.parts > 1 ? ctx.parts : 1, part = ctx.part || 1;
+    const marker = ctx.marker ? String(ctx.marker) : '';
+    const before = ctx.understanding || ctx.cast ? [
+      '',
+      'ĐÃ HIỂU TỪ CÁC PHẦN TRƯỚC (giữ nguyên mô tả nhân vật đã chốt, bổ sung người mới, cập nhật tóm tắt, cách minh họa và bối cảnh cho cả bài đến hết phần này):',
+      ctx.understanding ? understandingText(ctx.understanding) : '',
+      ctx.cast ? `NHÂN VẬT: ${ctx.cast}` : ''
+    ] : [];
+    return [
+      'Bạn là biên kịch đọc hiểu một bài đọc (truyện kể, tâm sự, bài nói, bình luận, châm biếm…) để chuẩn bị làm video minh họa.',
+      FRESH,
+      '',
+      `ĐỌC HIỂU${parts > 1 ? ` – phần ${part}/${parts} của bài` : ''}: đọc kỹ rồi ghi lại những gì đã hiểu. CHƯA chia cảnh, CHƯA viết prompt hình.`,
+      `1. TÓM TẮT: kể lại ý và diễn biến theo đúng thứ tự, mỗi ý một câu ngắn, đủ các ý chính, các ví dụ bài nêu; không bịa, không đổi ý${parts > 1 ? '; viết lại gọn cho cả bài từ đầu đến hết phần này (tối đa 15 ý)' : ''}.`,
+      '2. CÁCH MINH HỌA: (a) đây là truyện kể hay bài nói/bình luận/châm biếm, giọng điệu gì; (b) hình ảnh nên dựng thế nào cho đúng ý: truyện kể thì dựng đúng diễn biến; bài nói/bình luận thì dựng các tình huống và ví dụ mà bài nêu, bằng vài vai cố định làm việc cụ thể trong bối cảnh đời thường; (c) các câu ví von, nói quá, ẩn dụ quan trọng và cách thể hiện từng câu bằng hình cụ thể đúng ý (không dựng theo nghĩa đen nếu phi lý hay đáng sợ); (d) bối cảnh và phong cách chung.',
+      '3. NHÂN VẬT: mọi nhân vật CÓ MẶT (kể cả người chỉ gọi bằng vai như «bà», «người lái đò», «đồng nghiệp»), mỗi người một mục: tên/vai – tuổi, vóc dáng, tóc, trang phục cố định; chi tiết bài không nói thì chọn đơn giản, không bịa thêm. Bài nói/bình luận không có nhân vật tên riêng thì chốt 2–3 VAI cố định đại diện cho các kiểu người được nhắc; khi bài gọi người nghe là «bạn» thì «bạn» là một vai cụ thể.' + (config.reference ? ' Nhân vật chính là người ở ảnh tham chiếu đính kèm: ghi «theo ảnh tham chiếu».' : '') + (config.character ? ` Nhân vật chính (người dùng mô tả): ${config.character}` : ''),
+      '4. BỐI CẢNH: các địa điểm và thời điểm chính theo thứ tự xuất hiện.',
+      ...before,
+      '',
+      'Trả lời đúng khuôn sau, KHÔNG viết thêm câu dẫn hay giải thích:',
+      'TÓM TẮT: <…>',
+      'CÁCH MINH HỌA: <…>',
+      'NHÂN VẬT: <…>',
+      'BỐI CẢNH: <…>',
+      marker ? `(dòng cuối cùng của trả lời chỉ gồm đúng một từ: MSDONE${marker})` : '',
+      '',
+      parts > 1 ? `BÀI ĐỌC (phần ${part}/${parts}, đã đánh số câu):` : 'BÀI ĐỌC (đã đánh số câu):',
+      ...picked.map(u => `[${u.n}] ${u.text}`),
+      marker ? `MSEND${marker}` : ''
+    ].filter((line, index, lines) => line !== '' || (index > 0 && lines[index - 1] !== '' && index < lines.length - 1)).join('\n');
+  }
+
+  // Tách trả lời đọc hiểu của Muse: {summary, approach, cast, setting}. Thiếu tóm tắt hoặc cách minh họa thì báo lỗi.
+  function parseUnderstanding(reply) {
+    const lines = String(reply || '').replace(/\r\n?/g, '\n').split('\n');
+    const got = { summary: '', approach: '', cast: '', setting: '' };
+    let field = null;
+    for (const raw of lines) {
+      if (DONE.test(raw.trim())) break;
+      const line = raw.replace(/\*\*|__/g, '');
+      const bare = line.replace(/^[\t ]*(?:#{1,6}[\t ]*)?(?:\d+[.)][\t ]*)?(?:[-•*][\t ]+)?/, '');
+      const label = bare.match(LABEL);
+      const kind = label ? (SUMMARY.test(label[1].trim()) ? 'summary' : APPROACH.test(label[1].trim()) ? 'approach' : CAST.test(label[1].trim()) ? 'cast' : SETTING.test(label[1].trim()) ? 'setting' : null) : null;
+      if (kind && !(kind === field && got[kind])) { field = kind; got[kind] = label[2].trim(); continue; }
+      if (kind && kind === field) { got[kind] += ' ' + label[2].trim(); continue; }
+      if (field && line.trim()) got[field] += (got[field] ? '\n' : '') + line.trim();
+    }
+    const out = { summary: clean(got.summary).slice(0, 4000), approach: clean(got.approach).slice(0, 3000), cast: clean(got.cast).slice(0, 3000), setting: clean(got.setting).slice(0, 1500) };
+    if (!out.summary || !out.approach) throw Error('Chưa thấy phần tóm tắt và cách minh họa trong trả lời của Muse.');
+    return out;
+  }
 
   /* ---------- đối chiếu trả lời của Muse với kịch bản ---------- */
   // Mỗi chữ Hán/Kana là một đơn vị; các chữ khác tách theo từ. Bỏ dấu câu, không phân biệt hoa thường.
@@ -808,5 +897,5 @@
     return entries.map((entry, index) => `${index + 1}\n${srtTime(entry.start)} --> ${srtTime(entry.end)}\n${entry.text}\n`).join('\n');
   }
 
-  return { ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, MAX_SECONDS, MIN_SECONDS, sceneSeconds, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, buildMuseInstruction, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, subtitleChunks, srtTime, toSrt };
+  return { ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, MAX_SECONDS, MIN_SECONDS, sceneSeconds, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, buildMuseInstruction, buildUnderstandInstruction, parseUnderstanding, understandRanges, understandingText, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, subtitleChunks, srtTime, toSrt };
 });

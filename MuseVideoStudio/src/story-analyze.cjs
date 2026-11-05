@@ -114,18 +114,45 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
     return ranges;
   }
 
-  // `resume` = { from, cast }: làm tiếp từ câu `from` (sau khi một lượt trước đó dừng giữa chừng), giữ nhân vật đã chốt.
+  // Muse đọc hiểu cả bài TRƯỚC khi chia cảnh (tóm tắt, cách minh họa, nhân vật/vai, bối cảnh). Bài dài thì đọc từng phần, mỗi phần cập nhật hiểu biết đã có.
+  // Trả lời hỏng khuôn hai lần thì trả null (làm theo cách cũ: mỗi lượt chia cảnh kèm truyện làm ngữ cảnh), không tự bịa phần đọc hiểu.
+  async function understandStory({ muse, script, config, units, signal }) {
+    const parts = plan.understandRanges(units);
+    let understanding = null, cast = '';
+    for (let k = 0; k < parts.length; k++) {
+      const label = parts.length > 1 ? `Đọc hiểu truyện ${k + 1}/${parts.length}` : 'Đọc hiểu truyện';
+      let got = null;
+      for (let attempt = 0; attempt < 2 && !got; attempt++) {
+        const marker = randomBytes(3).toString('hex');
+        say(`${label} · chuẩn bị yêu cầu…`);
+        const instruction = plan.buildUnderstandInstruction(script, config, { units, range: parts[k], part: k + 1, parts: parts.length, understanding, cast, marker });
+        let reply;
+        try { reply = await ask(muse, instruction, marker, signal, label); }
+        catch (e) { if (!e.infra || attempt) throw e; await wait(2000, signal); continue; }
+        try { got = plan.parseUnderstanding(reply); } catch { /* hỏi lại một lần */ }
+      }
+      if (!got) return null;
+      understanding = { summary: got.summary, approach: got.approach, setting: got.setting };
+      cast = got.cast || cast;
+    }
+    say('Đọc hiểu truyện · xong');
+    return { understanding, cast };
+  }
+
+  // `resume` = { from, cast, understanding }: làm tiếp từ câu `from` (sau khi một lượt trước đó dừng giữa chừng), giữ nhân vật đã chốt.
   async function run({ script, options: input = {}, resume = null }) {
     if (state.busy) throw Error('Muse đang phân tích. Chờ xong hoặc bấm Dừng.');
     const config = plan.options(input);
     if (typeof script !== 'string' || !script.trim()) throw Error('Dán kịch bản trước khi nhờ Muse đọc.');
     const units = plan.storyUnits(script, config);
-    let ranges = chunkRanges(units, config), startCast = '';
+    let ranges = chunkRanges(units, config), startCast = '', startUnderstanding = null;
     if (resume) {
       const at = Number(resume.from);
       if (!Number.isInteger(at) || at < 1 || at > units.length) throw Error('Không làm tiếp được vì vị trí dừng không khớp kịch bản. Bấm phân tích lại từ đầu.');
       ranges = ranges.filter(([, to]) => to >= at).map(([a, b]) => [Math.max(a, at), b]);
       startCast = String(resume.cast || '').slice(0, 4000);
+      const u = resume.understanding;
+      if (u && typeof u === 'object' && String(u.summary || '').trim()) startUnderstanding = { summary: String(u.summary).slice(0, 4000), approach: String(u.approach || '').slice(0, 3000), setting: String(u.setting || '').slice(0, 1500) };
     }
     if (isBusy()) throw Error('Dừng hàng đợi và các thao tác trình duyệt trước khi nhờ Muse phân tích.');
     await ensureAllowed();
@@ -139,7 +166,13 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
       check(signal);
       const muse = getMuse(0);
       if (!muse) throw infra('Chưa mở được Muse tài khoản 1.');
-      let cast = startCast, stop = null;
+      let cast = startCast, understanding = startUnderstanding, stop = null;
+      // Truyện (không phải quảng cáo): Muse đọc hiểu cả bài trước, rồi mới chia cảnh theo hiểu biết đó.
+      if (!config.ad && !understanding) {
+        const read = await understandStory({ muse, script, config, units, signal });
+        if (read) { understanding = read.understanding; if (!cast) cast = read.cast; }
+        else notes.push('Muse chưa đọc hiểu được cả bài (trả lời sai khuôn) nên các lượt chia cảnh chỉ kèm truyện làm ngữ cảnh.');
+      }
       const all = [];
       for (let i = 0; i < ranges.length; i++) {
         const [from, to] = ranges[i];
@@ -148,7 +181,7 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
           say(`${label} · chuẩn bị yêu cầu…`, { part: i + 1 });
           const ask1 = (list, extra = {}) => {
             const marker = randomBytes(3).toString('hex');
-            const instruction = plan.buildMuseInstruction(script, config, { units, ranges: list, cast, part: i + 1, parts: ranges.length, marker, ...extra });
+            const instruction = plan.buildMuseInstruction(script, config, { units, ranges: list, cast, understanding, part: i + 1, parts: ranges.length, marker, ...extra });
             return ask(muse, instruction, marker, signal, label);
           };
           let scenes = null;
@@ -208,7 +241,7 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
       }
       const final = all.map((scene, index) => ({ ...scene, title: `Cảnh ${index + 1}` }));
       say(stop ? `Muse đã chia ${final.length} cảnh, dừng ở câu ${stop.from}` : `Muse đã chia ${final.length} cảnh`);
-      return { scenes: final, cast, notes, ...(stop ? { incomplete: { from: stop.from, total: units.length, message: stop.message } } : {}) };
+      return { scenes: final, cast, understanding, notes, ...(stop ? { incomplete: { from: stop.from, total: units.length, message: stop.message } } : {}) };
     } catch (error) {
       state.error = error.name === 'AbortError' ? '' : error.message;
       throw error;

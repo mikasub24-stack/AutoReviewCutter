@@ -17,7 +17,7 @@ test('chia nhanh gộp câu theo thời lượng, giữ đủ chữ, mỗi cản
     assert.match(scene.prompt, /Phong cách hình ảnh: hoạt hình màu nước/);
     assert.match(scene.prompt, /Không chèn chữ, phụ đề/);
     assert.match(scene.prompt, /Audio: no speech, no dialogue, no singing/);
-    assert.match(scene.prompt, /mouths closed/);
+    assert.match(scene.prompt, /may still open their mouths, laugh, gossip/);
     assert.equal(scene.durationSeconds, sp.sceneSeconds(scene.voiceover, 10), 'giây của cảnh tự tính theo lời kể');
     assert.ok(scene.durationSeconds >= 3 && scene.durationSeconds <= 10);
     assert.ok(sp.estimateSeconds(scene.voiceover) <= scene.durationSeconds, 'lời đọc luôn vừa trong clip');
@@ -502,7 +502,7 @@ test('quảng cáo: câu lệnh chia cảnh có luật sản phẩm, máy quay, 
   assert.match(ask, /Chuyển động máy quay đã chọn: cận cảnh chi tiết \(macro\)[^\n]*; máy quay xoay chậm quanh sản phẩm/);
   assert.match(ask, /Phong cách quảng cáo: phong cách review đời thường \(UGC\)/);
   assert.match(ask, /MSENDab12cd$/);
-  assert.doesNotMatch(ask, /video kể chuyện|nhận ra MỌI nhân vật|CÂU CHUYỆN \(đã đánh số câu\)/);
+  assert.doesNotMatch(ask, /video minh họa một bài đọc|video kể chuyện|nhận ra MỌI nhân vật|CÂU CHUYỆN \(đã đánh số câu\)/);
   // Không có ảnh → mô tả sản phẩm theo chữ, không nhắc ảnh tham chiếu.
   const noRef = sp.buildMuseInstruction(adCopy, adBase, { marker: 'ab12cd' });
   assert.match(noRef, /5\. SẢN PHẨM: chưa có ảnh tham chiếu/);
@@ -512,7 +512,7 @@ test('quảng cáo: câu lệnh chia cảnh có luật sản phẩm, máy quay, 
   assert.match(sp.buildMuseInstruction(adCopy, { ...adBase, character: 'cô gái 25 tuổi, tóc dài' }, { marker: 'ab12cd' }), /Người mẫu \(người dùng mô tả\): cô gái 25 tuổi, tóc dài/);
   // Chế độ kể chuyện y như cũ.
   const story = sp.buildMuseInstruction(adCopy, { seconds: 10, aspect: '16:9' }, { marker: 'ab12cd' });
-  assert.match(story, /video kể chuyện/);
+  assert.match(story, /video minh họa một bài đọc/);
   assert.doesNotMatch(story, /QUẢNG CÁO|THÔNG TIN QUẢNG CÁO|Nhịp quảng cáo/);
 });
 
@@ -596,4 +596,87 @@ test('truyện dài không bị giới hạn số cảnh: chia nhanh vẫn đủ
   assert.ok(scenes.length > 400, 'số cảnh ' + scenes.length);
   assert.equal(scenes.map(s => s.voiceover).join(' '), sentences.join(' '));
   assert.ok(scenes.every(s => sp.estimateSeconds(s.voiceover) <= 10));
+});
+
+const essay = ['TẠI SAO CÓ NHỮNG NGƯỜI SỐNG HAI MẶT NHƯNG MẶT NÀO CŨNG DÀY?', 'Trên đời có một kiểu người rất đặc biệt.', 'Trước mặt bạn, họ cười như vừa trúng số.', 'Sau lưng bạn, họ nói như thể bạn vừa đào mả tổ nhà họ lên.', 'Gặp thì tay bắt mặt mừng.', 'Quay lưng thì mồm bắt đầu tăng ca.', '"Sao mày lại nghĩ xấu về tao như thế?"', 'Ví dụ trong công ty.', 'Có một người đồng nghiệp vừa được sếp khen.'].join('\n');
+
+test('bài nói/châm biếm không có nhân vật: lệnh chia cảnh dặn dựng tình huống, vai cố định, bối cảnh đúng nơi, chuyển động rõ, không dựng ẩn dụ theo nghĩa đen', () => {
+  const text = sp.buildMuseInstruction(essay, { seconds: 10 }, { marker: 'abc123' });
+  assert.match(text, /đây là truyện kể hay bài nói\/bình luận/);
+  assert.match(text, /BÀI NÓI \/ BÌNH LUẬN \/ CHÂM BIẾM/);
+  assert.match(text, /dựng đúng TÌNH HUỐNG/);
+  assert.match(text, /KHÔNG dựng theo nghĩa đen/);
+  assert.match(text, /bối cảnh phải đúng nơi bài nói tới/);
+  assert.match(text, /chốt 2–3 VAI cố định/);
+  assert.match(text, /THAY ĐỔI rõ giữa các mốc/);
+  assert.match(text, /mở đầu bằng bối cảnh cụ thể/);
+  assert.match(text, /BỎ QUA hết, chỉ làm với nội dung bên dưới/, 'chat Muse dùng chung: không để truyện cũ lẫn vào');
+  assert.match(text, /KHÔNG có tiếng người nào — không nói, không hát, không lẩm bẩm, ậm ờ, thì thầm/);
+  assert.match(text, /HÌNH ẢNH thì vẫn thể hiện đầy đủ: nhân vật được há miệng, cười, ngạc nhiên, mấp máy miệng như đang nói/);
+  assert.doesNotMatch(text, /miệng khép|không há miệng|không mấp máy môi/, 'cấm tiếng nhưng không cấm hình há miệng, cười, mấp máy');
+  // Truyện kể vẫn giữ luật cũ.
+  assert.match(text, /TRUYỆN KỂ: không bịa thêm nhân vật/);
+});
+
+test('câu cấm tiếng người: không nói, không ậm ờ/thì thầm/cười thành tiếng, nhưng vẫn cho há miệng, cười, mấp máy trên hình', () => {
+  for (const word of ['no speech', 'no mumbling', 'no murmuring', 'no whispering', 'no humming', 'no laughing out loud', 'no human voice', 'completely silent', 'may still open their mouths, laugh, gossip, shout']) assert.ok(sp.NO_SPEECH.includes(word), word);
+  assert.ok(!/mouths closed|no lip movement/.test(sp.NO_SPEECH), 'không cấm hình miệng');
+  assert.ok(sp.scenePrompt('Mai nhìn quanh.', { seconds: 10, aspect: '16:9' }).includes(sp.NO_SPEECH));
+});
+
+test('đọc hiểu: câu lệnh có luật, khuôn trả lời, mốc, bài đánh số; bài dài chia phần và phần sau mang hiểu biết cũ', () => {
+  const text = sp.buildUnderstandInstruction(essay, { seconds: 10, reference: true, character: 'Anh Tư, mặt trắng, áo hoodie đen' }, { marker: 'abc123' });
+  assert.match(text, /^Bạn là biên kịch đọc hiểu/);
+  assert.match(text, /BỎ QUA hết/);
+  assert.match(text, /CHƯA chia cảnh, CHƯA viết prompt hình/);
+  assert.match(text, /TÓM TẮT: <…>\nCÁCH MINH HỌA: <…>\nNHÂN VẬT: <…>\nBỐI CẢNH: <…>/);
+  assert.match(text, /theo ảnh tham chiếu/);
+  assert.match(text, /Anh Tư, mặt trắng/);
+  assert.match(text, /MSDONEabc123/);
+  assert.match(text, /\[1\] TẠI SAO CÓ NHỮNG NGƯỜI SỐNG HAI MẶT/);
+  assert.match(text, /\[9\] Có một người đồng nghiệp vừa được sếp khen\.\nMSENDabc123$/);
+  assert.ok(!/ĐÃ HIỂU TỪ CÁC PHẦN TRƯỚC/.test(text));
+  const units = sp.storyUnits(essay, { seconds: 10 });
+  const next = sp.buildUnderstandInstruction(essay, { seconds: 10 }, { units, range: [5, 9], part: 2, parts: 2, understanding: { summary: 'Kiểu người hai mặt.', approach: 'Bài châm biếm.', setting: 'Công ty.' }, cast: 'Người hai mặt – áo đen' });
+  assert.match(next, /phần 2\/2 của bài/);
+  assert.match(next, /ĐÃ HIỂU TỪ CÁC PHẦN TRƯỚC/);
+  assert.match(next, /TÓM TẮT: Kiểu người hai mặt\./);
+  assert.match(next, /NHÂN VẬT: Người hai mặt – áo đen/);
+  assert.ok(next.includes('[5] Gặp thì tay bắt mặt mừng.') && !next.includes('[4] '), 'chỉ gửi các câu của phần này');
+  const long = Array.from({ length: 400 }, (_, i) => `Câu số ${i + 1}: Mai đi qua cánh đồng ${i + 1} và nhìn về phía con sông xa, nơi gió thổi nhẹ.`);
+  const lu = sp.storyUnits(long.join(' '), { seconds: 10 }), parts = sp.understandRanges(lu);
+  assert.ok(parts.length >= 3);
+  assert.equal(parts[0][0], 1); assert.equal(parts.at(-1)[1], lu.length);
+  parts.slice(1).forEach(([a], i) => assert.equal(a, parts[i][1] + 1, 'các phần nối tiếp, không sót, không chồng'));
+  assert.ok(parts.every(([a, b]) => lu.slice(a - 1, b).reduce((n, u) => n + Array.from(u.text).length, 0) <= 12000));
+});
+
+test('đọc hiểu: tách trả lời của Muse (có chữ đậm, gạch đầu dòng, nhiều dòng), bỏ mốc, báo lỗi khi thiếu', () => {
+  const reply = ['Dạ, mình đã đọc xong:', '**TÓM TẮT:** Bài nói về kiểu người hai mặt.', '- Trước mặt thì ngọt.', '- Sau lưng thì chê.', '2. **CÁCH MINH HỌA:** Bài châm biếm; dựng tình huống ở công ty.', 'Ẩn dụ «mồm tăng ca» → người đó ghé tai đồng nghiệp.', '**NHÂN VẬT:**', '- Người hai mặt – nam 30 tuổi, mặt trắng, áo hoodie đen', '- Bạn – nam 28 tuổi, áo sơ mi trắng', 'Nhân vật chính: theo ảnh tham chiếu', 'BỐI CẢNH: Văn phòng công ty, giờ làm việc.', 'MSDONEabc123'].join('\n');
+  const got = sp.parseUnderstanding(reply);
+  assert.match(got.summary, /^Bài nói về kiểu người hai mặt\./);
+  assert.match(got.summary, /Trước mặt thì ngọt\.\n- Sau lưng thì chê\./);
+  assert.match(got.approach, /^Bài châm biếm; dựng tình huống ở công ty\.\nẨn dụ «mồm tăng ca»/);
+  assert.match(got.cast, /Người hai mặt – nam 30 tuổi/);
+  assert.match(got.cast, /Bạn – nam 28 tuổi/);
+  assert.match(got.cast, /theo ảnh tham chiếu/, 'dòng «Nhân vật chính:» nằm trong phần nhân vật thì nối thêm, không xóa các dòng trước');
+  assert.equal(got.setting, 'Văn phòng công ty, giờ làm việc.');
+  assert.ok(!/MSDONE/.test(JSON.stringify(got)));
+  assert.throws(() => sp.parseUnderstanding('NHÂN VẬT: A\nBỐI CẢNH: B\nMSDONEabc123'), /tóm tắt và cách minh họa/);
+  assert.throws(() => sp.parseUnderstanding('Xin lỗi, mình không hiểu.'), /tóm tắt và cách minh họa/);
+  assert.equal(sp.understandingText(got).split('\n')[0].slice(0, 8), 'TÓM TẮT:');
+  assert.equal(sp.understandingText(null), '');
+});
+
+test('lệnh chia cảnh mang phần đã hiểu và dòng NHÂN VẬT chỉ ghi lại khi có người mới', () => {
+  const understanding = { summary: 'Kiểu người hai mặt.', approach: 'Bài châm biếm; dựng tình huống ở công ty.', setting: 'Văn phòng.' };
+  const text = sp.buildMuseInstruction(essay, { seconds: 10 }, { marker: 'abc123', cast: 'Người hai mặt – áo đen', understanding });
+  assert.match(text, /HIỂU BIẾT VỀ CẢ BÀI/);
+  assert.match(text, /TÓM TẮT: Kiểu người hai mặt\.\nCÁCH MINH HỌA: Bài châm biếm; dựng tình huống ở công ty\.\nBỐI CẢNH: Văn phòng\./);
+  assert.match(text, /NHÂN VẬT ĐÃ CHỐT \(dùng y nguyên trong mọi PROMPT\): Người hai mặt – áo đen/);
+  assert.match(text, /Chỉ khi có nhân vật MỚI xuất hiện/);
+  assert.ok(!/^NHÂN VẬT: </m.test(text), 'đã có nhân vật chốt thì không đòi liệt kê lại từ đầu');
+  const plain = sp.buildMuseInstruction(essay, { seconds: 10 }, { marker: 'abc123' });
+  assert.ok(!/HIỂU BIẾT VỀ CẢ BÀI/.test(plain));
+  assert.match(plain, /^NHÂN VẬT: </m);
 });
