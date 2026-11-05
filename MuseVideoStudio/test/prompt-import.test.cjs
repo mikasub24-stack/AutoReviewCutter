@@ -9,3 +9,4 @@ test('inline scene text and prepared long prompts are retained without arbitrary
 test('line splitting requires explicit mode and empty imports fail',()=>{assert.equal(importPrompts('one\ntwo').length,1);assert.equal(importPrompts('one\ntwo',{mode:'lines'}).length,2);assert.throws(()=>importPrompts(' '));});
 test('the number of prompts is not limited',()=>{const text=Array.from({length:700},(_,i)=>sample(i+1)).join('');const jobs=importPrompts(text);assert.equal(jobs.length,700);assert.equal(jobs.at(-1).number,700);
  const lines=importPrompts(Array.from({length:650},(_,i)=>`dòng ${i+1}`).join('\n'),{mode:'lines'});assert.equal(lines.length,650);});
+// (re-run marker: CI build of 1.3.1 failed on a 504 while downloading electron-builder tools)
