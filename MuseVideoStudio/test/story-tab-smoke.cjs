@@ -80,6 +80,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     // Script → Muse analysis → character image → create clips.
     await page.locator('#storyScript').fill('Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng Mai dậy sớm ra bến đón đò.\n\nMột hôm có chú cá vàng nhảy lên thuyền. Mai thả cá về sông và cá hứa sẽ giúp cô một điều ước.');
     await page.locator('#storyCharacter').fill('Mai, bé gái tóc đen');
+    await page.locator('#storyForm').fill('người que, đầu tròn trắng');
     assert.equal(await page.locator('#storySplit').count(), 0, 'không còn nút «Chia nhanh»: chỉ Muse đọc hiểu rồi mới chia cảnh');
     await page.locator('#storyAnalyze').click();
     await page.waitForFunction(() => document.querySelectorAll('#storyScenes .draftRow').length >= 2 && !document.getElementById('storyAnalyze').disabled);
@@ -267,6 +268,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.locator('#subOn').isChecked(), false);
     assert.equal(await page.locator('#storySfx').inputValue(), 'mid');
     assert.equal(await page.locator('#storyCharacter').inputValue(), 'Mai, bé gái tóc đen');
+    assert.equal(await page.locator('#storyForm').inputValue(), 'người que, đầu tròn trắng', 'hình dạng chuẩn được nhớ sau khi tải lại');
     await page.locator('#languagePicker').selectOption('en');
     await page.waitForFunction(() => document.documentElement.lang === 'en' && document.getElementById('storyExport').textContent === 'Export MP4');
     assert.equal(await page.locator('#headingText').textContent(), 'Story clip workspace');
@@ -308,7 +310,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.locator('#storyAnalyze').textContent(), 'Analyze with Muse');
     assert.equal(await page.locator('#storyAnalyzeAgain').isHidden(), true);
     const analyze = (await called('storyAnalyze')).at(-1).data;
-    assert.equal(analyze.seconds, 10); assert.equal(analyze.aspect, '16:9'); assert.match(analyze.script, /^Ngày xưa/); assert.equal(analyze.character, 'Mai, bé gái tóc đen');
+    assert.equal(analyze.form, 'người que, đầu tròn trắng', 'ô «Hình dạng nhân vật chuẩn» được gửi đi để khóa hình dạng'); assert.equal(analyze.seconds, 10); assert.equal(analyze.aspect, '16:9'); assert.match(analyze.script, /^Ngày xưa/); assert.equal(analyze.character, 'Mai, bé gái tóc đen');
     assert.equal('resume' in analyze, false, 'lần đầu không gửi vị trí làm tiếp');
     // Muse dừng giữa chừng: giữ cảnh đã chia, nút thành «Phân tích tiếp» (không tự chia nhanh); làm tiếp gửi chỗ dừng + nhân vật.
     await page.evaluate(() => { window.analyzeStop = true; window.analyzeDelay = 200; });

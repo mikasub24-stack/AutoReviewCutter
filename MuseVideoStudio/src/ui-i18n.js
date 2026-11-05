@@ -8,10 +8,12 @@ Kịch bản → cảnh → clip Muse|Script → scenes → Muse clips
 Chỉ cần dán nguyên câu chuyện. Muse tự đọc hiểu để chia cảnh và viết prompt hình; giọng đọc sẽ đọc đúng nguyên văn câu chuyện này.|Just paste the story as it is. Muse reads and understands it to split scenes and write the picture prompts; the voice reads your story word for word.
 Nhân vật chính (không bắt buộc)|Main character (optional)
 Phong cách hình ảnh|Visual style
+Hình dạng nhân vật chuẩn|Reference character shape
+Ví dụ: người que, đầu tròn trắng. Mọi nhân vật khác sẽ cùng hình dạng|e.g. stick figure, round white head. Every other character gets the same shape
 Để trống nếu không cần. Ví dụ: Mai, bé gái tóc đen, áo dài trắng|Leave empty if not needed. e.g. Mai, a girl with black hair in a white áo dài
 Ví dụ: hoạt hình màu nước|e.g. watercolor animation
 Chọn ảnh nhân vật|Choose character image
-Dán hoặc kéo ảnh nhân vật chính vào đây. Ảnh này gắn vào mọi cảnh để nhân vật giữ nguyên; nhân vật khác trong truyện do Muse nhận ra và mô tả cố định ở mọi cảnh.|Paste or drop the main character image here. It is attached to every scene so the character stays consistent; Muse recognizes the other characters in the story and gives each a fixed description in every scene.
+Dán hoặc kéo ảnh nhân vật chính vào đây. Ảnh này gắn vào mọi cảnh để nhân vật giữ nguyên; nhân vật khác do Muse nhận ra và vẽ cùng hình dạng với nhân vật này (chỉ khác màu áo, giới tính, tóc…).|Paste or drop the main character image here. It is attached to every scene so the character stays consistent; Muse recognizes the other characters and draws them with the same shape as this one (only clothes color, gender, hair… differ).
 Chưa chọn ảnh nhân vật.|No character image chosen.
 Dán câu chuyện rồi bấm «Phân tích bằng Muse» (cần đã đăng nhập Muse tài khoản 1). Muse đọc hiểu cả truyện rồi mới chia cảnh và viết prompt hình.|Paste the story, then click “Analyze with Muse” (you must be signed in to Muse account 1). Muse reads and understands the whole story first, then splits the scenes and writes the picture prompts.
 Phân tích lại từ đầu|Analyze again from the start
@@ -173,7 +175,7 @@ Trung bình|Medium
 Tên video|Video name
 Tên truyện|Story name
 Truyện|Story
-Tự edit: cảnh nào lời đọc ngắn hơn clip thì cắt phần thừa; lời dài hơn clip thì giữ khung cuối cho đọc hết. Prompt đã dặn Muse không cho nhân vật nói, chỉ có tiếng động.|Auto edit: if a scene's narration is shorter than its clip, the extra footage is cut; if it is longer, the last frame is held so it can finish. Prompts tell Muse that characters must not speak, only sound effects.
+Tự edit: cảnh nào lời đọc ngắn hơn clip thì cắt phần thừa; lời dài hơn clip thì giữ khung cuối cho đọc hết. Prompt đã dặn Muse tạo video im lặng, không âm thanh (nhân vật vẫn há miệng, cười, mấp máy trên hình); giọng đọc do app thêm.|Auto edit: if a scene's narration is shorter than its clip, the extra footage is cut; if it is longer, the last frame is held so it can finish. Prompts tell Muse to make the video silent with no audio (characters still open their mouths, laugh and mouth words on screen); the narration is added by the app.
 Xuất MP4|Export MP4
 Mở video|Open video
 Video đã xuất|Exported video

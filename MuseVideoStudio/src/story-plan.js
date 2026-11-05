@@ -12,7 +12,7 @@
   const CHARS_PER_SECOND = 14;
   const count = value => Array.from(String(value || '')).length;
   // Viết bằng tiếng Anh vì Muse hiểu ràng buộc âm thanh bằng tiếng Anh chắc hơn.
-  const NO_SPEECH = 'Audio: no speech, no dialogue, no singing, no narration, no mumbling, no murmuring, no whispering, no humming, no laughing out loud, no human voice or vocal sound of any kind - the voices are completely silent. Characters may still open their mouths, laugh, gossip, shout and show every facial expression and gesture visually, but with no sound at all. Only natural sound effects and ambient sounds (wind, water, footsteps, object sounds) and soft background music.';
+  const NO_SPEECH = 'Audio: no speech, no dialogue, no singing, no narration, no mumbling, no murmuring, no whispering, no humming, no laughing out loud, no human voice or vocal sound of any kind, and no music, no sound effects, no ambient noise - the video must be completely silent with no audio at all. Characters may still open their mouths, laugh, gossip, shout and show every facial expression and gesture visually so that the spoken lines are clearly expressed, but with no sound whatsoever.';
 
   /* ---------- ngôn ngữ ---------- */
   const SCRIPTS = {
@@ -186,7 +186,7 @@
     if (!Number.isFinite(seconds) || seconds < 3 || seconds > MAX_SECONDS) throw Error(`Muse chỉ tạo clip tối đa ${MAX_SECONDS} giây: chọn mỗi cảnh từ 3 đến ${MAX_SECONDS} giây.`);
     const aspect = input.aspect || '16:9';
     if (!ASPECTS.includes(aspect)) throw Error('Chọn tỷ lệ 16:9, 9:16 hoặc 1:1.');
-    return { seconds, aspect, style: String(input.style || '').trim(), character: String(input.character || '').trim(), reference: Boolean(input.reference), ad: adOptions(input.ad) };
+    return { seconds, aspect, style: String(input.style || '').trim(), character: String(input.character || '').trim(), form: String(input.form || '').trim().slice(0, 200), reference: Boolean(input.reference), ad: adOptions(input.ad) };
   }
 
   // Toàn bộ văn bản người dùng dán chính là lời đọc: không tách nhãn, không bỏ chữ.
@@ -291,6 +291,14 @@
   }
   const limitFor = (units, config) => budgetChars(config.seconds, detectLanguage(units.map(u => u.text).join(' ')));
 
+  /* Khóa hình dạng nhân vật: nhân vật chuẩn (ảnh tham chiếu và/hoặc kiểu người dùng mô tả) quyết định hình dạng của MỌI nhân vật;
+     người khác chỉ được khác màu/kiểu quần áo, giới tính, tóc, phụ kiện. Câu khóa do app tự gắn vào MỌI prompt, không phụ thuộc Muse viết gì. */
+  const isLocked = config => !config.ad && Boolean(config.reference || config.form);
+  function lockLine(config) {
+    if (!isLocked(config)) return '';
+    return `KHÓA HÌNH DẠNG NHÂN VẬT (bắt buộc): lấy ${config.reference ? 'nhân vật trong ảnh tham chiếu' : 'kiểu nhân vật mô tả dưới đây'} làm chuẩn${config.form ? ` — hình dạng chuẩn: ${config.form}` : ''}. MỌI nhân vật trong cảnh, kể cả người phụ, phải CÙNG hình dạng, tỉ lệ cơ thể, kiểu đầu và mặt, kiểu vẽ, nét viền và độ chi tiết với nhân vật chuẩn; chỉ được khác màu và kiểu quần áo, giới tính, kiểu tóc, phụ kiện, chiều cao. Không nhân vật nào giống người thật hay đổi sang kiểu vẽ khác.`;
+  }
+
   // `fixed` = số giây cố định của cảnh không có lời đọc (cảnh quay quảng cáo từ ảnh).
   function scenePrompt(voiceover, config, visual = '', fixed = 0) {
     const seconds = fixed || sceneSeconds(voiceover || visual, config.seconds);
@@ -310,6 +318,7 @@
       config.style ? `Phong cách hình ảnh: ${config.style}` : '',
       look ? `Phong cách quảng cáo: ${look}.` : '',
       ...(config.reference ? [ad ? 'Sản phẩm giữ đúng hình dạng, màu sắc, chất liệu và bao bì như trong ảnh tham chiếu; không đổi sang sản phẩm khác.' : 'Nhân vật chính giữ đúng khuôn mặt, trang phục và thiết kế như trong ảnh tham chiếu, ở mọi cảnh.'] : []),
+      lockLine(config),
       `Chỉ một khoảnh khắc liên tục trong ${seconds} giây, không chuyển cảnh; thể hiện đúng ${ad ? 'sản phẩm, bối cảnh, hành động và cảm xúc' : 'người, nơi chốn, thời gian, hành động và nét mặt'} được nêu.`,
       ad ? 'Chuyển động: tự nhiên, mượt; không thêm tính năng, chi tiết hay công dụng mà sản phẩm không có.' : 'Chuyển động: tự nhiên, mượt; không tự thêm nhân vật, sự kiện hay địa điểm, không bỏ chi tiết quan trọng.',
       camera.length ? `Máy quay (chọn hợp với cảnh): ${camera.join('; ')}.` : 'Máy quay: khung hình rõ ràng, chuyển động nhẹ hoặc cố định.',
@@ -448,7 +457,7 @@
     const numbered = list => list.map(u => `[${u.n}] (${u.seconds} giây) ${u.text}`);
     const first = picked[0].n, last = picked[picked.length - 1].n;
     const partNote = ctx.parts > 1 ? ` Đây là phần ${ctx.part}/${ctx.parts} của câu chuyện.` : '';
-    const ad = config.ad;
+    const ad = config.ad, lock = isLocked(config);
     return [
       ad ? `Bạn là đạo diễn hình ảnh cho video QUẢNG CÁO sản phẩm bán hàng. Mỗi cảnh sẽ được AI tạo thành MỘT video ngắn, dài tối đa ${s} giây, và mỗi lần tạo đều tốn lượt, nên sản phẩm, hành động và bố cục phải đúng ngay từ lần đầu.` : `Bạn là đạo diễn hình ảnh cho video minh họa một bài đọc (truyện kể, tâm sự, bài nói, bình luận, châm biếm…). Mỗi cảnh sẽ được AI tạo thành MỘT video ngắn, dài tối đa ${s} giây, và mỗi lần tạo đều tốn lượt, nên hình ảnh, hành động và nét mặt phải đúng ngay từ lần đầu.`,
       FRESH,
@@ -462,14 +471,14 @@
       `2. PROMPT thể hiện đúng điều các câu của cảnh nói: ai, ở đâu, lúc nào, làm gì, theo thứ tự thời gian, chia mốc theo đúng độ dài video của cảnh (video 5 giây: 0–2 giây…, 2–5 giây…; video ${s} giây: 0–3 giây…, 3–7 giây…, 7–${s} giây…), kèm nét mặt, ánh mắt, cử chỉ, tư thế, cảm xúc, ánh sáng và góc máy. Dùng từ cụ thể, không mơ hồ. Mỗi mốc ứng với đúng điều của câu tương ứng theo thứ tự câu, có chuyển động cụ thể của người hoặc vật (ai làm gì, mặt và tay thay đổi thế nào); tư thế, nét mặt, vị trí hoặc hướng nhìn phải THAY ĐỔI rõ giữa các mốc, không đứng yên một dáng cả cảnh; không chèn hình chung chung hay cảnh không liên quan tới câu.`,
       ad ? '3. Không bịa tính năng, thông số, công dụng, thành phần, chứng nhận hay kết quả mà lời quảng cáo không nói; không cảnh so sánh với sản phẩm khác; không cảnh «trước/sau» hay minh họa chữa bệnh, giảm cân, hiệu quả y tế. Ý trừu tượng thì thể hiện bằng hình cụ thể (người dùng thoải mái, sản phẩm đang được dùng).' : '3. TRUYỆN KỂ: không bịa thêm nhân vật, vật thể hay sự kiện; không đổi kết cục; không bỏ hành động quan trọng; suy nghĩ, cảm xúc hay ý trừu tượng thì thể hiện bằng nét mặt, cử chỉ hoặc vật cụ thể có trong câu. BÀI NÓI / BÌNH LUẬN / CHÂM BIẾM (nói về một kiểu người, một thói quen, một ý kiến, có ví dụ minh họa): dựng đúng TÌNH HUỐNG mà câu đang nói, bằng 1–3 vai cố định làm việc cụ thể trong bối cảnh đời thường (công ty, quán cà phê, nhà, đường phố); bối cảnh phải đúng nơi bài nói tới (ví dụ «trong công ty» → văn phòng có bàn làm việc, máy tính, đồng nghiệp), không dùng một căn phòng chung cho mọi cảnh; bài đã nêu ví dụ nào thì dựng đúng ví dụ đó, đúng thứ tự. Ý đối lập («trước mặt thân thiện, sau lưng nói xấu») thì cho thấy sự đối lập NGAY TRONG cảnh: cùng một người cười bắt tay người A, A vừa quay đi thì mặt đổi sang khinh bỉ và ghé sát tai người B, tay che miệng, mắt liếc về phía A (không có tiếng). Nói quá, ví von, ẩn dụ KHÔNG dựng theo nghĩa đen nếu phi lý hay đáng sợ: dựng tình huống thật đằng sau câu và thể hiện đúng ý bằng nét mặt, cử chỉ, đạo cụ cụ thể (có thể thêm MỘT chi tiết hài nhỏ hợp tinh thần câu). Câu mở bài, đặt câu hỏi, kết luận: dựng một hình ảnh chung nói lên đúng ý đó. Câu cảm thán rất ngắn: dựng phản ứng nét mặt, cử chỉ của người trong cảnh.',
       '4. Mỗi cảnh được tạo video riêng nên PROMPT phải tự đủ ý: mở đầu bằng bối cảnh cụ thể (nơi nào, ánh sáng gì), rồi nhắc lại tên, ngoại hình, trang phục của nhân vật theo cùng một cách ở mọi cảnh; không viết «như cảnh trước».',
-      ...[ad ? (config.reference ? '5. SẢN PHẨM: ảnh tham chiếu đính kèm là sản phẩm thật. Giữ đúng hình dạng, tỷ lệ, màu sắc, chất liệu, bao bì và nhãn như trong ảnh; không đổi, không thêm bộ phận, không đổi sang sản phẩm khác. Sản phẩm phải HIỆN RÕ ở mọi cảnh (đang được dùng hoặc trưng bày). Ở dòng NHÂN VẬT ghi mô tả cố định của sản phẩm theo ảnh và, nếu có người mẫu hay người dùng, MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) dùng y nguyên ở mọi cảnh có người đó. Người chỉ được nhắc đến mà không có mặt thì KHÔNG vẽ vào hình.' : '5. SẢN PHẨM: chưa có ảnh tham chiếu nên chỉ mô tả sản phẩm theo thông tin ở cuối, đơn giản và nhất quán (hình dạng, màu sắc, chất liệu) ở mọi cảnh; không bịa chi tiết mà thông tin không nói. Sản phẩm phải HIỆN RÕ ở mọi cảnh (đang được dùng hoặc trưng bày). Ở dòng NHÂN VẬT ghi mô tả cố định của sản phẩm và, nếu có người mẫu hay người dùng, MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) dùng y nguyên ở mọi cảnh có người đó. Người chỉ được nhắc đến mà không có mặt thì KHÔNG vẽ vào hình.') : config.reference ? '5. NHÂN VẬT: nhận ra MỌI nhân vật trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Nhân vật chính là người ở ảnh tham chiếu đính kèm: giữ đúng khuôn mặt, tóc, trang phục trong ảnh, không tự đổi. Mỗi nhân vật khác được chốt MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó (bài nói/bình luận không có nhân vật tên riêng thì chốt 2–3 vai đại diện cho các kiểu người được nhắc). Trong PROMPT của mỗi cảnh, gọi từng người xuất hiện trong khung hình bằng đúng tên/vai đó kèm mô tả cố định, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.' : '5. NHÂN VẬT: nhận ra các nhân vật CÓ MẶT trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Mỗi nhân vật được chốt MỘT mô tả cố định, ngắn gọn (tuổi, vóc dáng, tóc, trang phục) ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó; chi tiết truyện không nói thì chọn đơn giản, không bịa thêm. Bài nói/bình luận không có nhân vật tên riêng thì chốt 2–3 VAI cố định đại diện cho các kiểu người được nhắc (ví dụ «người hay nói xấu», «người bị nói xấu», «đồng nghiệp»); khi bài gọi người nghe là «bạn» thì «bạn» là một vai cụ thể trong cảnh. Nếu người dùng đã mô tả nhân vật chính (ở cuối) thì dùng đúng mô tả đó. Chỉ mô tả người XUẤT HIỆN trong khung hình của cảnh, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.'],
-      ad ? '6. ÂM THANH: người trong cảnh tuyệt đối không phát ra tiếng người nào (không nói, hát, ậm ờ, thì thầm, cười thành tiếng); HÌNH ẢNH thì vẫn được mỉm cười, há miệng, ngạc nhiên, nét mặt và cử chỉ rõ ràng, chỉ là im lặng. Lời quảng cáo do người đọc, không phải người trong cảnh.' : '6. ÂM THANH: tuyệt đối KHÔNG có tiếng người nào — không nói, không hát, không lẩm bẩm, ậm ờ, thì thầm, không cười hay thở dài thành tiếng; lời thoại trong truyện và lời kể do người đọc, không phải nhân vật. HÌNH ẢNH thì vẫn thể hiện đầy đủ: nhân vật được há miệng, cười, ngạc nhiên, mấp máy miệng như đang nói, la hét, nét mặt và cử chỉ thật rõ — chỉ là im lặng, không có tiếng. Câu có lời thoại: cho thấy ai đang nói với ai, khẩu hình, nét mặt, cử chỉ, nhưng không tiếng.',
+      ...[ad ? (config.reference ? '5. SẢN PHẨM: ảnh tham chiếu đính kèm là sản phẩm thật. Giữ đúng hình dạng, tỷ lệ, màu sắc, chất liệu, bao bì và nhãn như trong ảnh; không đổi, không thêm bộ phận, không đổi sang sản phẩm khác. Sản phẩm phải HIỆN RÕ ở mọi cảnh (đang được dùng hoặc trưng bày). Ở dòng NHÂN VẬT ghi mô tả cố định của sản phẩm theo ảnh và, nếu có người mẫu hay người dùng, MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) dùng y nguyên ở mọi cảnh có người đó. Người chỉ được nhắc đến mà không có mặt thì KHÔNG vẽ vào hình.' : '5. SẢN PHẨM: chưa có ảnh tham chiếu nên chỉ mô tả sản phẩm theo thông tin ở cuối, đơn giản và nhất quán (hình dạng, màu sắc, chất liệu) ở mọi cảnh; không bịa chi tiết mà thông tin không nói. Sản phẩm phải HIỆN RÕ ở mọi cảnh (đang được dùng hoặc trưng bày). Ở dòng NHÂN VẬT ghi mô tả cố định của sản phẩm và, nếu có người mẫu hay người dùng, MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) dùng y nguyên ở mọi cảnh có người đó. Người chỉ được nhắc đến mà không có mặt thì KHÔNG vẽ vào hình.') : config.reference ? '5. NHÂN VẬT: nhận ra MỌI nhân vật trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Nhân vật chính là người ở ảnh tham chiếu đính kèm: giữ đúng khuôn mặt, tóc, trang phục trong ảnh, không tự đổi. Mỗi nhân vật khác được chốt MỘT mô tả cố định ' + (lock ? '(chỉ phần được khác theo KHÓA HÌNH DẠNG ở cuối quy tắc này)' : '(tuổi, vóc dáng, tóc, trang phục)') + ' ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó (bài nói/bình luận không có nhân vật tên riêng thì chốt 2–3 vai đại diện cho các kiểu người được nhắc). Trong PROMPT của mỗi cảnh, gọi từng người xuất hiện trong khung hình bằng đúng tên/vai đó kèm mô tả cố định, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.' + (lock ? ' ' + lockRule(config) : '') : '5. NHÂN VẬT: nhận ra các nhân vật CÓ MẶT trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Mỗi nhân vật được chốt MỘT mô tả cố định, ngắn gọn ' + (lock ? '(chỉ phần được khác theo KHÓA HÌNH DẠNG ở cuối quy tắc này)' : '(tuổi, vóc dáng, tóc, trang phục)') + ' ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó; chi tiết truyện không nói thì chọn đơn giản, không bịa thêm. Bài nói/bình luận không có nhân vật tên riêng thì chốt 2–3 VAI cố định đại diện cho các kiểu người được nhắc (ví dụ «người hay nói xấu», «người bị nói xấu», «đồng nghiệp»); khi bài gọi người nghe là «bạn» thì «bạn» là một vai cụ thể trong cảnh. Nếu người dùng đã mô tả nhân vật chính (ở cuối) thì dùng đúng mô tả đó. Chỉ mô tả người XUẤT HIỆN trong khung hình của cảnh, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.' + (lock ? ' ' + lockRule(config) : '')],
+      ad ? '6. ÂM THANH: video phải hoàn toàn IM LẶNG, không có âm thanh nào (không tiếng người, không nhạc, không tiếng động); HÌNH ẢNH thì vẫn được mỉm cười, há miệng, ngạc nhiên, nét mặt và cử chỉ rõ ràng. Lời quảng cáo do người đọc, không phải người trong cảnh.' : '6. ÂM THANH: video phải hoàn toàn IM LẶNG, không có âm thanh nào (không tiếng người, không nhạc, không tiếng động); lời thoại trong truyện và lời kể do người đọc, không phải nhân vật. HÌNH ẢNH thì diễn đạt đầy đủ câu nói: nhân vật được há miệng, mấp máy miệng như đang nói, cười, ngạc nhiên, la hét, nét mặt và cử chỉ thật rõ — chỉ là không có tiếng. Câu có lời thoại: cho thấy ai đang nói với ai, khẩu hình, nét mặt, cử chỉ.',
       ad ? `7. Không thêm chữ, giá, phụ đề hay logo vào hình (nhãn thật trên sản phẩm giữ nguyên như ảnh)${config.style ? `; phong cách hình ảnh: ${config.style}` : ''}; tỷ lệ ${config.aspect}.` : `7. Không chèn chữ, phụ đề hay logo vào hình${config.style ? `; phong cách hình ảnh: ${config.style}` : ''}${config.reference ? '; nhân vật chính giữ đúng như ảnh tham chiếu' : ''}; tỷ lệ ${config.aspect}.`,
       '8. Viết PROMPT cùng ngôn ngữ với ' + (ad ? 'lời quảng cáo' : 'câu chuyện') + ', riêng câu cuối của PROMPT luôn là đúng câu tiếng Anh này: ' + NO_SPEECH,
       ...(ad ? ['9. Nhịp quảng cáo: cảnh đầu phải thu hút ngay trong 1–2 giây đầu; các cảnh giữa cho thấy rõ từng điểm nổi bật bằng hình cụ thể (sản phẩm đang được dùng, cận cảnh chi tiết); cảnh cuối là khung hình đẹp nhất của sản phẩm. Mỗi cảnh chọn chuyển động máy quay hợp với cảnh trong danh sách đã chọn (nếu có) và ghi rõ trong PROMPT.'] : []),
       '',
       'Trả lời đúng khuôn sau, KHÔNG viết thêm câu dẫn hay giải thích:',
-      ...(ctx.cast ? ['(Chỉ khi có nhân vật MỚI xuất hiện ở phần này: thêm một dòng «NHÂN VẬT: …» ghi lại ĐỦ danh sách gồm cả người đã chốt; không thì bỏ qua dòng này.)'] : [ad ? 'NHÂN VẬT: <sản phẩm: mô tả cố định' + (config.reference ? ' theo ảnh tham chiếu' : '') + '; người mẫu nếu có: tuổi, vóc dáng, tóc, trang phục cố định>' : 'NHÂN VẬT: <mọi nhân vật trong truyện, mỗi người một mục: tên/vai – tuổi, vóc dáng, tóc, trang phục cố định' + (config.reference ? '; nhân vật chính ghi «theo ảnh tham chiếu»' : '') + '>']),
+      ...(ctx.cast ? ['(Chỉ khi có nhân vật MỚI xuất hiện ở phần này: thêm một dòng «NHÂN VẬT: …» ghi lại ĐỦ danh sách gồm cả người đã chốt; không thì bỏ qua dòng này.)'] : [ad ? 'NHÂN VẬT: <sản phẩm: mô tả cố định' + (config.reference ? ' theo ảnh tham chiếu' : '') + '; người mẫu nếu có: tuổi, vóc dáng, tóc, trang phục cố định>' : (lock ? 'NHÂN VẬT: <nhân vật chuẩn: ' + (config.reference ? 'ghi «theo ảnh tham chiếu»' : 'ghi kiểu người dùng mô tả') + '; mỗi nhân vật khác một mục: tên/vai – giới tính, màu và kiểu quần áo, kiểu tóc, phụ kiện, chiều cao tương đối, cùng hình dạng với nhân vật chuẩn>' : 'NHÂN VẬT: <mọi nhân vật trong truyện, mỗi người một mục: tên/vai – tuổi, vóc dáng, tóc, trang phục cố định>')]),
       'CẢNH 1',
       `CÂU: <số câu đầu>-<số câu cuối> (ví dụ 1-3; một câu thì chỉ ghi số đó)`,
       'PROMPT: <mô tả hình ảnh theo quy tắc trên>',
@@ -488,6 +497,8 @@
     ].filter((line, index, lines) => line !== '' || (index > 0 && lines[index - 1] !== '' && index < lines.length - 1)).join('\n');
   }
 
+
+  const lockRule = config => `KHÓA HÌNH DẠNG: ${config.reference ? 'nhân vật trong ảnh tham chiếu' : 'nhân vật chuẩn do người dùng mô tả'}${config.form ? ` (hình dạng chuẩn: ${config.form})` : ''} là CHUẨN HÌNH DẠNG của MỌI nhân vật. Mọi nhân vật khác, kể cả người phụ, phải CÙNG hình dạng, tỉ lệ cơ thể, kiểu đầu và mặt, kiểu vẽ và độ chi tiết (ví dụ chuẩn là người que thì mọi người đều là người que); chỉ khác màu và kiểu quần áo, giới tính, kiểu tóc, phụ kiện, chiều cao. Vì vậy mỗi nhân vật khác chỉ được mô tả phần ĐƯỢC KHÁC đó; KHÔNG tả người thật (không tả da, cơ bắp, khuôn mặt thật, tuổi cụ thể), KHÔNG viết «người đàn ông», «phụ nữ» như người thật mà viết «nhân vật nam/nữ cùng kiểu với nhân vật chuẩn». Nhân vật chuẩn đóng vai chính của bài (bài nói/bình luận thì đóng vai kiểu người mà bài đang nói tới); các vai còn lại do nhân vật khác cùng hình dạng đóng. App tự thêm câu khóa hình dạng vào cuối mỗi PROMPT nên bạn không cần chép lại, nhưng mô tả nhân vật phải hợp kiểu đó.`;
 
   // Chat Muse dùng chung một cuộc trò chuyện nên có thể còn truyện/yêu cầu cũ ở phía trên: dặn Muse không để lẫn vào.
   const FRESH = 'Cuộc trò chuyện này có thể còn truyện hoặc yêu cầu khác ở phía trên: BỎ QUA hết, chỉ làm với nội dung bên dưới, không lấy nhân vật hay chi tiết nào từ chỗ khác.';
@@ -525,6 +536,7 @@
     const [a, b] = ctx.range || [1, units.length];
     const picked = units.slice(a - 1, b);
     const parts = ctx.parts > 1 ? ctx.parts : 1, part = ctx.part || 1;
+    const lock = isLocked(config);
     const marker = ctx.marker ? String(ctx.marker) : '';
     const before = ctx.understanding || ctx.cast ? [
       '',
@@ -539,7 +551,7 @@
       `ĐỌC HIỂU${parts > 1 ? ` – phần ${part}/${parts} của bài` : ''}: đọc kỹ rồi ghi lại những gì đã hiểu. CHƯA chia cảnh, CHƯA viết prompt hình.`,
       `1. TÓM TẮT: kể lại ý và diễn biến theo đúng thứ tự, mỗi ý một câu ngắn, đủ các ý chính, các ví dụ bài nêu; không bịa, không đổi ý${parts > 1 ? '; viết lại gọn cho cả bài từ đầu đến hết phần này (tối đa 15 ý)' : ''}.`,
       '2. CÁCH MINH HỌA: (a) đây là truyện kể hay bài nói/bình luận/châm biếm, giọng điệu gì; (b) hình ảnh nên dựng thế nào cho đúng ý: truyện kể thì dựng đúng diễn biến; bài nói/bình luận thì dựng các tình huống và ví dụ mà bài nêu, bằng vài vai cố định làm việc cụ thể trong bối cảnh đời thường; (c) các câu ví von, nói quá, ẩn dụ quan trọng và cách thể hiện từng câu bằng hình cụ thể đúng ý (không dựng theo nghĩa đen nếu phi lý hay đáng sợ); (d) bối cảnh và phong cách chung.',
-      '3. NHÂN VẬT: mọi nhân vật CÓ MẶT (kể cả người chỉ gọi bằng vai như «bà», «người lái đò», «đồng nghiệp»), mỗi người một mục: tên/vai – tuổi, vóc dáng, tóc, trang phục cố định; chi tiết bài không nói thì chọn đơn giản, không bịa thêm. Bài nói/bình luận không có nhân vật tên riêng thì chốt 2–3 VAI cố định đại diện cho các kiểu người được nhắc; khi bài gọi người nghe là «bạn» thì «bạn» là một vai cụ thể.' + (config.reference ? ' Nhân vật chính là người ở ảnh tham chiếu đính kèm: ghi «theo ảnh tham chiếu».' : '') + (config.character ? ` Nhân vật chính (người dùng mô tả): ${config.character}` : ''),
+      '3. NHÂN VẬT: mọi nhân vật CÓ MẶT (kể cả người chỉ gọi bằng vai như «bà», «người lái đò», «đồng nghiệp»), mỗi người một mục: tên/vai – tuổi, vóc dáng, tóc, trang phục cố định; chi tiết bài không nói thì chọn đơn giản, không bịa thêm. Bài nói/bình luận không có nhân vật tên riêng thì chốt 2–3 VAI cố định đại diện cho các kiểu người được nhắc; khi bài gọi người nghe là «bạn» thì «bạn» là một vai cụ thể.' + (config.reference ? ' Nhân vật chính là người ở ảnh tham chiếu đính kèm: ghi «theo ảnh tham chiếu».' : '') + (config.character ? ` Nhân vật chính (người dùng mô tả): ${config.character}` : '') + (lock ? ' ' + lockRule(config) : ''),
       '4. BỐI CẢNH: các địa điểm và thời điểm chính theo thứ tự xuất hiện.',
       ...before,
       '',
@@ -709,7 +721,7 @@
       const seconds = estimateSeconds(voice, language), own = sceneSeconds(voice || prompt, config.seconds);
       if (voice && seconds > config.seconds) w.push(`Lời đọc dài khoảng ${seconds.toFixed(1)} giây, hơn clip ${config.seconds} giây — sẽ phải giữ khung cuối. Nên tách cảnh.`);
       if (!prompt.trim()) w.push('Chưa có prompt: cảnh này sẽ không tạo được.');
-      else if (count(prompt.replace(NO_SPEECH, '').trim()) < 40) w.push('Prompt quá ngắn, dễ ra hình sai. Mô tả rõ ai, ở đâu, làm gì, nét mặt.');
+      else if (count(prompt.replace(NO_SPEECH, '').replace(lockLine(config), '').trim()) < 40) w.push('Prompt quá ngắn, dễ ra hình sai. Mô tả rõ ai, ở đâu, làm gì, nét mặt.');
       if (prompt.trim() && !/no speech/i.test(prompt)) w.push('Prompt thiếu câu «no speech» — nhân vật có thể bị nói.');
       if (QUOTED.test(voice) || QUOTED.test(prompt)) w.push('Có lời thoại trong ngoặc kép — nhân vật sẽ không nói, chỉ thể hiện bằng cử chỉ và nét mặt.');
       if (TIME_SKIP.test(voice) || TIME_SKIP.test(prompt)) w.push(`Có chuyển mốc thời gian — ${own} giây khó chứa nhiều khoảnh khắc. Nên tách thành cảnh riêng.`);
@@ -732,6 +744,14 @@
     return String(value || '').replace(/^[\s"“”'`]+|[\s"“”'`]+$/g, '').replace(/\*\*|__/g, '').replace(/[ \t]+\n/g, '\n').trim();
   }
   const ensureNoSpeech = prompt => (/no speech/i.test(prompt) ? prompt : prompt + '\n' + NO_SPEECH);
+  // Prompt Muse viết + câu khóa hình dạng (nếu có) + câu cấm tiếng ở cuối.
+  function finalPrompt(prompt, config) {
+    const lock = lockLine(config), text = String(prompt || '').trim();
+    if (!lock || text.includes(lock)) return ensureNoSpeech(text);
+    const at = text.indexOf(NO_SPEECH);
+    if (at >= 0) return text.slice(0, at).trimEnd() + '\n' + lock + '\n' + text.slice(at);
+    return ensureNoSpeech(text + '\n' + lock);
+  }
 
   // Tách trả lời của Muse: {scenes: [{title, units: [đầu, cuối] | null, voiceover, prompt}], cast, done}.
   // Hiểu cả khuôn «CÂU: 1-3» (chuẩn) lẫn khuôn cũ «LỜI: …».
@@ -783,7 +803,7 @@
   function parseMuseReply(reply, input = {}) {
     const config = options(input);
     return parseReply(reply, config).scenes.map((scene, index) => {
-      const prompt = scene.prompt ? ensureNoSpeech(scene.prompt) : scenePrompt(scene.voiceover, config);
+      const prompt = scene.prompt ? finalPrompt(scene.prompt, config) : scenePrompt(scene.voiceover, config);
       return { title: `Cảnh ${index + 1}`, source: scene.voiceover, voiceover: scene.voiceover, prompt, durationSeconds: sceneSeconds(scene.voiceover, config.seconds), ...(scene.units ? { units: scene.units } : {}) };
     });
   }
@@ -809,7 +829,7 @@
       let end = a;
       while (end < b && count(unitsText(units, a, end + 1)) <= hard) end++;
       const voiceover = unitsText(units, a, end);
-      out.push({ title: '', source: voiceover, voiceover, visual: '', prompt: item.prompt ? ensureNoSpeech(item.prompt) : scenePrompt(voiceover, config), durationSeconds: sceneSeconds(voiceover, config.seconds), units: [a, end], ...(item.prompt ? {} : { offline: true }) });
+      out.push({ title: '', source: voiceover, voiceover, visual: '', prompt: item.prompt ? finalPrompt(item.prompt, config) : scenePrompt(voiceover, config), durationSeconds: sceneSeconds(voiceover, config.seconds), units: [a, end], ...(item.prompt ? {} : { offline: true }) });
       if (end < b) fresh(end + 1, b);
       next = b + 1;
     }
@@ -897,5 +917,5 @@
     return entries.map((entry, index) => `${index + 1}\n${srtTime(entry.start)} --> ${srtTime(entry.end)}\n${entry.text}\n`).join('\n');
   }
 
-  return { ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, MAX_SECONDS, MIN_SECONDS, sceneSeconds, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, buildMuseInstruction, buildUnderstandInstruction, parseUnderstanding, understandRanges, understandingText, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, subtitleChunks, srtTime, toSrt };
+  return { ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, MAX_SECONDS, MIN_SECONDS, sceneSeconds, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, lockLine, buildMuseInstruction, buildUnderstandInstruction, parseUnderstanding, understandRanges, understandingText, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, subtitleChunks, srtTime, toSrt };
 });

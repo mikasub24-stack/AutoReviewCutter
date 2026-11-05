@@ -1,10 +1,10 @@
 Continue in 1.1.6 resubmits unfinished scenes with new attempt IDs, ignoring tentative send flags and old receipts. Completed files are kept. The sidebar now displays the actual application version.
 
-# Muse Video Studio V1 · 1.3.2 · Windows
+# Muse Video Studio V1 · 1.3.3 · Windows
 
 ## Bản cài đặt Windows
 
-Tải `MuseVideoStudio-1.3.2-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
+Tải `MuseVideoStudio-1.3.3-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
 
 Build riêng: `node tools/build-installer.cjs` trên Windows. Workflow installer kiểm thử cài đặt, shortcut, mở app, một cửa sổ chính và gỡ cài đặt trước khi thêm Setup.exe vào release hiện tại.
 
@@ -141,6 +141,12 @@ Nối MP4 tùy chọn cần FFmpeg/ffprobe trên máy (chưa đóng kèm): chọ
 Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. Các kiểm tra `node test/submit-diagnostics-smoke.cjs`, `node test/cards-smoke.cjs`, `node test/muse-tracker-smoke.cjs`, `node test/download-capture-smoke.cjs` xác minh thẻ video, gắn kết quả theo prompt và tải/cancel tệp video thật từ máy chủ cục bộ; smoke tải cần FFmpeg hoặc MUSE_VIDEO_FIXTURE. Test UI và browser smoke cần Chromium; đặt CHROMIUM_PATH nếu khác /usr/bin/chromium. `node test/attachment-ready-smoke.cjs` kiểm tra readiness ảnh trên DOM fixture thật. FFmpeg smoke riêng: `npm run test:merge`.
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
+
+## Update 1.3.3
+
+- **Khóa hình dạng nhân vật (tab Kể chuyện).** Lỗi trước đó: nhân vật trong ảnh tham chiếu là đầu tròn trắng áo hoodie đen, nhưng người thứ hai trong cảnh lại thành người thật hoặc anime (có clip nhân vật chính còn bị đổi thành đầu trọc). Nay nhân vật trong ảnh tham chiếu (và/hoặc kiểu bạn ghi ở ô mới **«Hình dạng nhân vật chuẩn»**, ví dụ «người que, đầu tròn trắng») là chuẩn của MỌI nhân vật: người khác phải cùng hình dạng, tỉ lệ, kiểu đầu và mặt, kiểu vẽ, chỉ khác màu và kiểu quần áo, giới tính, tóc, phụ kiện, chiều cao. Hai chỗ khóa: (1) lệnh đọc hiểu và lệnh chia cảnh gửi Muse dặn như vậy và cấm tả người thật; (2) **app tự gắn một câu khóa vào cuối MỌI prompt** (trước câu cấm tiếng), kể cả khi Muse quên, nên không phụ thuộc Muse viết gì. Không có ảnh và không ghi hình dạng thì không khóa; chế độ quảng cáo không đổi. Nhân vật chuẩn đóng vai chính của bài (bài nói/châm biếm thì đóng vai kiểu người bài nói tới); gõ vai khác vào ô «Nhân vật chính» nếu muốn.
+- **Video im lặng hoàn toàn** (thay mục Âm thanh của 1.3.2): lệnh và câu «Audio» trong prompt dặn không có âm thanh nào (không tiếng người, nhạc, tiếng động). Nhân vật vẫn há miệng, mấp máy như nói, cười, nét mặt rõ để diễn đạt câu nói; giọng đọc do app thêm.
+- **Chưa thử với Muse thật**: mô hình tạo video có nghe theo câu khóa và câu im lặng không (đó chỉ là lời dặn). App không nhìn được ảnh tham chiếu nên không tự kiểm hình dạng; vì vậy nếu ảnh tham chiếu lạ, hãy ghi hình dạng vào ô mới. Phần Muse «hiểu bài» có đúng chưa: chưa có cách kiểm ngoài khung «Muse hiểu bài thế này» để bạn tự đọc. Đã kiểm bằng trang chat Muse giả (26 kịch bản), giao diện giả và test đơn vị.
 
 ## Update 1.3.2
 

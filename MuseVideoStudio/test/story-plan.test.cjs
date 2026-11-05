@@ -611,15 +611,15 @@ test('bài nói/châm biếm không có nhân vật: lệnh chia cảnh dặn d�
   assert.match(text, /THAY ĐỔI rõ giữa các mốc/);
   assert.match(text, /mở đầu bằng bối cảnh cụ thể/);
   assert.match(text, /BỎ QUA hết, chỉ làm với nội dung bên dưới/, 'chat Muse dùng chung: không để truyện cũ lẫn vào');
-  assert.match(text, /KHÔNG có tiếng người nào — không nói, không hát, không lẩm bẩm, ậm ờ, thì thầm/);
-  assert.match(text, /HÌNH ẢNH thì vẫn thể hiện đầy đủ: nhân vật được há miệng, cười, ngạc nhiên, mấp máy miệng như đang nói/);
+  assert.match(text, /video phải hoàn toàn IM LẶNG, không có âm thanh nào \(không tiếng người, không nhạc, không tiếng động\)/);
+  assert.match(text, /HÌNH ẢNH thì diễn đạt đầy đủ câu nói: nhân vật được há miệng, mấp máy miệng như đang nói/);
   assert.doesNotMatch(text, /miệng khép|không há miệng|không mấp máy môi/, 'cấm tiếng nhưng không cấm hình há miệng, cười, mấp máy');
   // Truyện kể vẫn giữ luật cũ.
   assert.match(text, /TRUYỆN KỂ: không bịa thêm nhân vật/);
 });
 
 test('câu cấm tiếng người: không nói, không ậm ờ/thì thầm/cười thành tiếng, nhưng vẫn cho há miệng, cười, mấp máy trên hình', () => {
-  for (const word of ['no speech', 'no mumbling', 'no murmuring', 'no whispering', 'no humming', 'no laughing out loud', 'no human voice', 'completely silent', 'may still open their mouths, laugh, gossip, shout']) assert.ok(sp.NO_SPEECH.includes(word), word);
+  for (const word of ['no speech', 'no mumbling', 'no murmuring', 'no whispering', 'no humming', 'no laughing out loud', 'no human voice', 'no music', 'no sound effects', 'no ambient noise', 'completely silent with no audio at all', 'may still open their mouths, laugh, gossip, shout']) assert.ok(sp.NO_SPEECH.includes(word), word);
   assert.ok(!/mouths closed|no lip movement/.test(sp.NO_SPEECH), 'không cấm hình miệng');
   assert.ok(sp.scenePrompt('Mai nhìn quanh.', { seconds: 10, aspect: '16:9' }).includes(sp.NO_SPEECH));
 });
@@ -679,4 +679,66 @@ test('lệnh chia cảnh mang phần đã hiểu và dòng NHÂN VẬT chỉ ghi
   const plain = sp.buildMuseInstruction(essay, { seconds: 10 }, { marker: 'abc123' });
   assert.ok(!/HIỂU BIẾT VỀ CẢ BÀI/.test(plain));
   assert.match(plain, /^NHÂN VẬT: </m);
+});
+
+test('khóa hình dạng nhân vật: có ảnh tham chiếu hoặc mô tả hình dạng thì mọi nhân vật phải cùng hình dạng; quảng cáo và không có gì thì không khóa', () => {
+  const base = { seconds: 10, aspect: '16:9' };
+  assert.equal(sp.options({ ...base, form: '  người que, đầu tròn trắng  ' }).form, 'người que, đầu tròn trắng');
+  assert.equal(sp.options({ ...base }).form, '');
+  const ask = sp.buildMuseInstruction(essay, { ...base, reference: true, form: 'người que, đầu tròn trắng' }, { marker: 'abc123' });
+  assert.match(ask, /KHÓA HÌNH DẠNG: nhân vật trong ảnh tham chiếu \(hình dạng chuẩn: người que, đầu tròn trắng\) là CHUẨN HÌNH DẠNG của MỌI nhân vật/);
+  assert.match(ask, /ví dụ chuẩn là người que thì mọi người đều là người que/);
+  assert.match(ask, /chỉ khác màu và kiểu quần áo, giới tính, kiểu tóc, phụ kiện, chiều cao/);
+  assert.match(ask, /KHÔNG tả người thật/);
+  assert.match(ask, /Nhân vật chuẩn đóng vai chính của bài/);
+  assert.match(ask, /^NHÂN VẬT: <nhân vật chuẩn: ghi «theo ảnh tham chiếu»; mỗi nhân vật khác một mục: tên\/vai – giới tính, màu và kiểu quần áo/m);
+  assert.ok(!/tuổi, vóc dáng, tóc, trang phục\)/.test(ask), 'đã khóa thì không đòi tả tuổi, vóc dáng như người thật');
+  // Chỉ có mô tả hình dạng (không ảnh) cũng khóa.
+  const formOnly = sp.buildMuseInstruction(essay, { ...base, form: 'người que' }, { marker: 'abc123' });
+  assert.match(formOnly, /KHÓA HÌNH DẠNG: nhân vật chuẩn do người dùng mô tả \(hình dạng chuẩn: người que\)/);
+  assert.match(formOnly, /ghi kiểu người dùng mô tả/);
+  // Không ảnh, không mô tả: không khóa, giữ luật cũ.
+  const plain = sp.buildMuseInstruction(essay, base, { marker: 'abc123' });
+  assert.ok(!/KHÓA HÌNH DẠNG/.test(plain));
+  assert.match(plain, /tuổi, vóc dáng, tóc, trang phục\)/);
+  // Chế độ quảng cáo có ảnh sản phẩm: không khóa nhân vật.
+  const ad = sp.buildMuseInstruction('Bình Aqua giữ nóng 12 giờ.', { ...base, reference: true, ad: { product: 'Bình Aqua', points: '', audience: '', cta: '', tone: 'warm', length: 30, camera: [], look: '' } }, { marker: 'abc123' });
+  assert.ok(!/KHÓA HÌNH DẠNG/.test(ad));
+  // Lệnh đọc hiểu cũng khóa.
+  const read = sp.buildUnderstandInstruction(essay, { ...base, reference: true, form: 'người que' }, { marker: 'abc123' });
+  assert.match(read, /KHÓA HÌNH DẠNG: nhân vật trong ảnh tham chiếu \(hình dạng chuẩn: người que\)/);
+  assert.ok(!/KHÓA HÌNH DẠNG/.test(sp.buildUnderstandInstruction(essay, base, { marker: 'abc123' })));
+});
+
+test('khóa hình dạng: app tự gắn câu khóa vào MỌI prompt Muse viết (trước câu cấm tiếng), một lần duy nhất, cả cảnh mẫu', () => {
+  const cfg = { seconds: 10, aspect: '16:9', reference: true, form: 'người que, đầu tròn trắng' };
+  const lock = sp.lockLine ? sp.lockLine(cfg) : '';
+  assert.ok(lock.startsWith('KHÓA HÌNH DẠNG NHÂN VẬT (bắt buộc): lấy nhân vật trong ảnh tham chiếu làm chuẩn — hình dạng chuẩn: người que, đầu tròn trắng.'), lock.slice(0, 120));
+  assert.match(lock, /MỌI nhân vật trong cảnh, kể cả người phụ, phải CÙNG hình dạng, tỉ lệ cơ thể, kiểu đầu và mặt, kiểu vẽ/);
+  assert.match(lock, /chỉ được khác màu và kiểu quần áo, giới tính, kiểu tóc, phụ kiện, chiều cao/);
+  const units = sp.storyUnits(essay, cfg);
+  const withEnd = { units: [1, 3], prompt: '0–5 giây: nhân vật trắng bắt tay nhân vật áo xanh.\n' + sp.NO_SPEECH };
+  const noEnd = { units: [4, 6], prompt: '0–5 giây: nhân vật trắng ghé tai nhân vật áo xám.' };
+  const scenes = sp.assembleScenes(units, [withEnd, noEnd], cfg);
+  for (const scene of scenes.filter(s => !s.offline)) {
+    assert.equal(scene.prompt.split(lock).length - 1, 1, 'câu khóa đúng một lần');
+    assert.ok(scene.prompt.indexOf(lock) < scene.prompt.indexOf(sp.NO_SPEECH), 'câu khóa nằm trước câu cấm tiếng');
+    assert.ok(scene.prompt.trimEnd().endsWith(sp.NO_SPEECH), 'câu cấm tiếng vẫn nằm cuối');
+  }
+  assert.equal(scenes.filter(s => !s.offline).length, 2);
+  assert.match(scenes[0].prompt, /^0–5 giây: nhân vật trắng bắt tay/);
+  assert.ok(scenes.filter(s => s.offline).every(s => s.prompt.includes(lock)), 'cảnh mẫu cũng mang câu khóa');
+  // Muse đã tự chép câu khóa thì không thêm lần nữa.
+  const again = sp.assembleScenes(units, [{ units: [1, 3], prompt: 'Cảnh.\n' + lock + '\n' + sp.NO_SPEECH }], cfg);
+  assert.equal(again[0].prompt.split(lock).length - 1, 1);
+  // Không ảnh, không mô tả hình dạng: prompt y như cũ.
+  const free = sp.assembleScenes(units, [{ units: [1, 3], prompt: 'Cảnh.' }], { seconds: 10, aspect: '16:9' });
+  assert.ok(!/KHÓA HÌNH DẠNG/.test(free[0].prompt));
+  // Cảnh mẫu và khuôn cũ «LỜI» cũng mang khóa; chế độ quảng cáo thì không.
+  assert.ok(sp.scenePrompt('Mai nhìn quanh.', cfg).includes(lock));
+  assert.ok(sp.parseMuseReply('CẢNH 1\nLỜI: Mai nhìn quanh.\nPROMPT: Mai nhìn quanh trong phòng, mắt mở to.', cfg)[0].prompt.includes(lock));
+  assert.ok(!/KHÓA HÌNH DẠNG/.test(sp.scenePrompt('Mua ngay.', { seconds: 10, aspect: '9:16', reference: true, ad: sp.options({ ad: { product: 'Bình Aqua' } }).ad })));
+  // Soát cảnh: câu khóa không làm prompt ngắn trông như đủ dài.
+  const short = sp.lintScenes([{ voiceover: 'Mai nhìn quanh.', prompt: 'Mai.\n' + lock + '\n' + sp.NO_SPEECH }], cfg)[0];
+  assert.ok(short.some(w => /Prompt quá ngắn/.test(w)), short.join(' | '));
 });

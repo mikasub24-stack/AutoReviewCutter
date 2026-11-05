@@ -316,6 +316,33 @@ function brain(behavior = {}) {
       assert.equal(r.scenes.map(s => s.voiceover).join(' '), essay.replace(/\n/g, ' '));
       await page.close(); ok('bài nói/châm biếm: yêu cầu dặn dựng tình huống, vai cố định, bối cảnh đúng nơi, chuyển động rõ');
     }
+    // 11g. Khóa hình dạng: có ảnh tham chiếu + mô tả hình dạng → cả lệnh đọc hiểu và lệnh chia cảnh dặn «mọi nhân vật cùng hình dạng»,
+    //      và app tự gắn câu khóa vào MỌI prompt Muse viết (một lần, trước câu cấm tiếng), dù Muse không chép.
+    {
+      const lockCfg = { ...cfg, reference: true, form: 'người que, đầu tròn trắng' };
+      const { page, analyzer, museBrain } = await session({});
+      const r = await analyzer.run({ script: tale, options: lockCfg });
+      assert.match(museBrain.understood[0].text, /KHÓA HÌNH DẠNG: nhân vật trong ảnh tham chiếu \(hình dạng chuẩn: người que, đầu tròn trắng\)/);
+      assert.match(museBrain.asked[0].text, /ví dụ chuẩn là người que thì mọi người đều là người que/);
+      const lock = plan.lockLine(plan.options(lockCfg));
+      assert.ok(lock.length > 100);
+      assert.ok(r.scenes.length >= 2 && r.scenes.every(sc => !sc.offline));
+      for (const sc of r.scenes) {
+        assert.equal(sc.prompt.split(lock).length - 1, 1, 'câu khóa đúng một lần trong ' + sc.title);
+        assert.ok(sc.prompt.indexOf(lock) < sc.prompt.indexOf(plan.NO_SPEECH), 'khóa trước câu cấm tiếng');
+        assert.ok(sc.prompt.trimEnd().endsWith(plan.NO_SPEECH));
+        assert.match(sc.prompt, /Mai đứng bên sông/, 'prompt của Muse vẫn còn nguyên');
+      }
+      assert.equal(r.scenes.map(sc => sc.voiceover).join(' '), tale);
+      await page.close(); ok('khóa hình dạng: lệnh dặn mọi nhân vật cùng hình dạng, app tự gắn câu khóa vào mọi prompt');
+    }
+    // 11h. Không ảnh, không mô tả: prompt không có câu khóa.
+    {
+      const { page, analyzer, museBrain } = await session({});
+      const r = await analyzer.run({ script: tale, options: cfg });
+      assert.ok(!/KHÓA HÌNH DẠNG/.test(museBrain.asked[0].text) && r.scenes.every(sc => !/KHÓA HÌNH DẠNG/.test(sc.prompt)));
+      await page.close(); ok('không có ảnh/hình dạng chuẩn: không khóa');
+    }
     // 12. Đang bận thì không chạy hai lần; kịch bản rỗng báo lỗi.
     {
       const { page, analyzer } = await session({}, { reply: 20000 }, p => p.evaluate(() => { window.mode.streamMs = 3000; }));

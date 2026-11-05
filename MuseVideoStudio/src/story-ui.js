@@ -11,7 +11,7 @@
   const FIELDS = {
     adProduct: ['adProduct', ''], adPoints: ['adPoints', ''], adAudience: ['adAudience', ''], adOffer: ['adOffer', ''], adCta: ['adCta', ''],
     adTone: ['adTone', AD.AD_TONE[0].id], adLength: ['adLength', '30'],
-    storyScript: ['script', ''], storyAspect: ['aspect', '16:9'], storyCharacter: ['character', ''], storyStyle: ['style', ''],
+    storyScript: ['script', ''], storyAspect: ['aspect', '16:9'], storyCharacter: ['character', ''], storyForm: ['form', ''], storyStyle: ['style', ''],
     storyEngine: ['engine', 'none'], storyTempo: ['tempo', '1'], subFont: ['subFont', 'Arial'], subSize: ['subSize', '54'], subColor: ['subColor', '#ffffff'],
     subOutline: ['subOutline', '#000000'], subPos: ['subPos', 'bottom'], storySfx: ['sfx', 'low'], storyName: ['name', '']
   };
@@ -43,7 +43,7 @@
   }
   const isAd = () => mode === 'ad';
   const adFields = () => ({ product: $('adProduct').value, points: $('adPoints').value, audience: $('adAudience').value, offer: $('adOffer').value, cta: $('adCta').value, tone: $('adTone').value, length: Number($('adLength').value), camera: [...adCamera], look: adLook, template: adTemplate });
-  const options = () => ({ seconds: plan().MAX_SECONDS, reference: refs.length > 0, aspect: $('storyAspect').value, style: $('storyStyle').value, character: $('storyCharacter').value, ...(isAd() ? { ad: adFields() } : {}) });
+  const options = () => ({ seconds: plan().MAX_SECONDS, reference: refs.length > 0, aspect: $('storyAspect').value, style: $('storyStyle').value, character: $('storyCharacter').value, form: $('storyForm').value, ...(isAd() ? { ad: adFields() } : {}) });
   const plan = () => window.storyPlan;
   const dims = aspect => aspect === '9:16' ? [1080, 1920] : aspect === '1:1' ? [1080, 1080] : [1920, 1080];
   const baseName = file => String(file || '').split(/[\\/]/).pop();
@@ -253,7 +253,7 @@
     ['storyCharLabel', 'text', 'Nhân vật chính (không bắt buộc)', 'Người mẫu / người dùng (không bắt buộc)'],
     ['storyCharacter', 'placeholder', 'Để trống nếu không cần. Ví dụ: Mai, bé gái tóc đen, áo dài trắng', 'Để trống nếu không cần. Ví dụ: cô gái 25 tuổi, tóc dài, áo sơ mi trắng'],
     ['storyRefs', 'text', 'Chọn ảnh nhân vật', 'Chọn ảnh sản phẩm'],
-    ['storyRefPaste', 'text', 'Dán hoặc kéo ảnh nhân vật chính vào đây. Ảnh này gắn vào mọi cảnh để nhân vật giữ nguyên; nhân vật khác trong truyện do Muse nhận ra và mô tả cố định ở mọi cảnh.', 'Dán hoặc kéo ảnh sản phẩm vào đây (nên 1–2 ảnh rõ nét, nền sạch). Ảnh gắn vào mọi cảnh để sản phẩm giữ đúng hình dạng và màu sắc.']
+    ['storyRefPaste', 'text', 'Dán hoặc kéo ảnh nhân vật chính vào đây. Ảnh này gắn vào mọi cảnh để nhân vật giữ nguyên; nhân vật khác do Muse nhận ra và vẽ cùng hình dạng với nhân vật này (chỉ khác màu áo, giới tính, tóc…).', 'Dán hoặc kéo ảnh sản phẩm vào đây (nên 1–2 ảnh rõ nét, nền sạch). Ảnh gắn vào mọi cảnh để sản phẩm giữ đúng hình dạng và màu sắc.']
   ];
   const IDLE_INFO = ['Dán câu chuyện rồi bấm «Phân tích bằng Muse» (cần đã đăng nhập Muse tài khoản 1). Muse đọc hiểu cả truyện rồi mới chia cảnh và viết prompt hình.', 'Thả ảnh sản phẩm, chọn mẫu: các cảnh quay hiện ngay bên dưới. Muốn có lời đọc thì mở «Tùy chỉnh thêm», viết lời quảng cáo rồi bấm «Phân tích bằng Muse».'];
   function applyMode(initial) {
