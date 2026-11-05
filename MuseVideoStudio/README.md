@@ -1,10 +1,10 @@
 Continue in 1.1.6 resubmits unfinished scenes with new attempt IDs, ignoring tentative send flags and old receipts. Completed files are kept. The sidebar now displays the actual application version.
 
-# Muse Video Studio V1 · 1.3.3 · Windows
+# Muse Video Studio V1 · 1.3.4 · Windows
 
 ## Bản cài đặt Windows
 
-Tải `MuseVideoStudio-1.3.3-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
+Tải `MuseVideoStudio-1.3.4-Setup.exe`, thoát bản đang chạy rồi mở Setup. Chọn thư mục cài đặt; trình cài tạo lối tắt Desktop và Start menu, có mục gỡ cài đặt trong Windows. Dữ liệu app, hàng chờ và key vẫn dùng cùng hồ sơ với bản portable; gỡ cài đặt không yêu cầu xóa dữ liệu người dùng. Trình cài hỗ trợ English/Tiếng Việt.
 
 Build riêng: `node tools/build-installer.cjs` trên Windows. Workflow installer kiểm thử cài đặt, shortcut, mở app, một cửa sổ chính và gỡ cài đặt trước khi thêm Setup.exe vào release hiện tại.
 
@@ -141,6 +141,11 @@ Nối MP4 tùy chọn cần FFmpeg/ffprobe trên máy (chưa đóng kèm): chọ
 Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. Các kiểm tra `node test/submit-diagnostics-smoke.cjs`, `node test/cards-smoke.cjs`, `node test/muse-tracker-smoke.cjs`, `node test/download-capture-smoke.cjs` xác minh thẻ video, gắn kết quả theo prompt và tải/cancel tệp video thật từ máy chủ cục bộ; smoke tải cần FFmpeg hoặc MUSE_VIDEO_FIXTURE. Test UI và browser smoke cần Chromium; đặt CHROMIUM_PATH nếu khác /usr/bin/chromium. `node test/attachment-ready-smoke.cjs` kiểm tra readiness ảnh trên DOM fixture thật. FFmpeg smoke riêng: `npm run test:merge`.
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
+
+## Update 1.3.4
+
+- **Khóa hình dạng dùng được cho mọi kiểu nhân vật, không riêng hoạt hình.** Bản 1.3.3 viết câu khóa thiên về hoạt hình (có câu «không giống người thật»), nên sẽ cản nếu ảnh tham chiếu là người thật hoặc con vật. Nay khóa theo đúng kiểu của ảnh: chuẩn là người que thì mọi người là người que; là **người thật** thì mọi người là người thật; là **con vật** hoạt hình thì mọi nhân vật cùng kiểu đó. Chỉ được khác màu và kiểu quần áo, giới tính, kiểu tóc hoặc bộ lông, phụ kiện, chiều cao, và loài nếu truyện nói rõ. Ô «Hình dạng nhân vật chuẩn» nhận mọi mô tả (ví dụ «người thật, ảnh chụp», «mèo hoạt hình 3D», «thú nhân hóa kiểu tranh minh họa»).
+- **Chưa thử**: người thật và con vật chưa chạy với Muse thật, cũng chưa biết mô hình tạo video có từ chối ảnh người thật không; mặt người phụ không giữ được y hệt giữa các cảnh (chỉ nhân vật chính có ảnh tham chiếu gắn vào mọi cảnh, người phụ chỉ được dặn «cùng kiểu»).
 
 ## Update 1.3.3
 

@@ -9,7 +9,7 @@ Chỉ cần dán nguyên câu chuyện. Muse tự đọc hiểu để chia cản
 Nhân vật chính (không bắt buộc)|Main character (optional)
 Phong cách hình ảnh|Visual style
 Hình dạng nhân vật chuẩn|Reference character shape
-Ví dụ: người que, đầu tròn trắng. Mọi nhân vật khác sẽ cùng hình dạng|e.g. stick figure, round white head. Every other character gets the same shape
+Ví dụ: người que, đầu tròn trắng / người thật, ảnh chụp / mèo hoạt hình 3D. Mọi nhân vật khác cùng kiểu|e.g. stick figure, round white head / real person, photo / 3D cartoon cat. Every other character gets the same look
 Để trống nếu không cần. Ví dụ: Mai, bé gái tóc đen, áo dài trắng|Leave empty if not needed. e.g. Mai, a girl with black hair in a white áo dài
 Ví dụ: hoạt hình màu nước|e.g. watercolor animation
 Chọn ảnh nhân vật|Choose character image

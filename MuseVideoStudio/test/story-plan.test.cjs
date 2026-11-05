@@ -688,8 +688,10 @@ test('khóa hình dạng nhân vật: có ảnh tham chiếu hoặc mô tả hì
   const ask = sp.buildMuseInstruction(essay, { ...base, reference: true, form: 'người que, đầu tròn trắng' }, { marker: 'abc123' });
   assert.match(ask, /KHÓA HÌNH DẠNG: nhân vật trong ảnh tham chiếu \(hình dạng chuẩn: người que, đầu tròn trắng\) là CHUẨN HÌNH DẠNG của MỌI nhân vật/);
   assert.match(ask, /ví dụ chuẩn là người que thì mọi người đều là người que/);
-  assert.match(ask, /chỉ khác màu và kiểu quần áo, giới tính, kiểu tóc, phụ kiện, chiều cao/);
-  assert.match(ask, /KHÔNG tả người thật/);
+  assert.match(ask, /chỉ khác màu và kiểu quần áo, giới tính, kiểu tóc hoặc bộ lông, phụ kiện, chiều cao, và loài nếu câu chuyện nói rõ/);
+  assert.match(ask, /là người thật thì mọi người đều là người thật; là con vật hoạt hình thì mọi nhân vật đều cùng kiểu hoạt hình đó/, 'khóa theo đúng kiểu của ảnh: người que, người thật, con vật');
+  assert.match(ask, /KHÔNG thêm chi tiết làm lệch kiểu/);
+  assert.doesNotMatch(ask, /không giống người thật|KHÔNG tả người thật|«nhân vật nam\/nữ/, 'không bài xích người thật: ảnh tham chiếu có thể là người thật hay con vật');
   assert.match(ask, /Nhân vật chuẩn đóng vai chính của bài/);
   assert.match(ask, /^NHÂN VẬT: <nhân vật chuẩn: ghi «theo ảnh tham chiếu»; mỗi nhân vật khác một mục: tên\/vai – giới tính, màu và kiểu quần áo/m);
   assert.ok(!/tuổi, vóc dáng, tóc, trang phục\)/.test(ask), 'đã khóa thì không đòi tả tuổi, vóc dáng như người thật');
@@ -715,7 +717,10 @@ test('khóa hình dạng: app tự gắn câu khóa vào MỌI prompt Muse viế
   const lock = sp.lockLine ? sp.lockLine(cfg) : '';
   assert.ok(lock.startsWith('KHÓA HÌNH DẠNG NHÂN VẬT (bắt buộc): lấy nhân vật trong ảnh tham chiếu làm chuẩn — hình dạng chuẩn: người que, đầu tròn trắng.'), lock.slice(0, 120));
   assert.match(lock, /MỌI nhân vật trong cảnh, kể cả người phụ, phải CÙNG hình dạng, tỉ lệ cơ thể, kiểu đầu và mặt, kiểu vẽ/);
-  assert.match(lock, /chỉ được khác màu và kiểu quần áo, giới tính, kiểu tóc, phụ kiện, chiều cao/);
+  assert.match(lock, /chỉ được khác màu và kiểu quần áo, giới tính, kiểu tóc hoặc bộ lông, phụ kiện, chiều cao, và loài nếu câu chuyện nói rõ/);
+  assert.match(lock, /là người thật thì mọi người đều là người thật/);
+  assert.match(lock, /Không đổi sang kiểu vẽ hay độ chân thực khác với nhân vật chuẩn/);
+  assert.doesNotMatch(lock, /không giống người thật/, 'ảnh tham chiếu là người thật vẫn khóa được');
   const units = sp.storyUnits(essay, cfg);
   const withEnd = { units: [1, 3], prompt: '0–5 giây: nhân vật trắng bắt tay nhân vật áo xanh.\n' + sp.NO_SPEECH };
   const noEnd = { units: [4, 6], prompt: '0–5 giây: nhân vật trắng ghé tai nhân vật áo xám.' };
@@ -741,4 +746,16 @@ test('khóa hình dạng: app tự gắn câu khóa vào MỌI prompt Muse viế
   // Soát cảnh: câu khóa không làm prompt ngắn trông như đủ dài.
   const short = sp.lintScenes([{ voiceover: 'Mai nhìn quanh.', prompt: 'Mai.\n' + lock + '\n' + sp.NO_SPEECH }], cfg)[0];
   assert.ok(short.some(w => /Prompt quá ngắn/.test(w)), short.join(' | '));
+});
+
+test('khóa hình dạng dùng được cho người thật và con vật: câu khóa mang đúng mô tả của bạn, không ép sang hoạt hình', () => {
+  for (const form of ['người thật, ảnh chụp thực tế, người Việt', 'mèo hoạt hình 3D, đi bằng hai chân', 'cáo, chó sói, thỏ: thú nhân hóa kiểu tranh minh họa']) {
+    const cfg = { seconds: 10, aspect: '16:9', reference: true, form };
+    const lock = sp.lockLine(sp.options(cfg));
+    assert.ok(lock.includes(`hình dạng chuẩn: ${form}`), form);
+    assert.ok(!/không giống người thật|người que\.$/.test(lock));
+    const ask = sp.buildMuseInstruction(essay, cfg, { marker: 'abc123' });
+    assert.ok(ask.includes(`(hình dạng chuẩn: ${form})`));
+    assert.match(ask, /theo đúng kiểu của nhân vật chuẩn/);
+  }
 });
