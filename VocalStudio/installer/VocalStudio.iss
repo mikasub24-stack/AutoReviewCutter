@@ -7,7 +7,7 @@
 [Setup]
 AppId={{3BEE7FF2-E9DE-47C8-A770-B8D4E2E3AE1C}
 AppName=Vocal Studio
-AppVersion=1.6.0
+AppVersion=1.7.0
 AppPublisher=VocalStudio
 DefaultDirName={localappdata}\Programs\VocalStudio
 DefaultGroupName=Vocal Studio
@@ -16,7 +16,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
 OutputDir={#OutputDir}
-OutputBaseFilename=VocalStudio-1.6.0-Setup
+OutputBaseFilename=VocalStudio-1.7.0-Setup
 Compression=lzma2
 SolidCompression=yes
 CloseApplications=yes
@@ -33,6 +33,7 @@ Source: "..\THIRD_PARTY.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\JUCE-LICENSE.md"; DestDir: "{app}\licenses"; Flags: ignoreversion
 Source: "..\ThirdParty\Signalsmith-Stretch-LICENSE.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
 Source: "..\ThirdParty\Signalsmith-Linear-LICENSE.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
+Source: "..\ThirdParty\VeSTige-LICENSE.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
 [Icons]
 Name: "{group}\Vocal Studio"; Filename: "{app}\VocalStudio.exe"
 Name: "{autodesktop}\Vocal Studio"; Filename: "{app}\VocalStudio.exe"; Tasks: desktopicon

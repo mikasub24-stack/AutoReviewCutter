@@ -1,5 +1,12 @@
 # Vocal Studio
 
+## 1.7 · VST2 DLL x64 và vang plugin riêng
+
+App độc lập nạp được VST3 và VST2 effect `.dll` Windows 64-bit mono/stereo. **Chọn Auto-Tune VST2/3** là ô chỉnh giọng; **Nạp vang VST2/3** là ô độc lập sau Auto-Tune và FX tích hợp, dùng cho ArtsAcoustic/Lexicon tương thích. **Mở vang** mở giao diện plugin, **Bỏ vang plugin** giữ Auto-Tune. Chọn một DLL hoặc thư mục plugin để quét; menu liệt kê cả định dạng. Chuỗi, đường dẫn và trạng thái chunk/tham số của cả hai ô được lưu/khôi phục với phiên và cấu hình dự phòng. Latency của cả hai ô được bù với nhạc/xuất WAV; WAV micro gốc không đổi.
+
+Không có cầu nối 32-bit: app đọc header PE và báo rõ khi chọn DLL x86, ARM hoặc không phải DLL Windows. Không hỗ trợ VST2 synth, MIDI, shell, đa kênh hoặc plugin không có processReplacing. Một DLL bên thứ ba có thể lỗi/crash hoặc yêu cầu thư viện/giấy phép riêng; scanner hiện cùng tiến trình, không có sandbox cho plugin. Chỉ chọn thư mục plugin bạn tin cậy. Auto Key/Scale cho VST2 không được đoán từ chỉ số: plugin không công khai mapping xác minh được cần chọn Key/Scale trong giao diện riêng. Chưa kiểm thử ArtsAcoustic cụ thể trên máy người dùng. Nếu dùng vang plugin, giảm/tắt vang tích hợp khi không muốn chồng vang. Plugin thương mại không được kèm trong bộ cài.
+
+
 Ứng dụng Windows x64 để hát trên beat, thu micro qua sound card và mix vocal tại máy. Dự án nằm trong `VocalStudio/`, nhánh `vocal-studio`, không sửa Chùa Việt Online.
 
 ## Kiểm âm và ghi nhớ thiết lập (đang phát triển)

@@ -75,6 +75,9 @@ public:
     float browserPeak() const;
     void chooseAntaresPlugin(){choosePlugin();}
     void openAntaresEditor(){showPlugin();}
+    void chooseReverbPlugin(){choosePlugin(true);}
+    void openReverbEditor();
+    void clearReverbPlugin();
     std::shared_ptr<SongFitPlan> fitPlan;
     juce::String fitStatus;
     void analyseSelected();
@@ -103,14 +106,14 @@ private:
     juce::ScrollBar horizontal{false};
     juce::TextButton playButton{juce::String::fromUTF8("Phát")},stopButton{juce::String::fromUTF8("Dừng")},recordButton{"THU"},importButton{juce::String::fromUTF8("Nhập beat")},saveButton{juce::String::fromUTF8("Lưu")},openButton{juce::String::fromUTF8("Mở")},newButton{juce::String::fromUTF8("Mới")},exportButton{juce::String::fromUTF8("Xuất WAV")},deviceButton{"Sound card"},undoButton{juce::String::fromUTF8("Hoàn tác")};
     juce::TextButton toolsButton{juce::String::fromUTF8("Vang / Tone / Chỉnh phô")};
-    juce::TextButton pluginButton{juce::String::fromUTF8("Nạp VST3")},editorButton{juce::String::fromUTF8("Mở FX")},removePluginButton{juce::String::fromUTF8("Bỏ VST3")};
+    juce::TextButton pluginButton{juce::String::fromUTF8("Nạp VST2/3")},editorButton{juce::String::fromUTF8("Mở FX")},removePluginButton{juce::String::fromUTF8("Bỏ VST3")};
     juce::ToggleButton monitoring{juce::String::fromUTF8("Kiểm âm FX")},bypass{"Bypass vocal FX"},mute{"Mute"},solo{"Solo"},vocalType{juce::String::fromUTF8("Track giọng hát")};
     juce::ComboBox inputSelect,presetSelect;
     juce::Slider trackGain,trackPan,master,zoom;
     juce::Label trackTitle,trackInfo,positionLabel,deviceLabel,statusLabel,pluginLabel,gainLabel,panLabel,masterLabel;
     std::array<std::unique_ptr<Knob>,10> knobs;
     std::unique_ptr<juce::FileChooser> chooser;
-    std::unique_ptr<juce::DocumentWindow> deviceWindow,pluginWindow,toolsWindow,eqWindow,polishWindow,tuneFixWindow;
+    std::unique_ptr<juce::DocumentWindow> deviceWindow,pluginWindow,reverbWindow,toolsWindow,eqWindow,polishWindow,tuneFixWindow;
     vocal::EqSettings eqBefore,eqRestore,eqLast;
     juce::String eqSession,eqSourceFile;int eqSource=-1;
     juce::File projectFile;
@@ -129,7 +132,7 @@ private:
     void chooseAudio();
     void chooseProject();
     void chooseExport();
-    void choosePlugin();
+    void choosePlugin(bool reverbSlot=false);
     void showDevices();
     void showPlugin();
     void newSession();

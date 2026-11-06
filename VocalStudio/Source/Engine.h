@@ -84,7 +84,10 @@ public:
     juce::Result setSongKey(int tonic,bool minor,const juce::String& source);
     juce::Result sendSongKey();
     void scanToneLink();
-    int effectivePluginLatency() const noexcept {return (pluginBypassed.load()||calibrationInputOnly.load())?0:pluginLatency.load();}
+    int effectivePluginLatency() const noexcept {return calibrationInputOnly.load()?0:(pluginBypassed.load()?0:pluginLatency.load())+reverbPluginLatency.load();}
+    juce::Result installReverbPlugin(std::unique_ptr<juce::AudioPluginInstance>);
+    void removeReverbPlugin();
+    juce::AudioPluginInstance* reverbPluginInstance() const noexcept{return reverbPlugin.get();}
     juce::AudioPluginInstance* pluginInstance() const noexcept {return plugin.get();}
     juce::String pluginName() const {return plugin ? plugin->getName() : juce::String::fromUTF8("VST3: chưa chọn");}
     juce::StringArray inputNames() const;
@@ -133,6 +136,9 @@ private:
     std::unique_ptr<StudioTrack> eqAudition;
     std::atomic<bool> eqListening{false};
     std::atomic<double> sampleRate{48000},pluginTailSeconds{0};
+    std::atomic<int> reverbPluginLatency{0};
+    std::atomic<double> reverbPluginTail{0};
+    int reverbInputs=2,reverbOutputs=2;
     std::atomic<int> pluginInputs{2},pluginOutputs{2};
     std::atomic<int> currentBlock{256},driverInputLatency{0},driverOutputLatency{0},pluginLatency{0};
     std::atomic<juce::int64> positionFrames{0};
@@ -140,7 +146,7 @@ private:
     juce::TimeSliceThread diskThread{"Vocal recording writer"};
     std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> writer;
     std::atomic<juce::AudioFormatWriter::ThreadedWriter*> activeWriter{nullptr};
-    std::unique_ptr<juce::AudioPluginInstance> plugin;
+    std::unique_ptr<juce::AudioPluginInstance> plugin,reverbPlugin;
     juce::AudioBuffer<float> vocalBus,musicBus,monoInput;
     juce::MidiBuffer midi;
     vocal::VocalChain playbackFx,monitorFx,vocalAmbience;

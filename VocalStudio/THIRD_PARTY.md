@@ -13,3 +13,7 @@ Corresponding application source and fixed dependency identifiers are provided w
 ## Chromium Embedded Framework (CEF)
 
 Windows browser runtime: CEF 156.0.15+gcf671c0+chromium-156.0.8078.80, official minimal distribution from https://cef-builds.spotifycdn.com/ . Download SHA1 b690e035689ee20ba9d2500ac8953815bc7ed46a. CEF BSD license is copied as CEF-LICENSE.txt alongside the runtime; Chromium and other dependency notices are available through the browser's chrome://credits page. Browser sandbox uses the official CEF bootstrap.exe; the application code is in VocalStudio.dll. See https://github.com/chromiumembedded/cef and https://chromiumembedded.github.io/cef/ .
+
+## VeSTige compatibility declarations
+
+`ThirdParty/vestige/vestige.h` is the independently developed VST-compatibility header by Javier Serrano Polo (2006), distributed under GPL-2.0-or-later. Copied unchanged from Carla commit `97a9e0740baf6df2df942495c02532a624c44682`, path `source/includes/vestige/vestige.h`. Upstream: https://github.com/falkTX/Carla. See `ThirdParty/VeSTige-LICENSE.txt`. VocalStudio uses its own limited VST2 effect host; it does not include the proprietary Steinberg VST2 SDK.

@@ -1,4 +1,5 @@
 #include "Engine.h"
+#include "Vst2Host.h"
 #include <algorithm>
 #include <cmath>
 
@@ -38,7 +39,7 @@ juce::Result recoverRecording(const juce::File& source,juce::File& recovered){
 }
 }
 
-StudioEngine::StudioEngine(){formats.registerBasicFormats();pluginFormats.addDefaultFormats();diskThread.startThread();prepare(48000,256);}
+StudioEngine::StudioEngine(){formats.registerBasicFormats();pluginFormats.addDefaultFormats();pluginFormats.addFormat(createVst2Format().release());diskThread.startThread();prepare(48000,256);}
 StudioEngine::~StudioEngine(){activeWriter.store(nullptr);if(callbackAttached)devices.removeAudioCallback(this);writer.reset();diskThread.stopThread(5000);devices.closeAudioDevice();}
 juce::String StudioEngine::openDevice(const juce::String& saved){auto xml=juce::parseXML(saved);auto error=devices.initialise(2,2,xml.get(),true);lastDeviceError=error;if(error.isEmpty()){devices.addAudioCallback(this);callbackAttached=true;}return error;}
 void StudioEngine::prepareForTest(double sr,int block){testMode=true;withAudioStopped([&]{prepare(sr,block);});}
@@ -46,11 +47,13 @@ void StudioEngine::withAudioStopped(const std::function<void()>& edit){const boo
 void StudioEngine::prepare(double sr,int block){
     sampleRate.store(sr>0?sr:48000);currentBlock.store(juce::jlimit(16,8192,block));const auto n=currentBlock.load();
     vocalBus.setSize(2,n);musicBus.setSize(2,n);monoInput.setSize(1,n);playbackFx.prepare(rate());monitorFx.prepare(rate());vocalAmbience.prepare(rate());limiter.prepare(rate());
-    for(auto& d:musicDelay)d.prepare(rate(),2.1);smoothing=static_cast<float>(1-std::exp(-1/(rate()*.020)));currentMonitor=vocal::dbToGain(juce::jlimit(-12.0f,18.0f,monitorDb.load()));currentMaster=vocal::dbToGain(masterDb.load());
+    for(auto& d:musicDelay)d.prepare(rate(),4.1);smoothing=static_cast<float>(1-std::exp(-1/(rate()*.020)));currentMonitor=vocal::dbToGain(juce::jlimit(-12.0f,18.0f,monitorDb.load()));currentMaster=vocal::dbToGain(masterDb.load());
     if(plugin){plugin->setPlayConfigDetails(pluginInputs.load(),pluginOutputs.load(),rate(),n);plugin->prepareToPlay(rate(),n);pluginLatency.store(juce::jlimit(0,static_cast<int>(rate()*2),plugin->getLatencySamples()));const double tail=plugin->getTailLengthSeconds();pluginTailSeconds.store(std::isfinite(tail)?juce::jlimit(0.0,30.0,tail):0);}
     resetProcessing();
+    if(reverbPlugin){reverbPlugin->setPlayConfigDetails(reverbInputs,reverbOutputs,rate(),n);reverbPlugin->prepareToPlay(rate(),n);reverbPluginLatency=juce::jlimit(0,static_cast<int>(rate()*2),reverbPlugin->getLatencySamples());const auto tail=reverbPlugin->getTailLengthSeconds();reverbPluginTail=std::isfinite(tail)?juce::jlimit(0.0,30.0,tail):0;}
+
 }
-void StudioEngine::resetProcessing(){currentMonitor=vocal::dbToGain(juce::jlimit(-12.0f,18.0f,monitorDb.load()));currentMaster=vocal::dbToGain(masterDb.load());playbackFx.reset();monitorFx.reset();vocalAmbience.reset();limiter.reset();for(auto& d:musicDelay)d.reset();if(plugin)plugin->reset();for(auto& t:tracks){const float p=juce::jlimit(-1.0f,1.0f,t->pan.load());const float g=vocal::dbToGain(t->gainDb.load())*(t->audio.getNumChannels()>1?1.41421356f:1.0f);t->leftGain=g*std::cos((p+1)*static_cast<float>(vocal::pi)*.25f);t->rightGain=g*std::sin((p+1)*static_cast<float>(vocal::pi)*.25f);}}
+void StudioEngine::resetProcessing(){currentMonitor=vocal::dbToGain(juce::jlimit(-12.0f,18.0f,monitorDb.load()));currentMaster=vocal::dbToGain(masterDb.load());playbackFx.reset();monitorFx.reset();vocalAmbience.reset();limiter.reset();for(auto& d:musicDelay)d.reset();if(plugin)plugin->reset();if(reverbPlugin)reverbPlugin->reset();for(auto& t:tracks){const float p=juce::jlimit(-1.0f,1.0f,t->pan.load());const float g=vocal::dbToGain(t->gainDb.load())*(t->audio.getNumChannels()>1?1.41421356f:1.0f);t->leftGain=g*std::cos((p+1)*static_cast<float>(vocal::pi)*.25f);t->rightGain=g*std::sin((p+1)*static_cast<float>(vocal::pi)*.25f);}}
 void StudioEngine::audioDeviceAboutToStart(juce::AudioIODevice* device){if(!device)return;if(recording.load()&&!suspending.load()){recordingFault.store(2);activeWriter.store(nullptr);recording.store(false);}driverInputLatency.store(device->getInputLatencyInSamples());driverOutputLatency.store(device->getOutputLatencyInSamples());prepare(device->getCurrentSampleRate(),device->getCurrentBufferSizeSamples());}
 void StudioEngine::audioDeviceStopped(){if(recording.load()&&!suspending.load()){recordingFault.store(2);activeWriter.store(nullptr);recording.store(false);}inputPresent.store(false);}
 void StudioEngine::audioDeviceError(const juce::String& error){juce::ignoreUnused(error);recordingFault.store(2);}
@@ -82,6 +85,11 @@ void StudioEngine::processChunk(const float* input,float* const* output,int chan
     // Antares receives the dry vocal; ambience returns are added afterwards.
     if(!calibrationInputOnly.load())for(int i=0;i<count;++i){float l=vocalBus.getSample(0,i),r=vocalBus.getSample(1,i);vocalAmbience.processAmbience(l,r);vocalBus.setSample(0,i,l);vocalBus.setSample(1,i,r);}
     if(!liveMonitor)currentMonitor=1;
+    if(reverbPlugin&&!calibrationInputOnly.load()){
+        if(reverbInputs==1)for(int i=0;i<count;++i)vocalBus.setSample(0,i,(vocalBus.getSample(0,i)+vocalBus.getSample(1,i))*.5f);
+        auto view=juce::AudioBuffer<float>(vocalBus.getArrayOfWritePointers(),juce::jmax(reverbInputs,reverbOutputs),count);midi.clear();reverbPlugin->processBlock(view,midi);
+        if(reverbOutputs==1)vocalBus.copyFrom(1,0,vocalBus,0,0,count);
+    }
     float maximum=0;const float targetMonitor=liveMonitor?vocal::dbToGain(juce::jlimit(-12.0f,18.0f,monitorDb.load())):1.0f;const float targetMaster=vocal::dbToGain(masterDb.load());const auto latency=static_cast<std::size_t>(effectivePluginLatency());
     for(int i=0;i<count;++i){float ml=musicBus.getSample(0,i),mr=musicBus.getSample(1,i);const float delayedLeft=latency>0?musicDelay[0].tap(latency):ml,delayedRight=latency>0?musicDelay[1].tap(latency):mr;musicDelay[0].push(ml);musicDelay[1].push(mr);ml=delayedLeft;mr=delayedRight;currentMonitor+=(targetMonitor-currentMonitor)*smoothing;currentMaster+=(targetMaster-currentMaster)*smoothing;float l=(ml+vocalBus.getSample(0,i)*currentMonitor)*currentMaster,r=(mr+vocalBus.getSample(1,i)*currentMonitor)*currentMaster;limiter.process(l,r);maximum=juce::jmax(maximum,std::abs(l),std::abs(r));if(channels>0&&output[0])output[0][i]=l;if(channels>1&&output[1])output[1][i]=r;}
     outputPeak.store(maximum);gainReduction.store(juce::jmax(playbackFx.gainReductionDb(),monitorFx.gainReductionDb()));
@@ -111,7 +119,7 @@ double StudioEngine::effectTailSeconds() const noexcept {
     const double echoTail=delay.load()>.001f?echoSeconds*(feedback>.001?1+std::ceil(std::log(.001)/std::log(feedback)):1):0;
     const double shortTail=shortReverb.load()>.001f?juce::jlimit(.15,.9,static_cast<double>(shortDecaySeconds.load()))+.3:0;
     const double roomTail=reverb.load()>.001f?juce::jlimit(.3,4.0,static_cast<double>(decaySeconds.load()))+juce::jlimit(0.0,.1,preDelayMs.load()*.001)+.3:0;
-    return juce::jlimit(3.0,30.0,juce::jmax(shortTail,juce::jmax(roomTail,echoTail))+(pluginBypassed.load()?0:pluginTailSeconds.load()));
+    return juce::jlimit(3.0,30.0,juce::jmax(shortTail,juce::jmax(roomTail,echoTail))+reverbPluginTail.load()+(pluginBypassed.load()?0:pluginTailSeconds.load()));
 }
 juce::Result StudioEngine::play(){if(isRecording())return juce::Result::ok();auto ready=ensureSampleRate();if(ready.failed())return ready;if(position()>=duration()+3)positionFrames.store(0);withAudioStopped([&]{resetProcessing();});playing.store(true);return juce::Result::ok();}
 void StudioEngine::stop(){playing.store(false);eqListening=false;}
@@ -160,6 +168,7 @@ juce::var StudioEngine::projectState(const vocal::EqSettings* storedEq) const {
     auto* profile=new juce::DynamicObject();profile->setProperty("valid",voiceProfile.valid);profile->setProperty("low",voiceProfile.lowMidi);profile->setProperty("high",voiceProfile.highMidi);profile->setProperty("median",voiceProfile.medianMidi);profile->setProperty("seconds",voiceProfile.voicedSeconds);state->setProperty("voiceProfile",juce::var(profile));
     state->setProperty("toneLink",toneLink.state());state->setProperty("songTonic",songTonic);state->setProperty("songMinor",songMinor);state->setProperty("songKeySource",songKeySource);state->setProperty("pluginBypassed",pluginBypassed.load());state->setProperty("keyHold",heldForUnknownKey);
     if(plugin){juce::PluginDescription description;plugin->fillInPluginDescription(description);auto* slot=new juce::DynamicObject();slot->setProperty("description",description.createXml()->toString());juce::MemoryBlock bytes;plugin->getStateInformation(bytes);slot->setProperty("state",bytes.toBase64Encoding());state->setProperty("plugin",juce::var(slot));}
+    if(reverbPlugin){auto* slot=new juce::DynamicObject;slot->setProperty("description",reverbPlugin->getPluginDescription().createXml()->toString());juce::MemoryBlock bytes;reverbPlugin->getStateInformation(bytes);slot->setProperty("state",bytes.toBase64Encoding());state->setProperty("reverbPlugin",juce::var(slot));}
     if(activeWriter.load()) {state->setProperty("recoveringTake",recordFile.getFullPathName());state->setProperty("recoveringStart",recordStart);state->setProperty("recoveringCalibration",calibrationInputOnly.load());}
     return juce::var(state);
 }
@@ -188,11 +197,20 @@ juce::Result StudioEngine::loadProject(const juce::File& file){
     std::unique_ptr<juce::AudioPluginInstance> next;std::pair<int,int> nextChannels{2,2};
     juce::MemoryBlock pluginState;
     if(state["plugin"].isObject()){juce::PluginDescription desc;auto xml=juce::parseXML(state["plugin"]["description"].toString());if(!xml||!desc.loadFromXml(*xml))return juce::Result::fail(juce::String::fromUTF8("Thông tin VST3 không hợp lệ."));juce::String error;next=pluginFormats.createPluginInstance(desc,rate(),blockSize(),error);if(!next)return juce::Result::fail(juce::String::fromUTF8("Không khôi phục được VST3: ")+error);nextChannels=configureVocalPlugin(*next);if(nextChannels.first==0)return juce::Result::fail(juce::String::fromUTF8("VST3 không hỗ trợ bus vocal mono/stereo."));pluginState.fromBase64Encoding(state["plugin"]["state"].toString());next->setStateInformation(pluginState.getData(),static_cast<int>(pluginState.getSize()));}
+    std::unique_ptr<juce::AudioPluginInstance> nextReverb;std::pair<int,int> reverbChannels{2,2};
+    if(state["reverbPlugin"].isObject()){
+        juce::PluginDescription desc;const auto xml=juce::parseXML(state["reverbPlugin"]["description"].toString());
+        if(!xml||!desc.loadFromXml(*xml))return juce::Result::fail("Invalid reverb plugin description");
+        juce::String error;nextReverb=pluginFormats.createPluginInstance(desc,rate(),blockSize(),error);if(!nextReverb)return juce::Result::fail(error);
+        reverbChannels=configureVocalPlugin(*nextReverb);if(reverbChannels.first==0)return juce::Result::fail("Reverb plugin needs mono/stereo buses");
+        juce::MemoryBlock bytes;if(!bytes.fromBase64Encoding(state["reverbPlugin"]["state"].toString()))return juce::Result::fail("Invalid reverb plugin state");
+        nextReverb->setStateInformation(bytes.getData(),static_cast<int>(bytes.getSize()));
+    }
     const auto profile=state["voiceProfile"];if(static_cast<bool>(profile["valid"])){const double low=static_cast<double>(profile["low"]),high=static_cast<double>(profile["high"]),median=static_cast<double>(profile["median"]);if(std::isfinite(low)&&std::isfinite(high)&&std::isfinite(median)&&low>=33&&high<=96&&high-low>=4&&high-low<=48){voiceProfile={true,low,high,median,static_cast<double>(profile["seconds"])};}}
     songTonic=state.hasProperty("songTonic")?juce::jlimit(-1,11,static_cast<int>(state["songTonic"])):-1;songMinor=static_cast<bool>(state["songMinor"]);songKeySource=state["songKeySource"].toString();toneLink=PluginToneLink::fromState(state["toneLink"]);const bool nextBypass=static_cast<bool>(state["pluginBypassed"]);heldForUnknownKey=static_cast<bool>(state["keyHold"]);
-    withAudioStopped([&]{if(plugin)plugin->releaseResources();plugin=std::move(next);tuneUndo.clear();tuneFixStatus={};pluginInputs=nextChannels.first;pluginOutputs=nextChannels.second;pluginBypassed=nextBypass;eqListening=false;eqAudition.reset();tracks=std::move(loaded);sessionDirectory=file.getParentDirectory();positionFrames.store(0);const auto fx=state["fx"];auto value=[&](const char* key,float fallback){return fx.hasProperty(key)?static_cast<float>(fx[key]):fallback;};shortReverb=juce::jlimit(0.0f,.4f,value("shortReverb",0));shortDecaySeconds=juce::jlimit(.15f,.9f,value("shortDecaySeconds",.45f));monitorDb=state.hasProperty("monitorDb")?juce::jlimit(-12.0f,18.0f,static_cast<float>(state["monitorDb"])):0;fxBypass.store(static_cast<bool>(fx["bypass"]));inputDb=value("inputDb",0);highPass=value("highPass",80);warmth=value("warmth",-2);presence=value("presence",2);threshold=value("threshold",-18);ratio=value("ratio",3);makeup=value("makeup",2);deEss=value("deEss",.35f);reverb=value("reverb",.1f);delay=value("delay",.04f);delayMs=value("delayMs",240);decaySeconds=value("decaySeconds",1.2f);preDelayMs=value("preDelayMs",20);damping=value("damping",.65f);width=value("width",1);delayFeedback=value("delayFeedback",.27f);deharsh=value("deharsh",0);leveling=juce::jlimit(0.0f,1.0f,value("leveling",0));dynamicTame=juce::jlimit(0.0f,1.0f,value("dynamicTame",0));reverbDuck=juce::jlimit(0.0f,1.0f,value("reverbDuck",0));masterDb=state.hasProperty("masterDb")?static_cast<float>(state["masterDb"]):-3;pluginLatency.store(0);pluginTailSeconds.store(0);prepare(rate(),blockSize());});if(plugin){if(toneLink.identity!=pluginToneIdentity(*plugin)||!toneLink.complete())scanToneLink();if(toneLink.complete()&&toneLink.enabled&&songTonic>=0&&!isPluginBypassed())sendSongKey();}return juce::Result::ok();
+    withAudioStopped([&]{if(plugin)plugin->releaseResources();plugin=std::move(next);if(reverbPlugin)reverbPlugin->releaseResources();reverbPlugin=std::move(nextReverb);reverbInputs=reverbChannels.first;reverbOutputs=reverbChannels.second;reverbPluginLatency=0;reverbPluginTail=0;tuneUndo.clear();tuneFixStatus={};pluginInputs=nextChannels.first;pluginOutputs=nextChannels.second;pluginBypassed=nextBypass;eqListening=false;eqAudition.reset();tracks=std::move(loaded);sessionDirectory=file.getParentDirectory();positionFrames.store(0);const auto fx=state["fx"];auto value=[&](const char* key,float fallback){return fx.hasProperty(key)?static_cast<float>(fx[key]):fallback;};shortReverb=juce::jlimit(0.0f,.4f,value("shortReverb",0));shortDecaySeconds=juce::jlimit(.15f,.9f,value("shortDecaySeconds",.45f));monitorDb=state.hasProperty("monitorDb")?juce::jlimit(-12.0f,18.0f,static_cast<float>(state["monitorDb"])):0;fxBypass.store(static_cast<bool>(fx["bypass"]));inputDb=value("inputDb",0);highPass=value("highPass",80);warmth=value("warmth",-2);presence=value("presence",2);threshold=value("threshold",-18);ratio=value("ratio",3);makeup=value("makeup",2);deEss=value("deEss",.35f);reverb=value("reverb",.1f);delay=value("delay",.04f);delayMs=value("delayMs",240);decaySeconds=value("decaySeconds",1.2f);preDelayMs=value("preDelayMs",20);damping=value("damping",.65f);width=value("width",1);delayFeedback=value("delayFeedback",.27f);deharsh=value("deharsh",0);leveling=juce::jlimit(0.0f,1.0f,value("leveling",0));dynamicTame=juce::jlimit(0.0f,1.0f,value("dynamicTame",0));reverbDuck=juce::jlimit(0.0f,1.0f,value("reverbDuck",0));masterDb=state.hasProperty("masterDb")?static_cast<float>(state["masterDb"]):-3;pluginLatency.store(0);pluginTailSeconds.store(0);prepare(rate(),blockSize());});if(plugin){if(toneLink.identity!=pluginToneIdentity(*plugin)||!toneLink.complete())scanToneLink();if(toneLink.complete()&&toneLink.enabled&&songTonic>=0&&!isPluginBypassed())sendSongKey();}return juce::Result::ok();
 }
-void StudioEngine::newProject(){if(isRecording())return;songTonic=-1;songKeySource={};playing.store(false);withAudioStopped([&]{eqListening=false;eqAudition.reset();tracks.clear();if(plugin)plugin->releaseResources();plugin.reset();tuneUndo.clear();tuneFixStatus={};pluginBypassed=false;heldForUnknownKey=false;toneLink=PluginToneLink{};toneLinkStatus={};pluginLatency.store(0);pluginTailSeconds.store(0);positionFrames.store(0);selectPreset(0);masterDb=-3;resetProcessing();});}
+void StudioEngine::newProject(){if(isRecording())return;songTonic=-1;songKeySource={};playing.store(false);withAudioStopped([&]{eqListening=false;eqAudition.reset();tracks.clear();if(reverbPlugin)reverbPlugin->releaseResources();reverbPlugin.reset();reverbPluginLatency=0;reverbPluginTail=0;if(plugin)plugin->releaseResources();plugin.reset();tuneUndo.clear();tuneFixStatus={};pluginBypassed=false;heldForUnknownKey=false;toneLink=PluginToneLink{};toneLinkStatus={};pluginLatency.store(0);pluginTailSeconds.store(0);positionFrames.store(0);selectPreset(0);masterDb=-3;resetProcessing();});}
 juce::Result StudioEngine::exportMix(const juce::File& destination,std::atomic<bool>& cancel,std::atomic<float>& progress,int vocalIndex){
     if(isRecording()||isPlaying())return juce::Result::fail(juce::String::fromUTF8("Dừng phát và thu trước khi xuất."));if(tracks.empty())return juce::Result::fail(juce::String::fromUTF8("Chưa có track để xuất."));for(const auto& t:tracks)if(t->file==destination||t->originalFile==destination)return juce::Result::fail(juce::String::fromUTF8("Không xuất đè lên file âm thanh nguồn."));auto ready=vocalIndex>=0?juce::Result::ok():ensureSampleRate();if(ready.failed())return ready;
     std::unique_ptr<StudioTrack> solo;
@@ -238,6 +256,13 @@ juce::Result StudioEngine::restoreSetup(const juce::var& state){
         auto link=PluginToneLink::fromState(state["toneLink"]);if(link.complete()&&link.identity==pluginToneIdentity(*plugin))toneLink=link;
         pluginBypassed=static_cast<bool>(state["pluginBypassed"]);
     }
+    if(state["reverbPlugin"].isObject()){
+        juce::PluginDescription desc;auto xml=juce::parseXML(state["reverbPlugin"]["description"].toString());
+        if(!xml||!desc.loadFromXml(*xml))return juce::Result::fail("Invalid reverb plugin description");
+        juce::String error;auto next=pluginFormats.createPluginInstance(desc,rate(),blockSize(),error);if(!next)return juce::Result::fail(error);
+        juce::MemoryBlock bytes;if(!bytes.fromBase64Encoding(state["reverbPlugin"]["state"].toString()))return juce::Result::fail("Invalid reverb plugin state");
+        next->setStateInformation(bytes.getData(),static_cast<int>(bytes.getSize()));auto result=installReverbPlugin(std::move(next));if(result.failed())return result;
+    }
     auto p=parameters();const auto fx=state["fx"];
     if(fx.hasProperty("inputDb")){const float v=static_cast<float>(fx["inputDb"]);if(std::isfinite(v))p.inputDb=v;}
     if(fx.hasProperty("highPass")){const float v=static_cast<float>(fx["highPass"]);if(std::isfinite(v))p.highPassHz=v;}
@@ -265,3 +290,10 @@ juce::Result StudioEngine::restoreSetup(const juce::var& state){
     if(state.hasProperty("monitorDb"))monitorDb=juce::jlimit(-12.0f,18.0f,static_cast<float>(state["monitorDb"]));
     return juce::Result::ok();
 }
+
+juce::Result StudioEngine::installReverbPlugin(std::unique_ptr<juce::AudioPluginInstance> next){
+    if(isPlaying()||isRecording())return juce::Result::fail(juce::String::fromUTF8("Dừng phát/thu trước khi đổi vang plugin."));
+    if(!next)return juce::Result::fail("Invalid reverb plugin");const auto channels=configureVocalPlugin(*next);if(!channels.first)return juce::Result::fail("Reverb plugin needs mono/stereo buses");
+    withAudioStopped([&]{if(reverbPlugin)reverbPlugin->releaseResources();reverbPlugin=std::move(next);reverbInputs=channels.first;reverbOutputs=channels.second;prepare(rate(),blockSize());});return juce::Result::ok();
+}
+void StudioEngine::removeReverbPlugin(){if(isPlaying()||isRecording())return;withAudioStopped([&]{if(reverbPlugin)reverbPlugin->releaseResources();reverbPlugin.reset();reverbPluginLatency=0;reverbPluginTail=0;resetProcessing();});}
