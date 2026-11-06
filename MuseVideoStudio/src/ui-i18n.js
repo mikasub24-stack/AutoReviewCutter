@@ -268,6 +268,8 @@ Số ảnh đã lưu|Images saved
 Chưa xác nhận được tệp ảnh đã lưu.|Could not confirm the saved image file.
 Không xử lý được tác vụ ảnh.|The image task could not be processed.
 chưa thấy ảnh mới trong chat|no new image in the chat yet
+Đang bấm chuột phải → Tải xuống|Right-clicking the image → Download
+Menu Tải xuống chưa dùng được · đọc ảnh đang hiện trong chat|Download menu not usable · Reading the image shown in the chat
 Đúng phản hồi của cảnh này · đang lưu ảnh về máy|Matched scene result · Saving image
 Muse đang tạo hoặc tải ảnh|Muse is generating or loading the image
 Ảnh đã hiện · chờ ổn định trước khi lưu|Image visible · Waiting for it to settle before saving
@@ -535,6 +537,8 @@ Bước nào cũng cần prompt ảnh.|Every step needs an image prompt.
       [/^Phiên bản (.+)$/,m=>'Version '+m[1]],
       [/^Tài khoản (\d+)$/,m=>'Account '+m[1]],
       [/^Đã thấy tin nhắn · chờ Muse phản hồi \((.+)\)$/,m=>'Message found · Waiting for Muse response ('+t(m[1])+')'],
+      [/^Đang bấm chuột phải → Tải xuống \(ảnh (\d+)\/(\d+)\)$/,m=>'Right-clicking the image → Download (image '+m[1]+'/'+m[2]+')'],
+      [/^thấy (\d+) tin nhắn giống prompt, lúc gửi có (\d+|\?)$/,m=>'found '+m[1]+' message(s) matching the prompt, '+m[2]+' when it was sent'],
       [/^thấy (\d+) video mới nhưng chưa gắn được vào đúng prompt$/,m=>'found '+m[1]+' new video(s) not yet bound to this prompt'],
       [/^Tài khoản này chỉ chạy khi chọn «Chạy song song» từ (\d+) trình duyệt\.$/,m=>'This account only runs when "Parallel browsers" is set to '+m[1]+' or more.'],
       [/^Đăng xuất TK (\d+) · (.+)$/,m=>'Sign out · Account '+m[1]+' · '+t(m[2])],

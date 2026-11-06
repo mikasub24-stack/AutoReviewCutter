@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.4.4
+
+- **Lưu ảnh bằng đúng thao tác của bạn: chuột phải vào ảnh → «Tải xuống».** Từ bản 1.4.0 app chỉ đọc ảnh đang hiện trong chat (có thể là bản thu nhỏ). Nay app **bấm chuột phải vào ảnh của đúng cảnh, chọn dòng «Tải xuống»** (menu: emoji, Trả lời, Chia sẻ, Sao chép, Tải xuống) rồi lưu file Muse đưa ra, giống cách tải video. Chỉ bấm đúng dòng có chữ «Tải xuống» nằm trong menu vừa mở; không bấm nút «Tải xuống» nào khác trong trang. Ảnh được kiểm tra bằng byte đầu (PNG/JPG/WEBP/GIF) trước khi lưu; nếu file tải về không phải ảnh thì không lưu. Nếu menu không dùng được, app mới quay lại cách cũ (đọc ảnh đang hiện) và thẻ ghi rõ.
+- **Sửa lỗi kẹt «Đã thấy tin nhắn · chờ Muse phản hồi» mà không tải gì.** Khi chat Muse đã có **nhiều tin nhắn trùng prompt** (do thử lại nhiều lần) và Muse **dựng lại các tin nhắn** lúc có ảnh, app không còn nhận ra tin nhắn mình vừa gửi nên đứng chờ mãi, không bao giờ tới bước tải. Nay app đếm số tin nhắn giống prompt **trước khi gửi**, và tin nhắn vừa gửi là bản đứng ngay sau số đó. Nếu vẫn không khôi phục được, thẻ ghi «thấy N tin nhắn giống prompt, lúc gửi có M».
+- Thử bằng trang chat giả trong Chromium thật: 1 hoặc 3 prompt trùng trong lịch sử + Muse dựng lại toàn bộ dòng; menu chuột phải kiểu ảnh chụp của bạn (5 dòng), menu 4 dòng, trang chỉ nhận chuột phải thật, câu trả lời có 2 ảnh (tải đúng ảnh thứ hai), dòng «Tải xuống» sai vị trí không bao giờ bị bấm, nút «Tải xuống» khác trong trang không bị đụng; luồng Electron giả: ảnh lưu qua menu, rơi về cách cũ khi menu hỏng hoặc file tải về là trang web.
+- **Chưa thử với Muse thật.** Nếu Muse mở ảnh ở tab mới thay vì tải file, hoặc menu khác ảnh chụp, thẻ sẽ ghi lý do rồi dùng cách cũ.
+
 ## Update 1.4.3
 
 - **Sửa tiếp lỗi «có ảnh trong chat Muse mà vẫn không tải về».** Bản 1.4.2 chỉ sửa kích thước ảnh. Lần này tìm thêm một nguyên nhân nữa: app bỏ qua ảnh nếu chú thích (alt) hoặc đường dẫn của ảnh có chữ «logo», «icon», «avatar» hay «emoji». Prompt ảnh của Mẹo vặt có câu «không chữ, không số, **không logo**, không hình mờ», nên nếu Muse ghi lại prompt đó làm chú thích thì ảnh bị loại nhầm. Nay các từ đó chỉ dùng để loại ảnh **nhỏ** (dưới 140 px, đúng là biểu tượng hoặc avatar), ảnh cỡ kết quả thì luôn được nhận.

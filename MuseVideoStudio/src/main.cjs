@@ -11,7 +11,7 @@ const {submitPrompt}=require('./submit-prompt.cjs');
 const {ensureAttachmentInput,composerAttachmentSnapshot}=require('./attachment-input.cjs');
 const {imageSources,attachmentState}=require('./attachment-ready.cjs');
 const {beginTracking,pollTracking,downloadAction,endTracking,readTrackedImage}=require('./muse-tracker.cjs');
-const { decodeDataUrl,saveImageBuffer } = require('./image-save.cjs');
+const { decodeDataUrl,saveImageBuffer,sniffImage } = require('./image-save.cjs');
 const {captureElectronDownload,validateVideo}=require('./download-capture.cjs');
 const {triggerDownload}=require('./download-trigger.cjs');
 const {createLicense,deviceCode}=require('./license.cjs');
@@ -226,8 +226,8 @@ async function rightClickAt(muse,x,y) {
   contents.sendInputEvent({type:'mouseDown',x,y,button:'right',clickCount:1});
   contents.sendInputEvent({type:'mouseUp',x,y,button:'right',clickCount:1});
 }
-function triggerTrackedDownload(muse,id,signal) {
-  return triggerDownload({id,signal,delay,stopped:stoppedError,abortable,call:arg=>dom(muse,downloadAction,arg),rightClick:(x,y)=>rightClickAt(muse,x,y)});
+function triggerTrackedDownload(muse,id,signal,extra={}) {
+  return triggerDownload({id,signal,delay,stopped:stoppedError,abortable,call:arg=>dom(muse,downloadAction,arg),rightClick:(x,y)=>rightClickAt(muse,x,y),...extra});
 }
 async function download(muse,job,signal) {
   const outputDir=job.kind==='story'?storyFolder(settings.output,job.storyId):settings.output;
@@ -261,17 +261,46 @@ async function fetchImageInMain(muse,url,signal){
   try{const response=await muse.webContents.session.fetch(url,{signal:controller.signal});if(!response.ok)throw Error('HTTP '+response.status);return Buffer.from(await response.arrayBuffer());}
   finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
 }
+// A picture is saved the way a person does it: right-click it in the chat, then "Tải xuống".
+// That gives Muse's own full-size file. The file is checked by its first bytes before it is kept.
+async function downloadImageByMenu(muse,job,signal,index,directory) {
+  const temporary=path.join(directory,`.muse-${job.id}-${randomUUID().slice(0,8)}.part`);
+  const options={signal,timeoutMs:60000,trigger:()=>triggerTrackedDownload(muse,job.trackerId||job.id,signal,{kind:'image',index})};
+  try{
+    if(muse.external)await muse.captureDownload(temporary,options);
+    else await captureElectronDownload(muse.webContents,temporary,options);
+    if(signal.aborted)throw stoppedError();
+    const {size}=await fs.stat(temporary);
+    if(size>62914560)throw Error('Ảnh tải về lớn hơn giới hạn.');
+    return await fs.readFile(temporary);
+  }finally{await fs.rm(temporary,{force:true}).catch(()=>{});}
+}
+// Fallback: read the picture as shown in the chat (its own link, else the displayed copy).
+async function readShownImage(muse,job,signal,index) {
+  const item=await abortable(dom(muse,readTrackedImage,{id:job.trackerId||job.id,index},90000),signal);
+  if(item?.changed)throw Error('Ảnh trong phản hồi vừa thay đổi; kiểm tra lại trước khi lưu.');
+  let buffer=null;
+  if(item?.dataUrl)buffer=decodeDataUrl(item.dataUrl);
+  else buffer=await abortable(fetchImageInMain(muse,item?.url,signal),signal).catch(()=>null);
+  if(!buffer)throw Error('Không đọc được ảnh từ Muse'+(item?.errors?.length?' ('+item.errors.join('; ')+')':'')+'.');
+  return buffer;
+}
 async function saveImages(muse,job,signal,count) {
-  const directory=photoDirectory(job),trackerId=job.trackerId||job.id,saved=[];
+  const directory=photoDirectory(job),saved=[];
   await fs.mkdir(directory,{recursive:true});
   for(let index=0;index<count;index++){
     if(signal.aborted)throw stoppedError();
-    const item=await abortable(dom(muse,readTrackedImage,{id:trackerId,index},90000),signal);
-    if(item?.changed)throw Error('Ảnh trong phản hồi vừa thay đổi; kiểm tra lại trước khi lưu.');
-    let buffer=null;
-    if(item?.dataUrl)buffer=decodeDataUrl(item.dataUrl);
-    else buffer=await abortable(fetchImageInMain(muse,item?.url,signal),signal).catch(()=>null);
-    if(!buffer)throw Error('Không đọc được ảnh từ Muse'+(item?.errors?.length?' ('+item.errors.join('; ')+')':'')+'. Ảnh chưa được lưu.');
+    job.stage='downloading';job.stageMessage=`Đang bấm chuột phải → Tải xuống${count>1?` (ảnh ${index+1}/${count})`:''}`;notify();
+    let buffer=null;const notes=[];
+    try{
+      buffer=await downloadImageByMenu(muse,job,signal,index,directory);
+      if(!sniffImage(buffer)){notes.push('tệp tải xuống không phải ảnh');buffer=null;}
+    }catch(e){if(signal.aborted||e?.name==='AbortError')throw e;notes.push('menu chuột phải: '+e.message);}
+    if(!buffer){
+      job.stageMessage='Menu Tải xuống chưa dùng được · đọc ảnh đang hiện trong chat';notify();
+      try{buffer=await readShownImage(muse,job,signal,index);}
+      catch(e){if(signal.aborted||e?.name==='AbortError')throw e;throw Error(`${e.message} Ảnh chưa được lưu. (${notes.join('; ')})`);}
+    }
     saved.push(await saveImageBuffer(buffer,directory,job,{suffix:count>1?'_'+(index+1):''}));
   }
   job.outputs=saved;job.downloadCompletedAt=new Date().toISOString();

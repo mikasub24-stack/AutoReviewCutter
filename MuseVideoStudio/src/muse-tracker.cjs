@@ -228,6 +228,9 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   s.poll=()=>{
     if(s.echo?.isConnected&&s.echoRoot?.isConnected&&(!s.echoRoot.contains(s.echo)||norm(s.echo.innerText??s.echo.textContent)!==wanted||author(s.echo).kind==='assistant'))throw Error('Tin nhắn của cảnh đã thay đổi. Không lấy video từ câu Test hay cảnh khác.');
     let echoes=echoCandidates();
+    // Pictures, live send: the chat may already hold the same prompt from earlier tries, and Muse can
+    // rebuild old rows as new nodes. The copy sent now is the first one after those that were there before.
+    if(imageMode&&!recover&&!s.echo){const all=echoCandidates(true);echoes=all.length>s.baselineMatches?[all[s.baselineMatches]]:[];}
     if(!s.echo&&!echoes.length&&recover&&!recoverRequireAnchor&&(echoKey||echoMarker)){const exact=echoCandidates(true);if(exact.length===1)echoes=exact;else if(exact.length>1)throw Error('Có nhiều tin nhắn trùng prompt nhưng ID cũ đã thay đổi. Không chọn clip khi chưa xác định được cảnh.');}
     if(!s.echo&&echoes.length>1&&!(imageMode&&!recover&&echoes.every(e=>resend(e.leaf)||resend(e.root))))throw Error('Có nhiều tin nhắn trùng chính xác prompt. Không xác định được video của tác vụ; hãy dùng chat riêng hoặc xử lý thủ công.');
     if(!s.echo) {
@@ -237,8 +240,11 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     if(!s.echo.isConnected||!s.echoRoot.isConnected){
       const all=echoCandidates(true);
       let anchored=all.filter(e=>e.root===s.echoRoot||e.root.getAttribute('data-muse-studio-attempt')===id||(s.echoNativeKey&&[e.root.id,e.root.getAttribute('data-message-id'),e.root.getAttribute('data-id')].includes(s.echoNativeKey)));
-      if(!recoverRequireAnchor&&!anchored.length&&all.length===1&&s.echoContexts?.some(parent=>parent.isConnected&&parent.contains(all[0].root)))anchored=all;
-      if(anchored.length!==1)return result('waiting-response','Muse đang dựng lại tin nhắn · chờ khôi phục đúng cảnh gốc',null);
+      // Pictures, live send: the copy sent now is counted from the copies that were there before sending; a single
+      // remaining copy may be an old one from history, so the "only one match" rule is not used for them.
+      if(imageMode&&!recover){if(!anchored.length&&all.length>s.baselineMatches)anchored=[all[s.baselineMatches]];}
+      else if(!recoverRequireAnchor&&!anchored.length&&all.length===1&&s.echoContexts?.some(parent=>parent.isConnected&&parent.contains(all[0].root)))anchored=all;
+      if(anchored.length!==1)return {...result('waiting-response','Muse đang dựng lại tin nhắn · chờ khôi phục đúng cảnh gốc',null),hint:`thấy ${all.length} tin nhắn giống prompt, lúc gửi có ${s.baselineMatches??'?'}`};
       s.echo=anchored[0].leaf;s.echoRoot=anchored[0].root;s.echoContexts=rememberContext(s.echoRoot);s.echoNativeKey=s.echoRoot.id||s.echoRoot.getAttribute('data-message-id')||s.echoRoot.getAttribute('data-id')||'';if(s.echoNativeKey)s.echoAliases.add(s.echoNativeKey);s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.ready=false;s.responseRoot=null;s.video=null;
     }
     const thread=threadRoot(s.echoRoot);
@@ -305,9 +311,11 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   // (Download = 2nd row) and a right-click on the clip (Download = 4th row, after the
   // emoji row, Reply and Share). `soft` makes menu-specific problems return a note so
   // the caller can try the other route; binding problems (poll above) always throw.
-  s.download=({phase='auto',soft=false}={})=>{
-    if(imageMode)throw Error('Cảnh tạo ảnh lưu ảnh trực tiếp, không dùng menu tải video.');
-    s.poll();if(!s.ready||!s.responseRoot?.isConnected)throw Error('Video gắn với prompt chưa sẵn sàng tải.');
+  s.download=({phase='auto',soft=false,index=0}={})=>{
+    s.poll();if(!s.ready||!s.responseRoot?.isConnected)throw Error(imageMode?'Ảnh gắn với prompt chưa sẵn sàng tải.':'Video gắn với prompt chưa sẵn sàng tải.');
+    // Pictures: the one at `index` among the pictures bound to this prompt (poll() resets s.video to the first).
+    const clip=imageMode?(s.images[index]||s.video):s.video;
+    if(!clip?.isConnected)throw Error(imageMode?'Ảnh gắn với prompt vừa thay đổi.':'Video gắn với prompt vừa thay đổi.');
     const menuFail=message=>{if(soft)return {action:'failed',clicked:false,needsMenu:false,failed:true,note:message};throw Error(message);};
     const text=e=>norm(e.getAttribute('aria-label')||e.getAttribute('title')||e.textContent);
     const exactDownload=e=>/^(?:download(?:\s+(?:video|file))?|tải\s*(?:xuống|video))$/i.test(text(e));
@@ -340,7 +348,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     // Toolbars that appear on hover: send the hover events a pointer would.
     function hover() {
       let depth=0;
-      for(let n=s.video;n&&n!==document.body&&depth<8;n=n.parentElement,depth++){
+      for(let n=clip;n&&n!==document.body&&depth<8;n=n.parentElement,depth++){
         if(n.contains(s.echoRoot)||n.querySelector('textarea,input,[contenteditable="true"]'))break;
         const r=box(n);if(!r.width||!r.height)continue;
         for(const type of MOUSE_IN)fire(n,type,{clientX:Math.round(r.left+r.width/2),clientY:Math.round(r.top+r.height/2),pointerId:1,pointerType:'mouse',isPrimary:true,buttons:0});
@@ -373,7 +381,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     function moreButtons(scope) {
       const found=new Set();
       for(const e of scope.querySelectorAll('*')){
-        if(!visible(e)||e.closest('video')||s.video.contains(e)||e.closest('svg')&&e.tagName.toLowerCase()!=='svg')continue;
+        if(!visible(e)||e.closest('video')||clip.contains(e)||e.closest('svg')&&e.tagName.toLowerCase()!=='svg')continue;
         const r=box(e);if(!sizeOk(r))continue;
         const haspopup=e.getAttribute('aria-haspopup');
         const svgs=e.tagName.toLowerCase()==='svg'?[e]:[...e.querySelectorAll('svg')];
@@ -403,17 +411,17 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     const popupLike='[role="menu"],[role="dialog"],[role="listbox"],[data-radix-popper-content-wrapper],[class*="popover" i],[class*="dropdown" i],[class*="context-menu" i],[class*="contextmenu" i]';
     function popupOf(target) {
       const named=target.closest(popupLike);
-      if(named&&!named.contains(s.video)&&!named.contains(s.echoRoot))return named;
+      if(named&&!named.contains(clip)&&!named.contains(s.echoRoot))return named;
       let popup=null;
       for(let p=target.parentElement;p&&p!==document.body;p=p.parentElement){
-        if(p.contains(s.video)||p.contains(s.echoRoot)||p.querySelector('textarea,input,video'))break;
+        if(p.contains(clip)||p.contains(s.echoRoot)||p.querySelector('textarea,input,video'))break;
         if(box(p).height>640)break;
         if(menuRows(p).length>=2)popup=p;
       }
       return popup;
     }
     function mediaHost() {
-      for(let n=s.video;n&&n!==document.body;n=n.parentElement){
+      for(let n=clip;n&&n!==document.body;n=n.parentElement){
         const r=box(n);if(visible(n)&&r.width>=40&&r.height>=40)return n;
         if(n===s.responseRoot)break;
       }
@@ -458,7 +466,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       const rows=menuRows(popup),index=rows.findIndex(row=>row.items.some(e=>e===target||e.contains(target)||target.contains(e)));
       // "…" menu: Download is the 2nd row. Right-click menu: 4th row (after emoji row,
       // Reply, Share), or the last row when Muse drops one of them.
-      const right=context?(index===3||(index>=2&&index===rows.length-1)):index===1;
+      const right=context?(index===3||(imageMode&&index===4)||(index>=2&&index===rows.length-1)):index===1;
       if(!right)return menuFail(context?'Dòng thứ tư của menu chuột phải chưa phải Tải xuống. Chưa bấm để tránh tải nhầm.':'Dòng thứ hai của menu chưa phải Tải xuống. Chưa bấm để tránh tải nhầm.');
       if(target.disabled||target.getAttribute('aria-disabled')==='true')return {action:'waiting-menu',clicked:false,needsMenu:true};
       press(target);s.menuPending=false;return {action:'clicked',clicked:true,needsMenu:false};
@@ -467,7 +475,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     let more=[];
     for(let scope=s.responseRoot,depth=0;scope&&scope!==document.body&&depth<4;scope=scope.parentElement,depth++){
       if(scope!==s.responseRoot&&(scope.contains(s.echoRoot)||scope.querySelector('textarea,input,[contenteditable="true"],nav,aside')))break;
-      const media=mediaNodes(scope);if(media.length!==1||media[0]!==s.video)break;
+      const media=mediaNodes(scope);if(media.length!==1||media[0]!==clip)break;
       more=moreButtons(scope);
       if(more.length)break;
     }
@@ -479,7 +487,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     if(more.length===1){s.menuBaseline=new Set(controls());s.menuOpener=more[0];s.menuKind='more';s.menuPending=true;press(more[0]);return {action:'waiting-menu',clicked:false,needsMenu:true,kind:'more'};}
     return menuFail('Chưa thấy menu … của đúng clip. Chưa tải video.');
   };
-  const prior=echoCandidates(true).length;s.hadPriorSame=recover?prior>1:prior>0;
+  const prior=echoCandidates(true).length;s.hadPriorSame=recover?prior>1:prior>0;s.baselineMatches=prior;
   s.probe=()=>{
     const current=s.poll();
     const meaningful=text=>text.length>=3&&/[\p{L}\p{N}]/u.test(text)&&!/^((?:muse )?(?:is )?thinking|đang (?:suy nghĩ|xử lý|trả lời)|loading|typing)[.…\s]*$/i.test(text);
@@ -506,10 +514,10 @@ function pollTracking({id}) {
   if(!state)throw Error('Không có trạng thái theo dõi cho tác vụ này.');
   return state.poll();
 }
-function downloadAction({id,phase='auto',soft=false}) {
+function downloadAction({id,phase='auto',soft=false,index=0}) {
   const state=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]?.get(id);
   if(!state)throw Error('Không có video đã gắn với tác vụ này.');
-  return state.download({phase,soft});
+  return state.download({phase,soft,index});
 }
 // Reads the bytes of one picture that poll() bound to this prompt. The binding is
 // checked again first, so a picture that changed meanwhile is never saved.
