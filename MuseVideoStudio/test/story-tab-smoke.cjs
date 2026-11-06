@@ -43,6 +43,12 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
             if (window.analyzeStop && !data.resume) { result.scenes = result.scenes.slice(0, 1); result.incomplete = { from: 3, total: units.length, message: 'Muse chưa chia đúng đoạn từ câu 3.' }; }
             return result;
           }
+          if (name === 'storyAdWrite') {
+            s.story.analyze = { busy: true, kind: 'write', progress: 'Viết mẹo vặt · Muse đang viết…', part: 0, parts: 1, error: '' }; listener(structuredClone(s));
+            await new Promise(r => setTimeout(r, window.writeDelay || 300));
+            s.story.analyze = { busy: false, kind: 'write', progress: 'Muse đã viết xong mẹo vặt (2 bước)', part: 0, parts: 1, error: '' }; listener(structuredClone(s));
+            return { script: 'Tủ lạnh có mùi thì thử cách này. Bước 1: Lấy hộp baking soda. Bước 2: Đặt vào ngăn giữa. Vậy là xong.', notes: ['Muse còn thiếu bước 3: bổ sung vào ô mẹo hoặc bấm viết lại.'] };
+          }
           if (name === 'storyAnalyzeCancel') { s.story.analyze = { busy: false, progress: '', part: 0, parts: 0, error: '' }; }
           if (name === 'images') return ['C:\\Refs\\mai.png'];
           if (name === 'add') s.jobs.push(...data.map(j => ({ ...j, id: String(++id), status: 'pending', stage: 'pending', order: s.jobs.filter(x => x.kind === 'story').length + 1 })));
@@ -366,10 +372,11 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       await page.locator('#modeTip').click();   // hộp thoại xác nhận đổi chế độ tự đồng ý
       assert.equal(await page.locator('#modeTip').getAttribute('aria-pressed'), 'true');
       assert.equal(await page.locator('#modeStory').getAttribute('aria-pressed'), 'false');
-      assert.equal(await page.locator('#storyHead').textContent(), '1. Tip (steps)');
+      assert.equal(await page.locator('#storyHead').textContent(), '1. Tip (written by Muse, editable)');
+      assert.equal(await page.locator('#tipBox').isVisible(), true, 'ô tiêu đề hiện trong chế độ Mẹo vặt');
       assert.equal(await page.locator('#storyCreate').textContent(), '▶ Create images + clips');
       for (const id of ['storyRefRow', 'storyRefPaste', 'storyCharacter', 'storyForm']) assert.equal(await page.locator('#' + id).isVisible(), false, id + ' ẩn trong chế độ Mẹo vặt');
-      assert.match(await page.locator('#storyInfo').textContent(), /Each step uses 2 Muse generations/);
+      assert.match(await page.locator('#storyInfo').textContent(), /Enter a tip title, then click “Muse writes the tip and splits scenes”/);
       assert.match(await page.locator('#storyStyle').getAttribute('placeholder'), /Photorealistic by default/);
       assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('museStudio.story')).mode), 'tip');
       await page.locator('#storyScript').fill(tipText);
@@ -405,11 +412,46 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       await page.evaluate(() => { window.s.jobs.filter(j => j.kind === 'story' && j.phase).forEach(j => { j.status = 'completed'; j.output = 'C:\\Videos\\KeChuyen\\x\\' + j.number + (j.phase === 'image' ? '.png' : '.mp4'); }); window.push(); });
       await page.waitForFunction(() => /· 2\/2$/.test([...document.querySelectorAll('#storyPick option')].at(-1)?.textContent || ''));
       assert.equal(await page.locator('#storyExport').isDisabled(), false, 'đủ clip (2/2, không tính 2 việc ảnh) thì xuất MP4 được');
-      // Đổi lại chế độ Kể chuyện: hỏi trước vì sẽ xóa cảnh, rồi ô ảnh biến mất.
       await page.evaluate(() => { document.getElementById('storyPanel').open = true; });   // sau khi thêm vào hàng đợi khung được thu lại
+      // Chỉ nhập TIÊU ĐỀ: Muse viết mẹo theo bước rồi tự chia cảnh; không cần dán gì.
+      {
+        const writes = async () => (await called('storyAdWrite')).length;
+        await page.locator('#tipWrite').click();
+        assert.match(await page.locator('#toast').textContent(), /Enter the tip title first/);
+        assert.equal(await writes(), 0, 'chưa có tiêu đề thì không gọi Muse');
+        assert.equal(await page.locator('#tipMinutes').inputValue(), '2'); assert.equal(await page.locator('#tipSecs').inputValue(), '8'); assert.equal(await page.locator('#tipLanguage').inputValue(), 'vi');
+        assert.deepEqual(await page.locator('#tipMinutes option').allTextContents(), ['1 minute', '2 minutes', '3 minutes', '5 minutes', '10 minutes']);
+        assert.deepEqual(await page.locator('#tipSecs option').allTextContents(), ['6 seconds', '8 seconds', '10 seconds']);
+        assert.match(await page.locator('#tipCount').textContent(), /^≈ 15 scenes \(1 intro \+ 13 steps \+ 1 ending\) = 15 pictures \+ 15 clips, each scene narrated for about 8 seconds\. Creating the pictures and clips uses about 30 Muse generations\.$/);
+        await page.locator('#tipTitle').fill('  Mẹo khử mùi tủ lạnh  ');
+        await page.locator('#tipMinutes').selectOption('3'); await page.locator('#tipSecs').selectOption('6'); await page.locator('#tipLanguage').selectOption('en');
+        assert.match(await page.locator('#tipCount').textContent(), /^≈ 30 scenes \(1 intro \+ 28 steps \+ 1 ending\) = 30 pictures \+ 30 clips, each scene narrated for about 6 seconds\. Creating the pictures and clips uses about 60 Muse generations\.$/);
+        assert.equal(await page.locator('#tipLanguage option').nth(1).textContent(), 'English — Tiếng Anh', 'tên ngôn ngữ giữ nguyên ở giao diện tiếng Anh');
+        await page.evaluate(() => { window.writeDelay = 700; });
+        const analyzed = (await called('storyAnalyze')).length;
+        await page.locator('#tipWrite').click();   // ô mẹo đang có chữ → hộp thoại xác nhận tự đồng ý
+        await page.waitForFunction(() => /Muse is writing the tip/.test(document.getElementById('tipWrite').textContent));
+        assert.equal(await page.locator('#tipWrite').isDisabled(), true, 'đang viết thì không bấm được lần nữa');
+        await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyAnalyze').length > n && !document.getElementById('storyAnalyze').disabled && document.querySelectorAll('#storyScenes .draftRow').length === 2, analyzed);
+        const write = (await called('storyAdWrite')).at(-1).data;
+        assert.deepEqual([write.tip, write.tipTitle, write.tipMinutes, write.tipLanguage, write.seconds, write.reference, write.aspect], [true, '  Mẹo khử mùi tủ lạnh  ', 3, 'en', 6, false, '16:9']);
+        assert.equal(write.ad, undefined);
+        const script = await page.locator('#storyScript').inputValue();
+        assert.match(script, /^Tủ lạnh có mùi thì thử cách này\. Bước 1:/);
+        const chain = (await called('storyAnalyze')).at(-1).data;
+        assert.equal(chain.script, script, 'chia cảnh ngay sau khi viết, đúng mẹo vừa viết');
+        assert.deepEqual([chain.tip, chain.seconds, chain.reference], [true, 6, false]);
+        assert.match(await page.locator('#toast').textContent(), /Muse left out step 3: add them to the tip box or write again\./);
+        assert.match(await page.locator('#storyInfo').textContent(), /click Create images \+ clips/);
+        assert.equal(await writes(), 1);
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('museStudio.story')).tipTitle), '  Mẹo khử mùi tủ lạnh  ', 'tiêu đề được nhớ');
+        assert.equal(await page.locator('#storyCreate').isDisabled(), false);
+      }
+      // Đổi lại chế độ Kể chuyện: hỏi trước vì sẽ xóa cảnh, rồi ô ảnh biến mất.
       await page.locator('#modeStory').click();
       assert.equal(await page.locator('#storyRefRow').isVisible(), true);
       assert.equal(await page.locator('#storyCreate').textContent(), '▶ Create clips');
+      assert.equal(await page.locator('#tipBox').isVisible(), false, 'ô tiêu đề ẩn ngoài chế độ Mẹo vặt');
     }
     assert.deepEqual(errors, []);
     console.log('PASS: story tab — own jobs/counts/folder, Muse analysis + pasted Muse reply parsing (no-speech rule kept), no quick split, character image on every scene, free voice setup/listen/clone with consent, subtitles on/off + .srt + PNG captions, auto-edit report, export errors, persistence, English labels.');

@@ -776,3 +776,17 @@ test('Mẹo vặt: ảnh từng bước lưu vào KeChuyen/<truyện>/anh trư�
     await app.stop();
   }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
+
+test('story writer handler passes the tip fields through (tip mode asks for a title, not a product name)',{timeout:12000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-tip-write-'));
+  let app;
+  try{
+    await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+    app=await boot(dir,{browserResolver:()=>'/test/chrome'});
+    // Chế độ Mẹo vặt: thiếu tiêu đề báo ngay (trước khi mở Muse). Không có cờ tip thì vẫn là chế độ quảng cáo.
+    await assert.rejects(app.invoke('storyAdWrite',{tip:true,tipTitle:'   ',tipMinutes:2,tipLanguage:'vi',seconds:8,aspect:'16:9'}),/Nhập tiêu đề mẹo/);
+    await assert.rejects(app.invoke('storyAdWrite',{tipTitle:'Mẹo khử mùi tủ lạnh',seconds:8,aspect:'16:9'}),/Nhập tên sản phẩm/);
+    assert.equal(app.invoke('state').story.analyze?.busy||false,false,'không treo trạng thái bận');
+    await app.stop();
+  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});

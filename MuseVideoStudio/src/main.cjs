@@ -526,7 +526,7 @@ app.whenReady().then(async () => {
       finally{if(!starting&&!queue.active&&!flushingQuit&&main&&!main.isDestroyed()){main.show();main.focus();}}
     },
     storyAdWrite:async data=>{
-      try{return await storyAnalyzer.writeScript({options:{seconds:Number(data?.seconds)||10,reference:Boolean(data?.reference),aspect:String(data?.aspect||'16:9'),style:String(data?.style||''),character:String(data?.character||''),ad:data?.ad}});}
+      try{return await storyAnalyzer.writeScript({options:{seconds:Number(data?.seconds)||10,reference:Boolean(data?.reference),aspect:String(data?.aspect||'16:9'),style:String(data?.style||''),character:String(data?.character||''),ad:data?.ad,tip:Boolean(data?.tip),tipTitle:String(data?.tipTitle||''),tipMinutes:Number(data?.tipMinutes)||2,tipLanguage:String(data?.tipLanguage||'vi')}});}
       finally{if(!starting&&!queue.active&&!flushingQuit&&main&&!main.isDestroyed()){main.show();main.focus();}}
     },
     storyAnalyzeCancel:async()=>{storyAnalyzer.cancel();return snapshot();},

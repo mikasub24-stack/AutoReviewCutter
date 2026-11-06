@@ -30,6 +30,7 @@ const PAGE = `<!doctype html><meta charset="utf-8"><style>#log{white-space:pre-w
 
 const tale = 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng, em dắt trâu ra đồng. Một hôm, em nhặt được chiếc hộp gỗ cũ bên bờ nước, bên trong là một chiếc chìa khóa nhỏ. Em hoảng hốt nhìn quanh, rồi mỉm cười. Bà Ba từ xa gọi em về ăn cơm.';
 const cfg = { seconds: 10, aspect: '16:9', character: 'Mai, bé gái tóc đen' };
+const tipCfg = { seconds: 8, aspect: '16:9', tip: true, tipTitle: 'Mẹo khử mùi tủ lạnh bằng baking soda', tipMinutes: 2, tipLanguage: 'vi' };
 const adCfg = { seconds: 10, aspect: '9:16', ad: { product: 'Bình giữ nhiệt Aqua 500ml', points: 'Giữ nóng 12 giờ\nNắp chống tràn', audience: 'Dân văn phòng', cta: 'Bấm vào giỏ hàng để xem chi tiết', tone: 'warm', length: 30, camera: ['macro', 'orbit'], look: 'ugc' } };
 
 // «Muse» giả: đọc yêu cầu, gom câu đánh số theo số giây, viết prompt, kết thúc bằng mốc MSDONE.
@@ -49,6 +50,17 @@ function brain(behavior = {}) {
     const done = (text.match(/MSDONE([0-9a-f]{6})/) || [])[1];
     asked.push({ text, units: units.map(u => u.n), hasCast: /NHÂN VẬT ĐÃ CHỐT/.test(text), hasUnderstanding: /HIỂU BIẾT VỀ CẢ BÀI/.test(text), fresh: /BỎ QUA hết/.test(text), done });
     if (behavior.onAsk) await behavior.onAsk(asked.length);
+    // Yêu cầu VIẾT MẸO từ tiêu đề (chế độ Mẹo vặt): viết các mục A–B, intro/kết không nhãn, bước có nhãn «Bước k:».
+    if (/TIÊU ĐỀ MẸO/.test(text) && /^KỊCH BẢN:/m.test(text)) {
+      const range = text.match(/các mục (\d+)–(\d+) trong tổng (\d+) mục/);
+      const info = { text, from: Number(range[1]), to: Number(range[2]), total: Number(range[3]), written: /ĐÃ VIẾT Ở CÁC PHẦN TRƯỚC/.test(text), fix: (text.match(/SỬA LỖI[^\n]*\n([\s\S]*?)\n\nTIÊU ĐỀ/) || [])[1] || '', fresh: /BỎ QUA hết/.test(text), done };
+      asked.at(-1).tipWrite = info;
+      const calls = asked.filter(a => a.tipWrite).length;
+      if (behavior.tipReply) return behavior.tipReply(calls, info);
+      const lines = [];
+      for (let i = info.from; i <= info.to; i++) lines.push(i === 1 ? 'Tủ lạnh có mùi khó chịu thì thử cách đơn giản này.' : i === info.total ? 'Vậy là tủ lạnh thơm tho trở lại.' : `Bước ${i - 1}: Làm việc số ${i - 1} với baking soda trên mặt thớt gỗ.`);
+      return ['Dạ, đây là kịch bản:', 'KỊCH BẢN:', ...lines, `MSDONE${done}`].join('\n');
+    }
     // Yêu cầu VIẾT lời quảng cáo (chế độ quảng cáo): trả lời có lời dẫn, nhãn, emoji, hashtag, ngoặc ghi chú như Muse thật hay làm.
     if (/THÔNG TIN SẢN PHẨM/.test(text)) {
       asked.at(-1).adScript = true;
@@ -60,7 +72,7 @@ function brain(behavior = {}) {
       asked.at(-1).tip = true;
       if (behavior.garbage) return 'Xin lỗi, mình không hiểu yêu cầu này.';
       const tg = []; let tc = [];
-      for (const u of units) { if (tc.length && (tc.reduce((x, y) => x + y.s, 0) + u.s > 9 || u.n !== tc.at(-1).n + 1)) { tg.push(tc); tc = []; } tc.push(u); }
+      for (const u of units) { if (tc.length && (tc.reduce((x, y) => x + y.s, 0) + u.s > 9 || u.n !== tc.at(-1).n + 1 || /^(?:Bước|Step) \d+:/.test(u.t))) { tg.push(tc); tc = []; } tc.push(u); }   // «Bước N:» luôn mở cảnh mới (đúng lời dặn trong câu lệnh)
       if (tc.length) tg.push(tc);
       const out = [];
       if (!/ĐÃ CHỐT/.test(text)) out.push('NHÂN VẬT: Bếp gỗ sáng, thớt tròn, tỏi trắng');
@@ -541,6 +553,107 @@ function brain(behavior = {}) {
       assert.equal(analyzer.status().busy, false);
       assert.equal(analyzer.status().error, '');
       await page.close(); ok('quảng cáo: không chạy trùng; hủy được');
+    }
+    // 18. Mẹo vặt từ tiêu đề (2 phút = 15 cảnh): một lượt, Muse viết đủ mở đầu + 13 bước + kết.
+    {
+      const { page, analyzer, museBrain, progress } = await session({});
+      const r = await analyzer.writeScript({ options: tipCfg });
+      const lines = r.script.split('\n');
+      assert.equal(lines.length, 15);
+      assert.deepEqual(lines.map(l => (l.match(/^Bước (\d+):/) || [])[1]).filter(Boolean).map(Number), Array.from({ length: 13 }, (_, i) => i + 1));
+      assert.ok(!/^Bước/.test(lines[0]) && !/^Bước/.test(lines.at(-1)) && lines.every(l => /[.!?…]$/.test(l)), 'mở đầu/kết không nhãn, mỗi dòng kết thúc bằng dấu chấm');
+      assert.ok(!/Dạ, đây là|KỊCH BẢN|MSDONE/.test(r.script), 'bỏ lời dẫn và mốc');
+      assert.deepEqual(r.notes, []);
+      const writes = museBrain.asked.filter(a => a.tipWrite);
+      assert.equal(writes.length, 1);
+      assert.deepEqual([writes[0].tipWrite.from, writes[0].tipWrite.to, writes[0].tipWrite.total, writes[0].tipWrite.written, writes[0].tipWrite.fresh], [1, 15, 15, false, true]);
+      assert.match(writes[0].text, /Mẹo khử mùi tủ lạnh bằng baking soda/);
+      assert.ok(progress.some(p => /^Viết mẹo vặt · /.test(p)), 'tiến độ ghi «Viết mẹo vặt»: ' + progress.join(' | '));
+      assert.ok(progress.some(p => /Muse đã viết xong mẹo vặt \(13 bước\)/.test(p)));
+      assert.equal(analyzer.status().busy, false);
+      assert.equal(await page.evaluate(() => window.stopClicks), 0);
+      await page.close(); ok('mẹo vặt: chỉ có tiêu đề, Muse viết đủ mở đầu + 13 bước + kết');
+    }
+    // 19. Mẹo 5 phút = 38 cảnh → 3 lượt; mỗi lượt đúng khoảng mục, lượt sau thấy phần đã viết; ghép đủ và đúng thứ tự.
+    {
+      const { page, analyzer, museBrain, progress } = await session({});
+      const r = await analyzer.writeScript({ options: { ...tipCfg, tipMinutes: 5 } });
+      const writes = museBrain.asked.filter(a => a.tipWrite).map(a => a.tipWrite);
+      assert.deepEqual(writes.map(w => [w.from, w.to]), [[1, 13], [14, 26], [27, 38]]);
+      assert.deepEqual(writes.map(w => w.written), [false, true, true]);
+      const lines = r.script.split('\n');
+      assert.equal(lines.length, 38);
+      assert.deepEqual(lines.slice(1, -1).map(l => Number(l.match(/^Bước (\d+):/)[1])), Array.from({ length: 36 }, (_, i) => i + 1));
+      assert.ok(progress.some(p => /^Viết mẹo vặt 2\/3 · /.test(p)) && progress.some(p => /^Viết mẹo vặt 3\/3 · /.test(p)), progress.join(' | '));
+      await page.close(); ok('mẹo vặt: 5 phút viết 3 lượt nối tiếp, ghép đủ 36 bước đúng thứ tự');
+    }
+    // 20. Lần đầu thiếu Bước 3 → hỏi lại một lần kèm lời sửa → đủ.
+    {
+      const tipLines = (info, skip) => {
+        const lines = [];
+        for (let i = info.from; i <= info.to; i++) { if (skip(i - 1, i)) continue; lines.push(i === 1 ? 'Mở đầu ngắn gọn cho mẹo này.' : i === info.total ? 'Kết thúc gọn gàng.' : `Bước ${i - 1}: Việc số ${i - 1} trên thớt gỗ.`); }
+        return ['KỊCH BẢN:', ...lines, `MSDONE${info.done}`].join('\n');
+      };
+      const { page, analyzer, museBrain } = await session({ tipReply: (n, info) => tipLines(info, (k, i) => n === 1 && k === 3 && i > 1 && i < info.total) });
+      const r = await analyzer.writeScript({ options: tipCfg });
+      const writes = museBrain.asked.filter(a => a.tipWrite).map(a => a.tipWrite);
+      assert.equal(writes.length, 2);
+      assert.equal(writes[0].fix, '');
+      assert.match(writes[1].fix, /Thiếu Bước 3:/);
+      assert.equal(r.script.split('\n').length, 15);
+      assert.deepEqual(r.notes, []);
+      await page.close(); ok('mẹo vặt: thiếu bước thì hỏi lại một lần kèm lời sửa');
+      // 21. Thiếu một bước cả hai lần → vẫn trả mẹo kèm ghi chú; thiếu quá nửa → báo lỗi, không treo.
+      const a = await session({ tipReply: (n, info) => tipLines(info, (k, i) => k === 3 && i > 1 && i < info.total) });
+      const r2 = await a.analyzer.writeScript({ options: tipCfg });
+      assert.equal(r2.script.split('\n').length, 14);
+      assert.deepEqual(r2.notes, ['Muse còn thiếu bước 3: bổ sung vào ô mẹo hoặc bấm viết lại.']);
+      assert.equal(a.museBrain.asked.filter(x => x.tipWrite).length, 2, 'chỉ hỏi lại một lần');
+      await a.page.close();
+      const b = await session({ tipReply: (n, info) => tipLines(info, (k, i) => k % 3 !== 1 && i > 1 && i < info.total) });
+      await assert.rejects(b.analyzer.writeScript({ options: tipCfg }), /Muse viết thiếu nhiều bước \(thiếu 8\/13 bước ở phần 1\)\. Bấm «Muse viết mẹo» lại\./);
+      assert.equal(b.analyzer.status().busy, false);
+      await b.page.close(); ok('mẹo vặt: thiếu ít thì báo ghi chú, thiếu nhiều thì báo lỗi');
+    }
+    // 22. Muse trả lời rỗng hai lần → báo lỗi rõ bằng tên nút của chế độ Mẹo vặt.
+    {
+      const { page, analyzer } = await session({ tipReply: (n, info) => `MSDONE${info.done}` });
+      await assert.rejects(analyzer.writeScript({ options: tipCfg }), /Muse chưa viết mẹo\. Bấm «Muse viết mẹo» lại\./);
+      assert.equal(analyzer.status().busy, false);
+      await page.close(); ok('mẹo vặt: Muse không viết được thì báo lỗi, không treo');
+    }
+    // 23. Thiếu tiêu đề → báo ngay, không gửi gì.
+    {
+      const { page, analyzer, museBrain } = await session({});
+      await assert.rejects(analyzer.writeScript({ options: { ...tipCfg, tipTitle: '   ' } }), /Nhập tiêu đề mẹo/);
+      assert.equal(museBrain.asked.length, 0);
+      assert.equal(await page.evaluate(() => window.sent.length), 0);
+      await page.close(); ok('mẹo vặt: thiếu tiêu đề thì không gửi gì cho Muse');
+    }
+    // 24. Chuỗi đầy đủ: tiêu đề → viết mẹo → chia cảnh. Mỗi «Bước k:» mở một cảnh mới; lời giữ nguyên văn; mỗi cảnh có ảnh + prompt chuyển động.
+    {
+      const { page, analyzer, museBrain } = await session({});
+      const written = await analyzer.writeScript({ options: tipCfg });
+      const r = await analyzer.run({ script: written.script, options: tipCfg });
+      assert.equal(r.scenes.length, 15);
+      assert.equal(r.scenes.map(s => s.voiceover).join(' '), written.script.replace(/\n/g, ' '));
+      assert.deepEqual(r.scenes.slice(1, -1).map(s => s.voiceover.match(/^Bước (\d+):/)?.[1]), Array.from({ length: 13 }, (_, i) => String(i + 1)));
+      assert.ok(r.scenes.every(s => !s.offline && s.image && s.prompt.includes(plan.NO_SPEECH)));
+      assert.match(museBrain.asked.at(-1).text, /Câu bắt đầu bằng «Bước N:» hoặc «Step N:» là câu ĐẦU của một bước mới/);
+      await page.close(); ok('mẹo vặt: tiêu đề → mẹo → 15 cảnh, mỗi bước một cảnh có ảnh + chuyển động');
+    }
+    // 25. Đang viết mẹo thì không chạy trùng; hủy được.
+    {
+      const { page, analyzer } = await session({}, { reply: 20000 }, p => p.evaluate(() => { window.mode.streamMs = 4000; }));
+      const first = analyzer.writeScript({ options: tipCfg });
+      const settled = first.then(() => 'done', e => e.name);
+      await new Promise(r => setTimeout(r, 300));
+      await assert.rejects(analyzer.writeScript({ options: tipCfg }), /đang làm việc/);
+      analyzer.cancel();
+      assert.equal(await settled, 'AbortError');
+      assert.equal(analyzer.status().busy, false);
+      assert.equal(analyzer.status().error, '');
+      await page.close(); ok('mẹo vặt: không viết trùng; hủy được');
     }
   } finally { await browser.close(); }
   console.log(`PASS: ${passed} story analysis scenarios against a fake Muse chat page (not the real Muse).`);

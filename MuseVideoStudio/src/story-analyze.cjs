@@ -288,12 +288,13 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
   async function writeScript({ options: input = {} }) {
     if (state.busy) throw Error('Muse đang làm việc. Chờ xong hoặc bấm Dừng.');
     const config = plan.options(input);
-    plan.buildAdScriptInstruction(config);   // báo lỗi thiếu tên sản phẩm trước khi mở Muse
-    if (isBusy()) throw Error('Dừng hàng đợi và các thao tác trình duyệt trước khi nhờ Muse viết lời quảng cáo.');
+    const tip = Boolean(config.tip);
+    if (tip) plan.buildTipScriptInstruction(config); else plan.buildAdScriptInstruction(config);   // báo lỗi thiếu tiêu đề / tên sản phẩm trước khi mở Muse
+    if (isBusy()) throw Error(`Dừng hàng đợi và các thao tác trình duyệt trước khi nhờ Muse viết ${tip ? 'mẹo' : 'lời quảng cáo'}.`);
     await ensureAllowed();
     controller = new AbortController();
     const signal = controller.signal;
-    const label = 'Viết lời quảng cáo';
+    const label = tip ? 'Viết mẹo vặt' : 'Viết lời quảng cáo';
     Object.assign(state, { busy: true, kind: 'write', error: '', progress: 'Đang mở Muse…', part: 0, parts: 1 });
     notify();
     try {
@@ -301,6 +302,11 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
       check(signal);
       const muse = getMuse(0);
       if (!muse) throw infra('Chưa mở được Muse tài khoản 1.');
+      if (tip) {
+        const result = await writeTip(muse, config, signal, label);
+        say(`Muse đã viết xong mẹo vặt (${result.steps} bước)`);
+        return { script: result.script, notes: result.notes };
+      }
       let script = '';
       for (let attempt = 0; attempt < 2 && !script; attempt++) {
         const marker = randomBytes(3).toString('hex');
@@ -314,13 +320,49 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
       say('Muse đã viết xong lời quảng cáo');
       return { script };
     } catch (error) {
-      if (error.name !== 'AbortError') error.message = String(error.message).replace('bấm Phân tích lại.', 'bấm «Muse viết lời quảng cáo» lại.');
+      if (error.name !== 'AbortError') error.message = String(error.message).replace('bấm Phân tích lại.', tip ? 'bấm «Muse viết mẹo» lại.' : 'bấm «Muse viết lời quảng cáo» lại.');
       state.error = error.name === 'AbortError' ? '' : error.message;
       throw error;
     } finally {
       state.busy = false; controller = null;
       notify();
     }
+  }
+
+  // Mẹo vặt từ tiêu đề: viết theo từng phần (≤16 mục mỗi lượt), phần sau xem lại phần đã viết để nối tiếp; mỗi phần soát đủ bước, hỏi lại một lần nếu thiếu.
+  async function writeTip(muse, config, signal, label) {
+    const tp = plan.tipPlan(config);
+    const parts = plan.tipParts(tp), notes = [], missing = [], long = [];
+    let written = '';
+    for (let index = 0; index < parts.length; index++) {
+      const part = parts[index], partLabel = parts.length > 1 ? `${label} ${index + 1}/${parts.length}` : label;
+      let best = null, fix = '';
+      for (let attempt = 0; attempt < 2; attempt++) {
+        check(signal);
+        const marker = randomBytes(3).toString('hex');
+        say(`${partLabel} · chuẩn bị yêu cầu…`);
+        let reply;
+        try { reply = await ask(muse, plan.buildTipScriptInstruction(config, { marker, part, parts: parts.length, number: index + 1, written, fix }), marker, signal, partLabel); }
+        catch (e) { if (!e.infra || attempt) throw e; await wait(2000, signal); continue; }
+        let text;
+        try { text = plan.tipTrim(plan.tipScriptFromReply(reply), tp, part); }
+        catch (e) { if (attempt) { if (best) break; throw e; } fix = ''; continue; }
+        const issues = plan.tipCheck(text, tp, part);
+        const score = issues.missing.length * 3 + issues.long.length + (issues.noIntro ? 2 : 0) + (issues.noEnd ? 2 : 0);
+        if (!best || score < best.score) best = { text, issues, score };
+        if (issues.ok) break;
+        fix = plan.tipFix(issues, tp);
+      }
+      if (!best) throw Error('Muse chưa viết mẹo. Bấm «Muse viết mẹo» lại.');
+      const wanted = Math.min(part[1], tp.total - 1) - Math.max(part[0], 2) + 1;
+      if (wanted > 0 && best.issues.missing.length * 2 > wanted) throw Error(`Muse viết thiếu nhiều bước (thiếu ${best.issues.missing.length}/${wanted} bước ở phần ${index + 1}). Bấm «Muse viết mẹo» lại.`);
+      missing.push(...best.issues.missing); long.push(...best.issues.long);
+      written = written ? written + '\n' + best.text : best.text;
+    }
+    // Một ghi chú duy nhất (thiếu bước được ưu tiên hơn bước dài) để giao diện hiện gọn và dịch được.
+    if (missing.length) notes.push(`Muse còn thiếu ${missing.map(k => 'bước ' + k).join(', ')}: bổ sung vào ô mẹo hoặc bấm viết lại.`);
+    else if (long.length) notes.push(`${long.map(k => 'Bước ' + k).join(', ')} hơi dài, có thể bị chia thành 2 cảnh.`);
+    return { script: written, steps: tp.steps, notes };
   }
 
   function cancel() { controller?.abort(); }

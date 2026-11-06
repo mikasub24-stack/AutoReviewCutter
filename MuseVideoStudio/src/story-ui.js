@@ -8,7 +8,10 @@
   // Ô chọn của chế độ quảng cáo phải có đủ lựa chọn trước khi nạp giá trị đã lưu.
   $('adTone').replaceChildren(...AD.AD_TONE.map(t => { const o = el('option', '', t.label); o.value = t.id; return o; }));
   $('adLength').replaceChildren(...AD.AD_LENGTHS.map(n => { const o = el('option', '', n + ' giây'); o.value = String(n); return o; }));
+  $('tipMinutes').replaceChildren(...AD.TIP_MINUTES.map(n => { const o = el('option', '', n + ' phút'); o.value = String(n); return o; }));
+  $('tipSecs').replaceChildren(...AD.TIP_SECS.map(n => { const o = el('option', '', n + ' giây'); o.value = String(n); return o; }));
   const FIELDS = {
+    tipTitle: ['tipTitle', ''], tipMinutes: ['tipMinutes', '2'], tipSecs: ['tipSecs', '8'], tipLanguage: ['tipLanguage', 'vi'],
     adProduct: ['adProduct', ''], adPoints: ['adPoints', ''], adAudience: ['adAudience', ''], adOffer: ['adOffer', ''], adCta: ['adCta', ''],
     adTone: ['adTone', AD.AD_TONE[0].id], adLength: ['adLength', '30'],
     storyScript: ['script', ''], storyAspect: ['aspect', '16:9'], storyCharacter: ['character', ''], storyForm: ['form', ''], storyStyle: ['style', ''],
@@ -44,7 +47,10 @@
   const isAd = () => mode === 'ad';
   const isTip = () => mode === 'tip';
   const adFields = () => ({ product: $('adProduct').value, points: $('adPoints').value, audience: $('adAudience').value, offer: $('adOffer').value, cta: $('adCta').value, tone: $('adTone').value, length: Number($('adLength').value), camera: [...adCamera], look: adLook, template: adTemplate });
-  const options = () => ({ seconds: plan().MAX_SECONDS, reference: refs.length > 0 && !isTip(), aspect: $('storyAspect').value, style: $('storyStyle').value, character: $('storyCharacter').value, form: $('storyForm').value, ...(isAd() ? { ad: adFields() } : {}), ...(isTip() ? { tip: true } : {}) });
+  // Mẹo vặt: mỗi ảnh/clip dài tối đa «Mỗi ảnh chuyển động» giây (ô chọn); các chế độ khác dùng mức tối đa của Muse.
+  const capSeconds = () => (isTip() ? Number($('tipSecs').value) || plan().MAX_SECONDS : plan().MAX_SECONDS);
+  const tipFields = () => ({ tipTitle: $('tipTitle').value, tipMinutes: Number($('tipMinutes').value), tipLanguage: $('tipLanguage').value });
+  const options = () => ({ seconds: capSeconds(), reference: refs.length > 0 && !isTip(), aspect: $('storyAspect').value, style: $('storyStyle').value, character: $('storyCharacter').value, form: $('storyForm').value, ...(isAd() ? { ad: adFields() } : {}), ...(isTip() ? { tip: true, ...tipFields() } : {}) });
   const plan = () => window.storyPlan;
   const dims = aspect => aspect === '9:16' ? [1080, 1920] : aspect === '1:1' ? [1080, 1080] : [1920, 1080];
   const baseName = file => String(file || '').split(/[\\/]/).pop();
@@ -86,7 +92,7 @@
   }
   // Giây mỗi cảnh tự tính theo lời kể của cảnh đó (3–10 giây), không nhập tay.
   // Cảnh quay quảng cáo từ ảnh (không có lời đọc) giữ số giây cố định của mẫu; có lời đọc thì tính theo lời.
-  const secondsOf = scene => (scene.fixedSeconds && !String(scene.voiceover || scene.source || '').trim()) ? scene.fixedSeconds : plan().sceneSeconds(scene.voiceover || scene.source || '', plan().MAX_SECONDS);
+  const secondsOf = scene => (scene.fixedSeconds && !String(scene.voiceover || scene.source || '').trim()) ? scene.fixedSeconds : plan().sceneSeconds(scene.voiceover || scene.source || '', capSeconds());
   const headingText = (scene, index) => `${scene.title || 'Cảnh ' + (index + 1)} · ${secondsOf(scene)} giây`;
   // Muse đã hiểu bài thế nào (tóm tắt, cách minh họa, nhân vật/vai, bối cảnh): hiện để người dùng thấy ngay chỗ Muse hiểu sai.
   let understood = null;   // { summary, approach, cast, setting }
@@ -158,9 +164,10 @@
   function renderAnalyze() {
     const a = state?.story?.analyze || {}, busy = analyzing || writing || Boolean(a.busy);
     const writingNow = writing || (a.busy && a.kind === 'write');
-    $('storyAnalyze').disabled = busy; $('storyAnalyzeAgain').hidden = busy || !canResume(); $('adWrite').disabled = busy; $('adQuick').disabled = busy; $('storyAnalyzeStop').hidden = !busy;
+    $('storyAnalyze').disabled = busy; $('storyAnalyzeAgain').hidden = busy || !canResume(); $('adWrite').disabled = busy; $('tipWrite').disabled = busy; $('adQuick').disabled = busy; $('storyAnalyzeStop').hidden = !busy;
     $('storyAnalyze').textContent = busy && !writingNow ? 'Muse đang phân tích…' : canResume() ? 'Phân tích tiếp' : 'Phân tích bằng Muse';
     $('adWrite').textContent = writingNow ? 'Muse đang viết…' : 'Muse viết lời quảng cáo';
+    $('tipWrite').textContent = writingNow ? 'Muse đang viết mẹo…' : busy ? 'Muse đang chia cảnh…' : 'Muse viết mẹo và chia cảnh';
     if (busy && a.progress) $('storyInfo').textContent = a.progress;
   }
   // Quảng cáo nhanh từ ảnh: cảnh quay dựng sẵn theo mẫu, không cần lời đọc hay Muse.
@@ -215,6 +222,32 @@
       }
     } finally { writing = false; renderAnalyze(); }
   }
+  // Mẹo vặt: nhập tiêu đề → Muse viết mẹo theo bước → tự chia cảnh ngay (không cần dán gì). Xem lại cảnh rồi mới bấm «Tạo ảnh + clip».
+  function renderTipCount() {
+    let text = '';
+    try {
+      const tp = plan().tipPlan(options());
+      text = `≈ ${tp.total} cảnh (1 mở đầu + ${tp.steps} bước + 1 kết) = ${tp.total} ảnh + ${tp.total} clip, mỗi cảnh đọc khoảng ${tp.secs} giây. Tạo ảnh và clip tốn khoảng ${tp.total * 2} lượt Muse.`;
+    } catch { text = ''; }
+    $('tipCount').textContent = text;
+  }
+  async function writeTip() {
+    if (analyzing || writing) return;
+    if (!$('tipTitle').value.trim()) { $('tipTitle').focus(); return toast('Nhập tiêu đề mẹo trước.'); }
+    if (($('storyScript').value.trim() || scenes.length) && !confirm('Viết mới sẽ thay mẹo đang có trong ô và xóa các cảnh đã chia. Tiếp tục?')) return;
+    writing = true; renderAnalyze();
+    let notes = [];
+    try {
+      const result = await call('storyAdWrite', options());
+      if (!result?.script) return;
+      $('storyScript').value = result.script; saved.script = result.script; persist();
+      scenes = []; resume = null; understood = null; renderScenes();
+      notes = result.notes || [];
+    } finally { writing = false; renderAnalyze(); }
+    $('storyInfo').textContent = 'Muse đã viết xong mẹo. Đang nhờ Muse chia cảnh…';
+    await analyze(false);
+    if (notes.length && scenes.length) toast(notes[0]);
+  }
   function ask() {
     try {
       $('storyInstruction').value = plan().buildMuseInstruction($('storyScript').value, options());
@@ -251,15 +284,15 @@
   }
   // Chữ khác nhau giữa hai chế độ (viết sẵn tiếng Việt để bản dịch giao diện tự áp dụng).
   const MODE_TEXT = [
-    ['storyHead', 'text', '1. Câu chuyện', '1. Lời quảng cáo (không bắt buộc)', '1. Mẹo vặt (các bước)'],
-    ['storyScript', 'placeholder', 'Chỉ cần dán nguyên câu chuyện. Muse tự đọc hiểu để chia cảnh và viết prompt hình; giọng đọc sẽ đọc đúng nguyên văn câu chuyện này.', 'Không bắt buộc. Muốn có giọng đọc và phụ đề thì mở «Tùy chỉnh thêm» rồi bấm «Muse viết lời quảng cáo», hoặc tự dán lời quảng cáo vào đây. Giọng đọc sẽ đọc đúng nguyên văn lời này.', 'Dán nguyên mẹo vặt: mỗi bước một hoặc vài câu ngắn, theo đúng thứ tự. Muse chia mỗi bước thành một cảnh, vẽ ảnh chụp thật cho bước đó rồi cho ảnh chuyển động; giọng đọc sẽ đọc đúng nguyên văn mẹo này.'],
+    ['storyHead', 'text', '1. Câu chuyện', '1. Lời quảng cáo (không bắt buộc)', '1. Mẹo vặt (Muse viết, bạn sửa được)'],
+    ['storyScript', 'placeholder', 'Chỉ cần dán nguyên câu chuyện. Muse tự đọc hiểu để chia cảnh và viết prompt hình; giọng đọc sẽ đọc đúng nguyên văn câu chuyện này.', 'Không bắt buộc. Muốn có giọng đọc và phụ đề thì mở «Tùy chỉnh thêm» rồi bấm «Muse viết lời quảng cáo», hoặc tự dán lời quảng cáo vào đây. Giọng đọc sẽ đọc đúng nguyên văn lời này.', 'Đã có sẵn mẹo? Dán vào đây rồi bấm «Phân tích bằng Muse». Chưa có thì nhập tiêu đề ở trên: Muse viết mẹo theo từng bước và hiện ở đây để bạn sửa. Giọng đọc sẽ đọc đúng nguyên văn mẹo này.'],
     ['storyStyle', 'placeholder', 'Ví dụ: hoạt hình màu nước', 'Ví dụ: hoạt hình màu nước', 'Mặc định là ảnh chụp thật. Ví dụ: ảnh chụp thật, bếp trắng, ánh sáng cửa sổ'],
     ['storyCharLabel', 'text', 'Nhân vật chính (không bắt buộc)', 'Người mẫu / người dùng (không bắt buộc)'],
     ['storyCharacter', 'placeholder', 'Để trống nếu không cần. Ví dụ: Mai, bé gái tóc đen, áo dài trắng', 'Để trống nếu không cần. Ví dụ: cô gái 25 tuổi, tóc dài, áo sơ mi trắng'],
     ['storyRefs', 'text', 'Chọn ảnh nhân vật', 'Chọn ảnh sản phẩm'],
     ['storyRefPaste', 'text', 'Dán hoặc kéo ảnh nhân vật chính vào đây. Ảnh này gắn vào mọi cảnh để nhân vật giữ nguyên; nhân vật khác do Muse nhận ra và vẽ cùng hình dạng với nhân vật này (chỉ khác màu áo, giới tính, tóc…).', 'Dán hoặc kéo ảnh sản phẩm vào đây (nên 1–2 ảnh rõ nét, nền sạch). Ảnh gắn vào mọi cảnh để sản phẩm giữ đúng hình dạng và màu sắc.']
   ];
-  const IDLE_INFO = ['Dán câu chuyện rồi bấm «Phân tích bằng Muse» (cần đã đăng nhập Muse tài khoản 1). Muse đọc hiểu cả truyện rồi mới chia cảnh và viết prompt hình.', 'Thả ảnh sản phẩm, chọn mẫu: các cảnh quay hiện ngay bên dưới. Muốn có lời đọc thì mở «Tùy chỉnh thêm», viết lời quảng cáo rồi bấm «Phân tích bằng Muse».', 'Dán mẹo vặt rồi bấm «Phân tích bằng Muse». Muse chia mỗi bước thành một cảnh: một ảnh chụp thật, rồi ảnh đó thành clip chuyển động. Mỗi bước tốn 2 lượt Muse (1 ảnh + 1 clip).'];
+  const IDLE_INFO = ['Dán câu chuyện rồi bấm «Phân tích bằng Muse» (cần đã đăng nhập Muse tài khoản 1). Muse đọc hiểu cả truyện rồi mới chia cảnh và viết prompt hình.', 'Thả ảnh sản phẩm, chọn mẫu: các cảnh quay hiện ngay bên dưới. Muốn có lời đọc thì mở «Tùy chỉnh thêm», viết lời quảng cáo rồi bấm «Phân tích bằng Muse».', 'Nhập tiêu đề mẹo rồi bấm «Muse viết mẹo và chia cảnh» (cần đã đăng nhập Muse tài khoản 1). Muse viết mẹo theo từng bước và chia cảnh; bạn xem lại rồi bấm «Tạo ảnh + clip»: mỗi bước một ảnh chụp thật, rồi ảnh đó chuyển động thành clip.'];
   function applyMode(initial) {
     const ad = isAd(), tip = isTip();
     for (const [id, kind, story, adText, tipText] of MODE_TEXT) {
@@ -272,10 +305,10 @@
     for (const id of ['storyRefRow', 'storyRefPaste', 'storyRefInfo']) $(id).hidden = tip;
     for (const id of ['storyCharacter', 'storyForm']) $(id).closest('label').hidden = tip;
     $('storyCreate').textContent = tip ? '▶ Tạo ảnh + clip' : '▶ Tạo clip';
-    $('adBox').hidden = !ad; $('storyCompose').classList.toggle('adMode', ad);
+    $('adBox').hidden = !ad; $('tipBox').hidden = !tip; $('storyCompose').classList.toggle('adMode', ad);
     // Ô «Tỉ lệ» là một: ở chế độ quảng cáo nằm trong khung quảng cáo, ngược lại về chỗ cũ.
     if (ad) $('adAspectSlot').append($('storyAspectLabel')); else if (!initial) $('storyOptionsRow').prepend($('storyAspectLabel'));
-    refInfo();
+    refInfo(); renderTipCount();
     if (!initial || ad || tip) { const a = state?.story?.analyze || {}; if (!analyzing && !writing && !a.busy) $('storyInfo').textContent = IDLE_INFO[tip ? 2 : ad ? 1 : 0]; }
   }
   function setMode(next) {
@@ -575,7 +608,8 @@
     if (story && story.id !== lastStory) { lastStory = story.id; }
   }
 
-  $('modeStory').onclick = () => setMode('story'); $('modeAd').onclick = () => setMode('ad'); $('modeTip').onclick = () => setMode('tip'); $('adWrite').onclick = writeAd; $('adQuick').onclick = quickAd;
+  $('modeStory').onclick = () => setMode('story'); $('modeAd').onclick = () => setMode('ad'); $('modeTip').onclick = () => setMode('tip'); $('adWrite').onclick = writeAd; $('tipWrite').onclick = writeTip; $('adQuick').onclick = quickAd;
+  for (const id of ['tipMinutes', 'tipSecs', 'tipLanguage', 'storyAspect']) $(id).addEventListener('change', renderTipCount);
   $('storyAnalyze').onclick = () => analyze(false); $('storyAnalyzeAgain').onclick = () => analyze(true); $('storyScript').addEventListener('input', renderAnalyze);
   $('storyAnalyzeStop').onclick = async () => { const r = await call('storyAnalyzeCancel'); if (r) render(r); };
   $('storyAsk').onclick = ask; $('storyCopy').onclick = copyInstruction; $('storyParse').onclick = parse;
