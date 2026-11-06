@@ -221,6 +221,36 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
               }
             }
           }
+          // Cảnh Muse ghi mốc chuyển động sai (đảo thứ tự câu, thiếu câu, nhắc câu ngoài cảnh) → hỏi lại đúng những cảnh đó một lần,
+          // chỉ nhận bản mới khi không tệ hơn bản cũ. Muse không ghi số câu thì không có gì để kiểm, không hỏi lại.
+          if (!scenes.some(s => s.offline) && typeof plan.motionIssues === 'function') {
+            const hard = scene => plan.motionIssues(scene, config).filter(x => x.hard);
+            const hardCount = list => list.reduce((n, s) => n + hard(s).length, 0);
+            const bad = [];
+            scenes.forEach((scene, index) => {
+              const issues = hard(scene);
+              if (!issues.length || !scene.units) return;
+              const run = bad.at(-1), item = { scene, issues };
+              if (run && run.end === index - 1) { run.end = index; run.to = scene.units[1]; run.items.push(item); } else bad.push({ from: scene.units[0], to: scene.units[1], start: index, end: index, items: [item] });
+            });
+            if (bad.length) {
+              say(`${label} · soát lại chuyển động ${bad.reduce((n, r) => n + r.items.length, 0)} cảnh…`);
+              for (const run of bad.slice(0, 3).reverse()) {
+                try {
+                  const fix = run.items.map(({ scene, issues }) => `- Cảnh gồm câu ${scene.units[0] === scene.units[1] ? scene.units[0] : `${scene.units[0]}–${scene.units[1]}`} (video ${scene.durationSeconds} giây): ${issues.map(x => x.text).join(' ')}`).join('\n');
+                  const reply = await ask1([[run.from, run.to]], { fix });
+                  const got = plan.scenesFromReply(script, reply, config, { from: run.from, to: run.to });
+                  if (got.cast) cast = got.cast;
+                  const old = scenes.slice(run.start, run.end + 1);
+                  if (got.scenes.length && !got.scenes.some(s => s.offline) && hardCount(got.scenes) <= hardCount(old)) scenes.splice(run.start, run.end - run.start + 1, ...got.scenes);
+                } catch (e) {
+                  if (e.name === 'AbortError') throw e;
+                  if (e.infra) break;   // Muse không trả lời: giữ bản cũ, cảnh báo ở từng cảnh
+                  /* trả lời hỏng: giữ bản cũ */
+                }
+              }
+            }
+          }
           // Câu nào Muse vẫn chưa chia đúng thì KHÔNG tự chia thay Muse: giữ các cảnh đúng phía trước, dừng tại câu đó để làm tiếp.
           const missing = scenes.findIndex(s => s.offline);
           if (missing !== -1) {
@@ -239,6 +269,8 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
           break;
         }
       }
+      const motionLeft = typeof plan.motionIssues === 'function' ? all.filter(s => plan.motionIssues(s, config).some(x => x.hard)).length : 0;
+      if (motionLeft) notes.push(`Còn ${motionLeft} cảnh có mốc chuyển động lệch thứ tự câu hoặc thiếu câu (xem ⚠ ở từng cảnh).`);
       const final = all.map((scene, index) => ({ ...scene, title: `Cảnh ${index + 1}` }));
       say(stop ? `Muse đã chia ${final.length} cảnh, dừng ở câu ${stop.from}` : `Muse đã chia ${final.length} cảnh`);
       return { scenes: final, cast, understanding, notes, ...(stop ? { incomplete: { from: stop.from, total: units.length, message: stop.message } } : {}) };

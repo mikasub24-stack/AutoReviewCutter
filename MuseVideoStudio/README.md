@@ -142,6 +142,11 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.3.5
+
+- **Kiểm tra chuyển động của từng cảnh có khớp thứ tự lời đọc không.** Muse được dặn ghi số câu ngay sau mỗi mốc giờ, dạng «0–3 giây [câu 5]: …». App tự soát: các mốc có đi đúng thứ tự câu không, mỗi câu của cảnh có ít nhất một mốc không, có mốc nào nhắc câu ngoài cảnh không, mốc giờ có tăng dần và nằm trong độ dài video không, prompt có chia mốc giờ không. Cảnh nào đảo thứ tự, thiếu câu hoặc nhắc câu ngoài cảnh thì app **hỏi lại Muse đúng cảnh đó một lần** (kèm lỗi cụ thể), chỉ nhận bản mới khi không tệ hơn bản cũ; hỏi xong vẫn lệch thì giữ bản cũ và hiện ⚠ ở từng cảnh cùng một dòng ghi chú. Thẻ «[câu N]» hiện trong ô prompt để bạn thấy mốc nào ứng với câu nào, và **được bỏ tự động trước khi gửi tạo video**. Muse không ghi số câu thì không có gì để kiểm, app không hỏi lại thêm (chỉ cảnh báo nhẹ nếu cảnh từ 4 giây mà prompt không chia mốc giờ).
+- **Chưa thử**: chỉ kiểm bằng Muse giả (29 kịch bản phân tích, trong đó 3 kịch bản mới cho chuyển động) và Chromium thật. Chưa biết Muse thật có ghi số câu đúng khuôn không. App chỉ kiểm được **thứ tự và độ đủ của các mốc**, không kiểm được việc hình Muse hay mô hình video vẽ ra có đúng nghĩa câu hay không; chuyển động thật trong clip vẫn phải xem bằng mắt.
+
 ## Update 1.3.4
 
 - **Khóa hình dạng dùng được cho mọi kiểu nhân vật, không riêng hoạt hình.** Bản 1.3.3 viết câu khóa thiên về hoạt hình (có câu «không giống người thật»), nên sẽ cản nếu ảnh tham chiếu là người thật hoặc con vật. Nay khóa theo đúng kiểu của ảnh: chuẩn là người que thì mọi người là người que; là **người thật** thì mọi người là người thật; là **con vật** hoạt hình thì mọi nhân vật cùng kiểu đó. Chỉ được khác màu và kiểu quần áo, giới tính, kiểu tóc hoặc bộ lông, phụ kiện, chiều cao, và loài nếu truyện nói rõ. Ô «Hình dạng nhân vật chuẩn» nhận mọi mô tả (ví dụ «người thật, ảnh chụp», «mèo hoạt hình 3D», «thú nhân hóa kiểu tranh minh họa»).

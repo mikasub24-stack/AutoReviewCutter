@@ -65,7 +65,7 @@ function brain(behavior = {}) {
     if (!/NHÂN VẬT ĐÃ CHỐT/.test(text)) lines.push('NHÂN VẬT: Mai – theo ảnh tham chiếu; Bà Ba – 60 tuổi, tóc bạc búi, áo bà ba nâu');
     groups.forEach((g, i) => {
       if (behavior.legacy) { lines.push(`CẢNH ${i + 1}`, `LỜI: ${g.map(u => u.t).join(' ')}`, `PROMPT: Mô tả hình cho cảnh ${i + 1}: Mai đứng bên sông, nét mặt ngạc nhiên, gió thổi nhẹ qua tóc.`); return; }
-      lines.push(`CẢNH ${i + 1}`, `CÂU: ${g[0].n}${g.length > 1 ? '-' + g.at(-1).n : ''}`, `PROMPT: 0–3 giây: Mai đứng bên sông (câu ${g.map(u => u.n).join(',')}). 3–10 giây: nét mặt ngạc nhiên, gió thổi nhẹ qua tóc.`);
+      lines.push(`CẢNH ${i + 1}`, `CÂU: ${g[0].n}${g.length > 1 ? '-' + g.at(-1).n : ''}`, behavior.prompt ? `PROMPT: ${behavior.prompt(g, i, asked.at(-1))}` : `PROMPT: 0–3 giây: Mai đứng bên sông (câu ${g.map(u => u.n).join(',')}). 3–10 giây: nét mặt ngạc nhiên, gió thổi nhẹ qua tóc.`);
     });
     if (!behavior.noDone) lines.push(`MSDONE${done}`);
     return lines.join('\n');
@@ -342,6 +342,51 @@ function brain(behavior = {}) {
       const r = await analyzer.run({ script: tale, options: cfg });
       assert.ok(!/KHÓA HÌNH DẠNG/.test(museBrain.asked[0].text) && r.scenes.every(sc => !/KHÓA HÌNH DẠNG/.test(sc.prompt)));
       await page.close(); ok('không có ảnh/hình dạng chuẩn: không khóa');
+    }
+    // 11i. Muse ghi mốc chuyển động ĐẢO thứ tự câu ở một cảnh → app hỏi lại đúng cảnh đó (kèm lỗi cụ thể), nhận bản đã sửa.
+    {
+      const tagged = (g, ver) => g.length === 1 ? `Bối cảnh: bờ sông. 0–5 giây [câu ${g[0].n}]: Mai nhìn quanh (${ver}). 5–10 giây [câu ${g[0].n}]: Mai bước tới.` : `Bối cảnh: bờ sông. 0–5 giây [câu ${g[0].n}]: Mai chạy ra sông (${ver}). 5–10 giây [câu ${g.at(-1).n}]: Mai nhặt hộp gỗ.`;
+      const wrong = g => `Bối cảnh: bờ sông. 0–5 giây [câu ${g.at(-1).n}]: Mai nhặt hộp gỗ (ver1). 5–10 giây [câu ${g[0].n}]: Mai chạy ra sông.`;
+      const { page, analyzer, museBrain, progress } = await session({ prompt: (g, i, a) => g.length > 1 && i === 1 && !/SỬA LỖI/.test(a.text) ? wrong(g) : tagged(g, /SỬA LỖI/.test(a.text) ? 'ver2' : 'ver1') });
+      const r = await analyzer.run({ script: tale, options: cfg });
+      assert.equal(museBrain.asked.length, 2, 'một lượt chia cảnh + một lượt hỏi lại cảnh sai');
+      assert.deepEqual(museBrain.asked[1].units, [3, 4], 'hỏi lại đúng các câu của cảnh sai');
+      assert.match(museBrain.asked[1].text, /SỬA LỖI – lần trước/);
+      assert.match(museBrain.asked[1].text, /- Cảnh gồm câu 3–4 \(video \d+ giây\): Các mốc đảo thứ tự câu \(câu 4 rồi câu 3\)/);
+      assert.equal(r.scenes.map(s => s.voiceover).join(' '), tale);
+      assert.deepEqual(r.scenes.map(s => s.units), [[1, 2], [3, 4], [5, 5]]);
+      assert.ok(/ver2/.test(r.scenes[1].prompt) && !/ver1/.test(r.scenes[1].prompt), 'bản sửa thay bản sai');
+      assert.ok(r.scenes.every(s => !plan.motionIssues(s, cfg).some(x => x.hard)), 'không còn lỗi nặng');
+      assert.deepEqual(r.notes, []);
+      assert.ok(progress.some(p => /soát lại chuyển động 1 cảnh/.test(p)), progress.join(' | '));
+      await page.close(); ok('mốc chuyển động đảo thứ tự câu: hỏi lại đúng cảnh đó và nhận bản sửa');
+    }
+    // 11j. Hỏi lại mà Muse trả lời TỆ HƠN (vừa đảo vừa thiếu câu): giữ bản cũ, chỉ hỏi một lần, ghi chú còn cảnh lệch.
+    {
+      const wrong = (g, ver) => `Bối cảnh: bờ sông. 0–5 giây [câu ${g.at(-1).n}]: Mai nhặt hộp gỗ (${ver}). 5–10 giây [câu ${g[0].n}]: Mai chạy ra sông.`;
+      const worse = (g, ver) => `Bối cảnh: bờ sông. 0–10 giây [câu 9]: Mai nhặt hộp gỗ (${ver}).`;
+      const one = g => `Bối cảnh: bờ sông. 0–5 giây [câu ${g[0].n}]: Mai nhìn quanh. 5–10 giây [câu ${g[0].n}]: Mai bước tới.`;
+      const { page, analyzer, museBrain } = await session({ prompt: (g, i, a) => g.length === 1 ? one(g) : /SỬA LỖI/.test(a.text) ? worse(g, 'ver2') : wrong(g, 'ver1') });
+      const r = await analyzer.run({ script: tale, options: cfg });
+      assert.equal(museBrain.asked.length, 2, 'chỉ hỏi lại một lần');
+      assert.equal(r.scenes.map(s => s.voiceover).join(' '), tale, 'vẫn đủ lời, không mất cảnh');
+      assert.ok(r.scenes.some(s => /ver1/.test(s.prompt)) && !r.scenes.some(s => /ver2/.test(s.prompt)), 'giữ bản cũ');
+      assert.ok(r.notes.some(n => /^Còn \d+ cảnh có mốc chuyển động lệch thứ tự câu/.test(n)), r.notes.join(' | '));
+      assert.ok(plan.lintScenes(r.scenes, cfg).some(w => w.some(x => /đảo thứ tự câu/.test(x))), 'cảnh báo hiện ở từng cảnh');
+      assert.equal(r.incomplete, undefined);
+      await page.close(); ok('hỏi lại cảnh chuyển động mà Muse trả tệ hơn: giữ bản cũ, ghi chú cảnh còn lệch');
+    }
+    // 11k. Mốc đúng ngay từ đầu, hoặc Muse không ghi số câu: KHÔNG hỏi lại thêm.
+    {
+      const good = (g) => `Bối cảnh: bờ sông. 0–5 giây [câu ${g[0].n}]: Mai chạy ra sông. 5–10 giây [câu ${g.at(-1).n}]: Mai nhặt hộp gỗ.`;
+      const a = await session({ prompt: g => good(g) });
+      const r1 = await a.analyzer.run({ script: tale, options: cfg });
+      assert.equal(a.museBrain.asked.length, 1); assert.deepEqual(r1.notes, []);
+      await a.page.close();
+      const b = await session({});
+      const r2 = await b.analyzer.run({ script: tale, options: cfg });
+      assert.equal(b.museBrain.asked.length, 1, 'không có số câu thì không có gì để kiểm, không tốn thêm lượt'); assert.deepEqual(r2.notes, []);
+      await b.page.close(); ok('mốc đúng hoặc không ghi số câu: không hỏi lại thêm');
     }
     // 12. Đang bận thì không chạy hai lần; kịch bản rỗng báo lỗi.
     {

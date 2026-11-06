@@ -303,7 +303,7 @@
       if (!confirm(`Thêm ${scenes.length} cảnh và chạy toàn bộ clip kể chuyện đang chờ? Tạo video có thể dùng credit Muse. Tool gửi nguyên prompt đã xem, cùng ảnh ${isAd() ? 'sản phẩm' : 'nhân vật'}.`)) return;
     }
     const storyId = newStoryId();
-    const result = await call('add', scenes.map(s => ({ kind: 'story', storyId, title: s.title, source: s.voiceover || s.source || '', voiceover: s.voiceover || '', prompt: s.prompt, durationSeconds: secondsOf(s), image: refs[0] || '', references: [...refs] })));
+    const result = await call('add', scenes.map(s => ({ kind: 'story', storyId, title: s.title, source: s.voiceover || s.source || '', voiceover: s.voiceover || '', prompt: plan().stripBeatTags ? plan().stripBeatTags(s.prompt) : s.prompt, durationSeconds: secondsOf(s), image: refs[0] || '', references: [...refs] })));
     if (!result) return;
     scenes = []; renderScenes(); render(result);
     if (startNow) render(await call('start', { kind: 'story' }));

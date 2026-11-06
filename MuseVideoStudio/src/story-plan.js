@@ -468,7 +468,7 @@
       '',
       'QUY TẮC',
       `1. Mỗi cảnh chỉ là MỘT khoảnh khắc liên tục trong độ dài video của cảnh: một địa điểm, một nhóm nhân vật, tối đa 2–3 hành động nối tiếp; KHÔNG nhảy thời gian, KHÔNG đổi địa điểm, KHÔNG cắt cảnh trong cùng video. Các câu liên tiếp mà đổi địa điểm hoặc nhảy thời gian thì tách thành cảnh khác.`,
-      `2. PROMPT thể hiện đúng điều các câu của cảnh nói: ai, ở đâu, lúc nào, làm gì, theo thứ tự thời gian, chia mốc theo đúng độ dài video của cảnh (video 5 giây: 0–2 giây…, 2–5 giây…; video ${s} giây: 0–3 giây…, 3–7 giây…, 7–${s} giây…), kèm nét mặt, ánh mắt, cử chỉ, tư thế, cảm xúc, ánh sáng và góc máy. Dùng từ cụ thể, không mơ hồ. Mỗi mốc ứng với đúng điều của câu tương ứng theo thứ tự câu, có chuyển động cụ thể của người hoặc vật (ai làm gì, mặt và tay thay đổi thế nào); tư thế, nét mặt, vị trí hoặc hướng nhìn phải THAY ĐỔI rõ giữa các mốc, không đứng yên một dáng cả cảnh; không chèn hình chung chung hay cảnh không liên quan tới câu.`,
+      `2. PROMPT thể hiện đúng điều các câu của cảnh nói: ai, ở đâu, lúc nào, làm gì, theo thứ tự thời gian, chia mốc theo đúng độ dài video của cảnh (video 5 giây: 0–2 giây…, 2–5 giây…; video ${s} giây: 0–3 giây…, 3–7 giây…, 7–${s} giây…), kèm nét mặt, ánh mắt, cử chỉ, tư thế, cảm xúc, ánh sáng và góc máy. Dùng từ cụ thể, không mơ hồ. Mỗi mốc ứng với đúng điều của câu tương ứng theo thứ tự câu và GHI SỐ CÂU ngay sau mốc giờ, dạng «0–3 giây [câu 5]: …» (mốc gộp nhiều câu thì «[câu 5-6]»; một câu được có nhiều mốc): các mốc đi đúng thứ tự câu, KHÔNG đảo, mỗi câu của cảnh có ít nhất một mốc, mốc cuối kết thúc đúng độ dài video của cảnh (app dùng số câu để kiểm tra và tự bỏ khi tạo video); mỗi mốc có chuyển động cụ thể của người hoặc vật (ai làm gì, mặt và tay thay đổi thế nào); tư thế, nét mặt, vị trí hoặc hướng nhìn phải THAY ĐỔI rõ giữa các mốc, không đứng yên một dáng cả cảnh; không chèn hình chung chung hay cảnh không liên quan tới câu.`,
       ad ? '3. Không bịa tính năng, thông số, công dụng, thành phần, chứng nhận hay kết quả mà lời quảng cáo không nói; không cảnh so sánh với sản phẩm khác; không cảnh «trước/sau» hay minh họa chữa bệnh, giảm cân, hiệu quả y tế. Ý trừu tượng thì thể hiện bằng hình cụ thể (người dùng thoải mái, sản phẩm đang được dùng).' : '3. TRUYỆN KỂ: không bịa thêm nhân vật, vật thể hay sự kiện; không đổi kết cục; không bỏ hành động quan trọng; suy nghĩ, cảm xúc hay ý trừu tượng thì thể hiện bằng nét mặt, cử chỉ hoặc vật cụ thể có trong câu. BÀI NÓI / BÌNH LUẬN / CHÂM BIẾM (nói về một kiểu người, một thói quen, một ý kiến, có ví dụ minh họa): dựng đúng TÌNH HUỐNG mà câu đang nói, bằng 1–3 vai cố định làm việc cụ thể trong bối cảnh đời thường (công ty, quán cà phê, nhà, đường phố); bối cảnh phải đúng nơi bài nói tới (ví dụ «trong công ty» → văn phòng có bàn làm việc, máy tính, đồng nghiệp), không dùng một căn phòng chung cho mọi cảnh; bài đã nêu ví dụ nào thì dựng đúng ví dụ đó, đúng thứ tự. Ý đối lập («trước mặt thân thiện, sau lưng nói xấu») thì cho thấy sự đối lập NGAY TRONG cảnh: cùng một người cười bắt tay người A, A vừa quay đi thì mặt đổi sang khinh bỉ và ghé sát tai người B, tay che miệng, mắt liếc về phía A (không có tiếng). Nói quá, ví von, ẩn dụ KHÔNG dựng theo nghĩa đen nếu phi lý hay đáng sợ: dựng tình huống thật đằng sau câu và thể hiện đúng ý bằng nét mặt, cử chỉ, đạo cụ cụ thể (có thể thêm MỘT chi tiết hài nhỏ hợp tinh thần câu). Câu mở bài, đặt câu hỏi, kết luận: dựng một hình ảnh chung nói lên đúng ý đó. Câu cảm thán rất ngắn: dựng phản ứng nét mặt, cử chỉ của người trong cảnh.',
       '4. Mỗi cảnh được tạo video riêng nên PROMPT phải tự đủ ý: mở đầu bằng bối cảnh cụ thể (nơi nào, ánh sáng gì), rồi nhắc lại tên, ngoại hình, trang phục của nhân vật theo cùng một cách ở mọi cảnh; không viết «như cảnh trước».',
       ...[ad ? (config.reference ? '5. SẢN PHẨM: ảnh tham chiếu đính kèm là sản phẩm thật. Giữ đúng hình dạng, tỷ lệ, màu sắc, chất liệu, bao bì và nhãn như trong ảnh; không đổi, không thêm bộ phận, không đổi sang sản phẩm khác. Sản phẩm phải HIỆN RÕ ở mọi cảnh (đang được dùng hoặc trưng bày). Ở dòng NHÂN VẬT ghi mô tả cố định của sản phẩm theo ảnh và, nếu có người mẫu hay người dùng, MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) dùng y nguyên ở mọi cảnh có người đó. Người chỉ được nhắc đến mà không có mặt thì KHÔNG vẽ vào hình.' : '5. SẢN PHẨM: chưa có ảnh tham chiếu nên chỉ mô tả sản phẩm theo thông tin ở cuối, đơn giản và nhất quán (hình dạng, màu sắc, chất liệu) ở mọi cảnh; không bịa chi tiết mà thông tin không nói. Sản phẩm phải HIỆN RÕ ở mọi cảnh (đang được dùng hoặc trưng bày). Ở dòng NHÂN VẬT ghi mô tả cố định của sản phẩm và, nếu có người mẫu hay người dùng, MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) dùng y nguyên ở mọi cảnh có người đó. Người chỉ được nhắc đến mà không có mặt thì KHÔNG vẽ vào hình.') : config.reference ? '5. NHÂN VẬT: nhận ra MỌI nhân vật trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Nhân vật chính là người ở ảnh tham chiếu đính kèm: giữ đúng khuôn mặt, tóc, trang phục trong ảnh, không tự đổi. Mỗi nhân vật khác được chốt MỘT mô tả cố định ' + (lock ? '(chỉ phần được khác theo KHÓA HÌNH DẠNG ở cuối quy tắc này)' : '(tuổi, vóc dáng, tóc, trang phục)') + ' ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó (bài nói/bình luận không có nhân vật tên riêng thì chốt 2–3 vai đại diện cho các kiểu người được nhắc). Trong PROMPT của mỗi cảnh, gọi từng người xuất hiện trong khung hình bằng đúng tên/vai đó kèm mô tả cố định, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.' + (lock ? ' ' + lockRule(config) : '') : '5. NHÂN VẬT: nhận ra các nhân vật CÓ MẶT trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Mỗi nhân vật được chốt MỘT mô tả cố định, ngắn gọn ' + (lock ? '(chỉ phần được khác theo KHÓA HÌNH DẠNG ở cuối quy tắc này)' : '(tuổi, vóc dáng, tóc, trang phục)') + ' ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó; chi tiết truyện không nói thì chọn đơn giản, không bịa thêm. Bài nói/bình luận không có nhân vật tên riêng thì chốt 2–3 VAI cố định đại diện cho các kiểu người được nhắc (ví dụ «người hay nói xấu», «người bị nói xấu», «đồng nghiệp»); khi bài gọi người nghe là «bạn» thì «bạn» là một vai cụ thể trong cảnh. Nếu người dùng đã mô tả nhân vật chính (ở cuối) thì dùng đúng mô tả đó. Chỉ mô tả người XUẤT HIỆN trong khung hình của cảnh, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.' + (lock ? ' ' + lockRule(config) : '')],
@@ -481,13 +481,14 @@
       ...(ctx.cast ? ['(Chỉ khi có nhân vật MỚI xuất hiện ở phần này: thêm một dòng «NHÂN VẬT: …» ghi lại ĐỦ danh sách gồm cả người đã chốt; không thì bỏ qua dòng này.)'] : [ad ? 'NHÂN VẬT: <sản phẩm: mô tả cố định' + (config.reference ? ' theo ảnh tham chiếu' : '') + '; người mẫu nếu có: tuổi, vóc dáng, tóc, trang phục cố định>' : (lock ? 'NHÂN VẬT: <nhân vật chuẩn: ' + (config.reference ? 'ghi «theo ảnh tham chiếu»' : 'ghi kiểu người dùng mô tả') + '; mỗi nhân vật khác một mục: tên/vai – giới tính, màu và kiểu quần áo, kiểu tóc hoặc bộ lông, phụ kiện, chiều cao tương đối, cùng hình dạng với nhân vật chuẩn>' : 'NHÂN VẬT: <mọi nhân vật trong truyện, mỗi người một mục: tên/vai – tuổi, vóc dáng, tóc, trang phục cố định>')]),
       'CẢNH 1',
       `CÂU: <số câu đầu>-<số câu cuối> (ví dụ 1-3; một câu thì chỉ ghi số đó)`,
-      'PROMPT: <mô tả hình ảnh theo quy tắc trên>',
+      'PROMPT: <bối cảnh cụ thể, rồi các mốc dạng «0–3 giây [câu 5]: …» theo quy tắc trên>',
       'CẢNH 2',
       'CÂU: …',
       'PROMPT: …',
       `(cứ thế đến câu số ${last}${marker ? `; dòng cuối cùng của trả lời chỉ gồm đúng một từ: MSDONE${marker}` : ''})`,
       ctx.cast ? `\nNHÂN VẬT ĐÃ CHỐT (dùng y nguyên trong mọi PROMPT): ${ctx.cast}` : '',
       ...(ctx.understanding ? ['', 'HIỂU BIẾT VỀ CẢ BÀI (đã đọc trước; chỉ để nắm mạch và cách minh họa, KHÔNG viết cảnh cho phần này; làm theo CÁCH MINH HỌA ở mọi cảnh):', understandingText(ctx.understanding)] : []),
+      ...(ctx.fix ? ['', 'SỬA LỖI – lần trước các cảnh dưới đây bị sai; viết lại ĐÚNG, vẫn đủ mọi câu của phần này, vẫn theo khuôn trên:', ctx.fix] : []),
       config.character ? `\n${ad ? 'Người mẫu' : 'Nhân vật chính'} (người dùng mô tả): ${config.character}` : '',
       ...(ad ? adBlock(ad) : []),
       '',
@@ -711,6 +712,45 @@
   const TIME_SKIP = /(sau đó|hôm sau|ngày hôm sau|năm sau|nhiều năm|một lúc sau|lát sau|cuối cùng|đồng thời|trong khi đó|the next day|years later|later that|meanwhile|a moment later|finally|flashback|hours later|weeks later|第二天|多年后|与此同时|後日|翌日|数年後|다음 날|몇 년 후|al día siguiente|años después|le lendemain|plus tard|am nächsten tag|später|на следующий день)/i;
   const QUOTED = /["“”«»「」『』]([^"“”«»「」『』]{2,})["“”«»「」『』]/;
   // Trả về mảng cảnh báo (chuỗi) cho từng cảnh; mảng rỗng = ổn.
+  /* ---------- kiểm tra chuyển động của cảnh ----------
+     Muse ghi mỗi mốc dạng «0–3 giây [câu 5]: …». App kiểm: mốc có đi đúng thứ tự câu, đủ câu, không nhắc câu ngoài cảnh,
+     mốc giờ có nằm trong độ dài video. (Không kiểm được hình Muse/video vẽ ra có đúng nghĩa hay không.)
+     Trả mảng {kind, hard, text}. hard = lỗi thứ tự/thiếu câu: app hỏi lại Muse đúng cảnh đó. */
+  const BEAT_TIME = /(\d+(?:[.,]\d+)?)\s*[–—-]\s*(\d+(?:[.,]\d+)?)\s*(?:giây|s|sec|seconds?)(?![\p{L}])/giu;
+  // Thẻ số câu: «[câu 5]», «[câu 5-6]», «(câu 5, 6)»; Muse hay đổi ngoặc nên nhận cả ngoặc tròn.
+  const BEAT_TAG = /[\[(（]\s*c[âa]u\s*(\d+(?:\s*[-–—,;]\s*\d+)*)\s*[\])）]/giu;
+  const stripBeatTags = text => String(text || '').replace(/[ \t]*[\[(（]\s*c[âa]u\s*\d+(?:\s*[-–—,;]\s*\d+)*\s*[\])）]/giu, '');
+  function motionIssues(scene, input = {}) {
+    const config = options(input);
+    const prompt = String(scene?.prompt || '');
+    if (!prompt.trim() || scene.offline || scene.shot || !Array.isArray(scene.units)) return [];
+    const out = [];
+    const seconds = Number(scene.durationSeconds) || sceneSeconds(scene.voiceover || prompt, config.seconds);
+    const num = text => Number(String(text).replace(',', '.'));
+    const times = [...prompt.matchAll(BEAT_TIME)].map(m => [num(m[1]), num(m[2])]);
+    const tags = [...prompt.matchAll(BEAT_TAG)].map(m => { const n = m[1].match(/\d+/g).map(Number); return [Math.min(...n), Math.max(...n)]; });
+    if (!times.length) {
+      if (seconds >= 4) out.push({ kind: 'beats', hard: false, text: 'Prompt chưa chia mốc thời gian («0–3 giây: …») nên chuyển động dễ đứng yên hoặc lệch lời đọc.' });
+    } else {
+      let previous = -1, broken = false;
+      for (const [a, b] of times) { if (!(b > a) || a < previous - 0.01) broken = true; previous = a; }
+      const last = Math.max(...times.map(t => t[1]));
+      if (broken || last > seconds + 1) out.push({ kind: 'time', hard: false, text: `Mốc thời gian chưa hợp lý (video của cảnh dài ${seconds} giây): các mốc phải tăng dần và kết thúc trong ${seconds} giây.` });
+    }
+    if (tags.length) {
+      const [lo, hi] = scene.units;
+      const outside = [...new Set(tags.flatMap(t => [t[0], t[1]]).filter(n => n < lo || n > hi))];
+      if (outside.length) out.push({ kind: 'outside', hard: true, text: `Mốc nhắc câu ${outside.join(', ')} nhưng cảnh này chỉ gồm câu ${lo === hi ? lo : `${lo}–${hi}`}.` });
+      for (let i = 1; i < tags.length; i++) {
+        if (tags[i][0] < tags[i - 1][0]) { out.push({ kind: 'order', hard: true, text: `Các mốc đảo thứ tự câu (câu ${tags[i - 1][0]} rồi câu ${tags[i][0]}); phải đi đúng thứ tự lời đọc.` }); break; }
+      }
+      const missing = [];
+      for (let n = lo; n <= hi; n++) if (!tags.some(t => n >= t[0] && n <= t[1])) missing.push(n);
+      if (missing.length) out.push({ kind: 'missing', hard: true, text: `Chưa có mốc nào minh họa câu ${missing.join(', ')}.` });
+    }
+    return out;
+  }
+
   function lintScenes(scenes, input = {}) {
     const config = options(input);
     const warn = [];
@@ -726,6 +766,7 @@
       if (QUOTED.test(voice) || QUOTED.test(prompt)) w.push('Có lời thoại trong ngoặc kép — nhân vật sẽ không nói, chỉ thể hiện bằng cử chỉ và nét mặt.');
       if (TIME_SKIP.test(voice) || TIME_SKIP.test(prompt)) w.push(`Có chuyển mốc thời gian — ${own} giây khó chứa nhiều khoảnh khắc. Nên tách thành cảnh riêng.`);
       if (splitSentences(voice).length > 4) w.push(`Quá nhiều câu cho ${own} giây; hành động dễ bị bỏ sót hoặc dồn lại.`);
+      for (const issue of motionIssues(scene, config)) w.push(issue.text);
       warn.push(w);
     });
     return warn;
@@ -917,5 +958,5 @@
     return entries.map((entry, index) => `${index + 1}\n${srtTime(entry.start)} --> ${srtTime(entry.end)}\n${entry.text}\n`).join('\n');
   }
 
-  return { ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, MAX_SECONDS, MIN_SECONDS, sceneSeconds, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, lockLine, buildMuseInstruction, buildUnderstandInstruction, parseUnderstanding, understandRanges, understandingText, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, subtitleChunks, srtTime, toSrt };
+  return { ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, MAX_SECONDS, MIN_SECONDS, sceneSeconds, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, lockLine, buildMuseInstruction, buildUnderstandInstruction, parseUnderstanding, understandRanges, understandingText, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, motionIssues, stripBeatTags, subtitleChunks, srtTime, toSrt };
 });

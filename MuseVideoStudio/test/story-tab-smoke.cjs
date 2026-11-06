@@ -97,12 +97,17 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     const instruction = await page.locator('#storyInstruction').inputValue();
     assert.match(instruction, /CÂU CHUYỆN \(đã đánh số câu\):/); assert.match(instruction, /^\[1\] \(/m); assert.match(instruction, /Audio: no speech/);
     assert.match(instruction, /nhận ra MỌI nhân vật/);
-    await page.locator('#storyReply').fill('NHÂN VẬT: Mai – theo ảnh tham chiếu\nCẢNH 1\nCÂU: 1-2\nPROMPT: Cô bé Mai đứng trên bến sông lúc bình minh, mỉm cười nhìn mặt nước.\n\nCẢNH 2\nCÂU: 3-4\nPROMPT: Cá vàng bật lên khỏi mặt nước, Mai ngạc nhiên đưa tay đón.');
+    await page.locator('#storyReply').fill('NHÂN VẬT: Mai – theo ảnh tham chiếu\nCẢNH 1\nCÂU: 1-2\nPROMPT: Cô bé Mai đứng trên bến sông lúc bình minh, mỉm cười nhìn mặt nước.\n0–5 giây [câu 1]: Mai đứng trên bến sông, nhìn mặt nước.\n5–10 giây [câu 2]: Mai vẫy tay chào người lái đò.\n\nCẢNH 2\nCÂU: 3-4\nPROMPT: Cá vàng bật lên khỏi mặt nước, Mai ngạc nhiên đưa tay đón.\n0–5 giây [câu 4]: Mai thả cá về sông.\n5–10 giây [câu 3]: Cá vàng nhảy lên thuyền.');
     await page.locator('#storyParse').click();
     assert.equal(await page.locator('#storyScenes .draftRow').count(), 2);
     assert.match(await page.locator('#storyScenes .draftRow textarea').nth(1).inputValue(), /Cô bé Mai đứng trên bến sông[\s\S]*no speech/);
     assert.equal(await page.locator('#storyScenes .draftRow textarea').nth(0).inputValue(), 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng Mai dậy sớm ra bến đón đò.');
     assert.equal(await page.locator('#storyScenes .storyTag:visible').count(), 0, 'cảnh do Muse viết không bị đánh dấu là prompt mẫu');
+    // Mốc chuyển động: cảnh 2 ghi câu 4 trước câu 3 → cảnh báo ngay ở cảnh đó; cảnh 1 đúng thứ tự thì không bị cảnh báo mốc.
+    await page.waitForFunction(() => /đảo thứ tự câu/.test(document.querySelectorAll('#storyScenes .draftRow')[1]?.textContent || ''));
+    assert.ok(!/đảo thứ tự câu|Chưa có mốc nào/.test(await page.locator('#storyScenes .draftRow').nth(0).textContent()), 'cảnh đúng thứ tự không bị báo lỗi mốc');
+    assert.match(await page.locator('#storyScenes .draftRow').nth(1).textContent(), /câu 4 rồi câu 3/);
+
     await page.locator('#storyReply').fill('Xin lỗi tôi không làm được'); await page.locator('#storyParse').click();
     assert.match(await page.locator('#toast').textContent(), /Chưa thấy cảnh nào/);
     assert.equal(await page.locator('#storyScenes .draftRow').count(), 2, 'trả lời hỏng không xóa cảnh đang có');
@@ -114,6 +119,8 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.ok(add.every(j => j.kind === 'story' && /^Truyen-\d{8}-\d{6}$/.test(j.storyId) && j.storyId === add[0].storyId));
     assert.deepEqual(add.map(j => j.voiceover), ['Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng Mai dậy sớm ra bến đón đò.', 'Một hôm có chú cá vàng nhảy lên thuyền. Mai thả cá về sông và cá hứa sẽ giúp cô một điều ước.']);
     assert.ok(add.every(j => j.references.length === 1 && j.references[0] === 'C:\\Refs\\mai.png' && j.image === 'C:\\Refs\\mai.png'));
+    assert.ok(add.every(j => !/\[\s*câu/i.test(j.prompt)), 'thẻ [câu N] bị bỏ trước khi gửi tạo video');
+    assert.match(add[1].prompt, /0–5 giây: Mai thả cá về sông\.\n5–10 giây: Cá vàng nhảy lên thuyền\./);
     assert.deepEqual((await called('start')).at(-1).data, { kind: 'story' });
     assert.equal(await page.locator('#storyScenes .draftRow').count(), 0);
 
@@ -289,6 +296,11 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.match(englishCheck, /1 scene\(s\) need a look before creating/);
     assert.equal(await page.locator('#storyCheck button').textContent(), 'Fix narration to match the original script');
     assert.match(await page.locator('#storyScenes .storyWarn').first().textContent(), /Prompt too short/);
+    // Cảnh báo mốc chuyển động cũng được dịch.
+    await page.locator('#storyReply').fill('CẢNH 1\nCÂU: 1-2\nPROMPT: Bối cảnh bến sông lúc bình minh, ánh nắng vàng nhẹ.\n0–5 giây [câu 2]: Mai mỉm cười.\n5–10 giây [câu 1]: Cá vàng nhảy.');
+    await page.locator('#storyParse').click();
+    await page.waitForFunction(() => /Marks jump back in sentence order \(sentence 2 then sentence 1\); they must follow the narration order\./.test(document.querySelector('#storyScenes .storyWarn')?.textContent || ''));
+    assert.match(await page.locator('#storyScenes .storyWarn').first().textContent(), /Time marks look wrong \(this scene's video is \d+ seconds\)/);
     // Phân tích bằng Muse (giao diện): tiến độ hiện trong lúc chờ, nút Dừng, kết quả thay danh sách cảnh.
     await page.evaluate(() => { window.analyzeDelay = 700; });
     await page.locator('#storyScript').fill('Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng Mai dậy sớm ra bến đón đò. Một hôm có chú cá vàng nhảy lên thuyền. Mai thả cá về sông và cá hứa sẽ giúp cô một điều ước.');

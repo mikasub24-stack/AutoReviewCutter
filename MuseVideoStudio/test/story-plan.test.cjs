@@ -759,3 +759,70 @@ test('khóa hình dạng dùng được cho người thật và con vật: câu 
     assert.match(ask, /theo đúng kiểu của nhân vật chuẩn/);
   }
 });
+
+test('lệnh chia cảnh dặn Muse ghi số câu sau mỗi mốc giờ; lệnh sửa lỗi kèm đúng danh sách lỗi', () => {
+  const ask = sp.buildMuseInstruction(essay, { seconds: 10 }, { marker: 'abc123' });
+  assert.match(ask, /«0–3 giây \[câu 5\]: …»/);
+  assert.match(ask, /KHÔNG đảo, mỗi câu của cảnh có ít nhất một mốc/);
+  assert.match(ask, /PROMPT: <bối cảnh cụ thể, rồi các mốc dạng «0–3 giây \[câu 5\]: …»/);
+  assert.ok(!/SỬA LỖI/.test(ask));
+  const fix = sp.buildMuseInstruction(essay, { seconds: 10 }, { marker: 'abc123', fix: '- Cảnh gồm câu 2–3 (video 6 giây): Các mốc đảo thứ tự câu.' });
+  assert.match(fix, /SỬA LỖI – lần trước các cảnh dưới đây bị sai/);
+  assert.match(fix, /- Cảnh gồm câu 2–3 \(video 6 giây\): Các mốc đảo thứ tự câu\./);
+});
+
+test('kiểm chuyển động: mốc đúng thứ tự và đủ câu thì không có lỗi', () => {
+  const scene = { units: [5, 6], voiceover: 'Gặp thì tay bắt mặt mừng. Quay lưng thì mồm bắt đầu tăng ca.', durationSeconds: 8, prompt: 'Văn phòng, ánh đèn trắng.\n0–4 giây [câu 5]: Hùng cười bắt tay Nam, vỗ vai.\n4–8 giây [câu 6]: Nam quay đi, Hùng ghé tai Lan, tay che miệng.\n' + sp.NO_SPEECH };
+  assert.deepEqual(sp.motionIssues(scene, { seconds: 10 }), []);
+  // Mốc gộp nhiều câu, một câu nhiều mốc: vẫn hợp lệ.
+  const merged = { ...scene, prompt: '0–3 giây [câu 5-6]: Hùng bắt tay Nam.\n3–5 giây [câu 6]: Hùng ghé tai Lan.\n5–8 giây [câu 6]: Hùng liếc Nam.' };
+  assert.deepEqual(sp.motionIssues(merged, { seconds: 10 }), []);
+  assert.deepEqual(sp.lintScenes([scene], { seconds: 10 })[0].filter(w => /mốc|Mốc/.test(w)), []);
+});
+
+test('kiểm chuyển động: bắt mốc đảo thứ tự câu, thiếu câu, nhắc câu ngoài cảnh; chỉ các lỗi này là lỗi nặng', () => {
+  const base = { units: [5, 7], voiceover: 'A. B. C.', durationSeconds: 9 };
+  const order = sp.motionIssues({ ...base, prompt: '0–3 giây [câu 6]: B.\n3–6 giây [câu 5]: A.\n6–9 giây [câu 7]: C.' }, { seconds: 10 });
+  assert.deepEqual(order.map(i => i.kind), ['order']);
+  assert.ok(order[0].hard && /câu 6 rồi câu 5/.test(order[0].text));
+  const missing = sp.motionIssues({ ...base, prompt: '0–4 giây [câu 5]: A.\n4–9 giây [câu 7]: C.' }, { seconds: 10 });
+  assert.deepEqual(missing.map(i => i.kind), ['missing']);
+  assert.match(missing[0].text, /câu 6\./);
+  const outside = sp.motionIssues({ ...base, prompt: '0–3 giây [câu 5]: A.\n3–6 giây [câu 6]: B.\n6–9 giây [câu 8]: D.' }, { seconds: 10 });
+  assert.ok(outside.some(i => i.kind === 'outside' && i.hard && /câu 8 nhưng cảnh này chỉ gồm câu 5–7/.test(i.text)));
+  assert.ok(outside.some(i => i.kind === 'missing' && /câu 7/.test(i.text)));
+  // Không có mốc giờ: chỉ cảnh báo nhẹ (không hỏi lại Muse), và chỉ khi cảnh dài từ 4 giây.
+  const none = sp.motionIssues({ ...base, prompt: 'Hùng đứng trong văn phòng và cười rất tươi với mọi người xung quanh.' }, { seconds: 10 });
+  assert.deepEqual(none.map(i => [i.kind, i.hard]), [['beats', false]]);
+  assert.deepEqual(sp.motionIssues({ ...base, durationSeconds: 3, prompt: 'Hùng đứng trong văn phòng và cười rất tươi với mọi người xung quanh.' }, { seconds: 10 }), []);
+  // Mốc giờ vượt độ dài video hoặc giảm dần: cảnh báo nhẹ.
+  const over = sp.motionIssues({ ...base, prompt: '0–5 giây [câu 5-6]: A B.\n5–14 giây [câu 7]: C.' }, { seconds: 10 });
+  assert.deepEqual(over.map(i => [i.kind, i.hard]), [['time', false]]);
+  assert.match(over[0].text, /dài 9 giây/);
+  const back = sp.motionIssues({ ...base, prompt: '4–9 giây [câu 5-7]: A B C.\n0–4 giây [câu 6]: B.' }, { seconds: 10 });
+  assert.ok(back.some(i => i.kind === 'time'));
+  // Cảnh mẫu (chưa qua Muse), cảnh quảng cáo quay từ ảnh, cảnh không có số câu: không kiểm.
+  assert.deepEqual(sp.motionIssues({ ...base, offline: true, prompt: 'Mẫu chung.' }, { seconds: 10 }), []);
+  assert.deepEqual(sp.motionIssues({ ...base, shot: true, prompt: 'Mẫu chung.' }, { seconds: 10 }), []);
+  assert.deepEqual(sp.motionIssues({ voiceover: 'A.', prompt: 'Tự viết, không mốc, không số câu nào cả đủ dài.', durationSeconds: 8 }, { seconds: 10 }), []);
+  // Cách viết mốc khác: «0-3s», «0–3 sec», dấu phẩy thập phân.
+  assert.deepEqual(sp.motionIssues({ ...base, prompt: '0-3s [câu 5]: A.\n3,5–6 sec [Câu 6]: B.\n6–9 giây [câu 7]: C.' }, { seconds: 10 }), []);
+  // Cảnh báo hiện ở từng cảnh trong lintScenes.
+  const lint = sp.lintScenes([{ ...base, prompt: '0–3 giây [câu 6]: B.\n3–9 giây [câu 5-7]: A.' }], { seconds: 10 })[0];
+  assert.ok(lint.some(w => /đảo thứ tự câu/.test(w)), lint.join(' | '));
+});
+
+test('bỏ thẻ [câu N] trước khi gửi tạo video, giữ nguyên phần còn lại', () => {
+  const prompt = '0–3 giây [câu 5]: Hùng cười.\n3–6 giây [Câu 6-7]: Hùng ghé tai Lan.\nKhông có thẻ ở đây [ghi chú].\n' + sp.NO_SPEECH;
+  const out = sp.stripBeatTags(prompt);
+  assert.ok(!/\[\s*câu/i.test(out));
+  assert.match(out, /^0–3 giây: Hùng cười\.\n3–6 giây: Hùng ghé tai Lan\.\nKhông có thẻ ở đây \[ghi chú\]\./);
+  assert.ok(out.endsWith(sp.NO_SPEECH));
+  // Muse đổi ngoặc tròn, hoặc liệt kê «câu 6, 7»: vẫn kiểm và vẫn bỏ được.
+  const round = '0–4 giây (câu 5): Hùng cười.\n4–8 giây (Câu 6, 7): Hùng ghé tai Lan.';
+  assert.equal(sp.stripBeatTags(round), '0–4 giây: Hùng cười.\n4–8 giây: Hùng ghé tai Lan.');
+  assert.deepEqual(sp.motionIssues({ units: [5, 7], voiceover: 'A. B. C.', durationSeconds: 8, prompt: round }, { seconds: 10 }), []);
+  assert.deepEqual(sp.motionIssues({ units: [5, 7], voiceover: 'A. B. C.', durationSeconds: 8, prompt: '0–4 giây (câu 6): B.\n4–8 giây (câu 5): A.' }, { seconds: 10 }).map(i => i.kind), ['order', 'missing']);
+  assert.equal(sp.stripBeatTags(''), '');
+  assert.equal(sp.stripBeatTags(null), '');
+});
