@@ -218,4 +218,4 @@ void StudioMain::openReverbEditor(){
     auto* editor=plugin->createEditorIfNeeded();if(!editor)editor=new juce::GenericAudioProcessorEditor(*plugin);
     reverbWindow=std::make_unique<FloatingWindow>(plugin->getName(),editor,true);
 }
-void StudioMain::clearReverbPlugin(){if(!canEdit())return;reverbWindow.reset();engine.removeReverbPlugin();save();status(juce::String::fromUTF8("Đã bỏ vang plugin; giữ Auto-Tune và FX tích hợp."));}
+void StudioMain::clearReverbPlugin(){if(!canEdit())return;setupRestoreFailed=false;reverbWindow.reset();engine.removeReverbPlugin();save();status(juce::String::fromUTF8("Đã bỏ vang plugin; giữ Auto-Tune và FX tích hợp."));}

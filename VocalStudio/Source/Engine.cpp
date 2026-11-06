@@ -41,7 +41,8 @@ juce::Result recoverRecording(const juce::File& source,juce::File& recovered){
 
 StudioEngine::StudioEngine(){formats.registerBasicFormats();pluginFormats.addDefaultFormats();pluginFormats.addFormat(createVst2Format().release());diskThread.startThread();prepare(48000,256);}
 StudioEngine::~StudioEngine(){activeWriter.store(nullptr);if(callbackAttached)devices.removeAudioCallback(this);writer.reset();diskThread.stopThread(5000);devices.closeAudioDevice();}
-juce::String StudioEngine::openDevice(const juce::String& saved){auto xml=juce::parseXML(saved);auto error=devices.initialise(2,2,xml.get(),true);lastDeviceError=error;if(error.isEmpty()){devices.addAudioCallback(this);callbackAttached=true;}return error;}
+juce::String StudioEngine::openDevice(const juce::String& saved){auto xml=juce::parseXML(saved);auto error=devices.initialise(2,2,xml.get(),true);lastDeviceError=error;/* Keep the callback registered even if startup device selection fails.
+    AudioDeviceManager will start it when the user selects a working device later. */if(!callbackAttached){devices.addAudioCallback(this);callbackAttached=true;}return error;}
 void StudioEngine::prepareForTest(double sr,int block){testMode=true;withAudioStopped([&]{prepare(sr,block);});}
 void StudioEngine::withAudioStopped(const std::function<void()>& edit){const bool attached=callbackAttached;suspending.store(true);if(attached){devices.removeAudioCallback(this);callbackAttached=false;}try{edit();}catch(...){if(attached){devices.addAudioCallback(this);callbackAttached=true;}suspending=false;throw;}if(attached){devices.addAudioCallback(this);callbackAttached=true;}suspending.store(false);}
 void StudioEngine::prepare(double sr,int block){
