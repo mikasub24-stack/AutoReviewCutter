@@ -19,7 +19,10 @@ juce::Result StudioEngine::sendSongKey(){if(isPlaying()||isRecording())return ju
 juce::Result StudioEngine::setLiveSongKey(int tonic,bool minor){
     songTonic=tonic;songMinor=minor;songKeySource="YouTube live";
     if(!plugin||!toneLink.enabled)return juce::Result::ok();
-    if(tonic<0||tonic>11){if(!pluginBypassed.load()||heldForUnknownKey){pluginBypassed=true;heldForUnknownKey=true;}toneLinkStatus=u("Đang nghe nhạc để dò tone · Antares tạm bypass");return juce::Result::ok();}
+    if(tonic<0||tonic>11){
+        bool chromatic=false;for(int i=0;i<plugin->getParameters().size();++i)if(auto* p=plugin->getHostedParameter(i))if(p->getParameterID()==toneLink.scaleId)chromatic=p->getText(p->getValue(),128).trim().equalsIgnoreCase("Chromatic");
+        if(chromatic){if(heldForUnknownKey){heldForUnknownKey=false;pluginBypassed=false;}toneLinkStatus=u("Chưa rõ tone · giữ Chromatic trong Auto-Tune, chỉnh về nốt gần nhất.");return juce::Result::ok();}
+        if(!pluginBypassed.load()||heldForUnknownKey){pluginBypassed=true;heldForUnknownKey=true;}toneLinkStatus=u("Đang nghe nhạc để dò tone · Antares tạm bypass");return juce::Result::ok();}
     if(pluginBypassed.load()&&!heldForUnknownKey)return juce::Result::ok();
     auto result=applyPluginTone(*plugin,toneLink,tonic,minor);
     if(result.wasOk()){pluginBypassed=false;heldForUnknownKey=false;toneLinkStatus=u("Đã gửi Key/Scale: ")+juce::String(vocal::noteName(60+tonic))+(minor?" minor":" major");}

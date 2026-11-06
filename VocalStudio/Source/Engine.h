@@ -36,7 +36,7 @@ public:
     juce::AudioPluginFormatManager pluginFormats;
     juce::String openDevice(const juce::String& savedXml={});
     void prepareForTest(double sampleRate=48000,int blockSize=256);
-    void withAudioStopped(const std::function<void()>& edit);
+    void withAudioStopped(const std::function<void()>& edit,const std::function<void()>& finalise={});
     juce::Result readTrack(const juce::File&,bool vocal,std::unique_ptr<StudioTrack>& result);
     void addTrack(std::unique_ptr<StudioTrack>);
     void removeTrack(int index);
@@ -81,10 +81,15 @@ public:
     juce::String tuneFixStatus;
 
     void setPluginBypassed(bool);
+    void usePluginKey();
+    void enableTunerForMonitoring();
     juce::Result setSongKey(int tonic,bool minor,const juce::String& source);
     juce::Result sendSongKey();
     void scanToneLink();
-    int effectivePluginLatency() const noexcept {return calibrationInputOnly.load()?0:(pluginBypassed.load()?0:pluginLatency.load())+reverbPluginLatency.load();}
+    int effectivePluginLatency() const noexcept {return calibrationInputOnly.load()?0:(pluginBypassed.load()?0:pluginLatency.load())+reverbPluginLatency.load()+eqPluginLatency.load();}
+    juce::Result installEqPlugin(std::unique_ptr<juce::AudioPluginInstance>);
+    void removeEqPlugin();
+    juce::AudioPluginInstance* eqPluginInstance() const noexcept{return eqPlugin.get();}
     juce::Result installReverbPlugin(std::unique_ptr<juce::AudioPluginInstance>);
     void removeReverbPlugin();
     juce::AudioPluginInstance* reverbPluginInstance() const noexcept{return reverbPlugin.get();}
@@ -115,6 +120,7 @@ public:
     std::atomic<bool> monitor{false},fxBypass{false},latencyCompensation{true};
     std::atomic<int> inputChannel{0},recordingFault{0};
     std::atomic<float> inputDb{0},highPass{80},warmth{-2},presence{2},threshold{-18},ratio{3},makeup{2},deEss{.35f},reverb{.10f},delay{.04f},delayMs{240},masterDb{-3},manualOffsetMs{0};
+    std::atomic<float> reverbPluginMix{.2f};
     std::atomic<float> monitorDb{0},shortReverb{0},shortDecaySeconds{.45f};
     std::atomic<float> leveling{0},dynamicTame{0},reverbDuck{0};
     std::atomic<float> decaySeconds{1.2f},preDelayMs{20},damping{.65f},width{1},delayFeedback{.27f},deharsh{0};
@@ -136,6 +142,9 @@ private:
     std::unique_ptr<StudioTrack> eqAudition;
     std::atomic<bool> eqListening{false};
     std::atomic<double> sampleRate{48000},pluginTailSeconds{0};
+    std::atomic<int> eqPluginLatency{0};
+    std::atomic<double> eqPluginTail{0};
+    int eqInputs=2,eqOutputs=2;
     std::atomic<int> reverbPluginLatency{0};
     std::atomic<double> reverbPluginTail{0};
     int reverbInputs=2,reverbOutputs=2;
@@ -146,15 +155,15 @@ private:
     juce::TimeSliceThread diskThread{"Vocal recording writer"};
     std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> writer;
     std::atomic<juce::AudioFormatWriter::ThreadedWriter*> activeWriter{nullptr};
-    std::unique_ptr<juce::AudioPluginInstance> plugin,reverbPlugin;
-    juce::AudioBuffer<float> vocalBus,musicBus,monoInput;
+    std::unique_ptr<juce::AudioPluginInstance> plugin,reverbPlugin,eqPlugin;
+    juce::AudioBuffer<float> vocalBus,musicBus,monoInput,reverbDry;
     juce::MidiBuffer midi;
     vocal::VocalChain playbackFx,monitorFx,vocalAmbience;
     vocal::Limiter limiter;
-    std::array<vocal::Delay,2> musicDelay;
+    std::array<vocal::Delay,2> musicDelay,reverbDryDelay;
     juce::File sessionDirectory,recordFile;
     double recordStart=0;
-    float currentMonitor=1,currentMaster=1,smoothing=.001f;
+    float currentReverbMix=.2f,currentMonitor=1,currentMaster=1,smoothing=.001f;
     bool callbackAttached=false,offline=false,testMode=false,heldForUnknownKey=false;
     std::atomic<bool> suspending{false};
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StudioEngine)

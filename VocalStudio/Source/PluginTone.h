@@ -19,5 +19,5 @@ PluginToneLink discoverPluginTone(juce::AudioPluginInstance&);
 juce::Result applyPluginTone(juce::AudioPluginInstance&,const PluginToneLink&,int tonic,bool minor);
 
 struct PluginTuneChange {juce::String id;float before=0,after=0;};
-juce::Result applyNaturalTuning(juce::AudioPluginInstance&,std::vector<PluginTuneChange>&,juce::String& report);
+juce::Result applyNaturalTuning(juce::AudioPluginInstance&,std::vector<PluginTuneChange>&,juce::String& report,float retuneMinimumMs=35);
 juce::Result undoNaturalTuning(juce::AudioPluginInstance&,const std::vector<PluginTuneChange>&);

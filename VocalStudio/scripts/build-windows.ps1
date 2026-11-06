@@ -37,7 +37,7 @@ if ($iscc) { $compiler = $iscc.Source } else { $compiler = Join-Path ${env:Progr
 if (!(Test-Path $compiler)) { throw 'Install Inno Setup 6 to package the installer; the built app is in the build folder.' }
 & $compiler "/DSourceDir=$appDir" "/DOutputDir=$dist" 'VocalStudio/installer/VocalStudio.iss'
 if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
-$setup = Join-Path $dist 'VocalStudio-1.7.0-Setup.exe'
+$setup = Join-Path $dist 'VocalStudio-1.8.0-Setup.exe'
 $installDir = Join-Path ([IO.Path]::GetTempPath()) ('VocalStudio-verify-' + [Guid]::NewGuid().ToString('N'))
 $process = Start-Process $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$installDir`"") -Wait -PassThru
 if ($process.ExitCode -ne 0) { throw 'Test installation failed' }
@@ -49,7 +49,7 @@ if (!(Test-Path $report) -or !((Get-Content $report -Raw | ConvertFrom-Json).pas
 Test-Browser $installDir 'InstalledBrowserSelfTest.json'
 $uninstaller = Join-Path $installDir 'unins000.exe'
 if (Test-Path $uninstaller) { Start-Process $uninstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait | Out-Null }
-Compress-Archive -Path "$appDir/*" -DestinationPath (Join-Path $dist 'VocalStudio-1.7.0-Windows.zip') -Force
+Compress-Archive -Path "$appDir/*" -DestinationPath (Join-Path $dist 'VocalStudio-1.8.0-Windows.zip') -Force
 Copy-Item (Join-Path $build 'EngineSelfTest.json') $dist
 Copy-Item (Join-Path $build 'Testing/Temporary/LastTest.log') (Join-Path $dist 'VocalStudio-Verification.log')
 Get-ChildItem $dist -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content (Join-Path $dist 'SHA256SUMS.txt') -Encoding ascii

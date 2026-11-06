@@ -1,5 +1,25 @@
 # Vocal Studio
 
+## 1.8 · Kiểm âm, lưu cấu hình, quét plugin và EQ riêng
+
+Các nút Giọng tự nhiên, Giọng tai nghe, Lưu cấu hình giọng, Kiểm âm ít trễ và Quét plugin nằm đúng trong thanh cuộn, được kiểm tra parent/bounds khi chụp ảnh Windows. Giọng tự nhiên bật mic, đặt EQ nhẹ/nén vừa/vang nhẹ, giữ gain mic, mức tai nghe tối thiểu +6 dB và master −3 dB; đặt Retune tối thiểu 60 ms, Humanize tối thiểu 50% và Flex tối thiểu 20% nếu nhận diện chắc đơn vị tham số. Đây là điểm bắt đầu nghe thử, không tự tạo rung nhân tạo hoặc cam kết âm thanh phát hành.
+
+Vang plugin có mix riêng, mặc định 20% ở ô mới để giữ giọng trực tiếp kể cả khi plugin để all-wet; đường dry được bù trễ theo plugin. Phiên cũ không có giá trị mix giữ chế độ insert trước đây.
+
+Có ba ô plugin độc lập: EQ (ví dụ Pro-Q 3) → Auto-Tune → vang (ví dụ ArtsAcoustic/Pro-R). Quét các thư mục VST chuẩn và thư mục đã chọn trước; chỉ nạp module khi người dùng chọn. VST3 nhiều lớp như Waves có thể mở danh sách effect trong module. Việc quét không chứng minh giấy phép hay tương thích của mọi plugin. Pro-Q được nạp/chỉnh trong ô EQ, không có tự đoán band/processing mode của vendor. DLL VST2 x86 và VST2 shell vẫn chưa có bridge.
+
+Nút ít trễ ưu tiên Windows Audio Low Latency khi giữ được đúng cặp thiết bị hiện tại, chọn buffer thấp do driver cung cấp, thử 48 kHz nếu có; lỗi sẽ trả lại cấu hình trước. Thiết lập plugin được khôi phục lại sau khi driver chuẩn bị audio. Dùng Zero Latency trong Pro-Q khi hát, tắt Direct Monitor/DSP phần cứng để tránh hai tiếng; độ trễ thực tế còn phụ thuộc driver/plugin.
+
+Trạng thái plugin được phục hồi sau prepare và sau khi gắn callback (có thể gọi prepare lần nữa), kèm snapshot tham số theo ID cho cùng phiên bản plugin. Có kiểm thử VST3 với một tham số cố ý không nằm trong opaque state và bị reset khi prepare, cùng chuỗi ba ô với bù latency. Auto-Tune đang ở Chromatic được giữ hoạt động khi chưa dò ra tone; scale Major/Minor cũ vẫn tạm bypass khi thiếu key. Bật Auto-Tune · giữ cài đặt hoặc Giữ Key/Scale trong Auto-Tune để app không gửi đè key thủ công. Các giá trị Retune/Humanize/Input Type được lưu độc lập với chế độ dò key. Khi nâng từ bản cũ chưa có lựa chọn giữ key và đã lưu plugin, mặc định giữ key của plugin để tránh ghi đè ngay sau mở app; người dùng có thể bật lại Tự dò tone.
+
+### Khôi phục thiết lập và sửa vùng điều khiển giọng
+
+Sửa parent của các nút/slider mới để Giọng nổi, Giọng tai nghe, màu giọng và vang plugin nằm đúng trong thanh cuộn. Có kiểm tra cấu trúc/bounds giao diện trong bước chụp ảnh Windows. Thêm **Lưu cấu hình giọng**, báo thành công kèm giờ, lưu khi đóng cửa sổ plugin. Tự lưu định kỳ vẫn hoạt động.
+
+Trạng thái plugin được phục hồi sau prepareToPlay, kèm snapshot tham số theo ID cho cùng phiên bản plugin để giữ cả các giá trị controller mà opaque state có thể bỏ sót. Thêm **Giữ Key/Scale trong Auto-Tune**: app không gửi đè Key/Scale và bỏ trạng thái bypass tự động do chờ dò tone, vẫn giữ bypass thủ công. Muốn app theo tone nhạc thì bật lại Tự dò tone. Không tự đổi Retune/Humanize khi chọn chế độ key.
+
+Sau nâng cấp, bấm **Giọng nổi · Nén + Vang** nếu muốn áp dụng preset kiểm âm +6 dB/nén/vang; chọn Màu giọng, chỉnh Giọng tai nghe và bấm Lưu cấu hình giọng. Không tự nâng âm lượng hoặc thay preset đã lưu khi mở app.
+
 ## 1.7 · VST2 DLL x64 và vang plugin riêng
 
 Sửa đăng ký callback âm thanh: nếu thiết bị lúc khởi động không mở được, app vẫn theo dõi AudioDeviceManager để xử lý micro/YouTube khi người dùng chọn lại card hợp lệ. Chưa xác minh lại tình huống này trên sound card thật của người dùng.

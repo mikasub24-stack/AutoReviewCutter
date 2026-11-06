@@ -39,9 +39,9 @@ bool numericTarget(Parameter& p,float minimum,bool milliseconds,float& result){
     return valid(result)&&number(p.getText(result,128),decoded)&&std::abs(decoded-target)<.51f;
 }
 }
-juce::Result applyNaturalTuning(juce::AudioPluginInstance& plugin,std::vector<PluginTuneChange>& changes,juce::String& report){
+juce::Result applyNaturalTuning(juce::AudioPluginInstance& plugin,std::vector<PluginTuneChange>& changes,juce::String& report,float retuneMinimumMs){
     changes.clear();report={};auto* retune=uniqueControl(plugin,{"retunespeed","retune"});float value=0;
-    if(!retune||!numericTarget(*retune,35,true,value))return juce::Result::fail(u("Không nhận diện chắc Retune Speed theo ms. Mở Antares và chỉnh Retune khoảng 35 ms hoặc chậm hơn; tool chưa đổi tham số nào."));
+    if(!retune||!numericTarget(*retune,retuneMinimumMs,true,value))return juce::Result::fail(u("Không nhận diện chắc Retune Speed theo ms. Mở Antares và chỉnh Retune khoảng 35 ms hoặc chậm hơn; tool chưa đổi tham số nào."));
     std::vector<PluginTuneChange> planned;
     auto plan=[&](Parameter* p,float v){const float before=p->getValue();report+=p->getName(128)+": "+p->getText(before,128)+" → "+p->getText(v,128)+"\n";if(std::abs(before-v)>.00001f)planned.push_back({p->getParameterID(),before,v});};plan(retune,value);
     for(const auto& spec:std::vector<std::pair<juce::StringArray,float>>{{{"humanize"},50},{{"flextune","flex"},20}}){auto* p=uniqueControl(plugin,spec.first);if(p&&numericTarget(*p,spec.second,false,value))plan(p,value);else report+=spec.first[0]+u(": không có/không xác minh được đơn vị; giữ nguyên, chỉnh trong Antares nếu có.\n");}

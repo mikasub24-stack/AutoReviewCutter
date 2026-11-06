@@ -1,4 +1,4 @@
-name: Vocal Studio 1.6 Windows preview
+name: Vocal Studio 1.8 Windows preview
 on:
   workflow_dispatch:
   push:
@@ -37,12 +37,12 @@ jobs:
       - name: Archive corresponding source
         shell: pwsh
         run: |
-          & git archive '--format=zip' '--output=dist/VocalStudio-1.7.0-Source.zip' HEAD 'VocalStudio' '.github/workflows/vocal-studio-preview.yml'
+          & git archive '--format=zip' '--output=dist/VocalStudio-1.8.0-Source.zip' HEAD 'VocalStudio' '.github/workflows/vocal-studio-preview.yml'
           if ($LASTEXITCODE -ne 0) { throw 'Source archive failed' }
           Get-ChildItem dist -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content dist/SHA256SUMS.txt -Encoding ascii
       - uses: actions/upload-artifact@v4
         with:
-          name: VocalStudio-1.7.0-Verified-Windows
+          name: VocalStudio-1.8.0-Verified-Windows
           path: dist/
           if-no-files-found: error
       - name: Summarize build or native test failure
@@ -64,7 +64,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: VocalStudio-1.7.0-Diagnostics
+          name: VocalStudio-1.8.0-Diagnostics
           path: |
             build/vocal/Testing/Temporary/LastTest.log
             build/vocal/Compile.log

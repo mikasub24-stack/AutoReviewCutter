@@ -39,7 +39,7 @@ public:
     void importAudio(const juce::File&,bool vocal);
     void record();
     void stop();
-    void save();
+    bool save();
     void status(const juce::String&);
     juce::String userStatus() const{return currentStatus;}
     bool isBusy() const noexcept {return busy;}
@@ -70,12 +70,17 @@ public:
     void openSoundCard(){showDevices();}
     juce::PropertiesFile* settings(){return preferences.getUserSettings();}
     void showQuickMode(bool);
+    bool validateQuickControls() const;
     void startBrowserProbe();
     std::uint64_t browserCaptured() const;
     float browserPeak() const;
     void chooseAntaresPlugin(){choosePlugin();}
     void openAntaresEditor(){showPlugin();}
-    void chooseReverbPlugin(){choosePlugin(true);}
+    void chooseReverbPlugin(){choosePlugin(1);}
+    void chooseEqPlugin(){choosePlugin(2);}
+    void openEqEditor();void clearEqPlugin();
+    void scanPlugins(int slot);
+    void lowLatencyMonitoring();
     void openReverbEditor();
     void clearReverbPlugin();
     std::shared_ptr<SongFitPlan> fitPlan;
@@ -113,7 +118,7 @@ private:
     juce::Label trackTitle,trackInfo,positionLabel,deviceLabel,statusLabel,pluginLabel,gainLabel,panLabel,masterLabel;
     std::array<std::unique_ptr<Knob>,10> knobs;
     std::unique_ptr<juce::FileChooser> chooser;
-    std::unique_ptr<juce::DocumentWindow> deviceWindow,pluginWindow,reverbWindow,toolsWindow,eqWindow,polishWindow,tuneFixWindow;
+    std::unique_ptr<juce::DocumentWindow> deviceWindow,pluginWindow,reverbWindow,eqPluginWindow,toolsWindow,eqWindow,polishWindow,tuneFixWindow;
     vocal::EqSettings eqBefore,eqRestore,eqLast;
     juce::String eqSession,eqSourceFile;int eqSource=-1;
     juce::File projectFile;
@@ -132,7 +137,8 @@ private:
     void chooseAudio();
     void chooseProject();
     void chooseExport();
-    void choosePlugin(bool reverbSlot=false);
+    void choosePlugin(int slot=0);
+    void loadPluginPath(const juce::File&,int slot);
     void showDevices();
     void showPlugin();
     void newSession();
