@@ -22,6 +22,9 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   const savedAliases=[...new Set([...echoAliases,...(recover&&map.get(id)?.echoAliases?[...map.get(id).echoAliases]:[]),...(echoKey?[echoKey]:[])])];
   const visible = e => Boolean(e?.isConnected && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden');
   const following = (a,b) => Boolean(a?.isConnected && b?.isConnected && !(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_DISCONNECTED) && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING));
+  // Muse can show the same prompt twice ("not confirmed as sent", then sent again). The reply to the
+  // second copy still answers this prompt, so for pictures it does not count as another message.
+  const resend = e => imageMode && norm(e.innerText ?? e.textContent) === wanted;
   const composer = e => Boolean(e.closest('textarea,input,[contenteditable="true"],[role="textbox"]'));
   function author(e) {
     for(let n=e;n && n!==document.body;n=n.parentElement) {
@@ -37,16 +40,21 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   const imageMode=mediaKind==='image',imageSel=imageSelector||'img';
   const source=v=>{if(v.tagName==='IMG')return v.currentSrc||v.src||'';if(v.tagName==='A')return v.href;const declared=v.getAttribute('src');if(declared)return new URL(declared,document.baseURI).href;return v.currentSrc||v.querySelector('source[src]')?.src||'';};
   const videoLink=a=>a.tagName==='A'&&(/^video\//i.test(a.type||'')||/\.(mp4|webm)(?:$|[?#])/i.test(a.href)||/\.(mp4|webm)$/i.test(a.getAttribute('download')||''))&&/^(https:|blob:)/i.test(a.href);
-  // Generated pictures are large; avatars, icons, emoji and the small reference
-  // thumbnails inside the user's own bubble are not results of a prompt.
-  const IMG_MIN=150;
+  // Avatars, icons and emoji are not results of a prompt. Muse shows a generated picture
+  // as a thumbnail (about 220 px wide, so a 16:9 picture is only about 124 px high),
+  // which is why the floor is low: the picture must still follow this prompt's message.
+  const IMG_MIN=80,IMG_NATURAL_MIN=96;
   const imageSource=src=>/^(https:|blob:|data:image\/(?:png|jpe?g|webp|gif);)/i.test(src)&&!/\.svg(?:$|[?#])/i.test(src)&&!/(?:^|[\/_.-])(?:avatar|emoji|sprite|favicon|logo)(?:[\/_.-]|$)/i.test(src);
   function imageUsable(v){
     if(v.tagName!=='IMG'||!imageSource(source(v))||/avatar|emoji|icon|logo/i.test(v.getAttribute('alt')||''))return false;
     if(!visible(v)||composer(v))return false;
     const r=v.getBoundingClientRect();
     if(r.width<IMG_MIN||r.height<IMG_MIN)return false;
-    return !(v.complete&&v.naturalWidth>0&&(v.naturalWidth<128||v.naturalHeight<128));
+    return !(v.complete&&v.naturalWidth>0&&(v.naturalWidth<IMG_NATURAL_MIN||v.naturalHeight<IMG_NATURAL_MIN));
+  }
+  // Pictures that look like a result but are too small to count, for the card's hint.
+  function tinyImages(){
+    return [...document.querySelectorAll(imageSel)].filter(v=>v.tagName==='IMG'&&!imageUsable(v)&&imageSource(source(v))&&visible(v)&&!composer(v)&&!/avatar|emoji|icon|logo/i.test(v.getAttribute('alt')||'')&&s.echoRoot?.isConnected&&following(s.echoRoot,v)&&!s.echoRoot.contains(v)&&!s.baselineSources.has(source(v)));
   }
   function imageNodes(root){return [...new Set([...(root.matches?.(imageSel)?[root]:[]),...root.querySelectorAll(imageSel)])].filter(imageUsable);}
   function mediaNodes(root){
@@ -125,7 +133,15 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   }
   // Short reason shown on the card while no reply is bound to this prompt, so a
   // stuck scene says what the tool can and cannot see in the chat.
+  function tinyHint(){
+    if(!imageMode||!s.echoRoot?.isConnected)return '';
+    const tiny=tinyImages();
+    if(!tiny.length||imageNodes(document).some(v=>following(s.echoRoot,v)&&!s.echoRoot.contains(v)&&!s.baselineSources.has(source(v))))return '';
+    const r=tiny[0].getBoundingClientRect();
+    return `thấy ${tiny.length} ảnh nhưng quá nhỏ (${Math.round(r.width)}×${Math.round(r.height)} px, tối thiểu ${IMG_MIN}) nên chưa nhận là ảnh kết quả`;
+  }
   function hint(){
+    const small=tinyHint();if(small)return small;
     const fresh=(imageMode?imageNodes(document):[...document.querySelectorAll('video')]).filter(v=>s.echoRoot?.isConnected&&following(s.echoRoot,v)&&(!imageMode||!s.echoRoot.contains(v))&&(recover||(!s.baseline.has(v)&&!s.baselineSources.has(source(v))))).length;
     const why=Object.entries(s.reject||{}).map(([k,n])=>k+' '+n).join(', '),noun=imageMode?'ảnh':'video';
     return fresh?`thấy ${fresh} ${noun} mới nhưng chưa gắn được vào đúng prompt${why?' ('+why+')':''}`:`chưa thấy ${noun} mới trong chat`;
@@ -152,7 +168,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     const found=[];
     if(!s.echoRoot?.isConnected)return found;
     const bound=chatBound();if(!bound)return found;
-    const users=[...bound.querySelectorAll('*')].filter(e=>e!==s.echoRoot&&following(s.echoRoot,e)&&author(e).kind==='user'&&author(e).root===e);
+    const users=[...bound.querySelectorAll('*')].filter(e=>e!==s.echoRoot&&following(s.echoRoot,e)&&author(e).kind==='user'&&author(e).root===e&&!resend(e));
     const ids=new Set([...s.echoAliases,s.echoRoot.id,s.echoRoot.getAttribute('data-message-id'),s.echoRoot.getAttribute('data-id')].filter(Boolean));
     for(const video of mediaNodes(bound)){
       if(!following(s.echoRoot,video)||s.echoRoot.contains(video)||composer(video))continue;
@@ -196,14 +212,14 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     const values=[...root.querySelectorAll('*')].filter(e=>visible(e)&&e.children.length===0).map(e=>norm(e.textContent)).filter(t=>t.length<=80).map(t=>t.match(/(?:^|\s)(\d{1,3}(?:[.,]\d+)?)\s*%/)).filter(Boolean).map(m=>Number(m[1].replace(',','.'))).filter(v=>v>=0&&v<=100);
     return new Set(values).size===1?values[0]:null;
   }
-  const playable=v=>imageMode?(v.tagName==='IMG'&&v.complete&&v.naturalWidth>=128&&v.naturalHeight>=128&&imageSource(source(v))):videoLink(v)||(v.tagName==='VIDEO'&&/^(https:|blob:)/i.test(source(v)));
+  const playable=v=>imageMode?(v.tagName==='IMG'&&v.complete&&v.naturalWidth>=IMG_NATURAL_MIN&&v.naturalHeight>=IMG_NATURAL_MIN&&imageSource(source(v))):videoLink(v)||(v.tagName==='VIDEO'&&/^(https:|blob:)/i.test(source(v)));
   function rememberContext(root){const parents=[];for(let p=root.parentElement,depth=0;p&&p!==document.body&&depth<8;p=p.parentElement,depth++)if(!p.querySelector('textarea,input,[contenteditable="true"],[role="textbox"],nav,aside'))parents.push(p);return parents;}
   function result(phase,stage,root=s.responseRoot) {return {id,phase,stage,responseMatched:Boolean(root?.isConnected&&s.echoRoot&&following(s.echoRoot,root)),echoAliases:[...s.echoAliases],echoMatched:Boolean(s.echo),echoKey:s.echoRoot?.id||s.echoRoot?.getAttribute('data-message-id')||s.echoRoot?.getAttribute('data-id')||'',echoMarker:s.echoRoot?.getAttribute('data-muse-studio-attempt')||'',ready:phase==='ready',progress:progress(root),...(phase==='ready'?{url:source(s.video),fingerprint:s.fingerprint,...(imageMode?{count:s.images.length}:{})}:{})};}
   s.poll=()=>{
     if(s.echo?.isConnected&&s.echoRoot?.isConnected&&(!s.echoRoot.contains(s.echo)||norm(s.echo.innerText??s.echo.textContent)!==wanted||author(s.echo).kind==='assistant'))throw Error('Tin nhắn của cảnh đã thay đổi. Không lấy video từ câu Test hay cảnh khác.');
     let echoes=echoCandidates();
     if(!s.echo&&!echoes.length&&recover&&!recoverRequireAnchor&&(echoKey||echoMarker)){const exact=echoCandidates(true);if(exact.length===1)echoes=exact;else if(exact.length>1)throw Error('Có nhiều tin nhắn trùng prompt nhưng ID cũ đã thay đổi. Không chọn clip khi chưa xác định được cảnh.');}
-    if(!s.echo&&echoes.length>1)throw Error('Có nhiều tin nhắn trùng chính xác prompt. Không xác định được video của tác vụ; hãy dùng chat riêng hoặc xử lý thủ công.');
+    if(!s.echo&&echoes.length>1&&!(imageMode&&!recover&&echoes.every(e=>resend(e.leaf)||resend(e.root))))throw Error('Có nhiều tin nhắn trùng chính xác prompt. Không xác định được video của tác vụ; hãy dùng chat riêng hoặc xử lý thủ công.');
     if(!s.echo) {
       if(!echoes.length){if(recover&&recoverRequireAnchor)return {...result('recovery-unbound','Chưa xác nhận được tin nhắn của đúng lượt gửi cũ',null),recoveryUnbound:true,historicalEchoCount:echoCandidates(true).length};return result('waiting-prompt','Chờ Muse hiển thị đúng prompt đã gửi');}
       s.echo=echoes[0].leaf;s.echoRoot=echoes[0].root;s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.echoNativeKey=s.echoRoot.id||s.echoRoot.getAttribute('data-message-id')||s.echoRoot.getAttribute('data-id')||'';if(s.echoNativeKey)s.echoAliases.add(s.echoNativeKey);s.echoContexts=rememberContext(s.echoRoot);s.echoEpoch=Math.max(s.added.get(s.echo)||0,s.added.get(s.echoRoot)||0);
@@ -222,7 +238,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     // response boundaries again. A live DOM node can be recycled for Test or
     // another turn without being disconnected.
     s.ready=false;
-    const userRoots=thread?[...thread.querySelectorAll('*')].filter(e=>e!==s.echoRoot&&following(s.echoRoot,e)&&((author(e).kind==='user'&&author(e).root===e)||e.hasAttribute('data-muse-studio-attempt'))):[];
+    const userRoots=thread?[...thread.querySelectorAll('*')].filter(e=>e!==s.echoRoot&&following(s.echoRoot,e)&&((author(e).kind==='user'&&author(e).root===e&&!resend(e))||e.hasAttribute('data-muse-studio-attempt'))):[];
     const echoIds=new Set([...s.echoAliases,s.echoRoot.id,s.echoRoot.getAttribute('data-message-id'),s.echoRoot.getAttribute('data-id')].filter(Boolean));
     const candidates=[],reject={};const note=k=>{reject[k]=(reject[k]||0)+1;};s.reject=reject;
     for(const video of (thread?mediaNodes(thread):[])) {
@@ -249,13 +265,13 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       s.responseRoot=null;s.video=null;
       if(!thread)return {...result('waiting-response','Chưa xác định được vùng phản hồi cho prompt này'),hint:hint()};
       if(s.genericResponseRoot && author(s.genericResponseRoot).kind!=='user' && (recover || (!s.baseline.has(s.genericResponseRoot)&&(s.added.get(s.genericResponseRoot)||0)>=s.echoEpoch))) {
-        s.responseRoot=s.genericResponseRoot;return result('rendering','Muse đang xử lý prompt này',s.genericResponseRoot);
+        s.responseRoot=s.genericResponseRoot;return result('rendering','Muse đang xử lý prompt này'+(tinyHint()?' · '+tinyHint():''),s.genericResponseRoot);
       }
       const possible=[...thread.querySelectorAll(messageSelector||'*')].filter(root=>{
         const a=author(root),ref=root.getAttribute('data-response-to')||root.getAttribute('data-parent-message-id')||root.getAttribute('data-prompt-id');
         return a.kind==='assistant'&&a.root===root&&!root.contains(s.echo)&&following(s.echoRoot,root)&&!userRoots.some(user=>following(user,root))&&(recover||(!s.baseline.has(root)&&(s.added.get(root)||0)>=s.echoEpoch))&&(!ref||echoIds.has(ref.replace(/^#/,'')));
       });
-      if(possible.length===1){s.responseRoot=possible[0];return result('rendering','Muse đang xử lý prompt này',possible[0]);}
+      if(possible.length===1){s.responseRoot=possible[0];return result('rendering','Muse đang xử lý prompt này'+(tinyHint()?' · '+tinyHint():''),possible[0]);}
       return {...result('waiting-response','Đang chờ video phản hồi cho đúng prompt này'),hint:hint()};
     }
     s.video=candidates[0].video;s.responseRoot=candidates[0].root;
@@ -501,18 +517,18 @@ async function readTrackedImage({id,index=0,maxBytes=62914560}) {
   const asData=blob=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error||Error('Không đọc được ảnh'));reader.readAsDataURL(blob);});
   for(const url of [...new Set([full,shown].filter(Boolean))]) {
     try{
-      if(/^data:image\//i.test(url))return {count,url:url.slice(0,80),dataUrl:url,via:'data'};
+      if(/^data:image\//i.test(url))return {count,url:url.slice(0,80),dataUrl:url,via:'data',width:img.naturalWidth,height:img.naturalHeight};
       const response=await fetch(url,{credentials:'include'});
       if(!response.ok)throw Error('HTTP '+response.status);
       const blob=await response.blob();
       if(blob.size>maxBytes)throw Error('Ảnh lớn hơn giới hạn');
-      return {count,url,dataUrl:await asData(blob),via:'fetch'};
+      return {count,url,dataUrl:await asData(blob),via:'fetch',width:img.naturalWidth,height:img.naturalHeight};
     }catch(e){errors.push(String(e?.message||e).slice(0,120));}
   }
   try{
     const canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
     canvas.getContext('2d').drawImage(img,0,0);
-    return {count,url:shown,dataUrl:canvas.toDataURL('image/png'),via:'canvas'};
+    return {count,url:shown,dataUrl:canvas.toDataURL('image/png'),via:'canvas',width:img.naturalWidth,height:img.naturalHeight};
   }catch(e){errors.push('canvas: '+String(e?.message||e).slice(0,80));}
   return {count,url:full||shown,failed:true,errors};
 }

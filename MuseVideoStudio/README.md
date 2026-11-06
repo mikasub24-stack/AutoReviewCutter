@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.4.2
+
+- **Sửa lỗi «có ảnh trong chat Muse mà app không tải về».** Muse hiện ảnh vừa tạo dưới dạng **ảnh thu nhỏ rộng khoảng 220 px**, nên ảnh 16:9 chỉ cao khoảng 124 px. App từ trước đến nay chỉ nhận ảnh hiển thị cao và rộng ít nhất 150 px, nên **không bao giờ nhận ra ảnh 16:9** (thẻ cứ ghi «Đã thấy tin nhắn · chờ Muse phản hồi»). Nay mức tối thiểu là 80 px (ảnh thật nhỏ hơn vẫn bị bỏ qua để không nhầm với biểu tượng) và kích thước thật của ảnh tối thiểu 96 px. Lỗi này nằm ở cả «Tạo ảnh» lẫn bước ảnh của «Mẹo vặt».
+- Nếu vẫn có ảnh quá nhỏ, thẻ nay ghi rõ lý do, ví dụ «thấy 1 ảnh nhưng quá nhỏ (70×70 px, tối thiểu 80)», thay vì chỉ chờ mãi.
+- **Muse hiện cùng một prompt hai lần** (lần đầu báo «Không xác nhận là đã gửi», rồi gửi lại): với **ảnh**, phản hồi sau bản gửi lại vẫn tính là của prompt này (trước đây có thể bị coi là «sau tin nhắn khác»). Tin nhắn khác nội dung vẫn chặn như cũ; video và việc tiếp tục tác vụ cũ vẫn từ chối đoán khi có hai tin trùng.
+- **Chưa thử**: chỉ thử với trang chat giả và Chromium thật, chưa với Muse thật. **Chưa biết** ảnh Muse hiển thị trong chat có phải bản đầy đủ hay chỉ bản thu nhỏ: app lưu đúng ảnh Muse đưa ra (ưu tiên đường dẫn ảnh gốc nếu ảnh nằm trong liên kết), nên hãy mở thử một file đã lưu xem kích thước.
+
 ## Update 1.4.1
 
 - **Mẹo vặt: chỉ cần nhập TIÊU ĐỀ.** Bản 1.4.0 bắt phải tự dán cả mẹo vào; nay trong chế độ «Mẹo vặt» có ô «Bạn muốn hướng dẫn mẹo gì?» cùng ba ô chọn: **Độ dài video** (1, 2, 3, 5 hoặc 10 phút), **Mỗi ảnh chuyển động** (6, 8 hoặc 10 giây) và **Ngôn ngữ lời đọc** (Tiếng Việt hoặc English). Bấm **«Muse viết mẹo và chia cảnh»**: Muse viết mẹo theo từng bước (1 mở đầu + các bước + 1 kết), mẹo hiện trong ô để bạn sửa, rồi app **tự chia cảnh ngay** (không phải bấm thêm). Xem lại cảnh rồi bấm «Tạo ảnh + clip» như cũ: mỗi bước một ảnh chụp thật, rồi ảnh đó chuyển động thành clip. Ô «Đã có sẵn mẹo? Dán vào đây» vẫn dùng được nếu bạn có mẹo sẵn.

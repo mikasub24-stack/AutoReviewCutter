@@ -23,7 +23,7 @@ function png(w, h) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'muse-image-fixture-'));
   let browser;
   try {
-    const files = { old: png(220, 220), ref: png(64, 64), avatar: png(40, 40), slow: png(220, 220), a1: png(220, 220), a2: png(220, 220), swap: png(220, 220), big: png(220, 220), solo: png(220, 220) };
+    const files = { old: png(220, 220), ref: png(64, 64), avatar: png(40, 40), slow: png(220, 220), a1: png(220, 220), a2: png(220, 220), swap: png(220, 220), big: png(220, 220), solo: png(220, 220), wide: png(440, 248), tall: png(248, 440), small: png(100, 100), wide2: png(220, 124), wide3: png(220, 124), wide4: png(220, 124) };
     browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
     const context = await browser.newContext();
     const html = '<!doctype html><html><body><div id="thread" data-chat-thread></div><aside id="unrelated"></aside><textarea id="composer"></textarea></body></html>';
@@ -40,7 +40,7 @@ function png(w, h) {
         const root = document.createElement('article'); root.id = args.id; if (args.role) root.dataset.messageRole = args.role;
         if (args.ref) root.setAttribute('data-response-to', args.ref);
         if (args.text) { const p = document.createElement('p'); p.textContent = args.text; root.append(p); }
-        for (const item of args.images) { const img = document.createElement('img'); img.className = item.cls || 'result'; img.width = item.size; img.height = item.size; img.src = item.src; root.append(img); }
+        for (const item of args.images) { const img = document.createElement('img'); img.className = item.cls || 'result'; img.width = item.w || item.size; img.height = item.h || item.size; img.src = item.src; root.append(img); }
         document.getElementById('thread').append(root);
       }, { id, role, text, images, ref });
     }
@@ -126,6 +126,66 @@ function png(w, h) {
     await loaded('user-f'); await loaded('reply-f');
     state = await waitReady('f'); assert.equal(state.count, 1); assert.match(state.url, /solo\.png$/);
     await page.evaluate(endTracking, { id: 'f' });
+
+    // H: Muse shows a generated picture as a thumbnail (about 220 px wide), so a 16:9 picture is only
+    // ~124 px high. It must still be recognised (real run: the picture was in the chat but never saved).
+    await track('h', 'Dao và cà rốt trên thớt');
+    await append({ id: 'user-h', role: 'user', text: 'Dao và cà rốt trên thớt' });
+    await append({ id: 'reply-h', text: 'Xong rồi.', images: [{ src: '/img/wide.png', w: 220, h: 124 }] });
+    await loaded('reply-h');
+    state = await waitReady('h'); assert.equal(state.count, 1); assert.match(state.url, /wide\.png$/);
+    const wide = await read('h', 0); same(bytes(wide), files.wide); assert.deepEqual([wide.width, wide.height], [440, 248], 'báo kích thước thật của ảnh đã lưu');
+    await page.evaluate(endTracking, { id: 'h' });
+    await track('h2', 'Cảnh dọc');
+    await append({ id: 'user-h2', role: 'user', text: 'Cảnh dọc' });
+    await append({ id: 'reply-h2', text: 'Xong rồi.', images: [{ src: '/img/tall.png', w: 124, h: 220 }] });
+    await loaded('reply-h2');
+    state = await waitReady('h2'); assert.match(state.url, /tall\.png$/);
+    await page.evaluate(endTracking, { id: 'h2' });
+    // A picture that really is tiny is still not a result, and the card says why.
+    await track('h3', 'Cảnh nhỏ');
+    await append({ id: 'user-h3', role: 'user', text: 'Cảnh nhỏ' });
+    await append({ id: 'reply-h3', text: 'Xong rồi.', images: [{ src: '/img/small.png', size: 70 }] });
+    await loaded('reply-h3');
+    for (let i = 0; i < 4; i++) { state = await poll('h3'); assert.equal(state.ready, false); await new Promise(r => setTimeout(r, 120)); }
+    assert.match(`${state.hint || ''} ${state.stage}`, /thấy 1 ảnh nhưng quá nhỏ \(70×70 px, tối thiểu 80\)/);
+    await page.evaluate(endTracking, { id: 'h3' });
+
+    // I: Muse shows the same prompt twice ("not confirmed as sent", then sent again): the one reply after
+    // both copies answers this prompt. Another, different message before the reply still blocks it.
+    await track('i', 'Rửa cà rốt dưới vòi nước');
+    await append({ id: 'user-i1', role: 'user', text: 'Rửa cà rốt dưới vòi nước' });
+    await page.waitForTimeout(150);
+    state = await poll('i'); assert.equal(state.echoMatched, true);
+    await append({ id: 'user-i2', role: 'user', text: 'Rửa cà rốt dưới vòi nước' });
+    await append({ id: 'reply-i', text: 'Xong bản mới.', images: [{ src: '/img/wide2.png', w: 220, h: 124 }] });
+    await loaded('reply-i');
+    state = await waitReady('i'); assert.equal(state.count, 1); assert.match(state.url, /wide2\.png$/);
+    await page.evaluate(endTracking, { id: 'i' });
+    await track('i2', 'Cắt cà rốt thành khúc');
+    await append({ id: 'user-i3', role: 'user', text: 'Cắt cà rốt thành khúc' });
+    await page.waitForTimeout(150);
+    state = await poll('i2'); assert.equal(state.echoMatched, true);
+    await append({ id: 'user-i4', role: 'user', text: 'Một câu khác hẳn' });
+    await append({ id: 'reply-i2', text: 'Xong.', images: [{ src: '/img/wide3.png', w: 220, h: 124 }] });
+    await loaded('reply-i2');
+    for (let k = 0; k < 4; k++) { state = await poll('i2'); assert.equal(state.ready, false); await new Promise(r => setTimeout(r, 120)); }
+    await page.evaluate(endTracking, { id: 'i2' });
+
+    // Both copies already on screen at the first look: the first one is this prompt's message.
+    await track('i3', 'Đặt cà rốt vào nồi');
+    await append({ id: 'user-i5', role: 'user', text: 'Đặt cà rốt vào nồi' });
+    await append({ id: 'user-i6', role: 'user', text: 'Đặt cà rốt vào nồi' });
+    await append({ id: 'reply-i3', text: 'Xong bản mới.', images: [{ src: '/img/wide4.png', w: 220, h: 124 }] });
+    await loaded('reply-i3');
+    state = await waitReady('i3'); assert.equal(state.count, 1);
+    await page.evaluate(endTracking, { id: 'i3' });
+    // A video prompt (or a resumed job) with two identical messages still refuses to guess.
+    await track('i4', 'Khuấy nồi canh', { mediaKind: 'video', videoSelector: 'video' });
+    await append({ id: 'user-i7', role: 'user', text: 'Khuấy nồi canh' });
+    await append({ id: 'user-i8', role: 'user', text: 'Khuấy nồi canh' });
+    await assert.rejects(poll('i4'), /nhiều tin nhắn trùng chính xác prompt/);
+    await page.evaluate(endTracking, { id: 'i4' });
 
     // G: the saver only accepts real pictures.
     assert.equal(sniffImage(files.old).extension, '.png');
