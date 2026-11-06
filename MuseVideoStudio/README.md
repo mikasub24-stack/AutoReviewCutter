@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.3.6
+
+- **Truyện tiếng Anh (hoặc ngôn ngữ khác tiếng Việt): prompt gửi video không còn lẫn tiếng Việt.** Muse vốn được dặn viết PROMPT cùng ngôn ngữ với truyện; nhưng câu khóa hình dạng do app tự thêm vào vẫn là tiếng Việt. Nay app viết câu khóa bằng tiếng Anh khi truyện không phải tiếng Việt (truyện tiếng Việt giữ nguyên). Thẻ số câu của bản 1.3.5 nhận thêm «[sentence 5]» / «[line 5]» (Muse hay dịch chữ «câu»), vẫn được kiểm và vẫn bị bỏ trước khi gửi video; Muse cũng được dặn giữ nguyên chữ «câu» trong thẻ.
+- **Tỉ lệ khung hình đã chọn (16:9, 9:16 hoặc 1:1) luôn có trong prompt gửi video.** Trước đây tỉ lệ chỉ được nói với Muse, còn prompt Muse viết ra có ghi tỉ lệ hay không tùy Muse. Nay app tự thêm một câu («Tỷ lệ khung hình video: 9:16 (dọc).» hoặc «Video aspect ratio: 9:16 (vertical).») vào mọi prompt Muse viết, trước câu khóa hình dạng và câu cấm tiếng; Muse đã tự ghi tỉ lệ thì không thêm lần nữa. Tỉ lệ này cũng quyết định khung hình khi xuất MP4 (1920×1080, 1080×1920, 1080×1080).
+- **Chưa thử**: chưa chạy truyện tiếng Anh với Muse thật; chưa biết mô hình tạo video có theo câu tỉ lệ trong prompt hay chỉ theo ảnh tham chiếu / cài đặt riêng của Muse. Các prompt mẫu do app ghép khi Muse bỏ sót câu vẫn là tiếng Việt.
+
 ## Update 1.3.5
 
 - **Kiểm tra chuyển động của từng cảnh có khớp thứ tự lời đọc không.** Muse được dặn ghi số câu ngay sau mỗi mốc giờ, dạng «0–3 giây [câu 5]: …». App tự soát: các mốc có đi đúng thứ tự câu không, mỗi câu của cảnh có ít nhất một mốc không, có mốc nào nhắc câu ngoài cảnh không, mốc giờ có tăng dần và nằm trong độ dài video không, prompt có chia mốc giờ không. Cảnh nào đảo thứ tự, thiếu câu hoặc nhắc câu ngoài cảnh thì app **hỏi lại Muse đúng cảnh đó một lần** (kèm lỗi cụ thể), chỉ nhận bản mới khi không tệ hơn bản cũ; hỏi xong vẫn lệch thì giữ bản cũ và hiện ⚠ ở từng cảnh cùng một dòng ghi chú. Thẻ «[câu N]» hiện trong ô prompt để bạn thấy mốc nào ứng với câu nào, và **được bỏ tự động trước khi gửi tạo video**. Muse không ghi số câu thì không có gì để kiểm, app không hỏi lại thêm (chỉ cảnh báo nhẹ nếu cảnh từ 4 giây mà prompt không chia mốc giờ).

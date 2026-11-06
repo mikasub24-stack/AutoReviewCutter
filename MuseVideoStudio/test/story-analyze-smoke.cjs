@@ -388,6 +388,24 @@ function brain(behavior = {}) {
       assert.equal(b.museBrain.asked.length, 1, 'không có số câu thì không có gì để kiểm, không tốn thêm lượt'); assert.deepEqual(r2.notes, []);
       await b.page.close(); ok('mốc đúng hoặc không ghi số câu: không hỏi lại thêm');
     }
+    // 11l. Truyện tiếng Anh: Muse được dặn viết PROMPT cùng ngôn ngữ; câu khóa app tự thêm vào cũng bằng tiếng Anh (không lẫn tiếng Việt);
+    // thẻ số câu Muse dịch sang «[sentence N]» vẫn được kiểm và bị bỏ trước khi gửi video.
+    {
+      const english = 'Mai lived by the river with her grandmother. Every morning she walked the buffalo to the field. One day she found an old wooden box on the bank. Inside the box was a small silver key.';
+      const enCfg = { seconds: 10, aspect: '16:9', reference: true, form: 'stick figures' };
+      const reply = g => `River bank at dawn. 0–5 seconds [sentence ${g[0].n}]: Mai waves at the water. 5–10 seconds [sentence ${g.at(-1).n}]: Mai walks along the bank.`;
+      const { page, analyzer, museBrain } = await session({ prompt: g => reply(g) });
+      const r = await analyzer.run({ script: english, options: enCfg });
+      assert.match(museBrain.asked[0].text, /8\. Viết PROMPT cùng ngôn ngữ với câu chuyện/);
+      assert.equal(r.scenes.map(s => s.voiceover).join(' '), english);
+      assert.ok(r.scenes.every(s => !s.offline && s.prompt.split('CHARACTER SHAPE LOCK').length === 2 && !/KHÓA HÌNH DẠNG/.test(s.prompt) && s.prompt.trimEnd().endsWith(plan.NO_SPEECH)), r.scenes.map(s => s.prompt).join('\n---\n'));
+      assert.ok(r.scenes.every(s => /standard shape: stick figures/.test(s.prompt)));
+      assert.ok(r.scenes.every(s => s.prompt.includes('Video aspect ratio: 16:9 (landscape).') && s.prompt.indexOf('Video aspect ratio') < s.prompt.indexOf('CHARACTER SHAPE LOCK')), 'tỉ lệ đã chọn có trong mọi prompt, bằng tiếng Anh');
+      assert.equal(museBrain.asked.length, 1, 'thẻ [sentence N] đúng thứ tự: không hỏi lại');
+      assert.ok(r.scenes.every(s => !plan.motionIssues(s, enCfg).some(x => x.hard)), 'thẻ [sentence N] được nhận ra và đúng thứ tự');
+      assert.ok(r.scenes.every(s => !/\[\s*sentence/i.test(plan.stripBeatTags(s.prompt)) && /\[sentence/.test(s.prompt)));
+      await page.close(); ok('truyện tiếng Anh: câu khóa bằng tiếng Anh, thẻ số câu dịch vẫn được kiểm và bỏ');
+    }
     // 12. Đang bận thì không chạy hai lần; kịch bản rỗng báo lỗi.
     {
       const { page, analyzer } = await session({}, { reply: 20000 }, p => p.evaluate(() => { window.mode.streamMs = 3000; }));

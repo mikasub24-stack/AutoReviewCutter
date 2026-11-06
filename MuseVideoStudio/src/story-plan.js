@@ -51,6 +51,14 @@
     }
     return best;
   }
+  // Ngôn ngữ để viết câu khóa app thêm vào prompt. «en» của detectLanguage là mặc định khi không nhận ra, nên chỉ tin khi có đủ từ tiếng Anh
+  // phổ biến; câu ngắn tiếng Việt không dấu đặc trưng («Mai nhìn quanh.») vẫn là tiếng Việt.
+  function promptLanguage(text) {
+    const code = detectLanguage(text);
+    if (code !== 'en') return code;
+    const common = new Set(STOPWORDS.en), words = String(text || '').toLowerCase().match(/\p{L}+/gu) || [];
+    return words.filter(w => common.has(w)).length >= 3 ? 'en' : 'vi';
+  }
   const charsPerSecond = language => RATES[language] || CHARS_PER_SECOND;
   const isCjk = language => language === 'zh' || language === 'ja';
   // Số ký tự tối đa của lời đọc để vừa trong một clip (chừa 10% cho nhịp nghỉ).
@@ -294,9 +302,22 @@
   /* Khóa hình dạng nhân vật: nhân vật chuẩn (ảnh tham chiếu và/hoặc kiểu người dùng mô tả) quyết định hình dạng của MỌI nhân vật;
      người khác chỉ được khác màu/kiểu quần áo, giới tính, tóc, phụ kiện. Câu khóa do app tự gắn vào MỌI prompt, không phụ thuộc Muse viết gì. */
   const isLocked = config => !config.ad && Boolean(config.reference || config.form);
-  function lockLine(config) {
+  // Câu khóa do app tự thêm vào prompt: viết cùng ngôn ngữ với truyện (tiếng Việt khi truyện tiếng Việt, còn lại tiếng Anh)
+  // để prompt gửi mô hình video không bị lẫn hai thứ tiếng.
+  function lockLine(config, language = 'vi') {
     if (!isLocked(config)) return '';
+    if (language !== 'vi') {
+      return `CHARACTER SHAPE LOCK (mandatory): use ${config.reference ? 'the character in the attached reference image' : 'the character style described below'} as the standard${config.form ? ` — standard shape: ${config.form}` : ''}. EVERY character in the scene, including background people, must have the same body shape and proportions, head and face style, art style, level of realism and level of detail as the standard character (if the standard is a stick figure, everyone is a stick figure; if it is a real person, everyone is a real person; if it is a cartoon animal, everyone is drawn in that same cartoon style); they may differ only in clothing color and style, gender, hair or fur, accessories, height, and species if the story says so. Do not switch to a different drawing style or level of realism than the standard character.`;
+    }
     return `KHÓA HÌNH DẠNG NHÂN VẬT (bắt buộc): lấy ${config.reference ? 'nhân vật trong ảnh tham chiếu' : 'kiểu nhân vật mô tả dưới đây'} làm chuẩn${config.form ? ` — hình dạng chuẩn: ${config.form}` : ''}. MỌI nhân vật trong cảnh, kể cả người phụ, phải CÙNG hình dạng, tỉ lệ cơ thể, kiểu đầu và mặt, kiểu vẽ, độ chân thực và độ chi tiết với nhân vật chuẩn (chuẩn là người que thì mọi người đều là người que; là người thật thì mọi người đều là người thật; là con vật hoạt hình thì mọi nhân vật đều cùng kiểu hoạt hình đó); chỉ được khác màu và kiểu quần áo, giới tính, kiểu tóc hoặc bộ lông, phụ kiện, chiều cao, và loài nếu câu chuyện nói rõ. Không đổi sang kiểu vẽ hay độ chân thực khác với nhân vật chuẩn.`;
+  }
+  const lockBoth = config => [lockLine(config, 'vi'), lockLine(config, 'en')].filter(Boolean);
+  // Câu tỉ lệ khung hình app tự thêm vào mọi prompt Muse viết (Muse có thể quên ghi tỉ lệ đã chọn).
+  const ASPECT_WORDS = { '16:9': ['ngang', 'landscape'], '9:16': ['dọc', 'vertical'], '1:1': ['vuông', 'square'] };
+  function aspectLine(config, language = 'vi') {
+    const words = ASPECT_WORDS[config.aspect];
+    if (!words) return '';
+    return language !== 'vi' ? `Video aspect ratio: ${config.aspect} (${words[1]}).` : `Tỷ lệ khung hình video: ${config.aspect} (${words[0]}).`;
   }
 
   // `fixed` = số giây cố định của cảnh không có lời đọc (cảnh quay quảng cáo từ ảnh).
@@ -468,7 +489,7 @@
       '',
       'QUY TẮC',
       `1. Mỗi cảnh chỉ là MỘT khoảnh khắc liên tục trong độ dài video của cảnh: một địa điểm, một nhóm nhân vật, tối đa 2–3 hành động nối tiếp; KHÔNG nhảy thời gian, KHÔNG đổi địa điểm, KHÔNG cắt cảnh trong cùng video. Các câu liên tiếp mà đổi địa điểm hoặc nhảy thời gian thì tách thành cảnh khác.`,
-      `2. PROMPT thể hiện đúng điều các câu của cảnh nói: ai, ở đâu, lúc nào, làm gì, theo thứ tự thời gian, chia mốc theo đúng độ dài video của cảnh (video 5 giây: 0–2 giây…, 2–5 giây…; video ${s} giây: 0–3 giây…, 3–7 giây…, 7–${s} giây…), kèm nét mặt, ánh mắt, cử chỉ, tư thế, cảm xúc, ánh sáng và góc máy. Dùng từ cụ thể, không mơ hồ. Mỗi mốc ứng với đúng điều của câu tương ứng theo thứ tự câu và GHI SỐ CÂU ngay sau mốc giờ, dạng «0–3 giây [câu 5]: …» (mốc gộp nhiều câu thì «[câu 5-6]»; một câu được có nhiều mốc): các mốc đi đúng thứ tự câu, KHÔNG đảo, mỗi câu của cảnh có ít nhất một mốc, mốc cuối kết thúc đúng độ dài video của cảnh (app dùng số câu để kiểm tra và tự bỏ khi tạo video); mỗi mốc có chuyển động cụ thể của người hoặc vật (ai làm gì, mặt và tay thay đổi thế nào); tư thế, nét mặt, vị trí hoặc hướng nhìn phải THAY ĐỔI rõ giữa các mốc, không đứng yên một dáng cả cảnh; không chèn hình chung chung hay cảnh không liên quan tới câu.`,
+      `2. PROMPT thể hiện đúng điều các câu của cảnh nói: ai, ở đâu, lúc nào, làm gì, theo thứ tự thời gian, chia mốc theo đúng độ dài video của cảnh (video 5 giây: 0–2 giây…, 2–5 giây…; video ${s} giây: 0–3 giây…, 3–7 giây…, 7–${s} giây…), kèm nét mặt, ánh mắt, cử chỉ, tư thế, cảm xúc, ánh sáng và góc máy. Dùng từ cụ thể, không mơ hồ. Mỗi mốc ứng với đúng điều của câu tương ứng theo thứ tự câu và GHI SỐ CÂU ngay sau mốc giờ, dạng «0–3 giây [câu 5]: …» (mốc gộp nhiều câu thì «[câu 5-6]»; một câu được có nhiều mốc; PROMPT viết bằng tiếng nào cũng giữ nguyên chữ «câu» trong thẻ, ví dụ «0–3 seconds [câu 5]: …»): các mốc đi đúng thứ tự câu, KHÔNG đảo, mỗi câu của cảnh có ít nhất một mốc, mốc cuối kết thúc đúng độ dài video của cảnh (app dùng số câu để kiểm tra và tự bỏ khi tạo video); mỗi mốc có chuyển động cụ thể của người hoặc vật (ai làm gì, mặt và tay thay đổi thế nào); tư thế, nét mặt, vị trí hoặc hướng nhìn phải THAY ĐỔI rõ giữa các mốc, không đứng yên một dáng cả cảnh; không chèn hình chung chung hay cảnh không liên quan tới câu.`,
       ad ? '3. Không bịa tính năng, thông số, công dụng, thành phần, chứng nhận hay kết quả mà lời quảng cáo không nói; không cảnh so sánh với sản phẩm khác; không cảnh «trước/sau» hay minh họa chữa bệnh, giảm cân, hiệu quả y tế. Ý trừu tượng thì thể hiện bằng hình cụ thể (người dùng thoải mái, sản phẩm đang được dùng).' : '3. TRUYỆN KỂ: không bịa thêm nhân vật, vật thể hay sự kiện; không đổi kết cục; không bỏ hành động quan trọng; suy nghĩ, cảm xúc hay ý trừu tượng thì thể hiện bằng nét mặt, cử chỉ hoặc vật cụ thể có trong câu. BÀI NÓI / BÌNH LUẬN / CHÂM BIẾM (nói về một kiểu người, một thói quen, một ý kiến, có ví dụ minh họa): dựng đúng TÌNH HUỐNG mà câu đang nói, bằng 1–3 vai cố định làm việc cụ thể trong bối cảnh đời thường (công ty, quán cà phê, nhà, đường phố); bối cảnh phải đúng nơi bài nói tới (ví dụ «trong công ty» → văn phòng có bàn làm việc, máy tính, đồng nghiệp), không dùng một căn phòng chung cho mọi cảnh; bài đã nêu ví dụ nào thì dựng đúng ví dụ đó, đúng thứ tự. Ý đối lập («trước mặt thân thiện, sau lưng nói xấu») thì cho thấy sự đối lập NGAY TRONG cảnh: cùng một người cười bắt tay người A, A vừa quay đi thì mặt đổi sang khinh bỉ và ghé sát tai người B, tay che miệng, mắt liếc về phía A (không có tiếng). Nói quá, ví von, ẩn dụ KHÔNG dựng theo nghĩa đen nếu phi lý hay đáng sợ: dựng tình huống thật đằng sau câu và thể hiện đúng ý bằng nét mặt, cử chỉ, đạo cụ cụ thể (có thể thêm MỘT chi tiết hài nhỏ hợp tinh thần câu). Câu mở bài, đặt câu hỏi, kết luận: dựng một hình ảnh chung nói lên đúng ý đó. Câu cảm thán rất ngắn: dựng phản ứng nét mặt, cử chỉ của người trong cảnh.',
       '4. Mỗi cảnh được tạo video riêng nên PROMPT phải tự đủ ý: mở đầu bằng bối cảnh cụ thể (nơi nào, ánh sáng gì), rồi nhắc lại tên, ngoại hình, trang phục của nhân vật theo cùng một cách ở mọi cảnh; không viết «như cảnh trước».',
       ...[ad ? (config.reference ? '5. SẢN PHẨM: ảnh tham chiếu đính kèm là sản phẩm thật. Giữ đúng hình dạng, tỷ lệ, màu sắc, chất liệu, bao bì và nhãn như trong ảnh; không đổi, không thêm bộ phận, không đổi sang sản phẩm khác. Sản phẩm phải HIỆN RÕ ở mọi cảnh (đang được dùng hoặc trưng bày). Ở dòng NHÂN VẬT ghi mô tả cố định của sản phẩm theo ảnh và, nếu có người mẫu hay người dùng, MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) dùng y nguyên ở mọi cảnh có người đó. Người chỉ được nhắc đến mà không có mặt thì KHÔNG vẽ vào hình.' : '5. SẢN PHẨM: chưa có ảnh tham chiếu nên chỉ mô tả sản phẩm theo thông tin ở cuối, đơn giản và nhất quán (hình dạng, màu sắc, chất liệu) ở mọi cảnh; không bịa chi tiết mà thông tin không nói. Sản phẩm phải HIỆN RÕ ở mọi cảnh (đang được dùng hoặc trưng bày). Ở dòng NHÂN VẬT ghi mô tả cố định của sản phẩm và, nếu có người mẫu hay người dùng, MỘT mô tả cố định (tuổi, vóc dáng, tóc, trang phục) dùng y nguyên ở mọi cảnh có người đó. Người chỉ được nhắc đến mà không có mặt thì KHÔNG vẽ vào hình.') : config.reference ? '5. NHÂN VẬT: nhận ra MỌI nhân vật trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Nhân vật chính là người ở ảnh tham chiếu đính kèm: giữ đúng khuôn mặt, tóc, trang phục trong ảnh, không tự đổi. Mỗi nhân vật khác được chốt MỘT mô tả cố định ' + (lock ? '(chỉ phần được khác theo KHÓA HÌNH DẠNG ở cuối quy tắc này)' : '(tuổi, vóc dáng, tóc, trang phục)') + ' ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó (bài nói/bình luận không có nhân vật tên riêng thì chốt 2–3 vai đại diện cho các kiểu người được nhắc). Trong PROMPT của mỗi cảnh, gọi từng người xuất hiện trong khung hình bằng đúng tên/vai đó kèm mô tả cố định, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.' + (lock ? ' ' + lockRule(config) : '') : '5. NHÂN VẬT: nhận ra các nhân vật CÓ MẶT trong truyện (kể cả người chỉ được gọi bằng vai như «bà», «người lái đò», «đám trẻ»). Mỗi nhân vật được chốt MỘT mô tả cố định, ngắn gọn ' + (lock ? '(chỉ phần được khác theo KHÓA HÌNH DẠNG ở cuối quy tắc này)' : '(tuổi, vóc dáng, tóc, trang phục)') + ' ở dòng NHÂN VẬT và dùng y nguyên ở mọi cảnh có người đó; chi tiết truyện không nói thì chọn đơn giản, không bịa thêm. Bài nói/bình luận không có nhân vật tên riêng thì chốt 2–3 VAI cố định đại diện cho các kiểu người được nhắc (ví dụ «người hay nói xấu», «người bị nói xấu», «đồng nghiệp»); khi bài gọi người nghe là «bạn» thì «bạn» là một vai cụ thể trong cảnh. Nếu người dùng đã mô tả nhân vật chính (ở cuối) thì dùng đúng mô tả đó. Chỉ mô tả người XUẤT HIỆN trong khung hình của cảnh, nói rõ ai đứng đâu, ai làm gì; người chỉ được nhắc đến mà không có mặt trong cảnh thì KHÔNG vẽ vào hình.' + (lock ? ' ' + lockRule(config) : '')],
@@ -718,8 +739,8 @@
      Trả mảng {kind, hard, text}. hard = lỗi thứ tự/thiếu câu: app hỏi lại Muse đúng cảnh đó. */
   const BEAT_TIME = /(\d+(?:[.,]\d+)?)\s*[–—-]\s*(\d+(?:[.,]\d+)?)\s*(?:giây|s|sec|seconds?)(?![\p{L}])/giu;
   // Thẻ số câu: «[câu 5]», «[câu 5-6]», «(câu 5, 6)»; Muse hay đổi ngoặc nên nhận cả ngoặc tròn.
-  const BEAT_TAG = /[\[(（]\s*c[âa]u\s*(\d+(?:\s*[-–—,;]\s*\d+)*)\s*[\])）]/giu;
-  const stripBeatTags = text => String(text || '').replace(/[ \t]*[\[(（]\s*c[âa]u\s*\d+(?:\s*[-–—,;]\s*\d+)*\s*[\])）]/giu, '');
+  const BEAT_TAG = /[\[(（]\s*(?:c[âa]u|sentences?|lines?)\s*(\d+(?:\s*[-–—,;]\s*\d+)*)\s*[\])）]/giu;
+  const stripBeatTags = text => String(text || '').replace(/[ \t]*[\[(（]\s*(?:c[âa]u|sentences?|lines?)\s*\d+(?:\s*[-–—,;]\s*\d+)*\s*[\])）]/giu, '');
   function motionIssues(scene, input = {}) {
     const config = options(input);
     const prompt = String(scene?.prompt || '');
@@ -761,7 +782,7 @@
       const seconds = estimateSeconds(voice, language), own = sceneSeconds(voice || prompt, config.seconds);
       if (voice && seconds > config.seconds) w.push(`Lời đọc dài khoảng ${seconds.toFixed(1)} giây, hơn clip ${config.seconds} giây — sẽ phải giữ khung cuối. Nên tách cảnh.`);
       if (!prompt.trim()) w.push('Chưa có prompt: cảnh này sẽ không tạo được.');
-      else if (count(prompt.replace(NO_SPEECH, '').replace(lockLine(config), '').trim()) < 40) w.push('Prompt quá ngắn, dễ ra hình sai. Mô tả rõ ai, ở đâu, làm gì, nét mặt.');
+      else if (count(prompt.replace(NO_SPEECH, '').replace(lockLine(config, 'vi'), '').replace(lockLine(config, 'en'), '').replace(aspectLine(config, 'vi'), '').replace(aspectLine(config, 'en'), '').trim()) < 40) w.push('Prompt quá ngắn, dễ ra hình sai. Mô tả rõ ai, ở đâu, làm gì, nét mặt.');
       if (prompt.trim() && !/no speech/i.test(prompt)) w.push('Prompt thiếu câu «no speech» — nhân vật có thể bị nói.');
       if (QUOTED.test(voice) || QUOTED.test(prompt)) w.push('Có lời thoại trong ngoặc kép — nhân vật sẽ không nói, chỉ thể hiện bằng cử chỉ và nét mặt.');
       if (TIME_SKIP.test(voice) || TIME_SKIP.test(prompt)) w.push(`Có chuyển mốc thời gian — ${own} giây khó chứa nhiều khoảnh khắc. Nên tách thành cảnh riêng.`);
@@ -786,12 +807,15 @@
   }
   const ensureNoSpeech = prompt => (/no speech/i.test(prompt) ? prompt : prompt + '\n' + NO_SPEECH);
   // Prompt Muse viết + câu khóa hình dạng (nếu có) + câu cấm tiếng ở cuối.
-  function finalPrompt(prompt, config) {
-    const lock = lockLine(config), text = String(prompt || '').trim();
-    if (!lock || text.includes(lock)) return ensureNoSpeech(text);
+  function finalPrompt(prompt, config, language = 'vi') {
+    const lock = lockLine(config, language), text = String(prompt || '').trim();
+    const hasLock = !lock || lockBoth(config).some(line => text.includes(line));
+    const ratio = config.aspect && !text.includes(config.aspect) ? aspectLine(config, language) : '';
+    const extra = [ratio, hasLock ? '' : lock].filter(Boolean);
+    if (!extra.length) return ensureNoSpeech(text);
     const at = text.indexOf(NO_SPEECH);
-    if (at >= 0) return text.slice(0, at).trimEnd() + '\n' + lock + '\n' + text.slice(at);
-    return ensureNoSpeech(text + '\n' + lock);
+    if (at >= 0) return text.slice(0, at).trimEnd() + '\n' + extra.join('\n') + '\n' + text.slice(at);
+    return ensureNoSpeech(text + '\n' + extra.join('\n'));
   }
 
   // Tách trả lời của Muse: {scenes: [{title, units: [đầu, cuối] | null, voiceover, prompt}], cast, done}.
@@ -843,8 +867,9 @@
   // Tương thích khuôn cũ: trả mảng cảnh {title, source, voiceover, prompt, durationSeconds}.
   function parseMuseReply(reply, input = {}) {
     const config = options(input);
-    return parseReply(reply, config).scenes.map((scene, index) => {
-      const prompt = scene.prompt ? finalPrompt(scene.prompt, config) : scenePrompt(scene.voiceover, config);
+    const parsed = parseReply(reply, config).scenes, language = promptLanguage(parsed.map(scene => scene.voiceover || scene.prompt).join(' '));
+    return parsed.map((scene, index) => {
+      const prompt = scene.prompt ? finalPrompt(scene.prompt, config, language) : scenePrompt(scene.voiceover, config);
       return { title: `Cảnh ${index + 1}`, source: scene.voiceover, voiceover: scene.voiceover, prompt, durationSeconds: sceneSeconds(scene.voiceover, config.seconds), ...(scene.units ? { units: scene.units } : {}) };
     });
   }
@@ -856,7 +881,7 @@
   function assembleScenes(units, parsed, input = {}, range = null) {
     const config = options(input);
     const lo = Math.max(1, range?.from || 1), hi = Math.min(units.length, range?.to || units.length);
-    const limit = limitFor(units, config);
+    const limit = limitFor(units, config), language = promptLanguage(units.map(u => u.text).join(' '));
     // Muse cộng số giây đã làm tròn nên có thể gom sát 100% clip; chấp nhận đến hết thời lượng clip, chỉ cắt khi vượt hẳn.
     const hard = Math.floor(config.seconds * charsPerSecond(detectLanguage(units.map(u => u.text).join(' '))));
     const out = [];
@@ -870,7 +895,7 @@
       let end = a;
       while (end < b && count(unitsText(units, a, end + 1)) <= hard) end++;
       const voiceover = unitsText(units, a, end);
-      out.push({ title: '', source: voiceover, voiceover, visual: '', prompt: item.prompt ? finalPrompt(item.prompt, config) : scenePrompt(voiceover, config), durationSeconds: sceneSeconds(voiceover, config.seconds), units: [a, end], ...(item.prompt ? {} : { offline: true }) });
+      out.push({ title: '', source: voiceover, voiceover, visual: '', prompt: item.prompt ? finalPrompt(item.prompt, config, language) : scenePrompt(voiceover, config), durationSeconds: sceneSeconds(voiceover, config.seconds), units: [a, end], ...(item.prompt ? {} : { offline: true }) });
       if (end < b) fresh(end + 1, b);
       next = b + 1;
     }

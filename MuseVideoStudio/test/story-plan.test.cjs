@@ -826,3 +826,64 @@ test('bỏ thẻ [câu N] trước khi gửi tạo video, giữ nguyên phần c
   assert.equal(sp.stripBeatTags(''), '');
   assert.equal(sp.stripBeatTags(null), '');
 });
+
+test('truyện tiếng Anh: câu khóa app thêm vào prompt cũng bằng tiếng Anh, truyện tiếng Việt vẫn bằng tiếng Việt', () => {
+  const cfg = { seconds: 10, aspect: '16:9', reference: true, form: 'stick figures' };
+  const english = 'Mai lived by the river with her grandmother. Every morning she walked the buffalo to the field. One day she found an old wooden box on the bank.';
+  const units = sp.storyUnits(english, cfg);
+  const en = sp.assembleScenes(units, [{ units: [1, 3], prompt: 'River bank at dawn. 0–5 seconds [câu 1]: Mai waves. 5–10 seconds [câu 3]: Mai picks up the box.' }], cfg);
+  assert.match(en[0].prompt, /CHARACTER SHAPE LOCK \(mandatory\)/);
+  assert.match(en[0].prompt, /standard shape: stick figures/);
+  assert.ok(!/KHÓA HÌNH DẠNG/.test(en[0].prompt), 'không lẫn câu khóa tiếng Việt');
+  assert.ok(en[0].prompt.indexOf('CHARACTER SHAPE LOCK') < en[0].prompt.indexOf(sp.NO_SPEECH), 'câu khóa nằm trước câu cấm tiếng');
+  assert.equal(en[0].prompt.split('CHARACTER SHAPE LOCK').length, 2, 'chỉ một câu khóa');
+  // Gắn lại lần nữa (sửa cảnh, hỏi lại Muse) không nhân đôi câu khóa.
+  const viUnits = sp.storyUnits('Mai sống bên sông cùng bà. Sáng nào em cũng dắt trâu ra đồng.', cfg);
+  const vi = sp.assembleScenes(viUnits, [{ units: [1, 2], prompt: 'Bờ sông lúc bình minh.' }], cfg);
+  assert.match(vi[0].prompt, /KHÓA HÌNH DẠNG NHÂN VẬT/);
+  assert.ok(!/CHARACTER SHAPE LOCK/.test(vi[0].prompt));
+  // Soát cảnh: câu khóa tiếng Anh không làm prompt ngắn trông như đủ dài.
+  const short = sp.lintScenes([{ voiceover: 'Mai waves.', prompt: 'Mai.\n' + sp.lockLine(sp.options(cfg), 'en') + '\n' + sp.NO_SPEECH }], cfg)[0];
+  assert.ok(short.some(w => /Prompt quá ngắn/.test(w)), short.join(' | '));
+  // Không có ảnh/hình dạng chuẩn: không có câu khóa nào.
+  const free = sp.assembleScenes(units, [{ units: [1, 3], prompt: 'River bank.' }], { seconds: 10, aspect: '16:9' });
+  assert.ok(!/LOCK|KHÓA/.test(free[0].prompt));
+});
+
+test('thẻ số câu viết bằng tiếng Anh vẫn được kiểm và vẫn được bỏ trước khi gửi video', () => {
+  const scene = { units: [1, 3], voiceover: 'A. B. C.', durationSeconds: 8, prompt: '0–3 seconds [sentence 1]: Mai waves.\n3–6 seconds [sentence 2]: Mai walks.\n6–8 seconds [Sentence 3]: Mai smiles.' };
+  assert.deepEqual(sp.motionIssues(scene, { seconds: 10 }), []);
+  const wrong = { ...scene, prompt: '0–4 seconds [sentence 3]: Mai smiles.\n4–8 seconds [sentence 1]: Mai waves.' };
+  assert.deepEqual(sp.motionIssues(wrong, { seconds: 10 }).map(i => i.kind), ['order', 'missing']);
+  assert.equal(sp.stripBeatTags(scene.prompt), '0–3 seconds: Mai waves.\n3–6 seconds: Mai walks.\n6–8 seconds: Mai smiles.');
+  assert.equal(sp.stripBeatTags('Line 3 of the song [line 3] and (lines 4-5) end'), 'Line 3 of the song and end');
+  assert.match(sp.buildMuseInstruction(essay, { seconds: 10 }, { marker: 'abc123' }), /giữ nguyên chữ «câu» trong thẻ/);
+});
+
+test('tỉ lệ khung hình đã chọn luôn có trong prompt gửi video, cùng ngôn ngữ với truyện, không nhân đôi', () => {
+  const viUnits = sp.storyUnits('Mai sống bên sông cùng bà. Sáng nào em cũng dắt trâu ra đồng.', { seconds: 10 });
+  const enUnits = sp.storyUnits('Mai lived by the river with her grandmother. Every morning she walked the buffalo to the field.', { seconds: 10 });
+  const cases = [['16:9', 'ngang', 'landscape'], ['9:16', 'dọc', 'vertical'], ['1:1', 'vuông', 'square']];
+  for (const [aspect, vi, en] of cases) {
+    const cfg = { seconds: 10, aspect };
+    const a = sp.assembleScenes(viUnits, [{ units: [1, 2], prompt: 'Bờ sông lúc bình minh.' }], cfg)[0].prompt;
+    assert.ok(a.includes(`Tỷ lệ khung hình video: ${aspect} (${vi}).`), a);
+    assert.equal(a.split('Tỷ lệ khung hình video').length, 2);
+    assert.ok(a.trimEnd().endsWith(sp.NO_SPEECH));
+    const b = sp.assembleScenes(enUnits, [{ units: [1, 2], prompt: 'River bank at dawn.' }], cfg)[0].prompt;
+    assert.ok(b.includes(`Video aspect ratio: ${aspect} (${en}).`), b);
+    assert.ok(!/Tỷ lệ khung hình/.test(b));
+    // Muse đã tự ghi tỉ lệ thì không thêm lần nữa.
+    const own = sp.assembleScenes(viUnits, [{ units: [1, 2], prompt: `Bờ sông lúc bình minh, khung hình ${aspect}.` }], cfg)[0].prompt;
+    assert.ok(!/Tỷ lệ khung hình video/.test(own), own);
+  }
+  // Cùng với câu khóa hình dạng: tỉ lệ, rồi khóa, rồi câu cấm tiếng; hàng loạt lần gắn lại không nhân đôi.
+  const cfg = { seconds: 10, aspect: '9:16', reference: true, form: 'người que' };
+  const scene = sp.assembleScenes(viUnits, [{ units: [1, 2], prompt: 'Bờ sông lúc bình minh.' }], cfg)[0].prompt;
+  assert.ok(scene.indexOf('Tỷ lệ khung hình video') < scene.indexOf('KHÓA HÌNH DẠNG') && scene.indexOf('KHÓA HÌNH DẠNG') < scene.indexOf(sp.NO_SPEECH));
+  const again = sp.assembleScenes(viUnits, [{ units: [1, 2], prompt: scene }], cfg)[0].prompt;
+  assert.equal(again, scene);
+  // Soát cảnh: câu tỉ lệ không làm prompt ngắn trông như đủ dài.
+  const short = sp.lintScenes([{ voiceover: 'Mai nhìn quanh.', prompt: 'Mai.\nTỷ lệ khung hình video: 16:9 (ngang).\n' + sp.NO_SPEECH }], { seconds: 10, aspect: '16:9' })[0];
+  assert.ok(short.some(w => /Prompt quá ngắn/.test(w)), short.join(' | '));
+});
