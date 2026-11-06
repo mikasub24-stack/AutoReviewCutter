@@ -67,7 +67,7 @@ jobs:
           Copy-Item "$appDir/*" dist/portable/ -Recurse
           Remove-Item dist/portable/*.lib,dist/portable/*.pdb,dist/portable/*.exp,dist/portable/bootstrap*.exe,dist/portable/Browser*.json,dist/portable/Browser*.log,dist/portable/debug.log -ErrorAction SilentlyContinue
           Copy-Item VocalStudio/README.md,VocalStudio/LICENSE.txt,VocalStudio/THIRD_PARTY.md,VocalStudio/JUCE-LICENSE.md,VocalStudio/ThirdParty/Signalsmith-Stretch-LICENSE.txt,VocalStudio/ThirdParty/Signalsmith-Linear-LICENSE.txt dist/portable/
-          Compress-Archive -Path dist/portable/* -DestinationPath dist/VocalStudio-1.5.0-Windows.zip
+          Compress-Archive -Path dist/portable/* -DestinationPath dist/VocalStudio-1.6.0-Windows.zip
           $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
           if (!(Test-Path $iscc)) { choco install innosetup -y --no-progress; if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' } }
           & $iscc "/DSourceDir=$appDir" "/DOutputDir=$PWD\dist" VocalStudio/installer/VocalStudio.iss
@@ -76,7 +76,7 @@ jobs:
         shell: pwsh
         run: |
           $install = Join-Path $env:RUNNER_TEMP 'VocalStudioInstalled'
-          $setup = Start-Process "$PWD/dist/VocalStudio-1.5.0-Setup.exe" -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
+          $setup = Start-Process "$PWD/dist/VocalStudio-1.6.0-Setup.exe" -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
           if ($setup.ExitCode -ne 0 -or !(Test-Path "$install/VocalStudio.exe")) { throw 'Installer failed' }
           $report = Join-Path $PWD 'dist/InstalledSelfTest.json'
           $test = Start-Process "$install/VocalStudio.exe" -WorkingDirectory $PWD -ArgumentList @('--self-test','--report',"`"$report`"") -Wait -PassThru
@@ -90,7 +90,7 @@ jobs:
       - name: Export corresponding source and workspace handoff
         shell: pwsh
         run: |
-          git archive --format=zip --output=dist/VocalStudio-1.5.0-Source.zip HEAD VocalStudio .github/workflows/vocal-studio-windows.yml
+          git archive --format=zip --output=dist/VocalStudio-1.6.0-Source.zip HEAD VocalStudio .github/workflows/vocal-studio-windows.yml
           git fetch --no-tags --unshallow origin vocal-studio
           if ($LASTEXITCODE -ne 0) { throw 'Source history fetch failed' }
           git bundle create dist/VocalStudio-source.bundle HEAD ^4da27243521a32aa05b77cccdfcff6b5de479efc

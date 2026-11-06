@@ -52,6 +52,8 @@ public:
     void showVocalTools();
     void showAutoEq();
     void showPolish();void exportVocal();
+    void autoMixVocal();void previewAutoMix(bool);
+    bool hasAutoMix() const {return mixReady&&mixSession==projectFile.getFullPathName();}
     void showTuneFix();
     void listenAutoEq();void pauseMusicForEq();
     void recordAutoEq();void analyseAutoEq();void previewAutoEq(bool);void saveAutoEq();void loadAutoEq();void cancelAutoEq();
@@ -87,6 +89,9 @@ public:
     TrackCanvas canvas;
     int selected=-1;
 private:
+    bool mixReady=false;
+    juce::String mixSession;
+    vocal::VocalParameters mixBefore,mixAfter;
     struct Edit {int track;double beforeStart,beforeIn,beforeOut,afterStart,afterIn,afterOut;};
     struct Knob {juce::Label label;juce::Slider slider;std::atomic<float>* value=nullptr;};
     std::unique_ptr<juce::Component> karaoke;
@@ -115,6 +120,7 @@ private:
     std::atomic<float> exportProgress{0};
     bool busy=false,exporting=false,closing=false,calibrating=false;
     double calibrationDeadline=0;
+    bool setupRestoreFailed=false;
     int autosaveTicks=0;
     float shownInput=0,shownOutput=0;
     juce::String currentStatus;

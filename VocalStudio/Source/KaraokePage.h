@@ -8,6 +8,7 @@ public:
     void resized() override;
     void paint(juce::Graphics&) override;
     void leave();
+    void persist();
     void pauseMusic(){browser.pause();}
     void probe(){browser.runAudioProbe();}
     float capturedPeak() const{return browser.capturedPeak();}
@@ -15,13 +16,13 @@ public:
 private:
     StudioMain& owner;YouTubeBrowser browser;
     juce::TextEditor search;
-    juce::TextButton open,back,home,down,up,reset,advanced,devices,fx,antares,loadPlugin,mic,record,softReverb,autoEq,polish,fixTune;
-    juce::Label title,offset,key,musicLabel,micLabel,reverbLabel,delayLabel;
+    juce::TextButton open,back,home,down,up,reset,advanced,devices,fx,antares,loadPlugin,mic,record,softReverb,autoEq,polish,fixTune,livePreset;
+    juce::Label title,offset,key,musicLabel,micLabel,reverbLabel,delayLabel,monitorLabel,shortLabel,compressionLabel,colourLabel;
     juce::TextEditor status;
     juce::Viewport sidebar;juce::Component controls;
-    juce::ComboBox input;
+    juce::ComboBox input,colour;
     juce::AudioPluginInstance* lastPlugin=nullptr;
-    juce::Slider music,micGain,reverb,delay;
+    juce::Slider music,micGain,reverb,delay,monitorLevel,shortRoom,compression;
     juce::ComboBox keySelect,scaleSelect;
     juce::ToggleButton autoKey;
     std::uint64_t revision=~std::uint64_t(0);int lastKey=-2;bool lastMinor=false;

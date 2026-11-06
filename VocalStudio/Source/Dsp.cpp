@@ -11,6 +11,7 @@ VocalParameters preset(int i) noexcept {
     if (i == 2) { p.highPassHz=95; p.warmthDb=-3; p.presenceDb=3; p.thresholdDb=-22; p.ratio=4; p.makeupDb=4; p.deEss=.55f; p.reverb=.08f; p.delay=.06f; p.delayMs=190;p.decaySeconds=.85f;p.preDelayMs=18; }
     if (i == 3) { p.highPassHz=75; p.presenceDb=.5f; p.ratio=2; p.makeupDb=1; p.reverb=.06f;p.decaySeconds=.5f;p.preDelayMs=8; p.delay=0; }
     if(i==4){p.leveling=.7f;p.dynamicTame=.55f;p.reverbDuck=.65f;p.thresholdDb=-18;p.ratio=2.5f;p.makeupDb=1.5f;p.reverb=.09f;p.delay=.025f;p.delayMs=260;p.delayFeedback=.18f;p.decaySeconds=1.3f;p.preDelayMs=28;p.damping=.7f;p.width=.85f;}
+    if(i==5){p.thresholdDb=-24;p.ratio=3.5f;p.makeupDb=4;p.leveling=.65f;p.dynamicTame=.25f;p.deEss=.4f;p.shortReverb=.18f;p.shortDecaySeconds=.4f;p.reverb=.16f;p.decaySeconds=1.8f;p.preDelayMs=30;p.delay=.07f;p.delayMs=280;p.delayFeedback=.22f;p.reverbDuck=.45f;}
     return p;
 }
 void Biquad::configure(Type type, double sr, double hz, double q, double db) noexcept {
@@ -52,7 +53,7 @@ float Delay::diffuse(float sample,std::size_t samples) noexcept {
 }
 void VocalChain::prepare(double sr) {
     rate=std::clamp(sr,8000.0,384000.0);
-    for(auto& c:channels) { c.echo.prepare(rate,2.01);c.preDelay.prepare(rate,.15);for(auto& d:c.comb)d.prepare(rate,.06);for(auto& d:c.allpass)d.prepare(rate,.009); }
+    for(auto& c:channels) { c.echo.prepare(rate,2.01);c.preDelay.prepare(rate,.15);for(auto& d:c.comb)d.prepare(rate,.06);for(auto& d:c.shortComb)d.prepare(rate,.03);for(auto& d:c.shortAllpass)d.prepare(rate,.005);for(auto& d:c.allpass)d.prepare(rate,.009); }
     attack=static_cast<float>(std::exp(-1/(rate*.005)));release=static_cast<float>(std::exp(-1/(rate*.090)));essRelease=static_cast<float>(std::exp(-1/(rate*.045)));
     controlRate=static_cast<float>(1-std::exp(-1/(rate*.02)));
     powerRate=static_cast<float>(1-std::exp(-1/(rate*.05)));levelUp=static_cast<float>(1-std::exp(-1/(rate*.7)));levelDown=static_cast<float>(1-std::exp(-1/(rate*.08)));tameAttack=static_cast<float>(1-std::exp(-1/(rate*.005)));tameRelease=static_cast<float>(1-std::exp(-1/(rate*.12)));roomAttack=static_cast<float>(1-std::exp(-1/(rate*.01)));roomRelease=static_cast<float>(1-std::exp(-1/(rate*.18)));
@@ -60,12 +61,14 @@ void VocalChain::prepare(double sr) {
 }
 void VocalChain::reset() noexcept {
     envelope=essEnvelope=reduction=0;compression=1;levelPower=levelDb=harshPower=harshGain=roomPower=0;levelAmount=tameAmount=duckAmount=0;
-    for(auto& c:channels){ c.high.reset();c.warmth.reset();c.presence.reset();c.ess.reset();c.tame.reset();c.harsh.reset();c.echo.reset();c.preDelay.reset();for(auto& d:c.comb)d.reset();for(auto& d:c.allpass)d.reset();c.damping.fill(0); }
+    for(auto& c:channels){ c.high.reset();c.warmth.reset();c.presence.reset();c.ess.reset();c.tame.reset();c.harsh.reset();c.echo.reset();c.preDelay.reset();for(auto& d:c.comb)d.reset();for(auto& d:c.allpass)d.reset();c.damping.fill(0);c.shortDamping.fill(0);for(auto& d:c.shortComb)d.reset();for(auto& d:c.shortAllpass)d.reset(); }
 }
 void VocalChain::setParameters(const VocalParameters& value) noexcept {
     p=value;p.ratio=std::clamp(p.ratio,1.0f,12.0f);p.deEss=std::clamp(p.deEss,0.0f,1.0f);p.reverb=std::clamp(p.reverb,0.0f,.4f);p.delay=std::clamp(p.delay,0.0f,.3f);
     p.decaySeconds=std::clamp(p.decaySeconds,.3f,4.0f);p.damping=std::clamp(p.damping,.05f,.95f);p.width=std::clamp(p.width,0.0f,1.5f);p.delayFeedback=std::clamp(p.delayFeedback,0.0f,.65f);p.deharsh=std::clamp(p.deharsh,0.0f,1.0f);
     p.leveling=std::clamp(p.leveling,0.0f,1.0f);p.dynamicTame=std::clamp(p.dynamicTame,0.0f,1.0f);p.reverbDuck=std::clamp(p.reverbDuck,0.0f,1.0f);
+    p.shortReverb=std::clamp(p.shortReverb,0.0f,.4f);p.shortDecaySeconds=std::clamp(p.shortDecaySeconds,.15f,.9f);
+    constexpr double shortTimes[4]={.011,.0137,.0173,.0199};for(int j=0;j<4;++j)shortFeedback[j]=static_cast<float>(std::pow(.001,shortTimes[j]/p.shortDecaySeconds));
     preDelaySamples=static_cast<std::size_t>(rate*std::clamp(p.preDelayMs,0.0f,100.0f)/1000);
     constexpr double combTimes[4]={.0297,.0371,.0411,.0437};for(int j=0;j<4;++j)roomFeedback[j]=static_cast<float>(std::pow(.001,combTimes[j]/p.decaySeconds));
     preGain=dbToGain(p.inputDb);makeup=dbToGain(p.makeupDb);
@@ -102,6 +105,7 @@ void VocalChain::processAmbience(float& left,float& right) noexcept {
     const float power=static_cast<float>(std::min(16.0,(static_cast<double>(left)*left+static_cast<double>(right)*right)*.5));roomPower+=(power-roomPower)*(power>roomPower?roomAttack:roomRelease);const float activity=std::clamp((10*std::log10(std::max(1e-12f,roomPower))+36)/20,0.0f,1.0f);const float wetGain=1-.75f*duckAmount*activity;
     constexpr double combTimes[4]={.0297,.0371,.0411,.0437};
     constexpr double allpassTimes[2]={.005,.0017};
+    float shortWet[2]={0,0};
     float wet[2]={0,0},echoWet[2]={0,0},drySignal[2]={0,0};
     for(int i=0;i<2;++i) {
         auto& c=channels[static_cast<std::size_t>(i)];float dry=signal[i];drySignal[i]=dry;
@@ -111,9 +115,15 @@ void VocalChain::processAmbience(float& left,float& right) noexcept {
         for(std::size_t j=0;j<4;++j) {const auto n=static_cast<std::size_t>(rate*(combTimes[j]+i*.0013));const float v=c.comb[j].tap(n);c.damping[j]=(1-p.damping)*v+p.damping*c.damping[j];c.comb[j].push(excitation+c.damping[j]*roomFeedback[j]);room+=v*.25f;}
         for(std::size_t j=0;j<2;++j) {const auto n=static_cast<std::size_t>(rate*(allpassTimes[j]+i*.00013));room=c.allpass[j].diffuse(room,n);}
         wet[i]=room;
+        constexpr double shortTimes[4]={.011,.0137,.0173,.0199};
+        float shortRoom=0;
+        for(std::size_t j=0;j<4;++j){const auto n=static_cast<std::size_t>(rate*(shortTimes[j]+i*.0007));const float v=c.shortComb[j].tap(n);c.shortDamping[j]=.45f*v+.55f*c.shortDamping[j];c.shortComb[j].push(dry+c.shortDamping[j]*shortFeedback[j]);shortRoom+=v*.25f;}
+        shortRoom=c.shortAllpass[0].diffuse(shortRoom,static_cast<std::size_t>(rate*(.0023+i*.0001)));
+        shortWet[i]=c.shortAllpass[1].diffuse(shortRoom,static_cast<std::size_t>(rate*(.0008+i*.00007)));
+
     }
     const float middle=(wet[0]+wet[1])*.5f,side=(wet[0]-wet[1])*.5f*p.width;
-    left=drySignal[0]*(1-p.reverb*.3f)+(middle+side)*p.reverb*wetGain+echoWet[0]*p.delay*wetGain;right=drySignal[1]*(1-p.reverb*.3f)+(middle-side)*p.reverb*wetGain+echoWet[1]*p.delay*wetGain;
+    left=shortWet[0]*p.shortReverb*wetGain+drySignal[0]*(1-p.reverb*.3f)+(middle+side)*p.reverb*wetGain+echoWet[0]*p.delay*wetGain;right=shortWet[1]*p.shortReverb*wetGain+drySignal[1]*(1-p.reverb*.3f)+(middle-side)*p.reverb*wetGain+echoWet[1]*p.delay*wetGain;
 }
 void Limiter::prepare(double sr) {lookahead=std::max<std::size_t>(1,static_cast<std::size_t>(sr*.001));for(auto& d:delay)d.prepare(sr,.003);recovery=static_cast<float>(std::exp(-1/(sr*.080)));reset();}
 void Limiter::reset() noexcept {gain=1;hold=0;for(auto& d:delay)d.reset();}

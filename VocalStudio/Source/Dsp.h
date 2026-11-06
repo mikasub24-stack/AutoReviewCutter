@@ -11,6 +11,7 @@ struct VocalParameters {
     bool bypass = false;
     float inputDb = 0, highPassHz = 80, warmthDb = -2, presenceDb = 2;
     float thresholdDb = -18, ratio = 3, makeupDb = 2, deEss = .35f;
+    float shortReverb=0,shortDecaySeconds=.45f;
     float reverb = .10f, delay = .04f, delayMs = 240;
     float leveling=0,dynamicTame=0,reverbDuck=0;
     float decaySeconds=1.2f,preDelayMs=20,damping=.65f,width=1,delayFeedback=.27f,deharsh=0;
@@ -52,9 +53,9 @@ private:
     struct Channel {
         Biquad high, warmth, presence, ess, tame, harsh;
         Delay echo,preDelay;
-        std::array<Delay, 4> comb;
-        std::array<float, 4> damping {};
-        std::array<Delay, 2> allpass;
+        std::array<Delay, 4> comb,shortComb;
+        std::array<float, 4> damping {},shortDamping {};
+        std::array<Delay, 2> allpass,shortAllpass;
     };
     std::array<Channel, 2> channels;
     VocalParameters p;
@@ -65,7 +66,7 @@ private:
     float powerRate=.001f,levelUp=.001f,levelDown=.001f,tameAttack=.001f,tameRelease=.001f,roomAttack=.001f,roomRelease=.001f;
     float preGain = 1, makeup = 1, attack = .99f, release = .999f, essRelease = .999f;
     std::size_t delaySamples = 1,preDelaySamples=1;
-    std::array<float,4> roomFeedback{};
+    std::array<float,4> roomFeedback{},shortFeedback{};
 };
 class Limiter {
 public:

@@ -2,6 +2,24 @@
 
 Ứng dụng Windows x64 để hát trên beat, thu micro qua sound card và mix vocal tại máy. Dự án nằm trong `VocalStudio/`, nhánh `vocal-studio`, không sửa Chùa Việt Online.
 
+## Kiểm âm và ghi nhớ thiết lập (đang phát triển)
+
+Trong màn hình hát, **Giọng tai nghe** tăng/giảm riêng vocal sau Auto-Tune/vang và trước limiter, không tăng nhạc, không sửa WAV micro gốc và không đổi mức xuất offline. Thanh **Gain micro** vẫn là mức trước EQ/nén; dùng để chỉnh đầu vào FX, khác với mức giọng tai nghe. Giọng tai nghe cũng áp dụng khi nghe lại vocal trong app. Không tự động nâng mức khi cập nhật; bấm **Giọng nổi · Nén + Vang** để áp dụng điểm bắt đầu với kiểm âm +6 dB, nén 3,5:1, cân câu, vang ngắn 0,4 s và vang dài 1,8 s, delay 280 ms. Giữ EQ riêng và trạng thái Antares đang dùng. Điều chỉnh mức nghe vừa phải theo mic thật.
+
+Có hai bộ vang song song: **Vang ngắn** tạo độ dày và **Vang dài** tạo đuôi; chỉnh lượng ngay màn hình hát, chỉnh thời gian trong Menu FX. **Nén giọng** là một thanh điều khiển threshold/ratio/makeup/cân câu; số dB giảm gain hiện trong trạng thái. **Màu giọng** gồm Tự nhiên / Ấm dày / Sáng rõ, chỉ đổi EQ và giảm xì, không đổi pitch, formant hoặc giả giọng người khác.
+
+Trạng thái báo rõ nếu FX bypass, Auto-Tune chưa nạp/đang bypass/chưa ghép Key/Scale. Đã nạp không có nghĩa mọi nốt đều được sửa: kiểm tra đúng tone và thiết lập trong Antares.
+
+App tự lưu mỗi khoảng 5 giây và khi đóng: phiên, plugin VST3 cùng trạng thái riêng của plugin, mapping Key/Scale, FX, mức kiểm âm, sound card, ngõ micro, âm lượng nhạc và lựa chọn màn hình hát. Mở lại tự khôi phục phiên gần nhất; tạo phiên mới giữ cấu hình giọng đang dùng. Có cấu hình dự phòng không chứa track để khôi phục khi phiên cũ bị mất. Nếu plugin không còn ở đường dẫn cũ hoặc không mở được, app báo lỗi và giữ cấu hình dự phòng; cần sửa cài đặt/giấy phép, không tự coi plugin đang hoạt động. Chưa xác nhận trên Auto-Tune thương mại/sound card thật.
+
+## Tự mix vocal (đang phát triển)
+
+Trong màn hình hát chọn **Tự mix vocal / Mượt giọng**. Thu micro khô, dừng rồi bấm **Tự mix vocal**; có thể chọn track vocal trong Studio trước khi mở bảng. App phân tích WAV gốc để chọn low-cut, EQ, de-esser, mức vào và threshold/ratio nén; tự đặt cân câu, dịu gắt và reverb/delay nhẹ có ducking. Sau đó bấm **Nghe bản thu với FX**, so **A · Trước tự mix / B · Sau tự mix**, và **Xuất WAV vocal có FX**. A/B có thể khác âm lượng, không phải so sánh loudness đã khớp.
+
+A/B khôi phục toàn bộ FX về hai mốc trước/sau, kể cả thay đổi thủ công sau đó; thiết lập đang chọn được lưu vào phiên, WAV gốc và Antares/Key/Scale giữ nguyên. Các mốc A/B chỉ có trong lần mở phiên hiện tại. FX áp dụng cho toàn vocal bus; phân tích chỉ dựa trên track đã chọn. Phân tích chạy nền, không áp dụng nếu lỗi/hủy; từ chối mẫu thiếu giọng rõ, clip nhiều hoặc dữ liệu không hợp lệ. Giới hạn bản thu phân tích là 256 MB âm thanh giải mã.
+
+Đây là tự mix giọng bước đầu, chưa tự cân với beat, chỉnh từng nốt hay mastering/LUFS/true-peak toàn bài. Xuất riêng vocal không kèm nhạc YouTube. Muốn xuất cùng beat cần nhập beat có sẵn và dùng Xuất WAV trong Studio. Chất lượng phát hành cần nghe kiểm tra trên bản thu thật; preset không phục hồi được bản thu đã vỡ hoặc vang phòng nặng.
+
 ## 1.5 · Fix méo Auto-Tune
 
 Nút **Fix méo Auto-Tune** ngay màn hình hát mở bảng có **Áp dụng · Kéo nhẹ hơn**, **Hoàn tác Fix méo**, **Mở Antares** và báo cáo từng tham số. Đây là giảm kiểu kéo nốt quá gắt, không phải phục hồi clipping và không bảo đảm hết mọi méo. Dừng thu/phát/nghe bản thu trước khi áp dụng. Nạp Antares VST3 có giấy phép, ghép Key/Scale và chờ dò/chọn tone đúng trước. Khi nâng/hạ nhạc trong YouTube, Key/Scale theo tone đầu ra như trước; nếu dò nhầm Major/Minor hoặc bài chuyển giọng thì chọn tay/kiểm tra lại. Không tự bật plugin bạn đã bypass.
@@ -139,3 +157,9 @@ ctest --test-dir build/vocal -C Release --output-on-failure
 ```
 
 CMake lấy JUCE và ASIO SDK ở commit cố định. Source ứng dụng AGPL-3.0-or-later; xem LICENSE.txt và THIRD_PARTY.md. Micro và bản thu lưu trên máy; trình duyệt YouTube kết nối tới YouTube như trình duyệt thông thường và không được cấp quyền micro/camera. CEF Windows x64 stable 156.0.15 được ghim version và checksum trong cmake/Browser.cmake.
+
+## Build bản 1.6.0 trên Windows
+
+Cài Visual Studio 2022 với Desktop development with C++ và CMake, cùng Inno Setup 6. Mở Developer PowerShell tại thư mục gốc, chạy `./VocalStudio/scripts/build-windows.ps1`. Script tải dependency đã ghim, build x64, chạy CTest, thử Chromium audio/sandbox, chụp giao diện, tạo installer rồi thử bản đã cài. Chỉ sau khi tất cả thành công mới tạo ZIP portable và ghi SHA256. Sản phẩm nằm ở `dist/VocalStudio-1.6.0-Setup.exe`.
+
+Có workflow thủ công `Vocal Studio 1.6 Windows preview` trong `.github/workflows/vocal-studio-preview.yml`; artifact chỉ được tải lên khi toàn bộ quy trình thành công. Workflow này chưa tự phát hành công khai. Antares thương mại không được kèm trong bộ cài.

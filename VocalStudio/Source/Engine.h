@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Dsp.h"
 #include "AutoEq.h"
+#include "AutoMix.h"
 #include "LiveMusic.h"
 #include "Pitch.h"
 #include "VoiceFit.h"
@@ -93,6 +94,12 @@ public:
     juce::String deviceSummary() const;
     void selectPreset(int index);
     void studioPolish();
+    void liveVocalPreset();
+    void setVoiceColour(int);
+    juce::Result restoreSetup(const juce::var&);
+    vocal::VocalParameters vocalSettings() const noexcept {return parameters();}
+    void applyVocalSettings(const vocal::VocalParameters&);
+    juce::Result analyseMixTrack(int,vocal::MixRecommendation&,std::atomic<bool>&,std::atomic<float>&);
     void setSessionDirectory(juce::File dir) {sessionDirectory=std::move(dir);}
     const juce::File& session() const noexcept {return sessionDirectory;}
     juce::Result saveProject(const juce::File&,const vocal::EqSettings* storedEq=nullptr);
@@ -105,6 +112,7 @@ public:
     std::atomic<bool> monitor{false},fxBypass{false},latencyCompensation{true};
     std::atomic<int> inputChannel{0},recordingFault{0};
     std::atomic<float> inputDb{0},highPass{80},warmth{-2},presence{2},threshold{-18},ratio{3},makeup{2},deEss{.35f},reverb{.10f},delay{.04f},delayMs{240},masterDb{-3},manualOffsetMs{0};
+    std::atomic<float> monitorDb{0},shortReverb{0},shortDecaySeconds{.45f};
     std::atomic<float> leveling{0},dynamicTame{0},reverbDuck{0};
     std::atomic<float> decaySeconds{1.2f},preDelayMs{20},damping{.65f},width{1},delayFeedback{.27f},deharsh{0};
     std::atomic<float> inputPeak{0},outputPeak{0},inputRms{0},gainReduction{0};
@@ -140,7 +148,7 @@ private:
     std::array<vocal::Delay,2> musicDelay;
     juce::File sessionDirectory,recordFile;
     double recordStart=0;
-    float currentMaster=1,smoothing=.001f;
+    float currentMonitor=1,currentMaster=1,smoothing=.001f;
     bool callbackAttached=false,offline=false,testMode=false,heldForUnknownKey=false;
     std::atomic<bool> suspending{false};
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StudioEngine)

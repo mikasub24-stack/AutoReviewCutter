@@ -8,3 +8,31 @@ void StudioMain::saveAutoEq(){if(isBusy()||!eqSuggestion.valid||eqSession!=proje
 void StudioMain::loadAutoEq(){if(isBusy()||engine.isRecording())return;const auto data=juce::JSON::parse(preferences.getUserSettings()->getValue("personalEq"));vocal::EqSettings eq{static_cast<float>(data["highPass"]),static_cast<float>(data["warmth"]),static_cast<float>(data["presence"]),static_cast<float>(data["deharsh"]),static_cast<float>(data["deEss"]),static_cast<float>(data["inputDb"])};if(!data.isObject()||static_cast<int>(data["version"])!=1||!eq.valid()){eqStatus=u("Chưa có EQ riêng hợp lệ. Thu một bài hoặc chọn bản micro khô để phân tích trước.");return;}cancelAutoEq();eqBefore=engine.eqSettings();eqSource=-1;eqSourceFile={};eqRestore=eqLast=eq;eqSession=projectFile.getFullPathName();eqSuggestion={};eqSuggestion.valid=true;eqSuggestion.suggested=eq;eqSuggestion.message="Đã nạp EQ riêng đã lưu; không phân tích lại bài hiện tại.";engine.applyEq(eq);syncKnobs();save();eqStatus=u("Đã áp dụng EQ riêng đã lưu. Có thể hát để nghe, hoặc phân tích một bản giọng mới khi đổi micro, khoảng cách hoặc phòng. Không tự đổi tone/Antares.");}
 
 void StudioMain::listenAutoEq(){if(isBusy()||engine.isRecording())return;if(engine.isEqListening()){engine.stop();return;}const int index=eqSource>=0&&eqSession==projectFile.getFullPathName()?eqSource:selected;if(eqSource>=0&&(!juce::isPositiveAndBelow(index,static_cast<int>(engine.getTracks().size()))||engine.getTracks()[static_cast<std::size_t>(index)]->originalFile.getFullPathName()!=eqSourceFile)){eqStatus=u("Bản giọng đã đổi. Chọn lại và phân tích trước khi nghe A/B.");return;}pauseMusicForEq();const auto result=engine.auditionOriginal(index);if(result.failed())eqStatus=result.getErrorMessage();else status(u("Đang nghe riêng WAV micro gốc qua FX hiện tại. Bấm A/B để so EQ; YouTube đã tạm dừng, micro kiểm âm tạm tắt trong lúc nghe."));}
+
+void StudioMain::autoMixVocal(){
+    if(!canEdit()){status(u("Dừng phát/thu trước khi tự mix."));return;}
+    if(!juce::isPositiveAndBelow(selected,static_cast<int>(engine.getTracks().size()))||!engine.getTracks()[static_cast<std::size_t>(selected)]->vocal){status(u("Thu giọng hoặc chọn một track vocal khô trước khi tự mix."));return;}
+    cancelAutoEq();eqSuggestion={};eqSource=-1;mixReady=false;
+    mixBefore=engine.vocalSettings();mixSession=projectFile.getFullPathName();
+    const int index=selected;const auto source=engine.getTracks()[static_cast<std::size_t>(index)]->originalFile;
+    const auto session=mixSession;
+    cancelExport=false;exportProgress=0;
+    setBusy(true,u("Đang phân tích và tự mix vocal…"));
+    auto result=std::make_shared<vocal::MixRecommendation>();
+    auto ok=std::make_shared<juce::Result>(juce::Result::ok());
+    juce::Component::SafePointer<StudioMain> safe(this);
+    runJob([this,index,result,ok]{*ok=engine.analyseMixTrack(index,*result,cancelExport,exportProgress);},[safe,index,source,session,result,ok]{
+        if(!safe)return;
+        if(safe->cancelExport||ok->failed()){safe->status(safe->cancelExport?u("Đã hủy tự mix; giữ thiết lập cũ."):ok->getErrorMessage());return;}
+        if(session!=safe->projectFile.getFullPathName()||!juce::isPositiveAndBelow(index,static_cast<int>(safe->engine.getTracks().size()))||safe->engine.getTracks()[static_cast<std::size_t>(index)]->originalFile!=source){safe->status(u("Bản thu đã đổi; chọn lại để tự mix."));return;}
+        safe->mixAfter=result->settings;safe->mixReady=true;
+        safe->engine.applyVocalSettings(safe->mixAfter);safe->syncKnobs();safe->save();
+        safe->status(u(result->message.c_str())+u("\nMức giọng hoạt động: ")+juce::String(result->activeRmsDb,1)+" dBFS"+u(" · Nén: ")+juce::String(result->settings.ratio,1)+":1"+u(" · Low-cut: ")+juce::String(result->settings.highPassHz,0)+" Hz");
+    });
+}
+void StudioMain::previewAutoMix(bool after){
+    if(isBusy()||engine.isRecording()||!hasAutoMix())return;
+    if(eqPreview)cancelAutoEq();eqSuggestion={};
+    engine.applyVocalSettings(after?mixAfter:mixBefore);syncKnobs();save();
+    status(after?u("B · Bản tự mix. Antares giữ nguyên."):u("A · Thiết lập trước khi tự mix. Antares giữ nguyên."));
+}

@@ -1,0 +1,41 @@
+name: Vocal Studio 1.6 Windows preview
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: build/vocal
+          key: vocal-preview156-${{ runner.os }}-${{ github.sha }}
+          restore-keys: vocal-preview156-${{ runner.os }}-
+      - name: Compile, test, package and verify installed app
+        shell: pwsh
+        run: ./VocalStudio/scripts/build-windows.ps1
+      - name: Archive corresponding source
+        shell: pwsh
+        run: |
+          git archive --format=zip --output=dist/VocalStudio-1.6.0-Source.zip HEAD VocalStudio .github/workflows/vocal-studio-preview.yml
+          if ($LASTEXITCODE -ne 0) { throw 'Source archive failed' }
+          Get-ChildItem dist -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content dist/SHA256SUMS.txt -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VocalStudio-1.6.0-Verified-Windows
+          path: dist/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: VocalStudio-1.6.0-Diagnostics
+          path: |
+            build/vocal/Testing/Temporary/LastTest.log
+            build/vocal/EngineSelfTest.json
+            build/vocal/VocalStudio_artefacts/Release/Browser*.log
+            build/vocal/VocalStudio_artefacts/Release/BrowserSelfTest.json
+            dist/*SelfTest.json
+          if-no-files-found: warn
