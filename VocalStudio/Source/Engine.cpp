@@ -360,6 +360,7 @@ juce::Result StudioEngine::restoreSetup(const juce::var& state){
     if(fx.hasProperty("shortDecaySeconds")){const float v=static_cast<float>(fx["shortDecaySeconds"]);if(std::isfinite(v))p.shortDecaySeconds=v;}
     p.bypass=static_cast<bool>(fx["bypass"]);applyVocalSettings(p);if(state.hasProperty("reverbPluginMix"))reverbPluginMix=juce::jlimit(0.f,1.f,static_cast<float>(state["reverbPluginMix"]));
     if(state.hasProperty("monitorDb"))monitorDb=juce::jlimit(-12.0f,18.0f,static_cast<float>(state["monitorDb"]));
+    if(state.hasProperty("masterDb")){const float value=static_cast<float>(state["masterDb"]);if(std::isfinite(value))masterDb=juce::jlimit(-30.f,6.f,value);}
     withAudioStopped([]{},[&]{if(plugin&&state["plugin"].isObject())applyPluginState(*plugin,state["plugin"]);if(reverbPlugin&&state["reverbPlugin"].isObject())applyPluginState(*reverbPlugin,state["reverbPlugin"]);if(eqPlugin&&state["eqPlugin"].isObject())applyPluginState(*eqPlugin,state["eqPlugin"]);});
     return juce::Result::ok();
 }
