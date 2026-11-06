@@ -59,7 +59,7 @@ public:
     void fillInPluginDescription(juce::PluginDescription& d) const override{d=description;}
     bool isBusesLayoutSupported(const BusesLayout& layout) const override{return effect&&layout.getMainInputChannels()==effect->numInputs&&layout.getMainOutputChannels()==effect->numOutputs;}
     void prepareToPlay(double rate,int size) override{
-        releaseResources();sampleRate=rate;blockSize=juce::jmax(16,size);inputs.setSize(effect->numInputs,blockSize);outputs.setSize(effect->numOutputs,blockSize);
+        releaseResources();if(effect->numInputs<1||effect->numInputs>2||effect->numOutputs<1||effect->numOutputs>2)return;sampleRate=rate;blockSize=juce::jmax(16,size);inputs.setSize(effect->numInputs,blockSize);outputs.setSize(effect->numOutputs,blockSize);
         dispatch(effSetSampleRate,0,0,nullptr,static_cast<float>(rate));dispatch(effSetBlockSize,0,blockSize);dispatch(effMainsChanged,0,1);dispatch(effStartProcess);prepared=true;time={};time.sampleRate=rate;time.tempo=120;time.timeSigNumerator=4;time.timeSigDenominator=4;time.flags=kVstTempoValid|kVstTimeSigValid|kVstPpqPosValid;
         setLatencySamples(juce::jlimit(0,static_cast<int>(rate*2),effect->initialDelay));
     }
@@ -69,7 +69,7 @@ public:
         juce::ScopedNoDenormals noDenormals;
         if(!prepared){buffer.clear();return;}
         const int n=buffer.getNumSamples();
-        if(n>blockSize){buffer.clear();return;}
+        if(n>blockSize||!effect->processReplacing||effect->numInputs!=inputs.getNumChannels()||effect->numOutputs!=outputs.getNumChannels()){buffer.clear();return;}
         for(int c=0;c<effect->numInputs;++c)inputs.copyFrom(c,0,buffer,c,0,n);
         outputs.clear();time.ppqPos=time.samplePos/sampleRate*2;
         float* ins[2]={inputs.getWritePointer(0),effect->numInputs>1?inputs.getWritePointer(1):nullptr};float* outs[2]={outputs.getWritePointer(0),effect->numOutputs>1?outputs.getWritePointer(1):nullptr};effect->processReplacing(effect,ins,outs,n);

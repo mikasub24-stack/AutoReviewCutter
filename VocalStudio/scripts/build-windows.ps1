@@ -9,9 +9,9 @@ $dist = [IO.Path]::GetFullPath((Join-Path $root $OutputDirectory))
 New-Item -ItemType Directory -Force $dist | Out-Null
 & cmake -S VocalStudio -B $build -A x64 "-DVOCAL_BUILD_TESTS=ON"
 if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
-& cmake --build $build --config Release --parallel 2
+& cmake --build $build --config Release --parallel 2 2>&1 | Tee-Object -FilePath (Join-Path $build 'Compile.log')
 if ($LASTEXITCODE -ne 0) { throw 'Windows compilation failed' }
-& ctest --test-dir $build -C Release --output-on-failure
+& ctest --test-dir $build -C Release --output-on-failure 2>&1 | Tee-Object -FilePath (Join-Path $build 'CTest.log')
 if ($LASTEXITCODE -ne 0) { throw 'Native tests failed; no installer packaged' }
 $appDir = Join-Path $build 'VocalStudio_artefacts/Release'
 function Invoke-Studio([string]$Executable, [string[]]$StudioArguments, [int]$Timeout = 120000) {

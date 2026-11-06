@@ -34,14 +34,33 @@ jobs:
           name: VocalStudio-1.7.0-Verified-Windows
           path: dist/
           if-no-files-found: error
+      - name: Summarize build or native test failure
+        if: failure()
+        shell: pwsh
+        run: |
+          foreach ($file in @('build/vocal/Compile.log','build/vocal/CTest.log','build/vocal/EngineSelfTest.json','build/vocal/Testing/Temporary/LastTest.log')) {
+            if (Test-Path $file) {
+              "### $file" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+              '```text' | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+              Get-Content $file -Tail 100 | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+              '```' | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            }
+          }
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: VocalStudio-1.7.0-Diagnostics
           path: |
             build/vocal/Testing/Temporary/LastTest.log
+            build/vocal/Compile.log
+            build/vocal/CTest.log
             build/vocal/EngineSelfTest.json
             build/vocal/VocalStudio_artefacts/Release/Browser*.log
             build/vocal/VocalStudio_artefacts/Release/BrowserSelfTest.json
             dist/*SelfTest.json
           if-no-files-found: warn
+      - uses: actions/cache/save@v4
+        if: failure()
+        with:
+          path: build/vocal
+          key: vocal-preview156-${{ runner.os }}-${{ github.sha }}-diagnostic
