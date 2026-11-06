@@ -1,6 +1,9 @@
 name: Vocal Studio 1.6 Windows preview
 on:
   workflow_dispatch:
+  push:
+    branches: [fix/vst3-discovery]
+    paths: ['VocalStudio/**', '.github/workflows/vocal-studio-preview.yml']
 permissions:
   contents: read
 jobs:
