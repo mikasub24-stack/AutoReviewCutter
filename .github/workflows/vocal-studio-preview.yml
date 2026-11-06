@@ -22,7 +22,18 @@ jobs:
           restore-keys: vocal-preview156-${{ runner.os }}-
       - name: Compile, test, package and verify installed app
         shell: pwsh
-        run: ./VocalStudio/scripts/build-windows.ps1
+        run: |
+          try { ./VocalStudio/scripts/build-windows.ps1 }
+          catch {
+            '### Windows build failure' | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            '```text' | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            $_ | Out-String | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            $_.ScriptStackTrace | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            $detail = (($_ | Out-String) + $_.ScriptStackTrace).Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Host "::error title=Windows build failure::$detail"
+            '```' | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            throw
+          }
       - name: Archive corresponding source
         shell: pwsh
         run: |
@@ -43,6 +54,10 @@ jobs:
               "### $file" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
               '```text' | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
               Get-Content $file -Tail 100 | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+              $detail = ($file + "`n" + ((Get-Content $file -Tail 60) -join "`n"))
+              if ($detail.Length -gt 10000) { $detail = $detail.Substring($detail.Length - 10000) }
+              $detail = $detail.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+              Write-Host "::error title=Vocal build diagnostic::$detail"
               '```' | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
             }
           }

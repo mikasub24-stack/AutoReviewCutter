@@ -167,8 +167,8 @@ ctest --test-dir build/vocal -C Release --output-on-failure
 
 CMake lấy JUCE và ASIO SDK ở commit cố định. Source ứng dụng AGPL-3.0-or-later; xem LICENSE.txt và THIRD_PARTY.md. Micro và bản thu lưu trên máy; trình duyệt YouTube kết nối tới YouTube như trình duyệt thông thường và không được cấp quyền micro/camera. CEF Windows x64 stable 156.0.15 được ghim version và checksum trong cmake/Browser.cmake.
 
-## Build bản 1.6.0 trên Windows
+## Build bản 1.7.0 trên Windows
 
-Cài Visual Studio 2022 với Desktop development with C++ và CMake, cùng Inno Setup 6. Mở Developer PowerShell tại thư mục gốc, chạy `./VocalStudio/scripts/build-windows.ps1`. Script tải dependency đã ghim, build x64, chạy CTest, thử Chromium audio/sandbox, chụp giao diện, tạo installer rồi thử bản đã cài. Chỉ sau khi tất cả thành công mới tạo ZIP portable và ghi SHA256. Sản phẩm nằm ở `dist/VocalStudio-1.6.0-Setup.exe`.
+Cài Visual Studio 2022 với Desktop development with C++ và CMake, cùng Inno Setup 6. Mở Developer PowerShell tại thư mục gốc, chạy `./VocalStudio/scripts/build-windows.ps1`. Script tải dependency đã ghim, build x64, chạy CTest, thử Chromium audio/sandbox, chụp giao diện, tạo installer rồi thử bản đã cài. Chỉ sau khi tất cả thành công mới tạo ZIP portable và ghi SHA256. Sản phẩm nằm ở `dist/VocalStudio-1.7.0-Setup.exe`.
 
-Có workflow thủ công `Vocal Studio 1.6 Windows preview` trong `.github/workflows/vocal-studio-preview.yml`; artifact chỉ được tải lên khi toàn bộ quy trình thành công. Workflow này chưa tự phát hành công khai. Antares thương mại không được kèm trong bộ cài.
+Có workflow thủ công `Vocal Studio 1.7 Windows preview` trong `.github/workflows/vocal-studio-preview.yml`; artifact chỉ được tải lên khi toàn bộ quy trình thành công. Workflow này chưa tự phát hành công khai. Antares thương mại không được kèm trong bộ cài.

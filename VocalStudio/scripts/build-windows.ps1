@@ -42,7 +42,7 @@ $installDir = Join-Path ([IO.Path]::GetTempPath()) ('VocalStudio-verify-' + [Gui
 $process = Start-Process $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$installDir`"") -Wait -PassThru
 if ($process.ExitCode -ne 0) { throw 'Test installation failed' }
 $report = Join-Path $dist 'InstalledSelfTest.json'
-$vst2Fixture = Join-Path $build 'Vst2Fixture/Release/VocalStudioVst2Fixture.dll'
+$vst2Fixture = (Get-Content (Join-Path $build 'Vst2FixturePath-Release.txt') -Raw).Trim()
 if (!(Test-Path $vst2Fixture)) { throw 'VST2 test DLL missing' }
 Invoke-Studio (Join-Path $installDir 'VocalStudio.exe') @('--self-test','--vst2-fixture',"`"$vst2Fixture`"",'--report',"`"$report`"")
 if (!(Test-Path $report) -or !((Get-Content $report -Raw | ConvertFrom-Json).passed)) { throw 'Installed self-test failed' }
