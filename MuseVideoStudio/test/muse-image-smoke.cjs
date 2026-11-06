@@ -23,7 +23,7 @@ function png(w, h) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'muse-image-fixture-'));
   let browser;
   try {
-    const files = { old: png(220, 220), ref: png(64, 64), avatar: png(40, 40), slow: png(220, 220), a1: png(220, 220), a2: png(220, 220), swap: png(220, 220), big: png(220, 220), solo: png(220, 220), wide: png(440, 248), tall: png(248, 440), small: png(100, 100), wide2: png(220, 124), wide3: png(220, 124), wide4: png(220, 124) };
+    const files = { old: png(220, 220), ref: png(64, 64), avatar: png(40, 40), slow: png(220, 220), a1: png(220, 220), a2: png(220, 220), swap: png(220, 220), big: png(220, 220), solo: png(220, 220), wide: png(440, 248), tall: png(248, 440), small: png(100, 100), wide2: png(220, 124), wide3: png(220, 124), wide4: png(220, 124), wide5: png(220, 124), wide6: png(220, 124), logo: png(220, 124) };
     browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
     const context = await browser.newContext();
     const html = '<!doctype html><html><body><div id="thread" data-chat-thread></div><aside id="unrelated"></aside><textarea id="composer"></textarea></body></html>';
@@ -40,7 +40,7 @@ function png(w, h) {
         const root = document.createElement('article'); root.id = args.id; if (args.role) root.dataset.messageRole = args.role;
         if (args.ref) root.setAttribute('data-response-to', args.ref);
         if (args.text) { const p = document.createElement('p'); p.textContent = args.text; root.append(p); }
-        for (const item of args.images) { const img = document.createElement('img'); img.className = item.cls || 'result'; img.width = item.w || item.size; img.height = item.h || item.size; img.src = item.src; root.append(img); }
+        for (const item of args.images) { const img = document.createElement('img'); img.className = item.cls || 'result'; img.width = item.w || item.size; img.height = item.h || item.size; if (item.alt !== undefined) img.alt = item.alt; img.src = item.src; root.append(img); }
         document.getElementById('thread').append(root);
       }, { id, role, text, images, ref });
     }
@@ -148,7 +148,7 @@ function png(w, h) {
     await append({ id: 'reply-h3', text: 'Xong rồi.', images: [{ src: '/img/small.png', size: 70 }] });
     await loaded('reply-h3');
     for (let i = 0; i < 4; i++) { state = await poll('h3'); assert.equal(state.ready, false); await new Promise(r => setTimeout(r, 120)); }
-    assert.match(`${state.hint || ''} ${state.stage}`, /thấy 1 ảnh nhưng quá nhỏ \(70×70 px, tối thiểu 80\)/);
+    assert.match(`${state.hint || ''} ${state.stage}`, /thấy 1 ảnh nhưng chưa nhận: quá nhỏ \(70×70 px, tối thiểu 80\)/);
     await page.evaluate(endTracking, { id: 'h3' });
 
     // I: Muse shows the same prompt twice ("not confirmed as sent", then sent again): the one reply after
@@ -186,6 +186,28 @@ function png(w, h) {
     await append({ id: 'user-i8', role: 'user', text: 'Khuấy nồi canh' });
     await assert.rejects(poll('i4'), /nhiều tin nhắn trùng chính xác prompt/);
     await page.evaluate(endTracking, { id: 'i4' });
+
+    // J: the picture's alt text may repeat the prompt ("không logo"), and its address may contain a word
+    // like "logo": a result of normal size is still a result. Only small pictures are judged by those words.
+    await track('j', 'Đặt khăn lên thớt');
+    await append({ id: 'user-j', role: 'user', text: 'Đặt khăn lên thớt' });
+    await append({ id: 'reply-j', text: 'Xong.', images: [{ src: '/img/wide5.png', w: 220, h: 124, alt: 'Tạo ảnh chụp thật, không chữ, không số, không logo, không hình mờ' }] });
+    await loaded('reply-j');
+    state = await waitReady('j'); assert.match(state.url, /wide5\.png$/);
+    await page.evaluate(endTracking, { id: 'j' });
+    await track('j2', 'Lau mặt bàn');
+    await append({ id: 'user-j2', role: 'user', text: 'Lau mặt bàn' });
+    await append({ id: 'reply-j2', text: 'Xong.', images: [{ src: '/img/logo.png', w: 220, h: 124, alt: 'icon' }] });
+    await loaded('reply-j2');
+    state = await waitReady('j2'); assert.match(state.url, /logo\.png$/);
+    await page.evaluate(endTracking, { id: 'j2' });
+    await track('j3', 'Gấp khăn');
+    await append({ id: 'user-j3', role: 'user', text: 'Gấp khăn' });
+    await append({ id: 'reply-j3', text: 'Xong.', images: [{ src: '/img/wide6.png', w: 100, h: 100, alt: 'icon' }] });
+    await loaded('reply-j3');
+    for (let k = 0; k < 3; k++) { state = await poll('j3'); assert.equal(state.ready, false); await new Promise(r => setTimeout(r, 120)); }
+    assert.match(`${state.hint || ''} ${state.stage}`, /thấy 1 ảnh nhưng chưa nhận: giống biểu tượng hoặc avatar/);
+    await page.evaluate(endTracking, { id: 'j3' });
 
     // G: the saver only accepts real pictures.
     assert.equal(sniffImage(files.old).extension, '.png');

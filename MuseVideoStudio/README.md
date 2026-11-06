@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.4.3
+
+- **Sửa tiếp lỗi «có ảnh trong chat Muse mà vẫn không tải về».** Bản 1.4.2 chỉ sửa kích thước ảnh. Lần này tìm thêm một nguyên nhân nữa: app bỏ qua ảnh nếu chú thích (alt) hoặc đường dẫn của ảnh có chữ «logo», «icon», «avatar» hay «emoji». Prompt ảnh của Mẹo vặt có câu «không chữ, không số, **không logo**, không hình mờ», nên nếu Muse ghi lại prompt đó làm chú thích thì ảnh bị loại nhầm. Nay các từ đó chỉ dùng để loại ảnh **nhỏ** (dưới 140 px, đúng là biểu tượng hoặc avatar), ảnh cỡ kết quả thì luôn được nhận.
+- **Thẻ nói rõ vì sao chưa nhận ảnh**: ví dụ «thấy 1 ảnh nhưng chưa nhận: quá nhỏ (70×70 px, tối thiểu 80)», «giống biểu tượng hoặc avatar», «đang ẩn», «nguồn ảnh lạ». Nếu vẫn kẹt, chụp dòng này gửi lại là biết sửa đúng chỗ.
+- Thử bằng một trang chat giả dựng giống ảnh chụp chat Muse của bạn (không có thuộc tính đánh dấu tin nhắn): 3 kiểu bố cục × có/không chú thích «logo» × có tin nhắn cũ trùng prompt, Muse gửi lại prompt hai lần, đường dẫn ảnh có chữ «logo» (18 trường hợp). Bản 1.4.0 và 1.4.1 đều không nhận ảnh nào.
+- **Chưa thử với Muse thật.** Nếu vẫn không tải được ảnh, nguyên nhân còn lại nằm ở cách Muse dựng ảnh trong trang mà em chưa thấy; dòng chữ trên thẻ sẽ cho biết.
+
 ## Update 1.4.2
 
 - **Sửa lỗi «có ảnh trong chat Muse mà app không tải về».** Muse hiện ảnh vừa tạo dưới dạng **ảnh thu nhỏ rộng khoảng 220 px**, nên ảnh 16:9 chỉ cao khoảng 124 px. App từ trước đến nay chỉ nhận ảnh hiển thị cao và rộng ít nhất 150 px, nên **không bao giờ nhận ra ảnh 16:9** (thẻ cứ ghi «Đã thấy tin nhắn · chờ Muse phản hồi»). Nay mức tối thiểu là 80 px (ảnh thật nhỏ hơn vẫn bị bỏ qua để không nhầm với biểu tượng) và kích thước thật của ảnh tối thiểu 96 px. Lỗi này nằm ở cả «Tạo ảnh» lẫn bước ảnh của «Mẹo vặt».

@@ -44,17 +44,28 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   // as a thumbnail (about 220 px wide, so a 16:9 picture is only about 124 px high),
   // which is why the floor is low: the picture must still follow this prompt's message.
   const IMG_MIN=80,IMG_NATURAL_MIN=96;
-  const imageSource=src=>/^(https:|blob:|data:image\/(?:png|jpe?g|webp|gif);)/i.test(src)&&!/\.svg(?:$|[?#])/i.test(src)&&!/(?:^|[\/_.-])(?:avatar|emoji|sprite|favicon|logo)(?:[\/_.-]|$)/i.test(src);
-  function imageUsable(v){
-    if(v.tagName!=='IMG'||!imageSource(source(v))||/avatar|emoji|icon|logo/i.test(v.getAttribute('alt')||''))return false;
-    if(!visible(v)||composer(v))return false;
+  // The name/alt checks only apply to small pictures: a result is never an icon or avatar, and its
+  // alt text may legitimately contain those words (it can repeat the prompt, e.g. "no logo").
+  const imageSource=(src,small=true)=>/^(https:|blob:|data:image\/(?:png|jpe?g|webp|gif);)/i.test(src)&&!/\.svg(?:$|[?#])/i.test(src)&&!(small&&/(?:^|[\/_.-])(?:avatar|emoji|sprite|favicon|logo)(?:[\/_.-]|$)/i.test(src));
+  const SMALL_SIDE=140;
+  // Why a picture near this prompt is not accepted as its result ('' = usable).
+  function imageWhy(v){
+    if(v.tagName!=='IMG')return 'không phải thẻ ảnh';
+    const src=source(v);
+    if(!/^(https:|blob:|data:image\/(?:png|jpe?g|webp|gif);)/i.test(src))return 'nguồn ảnh lạ ('+(src.match(/^[a-z]+:/i)?.[0]||'trống')+')';
+    if(/\.svg(?:$|[?#])/i.test(src))return 'ảnh vector';
+    if(!visible(v))return 'đang ẩn';
+    if(composer(v))return 'nằm trong ô soạn thảo';
     const r=v.getBoundingClientRect();
-    if(r.width<IMG_MIN||r.height<IMG_MIN)return false;
-    return !(v.complete&&v.naturalWidth>0&&(v.naturalWidth<IMG_NATURAL_MIN||v.naturalHeight<IMG_NATURAL_MIN));
+    if(r.width<IMG_MIN||r.height<IMG_MIN)return `quá nhỏ (${Math.round(r.width)}×${Math.round(r.height)} px, tối thiểu ${IMG_MIN})`;
+    if(Math.max(r.width,r.height)<SMALL_SIDE&&(/avatar|emoji|icon|logo/i.test(v.getAttribute('alt')||'')||!imageSource(src,true)))return 'giống biểu tượng hoặc avatar';
+    if(v.complete&&v.naturalWidth>0&&(v.naturalWidth<IMG_NATURAL_MIN||v.naturalHeight<IMG_NATURAL_MIN))return `ảnh thật chỉ ${v.naturalWidth}×${v.naturalHeight} px`;
+    return '';
   }
-  // Pictures that look like a result but are too small to count, for the card's hint.
+  const imageUsable=v=>!imageWhy(v);
+  // Pictures that look like a result but are not accepted, for the card's hint.
   function tinyImages(){
-    return [...document.querySelectorAll(imageSel)].filter(v=>v.tagName==='IMG'&&!imageUsable(v)&&imageSource(source(v))&&visible(v)&&!composer(v)&&!/avatar|emoji|icon|logo/i.test(v.getAttribute('alt')||'')&&s.echoRoot?.isConnected&&following(s.echoRoot,v)&&!s.echoRoot.contains(v)&&!s.baselineSources.has(source(v)));
+    return [...document.querySelectorAll(imageSel)].filter(v=>v.tagName==='IMG'&&s.echoRoot?.isConnected&&following(s.echoRoot,v)&&!s.echoRoot.contains(v)&&!s.baselineSources.has(source(v))&&imageWhy(v)&&visible(v)&&!composer(v));
   }
   function imageNodes(root){return [...new Set([...(root.matches?.(imageSel)?[root]:[]),...root.querySelectorAll(imageSel)])].filter(imageUsable);}
   function mediaNodes(root){
@@ -137,8 +148,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     if(!imageMode||!s.echoRoot?.isConnected)return '';
     const tiny=tinyImages();
     if(!tiny.length||imageNodes(document).some(v=>following(s.echoRoot,v)&&!s.echoRoot.contains(v)&&!s.baselineSources.has(source(v))))return '';
-    const r=tiny[0].getBoundingClientRect();
-    return `thấy ${tiny.length} ảnh nhưng quá nhỏ (${Math.round(r.width)}×${Math.round(r.height)} px, tối thiểu ${IMG_MIN}) nên chưa nhận là ảnh kết quả`;
+    return `thấy ${tiny.length} ảnh nhưng chưa nhận: ${imageWhy(tiny[0])}`;
   }
   function hint(){
     const small=tinyHint();if(small)return small;
@@ -212,7 +222,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     const values=[...root.querySelectorAll('*')].filter(e=>visible(e)&&e.children.length===0).map(e=>norm(e.textContent)).filter(t=>t.length<=80).map(t=>t.match(/(?:^|\s)(\d{1,3}(?:[.,]\d+)?)\s*%/)).filter(Boolean).map(m=>Number(m[1].replace(',','.'))).filter(v=>v>=0&&v<=100);
     return new Set(values).size===1?values[0]:null;
   }
-  const playable=v=>imageMode?(v.tagName==='IMG'&&v.complete&&v.naturalWidth>=IMG_NATURAL_MIN&&v.naturalHeight>=IMG_NATURAL_MIN&&imageSource(source(v))):videoLink(v)||(v.tagName==='VIDEO'&&/^(https:|blob:)/i.test(source(v)));
+  const playable=v=>imageMode?(v.tagName==='IMG'&&v.complete&&v.naturalWidth>=IMG_NATURAL_MIN&&v.naturalHeight>=IMG_NATURAL_MIN&&imageSource(source(v),false)):videoLink(v)||(v.tagName==='VIDEO'&&/^(https:|blob:)/i.test(source(v)));
   function rememberContext(root){const parents=[];for(let p=root.parentElement,depth=0;p&&p!==document.body&&depth<8;p=p.parentElement,depth++)if(!p.querySelector('textarea,input,[contenteditable="true"],[role="textbox"],nav,aside'))parents.push(p);return parents;}
   function result(phase,stage,root=s.responseRoot) {return {id,phase,stage,responseMatched:Boolean(root?.isConnected&&s.echoRoot&&following(s.echoRoot,root)),echoAliases:[...s.echoAliases],echoMatched:Boolean(s.echo),echoKey:s.echoRoot?.id||s.echoRoot?.getAttribute('data-message-id')||s.echoRoot?.getAttribute('data-id')||'',echoMarker:s.echoRoot?.getAttribute('data-muse-studio-attempt')||'',ready:phase==='ready',progress:progress(root),...(phase==='ready'?{url:source(s.video),fingerprint:s.fingerprint,...(imageMode?{count:s.images.length}:{})}:{})};}
   s.poll=()=>{
