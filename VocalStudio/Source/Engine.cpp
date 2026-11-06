@@ -28,6 +28,17 @@ void applyPluginState(juce::AudioPluginInstance& plugin,const juce::var& slot){
     }
 }
 
+void resetPluginPreservingParameters(juce::AudioPluginInstance& plugin){
+    std::vector<std::pair<juce::AudioPluginInstance::HostedParameter*,float>> values;
+    values.reserve(static_cast<size_t>(plugin.getParameters().size()));
+    for(int i=0;i<plugin.getParameters().size();++i)if(auto* p=plugin.getHostedParameter(i)){const float value=p->getValue();if(std::isfinite(value)&&value>=0&&value<=1)values.emplace_back(p,value);}
+    plugin.reset();
+    // VST3 reset deactivates/reactivates the component, and some plugins reset
+    // controls on activation. Hosted setValue updates the processor queue even
+    // when its controller cache still displays the pre-reset value.
+    for(const auto& value:values)value.first->setValue(value.second);
+}
+
 struct RenderScopeExit{std::function<void()> fn;~RenderScopeExit(){fn();}};
 // Recover our mono PCM24 recording using bytes on disk, even if a crash left
 // the RIFF/data lengths stale. Never modify the interrupted source file.
@@ -85,12 +96,11 @@ void StudioEngine::prepare(double sr,int block){
     reverbDry.setSize(2,n);for(auto& d:reverbDryDelay)d.prepare(rate(),2.1);vocalBus.setSize(2,n);musicBus.setSize(2,n);monoInput.setSize(1,n);playbackFx.prepare(rate());monitorFx.prepare(rate());vocalAmbience.prepare(rate());limiter.prepare(rate());
     for(auto& d:musicDelay)d.prepare(rate(),6.1);smoothing=static_cast<float>(1-std::exp(-1/(rate()*.020)));currentMonitor=vocal::dbToGain(juce::jlimit(-12.0f,18.0f,monitorDb.load()));currentMaster=vocal::dbToGain(masterDb.load());
     if(plugin){plugin->setPlayConfigDetails(pluginInputs.load(),pluginOutputs.load(),rate(),n);plugin->prepareToPlay(rate(),n);pluginLatency.store(juce::jlimit(0,static_cast<int>(rate()*2),plugin->getLatencySamples()));const double tail=plugin->getTailLengthSeconds();pluginTailSeconds.store(std::isfinite(tail)?juce::jlimit(0.0,30.0,tail):0);}
-    resetProcessing();
     if(reverbPlugin){reverbPlugin->setPlayConfigDetails(reverbInputs,reverbOutputs,rate(),n);reverbPlugin->prepareToPlay(rate(),n);reverbPluginLatency=juce::jlimit(0,static_cast<int>(rate()*2),reverbPlugin->getLatencySamples());const auto tail=reverbPlugin->getTailLengthSeconds();reverbPluginTail=std::isfinite(tail)?juce::jlimit(0.0,30.0,tail):0;}
     if(eqPlugin){eqPlugin->setPlayConfigDetails(eqInputs,eqOutputs,rate(),n);eqPlugin->prepareToPlay(rate(),n);eqPluginLatency=juce::jlimit(0,static_cast<int>(rate()*2),eqPlugin->getLatencySamples());const auto tail=eqPlugin->getTailLengthSeconds();eqPluginTail=std::isfinite(tail)?juce::jlimit(0.0,30.0,tail):0;}
-
+    resetProcessing();
 }
-void StudioEngine::resetProcessing(){currentMonitor=vocal::dbToGain(juce::jlimit(-12.0f,18.0f,monitorDb.load()));currentMaster=vocal::dbToGain(masterDb.load());playbackFx.reset();monitorFx.reset();vocalAmbience.reset();limiter.reset();for(auto& d:musicDelay)d.reset();for(auto& d:reverbDryDelay)d.reset();currentReverbMix=juce::jlimit(0.f,1.f,reverbPluginMix.load());if(plugin)plugin->reset();if(reverbPlugin)reverbPlugin->reset();if(eqPlugin)eqPlugin->reset();for(auto& t:tracks){const float p=juce::jlimit(-1.0f,1.0f,t->pan.load());const float g=vocal::dbToGain(t->gainDb.load())*(t->audio.getNumChannels()>1?1.41421356f:1.0f);t->leftGain=g*std::cos((p+1)*static_cast<float>(vocal::pi)*.25f);t->rightGain=g*std::sin((p+1)*static_cast<float>(vocal::pi)*.25f);}}
+void StudioEngine::resetProcessing(){currentMonitor=vocal::dbToGain(juce::jlimit(-12.0f,18.0f,monitorDb.load()));currentMaster=vocal::dbToGain(masterDb.load());playbackFx.reset();monitorFx.reset();vocalAmbience.reset();limiter.reset();for(auto& d:musicDelay)d.reset();for(auto& d:reverbDryDelay)d.reset();currentReverbMix=juce::jlimit(0.f,1.f,reverbPluginMix.load());if(plugin)resetPluginPreservingParameters(*plugin);if(reverbPlugin)resetPluginPreservingParameters(*reverbPlugin);if(eqPlugin)resetPluginPreservingParameters(*eqPlugin);for(auto& t:tracks){const float p=juce::jlimit(-1.0f,1.0f,t->pan.load());const float g=vocal::dbToGain(t->gainDb.load())*(t->audio.getNumChannels()>1?1.41421356f:1.0f);t->leftGain=g*std::cos((p+1)*static_cast<float>(vocal::pi)*.25f);t->rightGain=g*std::sin((p+1)*static_cast<float>(vocal::pi)*.25f);}}
 void StudioEngine::audioDeviceAboutToStart(juce::AudioIODevice* device){if(!device)return;if(recording.load()&&!suspending.load()){recordingFault.store(2);activeWriter.store(nullptr);recording.store(false);}driverInputLatency.store(device->getInputLatencyInSamples());driverOutputLatency.store(device->getOutputLatencyInSamples());prepare(device->getCurrentSampleRate(),device->getCurrentBufferSizeSamples());}
 void StudioEngine::audioDeviceStopped(){if(recording.load()&&!suspending.load()){recordingFault.store(2);activeWriter.store(nullptr);recording.store(false);}inputPresent.store(false);}
 void StudioEngine::audioDeviceError(const juce::String& error){juce::ignoreUnused(error);recordingFault.store(2);}
