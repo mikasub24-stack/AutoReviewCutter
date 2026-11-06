@@ -7,7 +7,7 @@ if (!(Get-Command cmake -ErrorAction SilentlyContinue)) { throw 'Install Visual 
 $build = [IO.Path]::GetFullPath((Join-Path $root $BuildDirectory))
 $dist = [IO.Path]::GetFullPath((Join-Path $root $OutputDirectory))
 New-Item -ItemType Directory -Force $dist | Out-Null
-& cmake -S VocalStudio -B $build -A x64 -DVOCAL_BUILD_TESTS=ON
+& cmake -S VocalStudio -B $build -A x64 "-DVOCAL_BUILD_TESTS=ON"
 if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
 & cmake --build $build --config Release --parallel 2
 if ($LASTEXITCODE -ne 0) { throw 'Windows compilation failed' }

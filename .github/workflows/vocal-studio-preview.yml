@@ -4,6 +4,9 @@ on:
   push:
     branches: [fix/vst3-discovery]
     paths: ['VocalStudio/**', '.github/workflows/vocal-studio-preview.yml']
+concurrency:
+  group: vocal-preview-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
