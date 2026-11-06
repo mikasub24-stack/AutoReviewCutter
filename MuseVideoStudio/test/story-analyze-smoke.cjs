@@ -55,6 +55,25 @@ function brain(behavior = {}) {
       if (behavior.adReply) return behavior.adReply(asked.filter(a => a.adScript).length, done);
       return ['Dạ, đây là kịch bản bạn cần:', 'KỊCH BẢN:', 'Sáng nào cũng lạnh tay? 😍', '(nhạc nền nhẹ)', 'Bình Aqua giữ nóng 12 giờ. #binhgiunhiet', 'Mở đầu: Nắp chống tràn, bỏ vào túi thoải mái.', 'Bấm vào giỏ hàng để xem chi tiết.', `MSDONE${done}`].join('\n');
     }
+    // Yêu cầu MẸO VẶT: mỗi nhóm câu là một bước, trả lời có dòng ẢNH + PROMPT chuyển động với mốc [câu N].
+    if (/video MẸO VẶT/.test(text)) {
+      asked.at(-1).tip = true;
+      if (behavior.garbage) return 'Xin lỗi, mình không hiểu yêu cầu này.';
+      const tg = []; let tc = [];
+      for (const u of units) { if (tc.length && (tc.reduce((x, y) => x + y.s, 0) + u.s > 9 || u.n !== tc.at(-1).n + 1)) { tg.push(tc); tc = []; } tc.push(u); }
+      if (tc.length) tg.push(tc);
+      const out = [];
+      if (!/ĐÃ CHỐT/.test(text)) out.push('NHÂN VẬT: Bếp gỗ sáng, thớt tròn, tỏi trắng');
+      tg.forEach((g, i) => {
+        const sec = Math.max(3, Math.ceil(g.reduce((x, y) => x + y.s, 0) / 0.9));
+        out.push(`CẢNH ${i + 1}`, `CÂU: ${g[0].n}${g.length > 1 ? '-' + g.at(-1).n : ''}`);
+        if (!(behavior.noImage && behavior.noImage(asked.length, g))) out.push(`ẢNH: Tạo ảnh chụp thật cận cảnh bàn tay làm bước câu ${g[0].n} trên thớt gỗ tròn, ánh sáng cửa sổ`);
+        const beats = g.map((u, k) => `${Math.round(k * sec / g.length)}–${Math.round((k + 1) * sec / g.length)} giây [câu ${u.n}]: tay làm đúng câu ${u.n}`);
+        out.push(`PROMPT: Bếp gỗ sáng, thớt tròn. ${beats.join('. ')}.`);
+      });
+      if (!behavior.noDone) out.push(`MSDONE${done}`);
+      return out.join('\n');
+    }
     if (behavior.garbage) return 'Xin lỗi, mình không hiểu yêu cầu này.';
     let list = units;
     if (behavior.skip && asked.length === 1) list = units.filter(u => !behavior.skip.includes(u.n));
@@ -405,6 +424,37 @@ function brain(behavior = {}) {
       assert.ok(r.scenes.every(s => !plan.motionIssues(s, enCfg).some(x => x.hard)), 'thẻ [sentence N] được nhận ra và đúng thứ tự');
       assert.ok(r.scenes.every(s => !/\[\s*sentence/i.test(plan.stripBeatTags(s.prompt)) && /\[sentence/.test(s.prompt)));
       await page.close(); ok('truyện tiếng Anh: câu khóa bằng tiếng Anh, thẻ số câu dịch vẫn được kiểm và bỏ');
+    }
+    // 11m. Mẹo vặt: không đọc hiểu riêng; mỗi bước có ẢNH + PROMPT; lời đọc nguyên văn; không có khóa nhân vật.
+    {
+      const tip = 'Mẹo bóc tỏi nhanh trong mười giây. Bước một: đặt tép tỏi lên thớt rồi dùng sống dao đập nhẹ. Vỏ tỏi sẽ bong ra ngay. Bước hai: cho tỏi vào hộp kín và lắc thật mạnh. Vỏ tỏi rơi hết ra ngoài. Bước ba: đổ tỏi ra đĩa sạch. Tỏi trắng sạch sẵn sàng để nấu.';
+      const tipCfg = { seconds: 10, aspect: '9:16', tip: true, reference: true, form: 'người que' };
+      const { page, analyzer, museBrain } = await session({});
+      const r = await analyzer.run({ script: tip, options: tipCfg });
+      assert.equal(museBrain.understood.length, 0, 'mẹo vặt không tốn lượt đọc hiểu riêng');
+      assert.ok(museBrain.asked.length >= 1 && museBrain.asked.every(a => a.tip));
+      assert.equal(r.scenes.map(s => s.voiceover).join(' '), tip, 'lời đọc là nguyên văn mẹo');
+      assert.ok(r.scenes.every(s => !s.offline && s.image && s.prompt));
+      assert.ok(r.scenes.every(s => s.image.startsWith('Tạo ảnh chụp thật cận cảnh') && s.image.includes('9:16') && /Không có chữ/.test(s.image)), r.scenes[0].image);
+      assert.ok(r.scenes.every(s => s.prompt.includes(plan.tipStartLine('vi')) && s.prompt.trimEnd().endsWith(plan.NO_SPEECH) && !/KHÓA HÌNH DẠNG/.test(s.prompt)));
+      assert.ok(r.scenes.every(s => !plan.motionIssues(s, tipCfg).some(x => x.hard)), 'mốc [câu N] đúng thứ tự');
+      assert.match(r.cast, /Bếp gỗ sáng/);
+      assert.equal(r.understanding, null);
+      await page.close(); ok('mẹo vặt: mỗi bước có ảnh + prompt chuyển động, lời nguyên văn, không đọc hiểu riêng, không khóa nhân vật');
+    }
+    // 11n. Mẹo vặt: Muse quên dòng ẢNH ở một bước → app chỉ hỏi lại đúng bước đó (không bỏ qua, không tự bịa ảnh).
+    {
+      const tip = 'Mẹo bóc tỏi nhanh trong mười giây. Bước một: đặt tép tỏi lên thớt rồi dùng sống dao đập nhẹ. Vỏ tỏi sẽ bong ra ngay. Bước hai: cho tỏi vào hộp kín và lắc thật mạnh. Vỏ tỏi rơi hết ra ngoài. Bước ba: đổ tỏi ra đĩa sạch. Tỏi trắng sạch sẵn sàng để nấu.';
+      const tipCfg = { seconds: 10, aspect: '16:9', tip: true };
+      const { page, analyzer, museBrain } = await session({ noImage: (round, g) => round === 1 && g.some(u => u.n === 4) });
+      const r = await analyzer.run({ script: tip, options: tipCfg });
+      assert.ok(museBrain.asked.length >= 2, 'hỏi lại bước thiếu ảnh');
+      const again = museBrain.asked.at(-1);
+      assert.ok(again.units.includes(4) && !again.units.includes(1), 'chỉ hỏi lại đoạn thiếu: ' + again.units.join(','));
+      assert.ok(r.scenes.every(s => !s.offline && s.image && /^Tạo ảnh chụp thật cận cảnh/.test(s.image)));
+      assert.equal(r.incomplete, undefined);
+      assert.equal(r.scenes.map(s => s.voiceover).join(' '), tip);
+      await page.close(); ok('mẹo vặt: thiếu dòng ẢNH thì hỏi lại đúng bước đó');
     }
     // 12. Đang bận thì không chạy hai lần; kịch bản rỗng báo lỗi.
     {

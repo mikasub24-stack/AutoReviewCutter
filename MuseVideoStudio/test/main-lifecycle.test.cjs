@@ -728,3 +728,51 @@ test('story tab runs only its own scenes, saves clips under KeChuyen/<truyện> 
     await app.stop();
   }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
+
+test('Mẹo vặt: ảnh từng bước lưu vào KeChuyen/<truyện>/anh trước, rồi clip được gửi kèm đúng ảnh của bước đó; ghép MP4 chỉ tính clip',{timeout:25000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-tip-run-'));
+  const picture=seed=>Buffer.concat([Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]),Buffer.alloc(3000,seed)]);
+  let app;const sent=[],trackers=[],uploads=[];
+  try{
+    await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+    app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>{
+      let closed=false,draft='';return{external:true,isDestroyed:()=>closed,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',show:async()=>{},openMuse:async()=>{},
+      evaluate:async(fn,arg)=>{
+        if(fn.name==='submitPrompt'){sent.push(draft);return{clicked:true};}
+        if(fn.name==='beginTracking'){trackers.push({...arg});return{phase:'waiting-prompt'};}
+        if(fn.name==='pollTracking')return{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null,count:1};
+        if(fn.name==='browserStop')return{state:'idle'};
+        if(fn.name==='readTrackedImage')return{count:1,url:'https://muse.ai/'+sent.length+'.png',dataUrl:'data:image/png;base64,'+picture(sent.length).toString('base64'),via:'fetch'};
+        if(fn.name==='imageSources')return[];
+        if(fn.name==='composerAttachmentSnapshot')return{count:0,tokens:[]};
+        if(fn.name==='attachmentState')return{ready:true,tokens:['tok-'+sent.length]};
+        if(fn.name==='downloadAction')return{action:'clicked',clicked:true,needsMenu:false};
+        if(arg?.prompt && !arg?.id)draft=arg.prompt;return null;
+      },pressEnter:async()=>{sent.push(draft);},
+      upload:async(selector,files)=>{uploads.push(await Promise.all(files.map(f=>fs.readFile(f))));},
+      captureDownload:async(target,{trigger,onProgress})=>{await trigger();await fs.writeFile(target,fixtureMp4());onProgress({receivedBytes:80,totalBytes:80});},
+      close:async()=>{closed=true;}};
+    }});
+    await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);
+    const id='Truyen-tip';
+    await app.invoke('add',[
+      {kind:'story',storyId:id,phase:'image',number:1,title:'Cảnh 1 · ảnh',prompt:'Ảnh bước 1',source:'Đập nhẹ tỏi.'},
+      {kind:'story',storyId:id,phase:'image',number:2,title:'Cảnh 2 · ảnh',prompt:'Ảnh bước 2',source:'Lắc hộp.'},
+      {kind:'story',storyId:id,phase:'clip',dependsOn:'image',number:1,title:'Cảnh 1 · clip',prompt:'Clip bước 1',voiceover:'Đập nhẹ tỏi.',durationSeconds:4},
+      {kind:'story',storyId:id,phase:'clip',dependsOn:'image',number:2,title:'Cảnh 2 · clip',prompt:'Clip bước 2',voiceover:'Lắc hộp.',durationSeconds:4}]);
+    await app.invoke('start',{kind:'story'});
+    await until(()=>!app.invoke('state').active&&app.invoke('state').jobs.length===4&&app.invoke('state').jobs.every(j=>j.status==='completed'),20000).catch(e=>{throw Error(e.message+' '+JSON.stringify(app.invoke('state').jobs.map(j=>[j.phase,j.number,j.status,j.stage,j.stageMessage,j.error])))});
+    const result=app.invoke('state');
+    assert.deepEqual(sent,['Ảnh bước 1','Ảnh bước 2','Clip bước 1','Clip bước 2'],'ảnh trước, clip sau, đúng thứ tự bước');
+    assert.deepEqual(trackers.map(t=>t.mediaKind),['image','image','video','video']);
+    assert.deepEqual((await fs.readdir(path.join(dir,'KeChuyen',id,'anh'))).sort(),['001.png','002.png']);
+    assert.deepEqual((await fs.readdir(path.join(dir,'KeChuyen',id))).sort(),['001.mp4','002.mp4','anh']);
+    assert.equal((await fs.readdir(path.join(dir,'Anh')).catch(()=>[])).length,0,'ảnh mẹo vặt không lẫn vào thư mục của tab Tạo ảnh');
+    assert.equal(uploads.length,2,'chỉ clip mới đính kèm ảnh');
+    assert.deepEqual(uploads[0][0],picture(1),'clip 1 gửi kèm ảnh bước 1');assert.deepEqual(uploads[1][0],picture(2),'clip 2 gửi kèm ảnh bước 2');
+    assert.equal(result.jobs[2].references[0],result.jobs[0].output);assert.equal(result.jobs[3].references[0],result.jobs[1].output);
+    assert.equal(result.jobs[0].stageMessage,'Đã lưu ảnh về máy');assert.equal(result.jobs[2].stageMessage,'Đã tải và lưu video về máy');
+    assert.equal((await fs.readdir(dir)).some(f=>/\.(mp4|webm|part|png)$/.test(f)),false,'không có file lạc ở thư mục video');
+    await app.stop();
+  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});

@@ -10,6 +10,8 @@ function abortable(promise,signal){
   });
 }
 const kindOf=k=>k==='image'?'image':k==='story'?'story':'video';
+// Việc «ảnh» của chế độ Mẹo vặt nằm trong hàng đợi kể chuyện nhưng xử lý như tác vụ ảnh.
+const isPhoto=j=>j.kind==='image'||j.phase==='image';
 function resetRunFields(job, stage='pending') {
   Object.assign(job,{stage,stageMessage:'',progress:null,downloadProgress:null,submissionProtocol:null,submissionReceipt:null,acknowledgedAt:null,confirmedResponseAt:null,submittedAt:null,mayHaveSubmitted:false,submissionProfileKey:null,submissionSessionId:null,resultReadyAt:null,downloadStartedAt:null,downloadCompletedAt:null,startedAt:null,finishedAt:null,error:'',output:''});
   job.account=undefined;
@@ -24,7 +26,7 @@ class Queue {
   async add(items){
     if(!Array.isArray(items)||!items.length||items.some(j=>typeof j.prompt!=='string'||!j.prompt.trim()))throw Error('Mỗi tác vụ cần một prompt.');
     const batchKind=kindOf(items[0]?.kind),nextOrder=Math.max(0,...this.jobs.filter(j=>j.kind===batchKind).map(j=>j.order||0));
-    this.jobs.push(...items.map((j,index)=>({order:nextOrder+index+1,id:randomUUID(),kind:kindOf(j.kind),storyId:typeof j.storyId==='string'?j.storyId.replace(/[^\w-]/g,'').slice(0,60):'',prompt:j.prompt.trim(),source:typeof j.source==='string'?j.source:'',title:typeof j.title==='string'?j.title:'',number:Number.isInteger(j.number)?j.number:null,voiceover:typeof j.voiceover==='string'?j.voiceover:'',durationSeconds:Number.isFinite(j.durationSeconds)&&j.durationSeconds>0?j.durationSeconds:null,image:j.image||j.references?.[0]||'',references:Array.isArray(j.references)?[...j.references]:j.image?[j.image]:[],status:'pending',stage:'pending',stageMessage:'',progress:null,downloadProgress:null,submissionProtocol:null,submissionReceipt:null,acknowledgedAt:null,confirmedResponseAt:null,submittedAt:null,mayHaveSubmitted:false,submissionProfileKey:null,submissionSessionId:null,resultReadyAt:null,downloadStartedAt:null,downloadCompletedAt:null,startedAt:null,finishedAt:null,error:'',output:'',createdAt:Date.now()})));
+    this.jobs.push(...items.map((j,index)=>({order:nextOrder+index+1,id:randomUUID(),kind:kindOf(j.kind),storyId:typeof j.storyId==='string'?j.storyId.replace(/[^\w-]/g,'').slice(0,60):'',prompt:j.prompt.trim(),source:typeof j.source==='string'?j.source:'',phase:j.phase==='image'||j.phase==='clip'?j.phase:'',dependsOn:j.dependsOn==='image'?'image':'',title:typeof j.title==='string'?j.title:'',number:Number.isInteger(j.number)?j.number:null,voiceover:typeof j.voiceover==='string'?j.voiceover:'',durationSeconds:Number.isFinite(j.durationSeconds)&&j.durationSeconds>0?j.durationSeconds:null,image:j.image||j.references?.[0]||'',references:Array.isArray(j.references)?[...j.references]:j.image?[j.image]:[],status:'pending',stage:'pending',stageMessage:'',progress:null,downloadProgress:null,submissionProtocol:null,submissionReceipt:null,acknowledgedAt:null,confirmedResponseAt:null,submittedAt:null,mayHaveSubmitted:false,submissionProfileKey:null,submissionSessionId:null,resultReadyAt:null,downloadStartedAt:null,downloadCompletedAt:null,startedAt:null,finishedAt:null,error:'',output:'',createdAt:Date.now()})));
     await this.publish();
   }
   async retry(id){const j=this.jobs.find(x=>x.id===id);if(!j||!['failed','interrupted'].includes(j.status))throw Error('Chỉ chạy lại tác vụ lỗi hoặc bị gián đoạn.');delete j.resumeMode;resetRunFields(j);j.status='pending';await this.publish();}
@@ -35,6 +37,23 @@ class Queue {
     if(!Array.isArray(files)||files.some(x=>typeof x!=='string'||!x))throw Error('Ảnh tham chiếu không hợp lệ.');
     for(const j of this.jobs)if(j.kind!=='story'&&j.status==='pending'&&!j.lockedInput){j.references=[...files];j.image=files[0]||'';}
     await this.publish();
+  }
+  // Clip của chế độ Mẹo vặt (dependsOn:'image') chỉ chạy sau khi ảnh cùng số cảnh trong cùng truyện đã lưu xong.
+  imageOf(job){return job.dependsOn==='image'?this.jobs.find(d=>d!==job&&d.kind===job.kind&&d.storyId===job.storyId&&d.phase==='image'&&d.number===job.number):null;}
+  // 'ready' = chạy được; 'wait' = ảnh đang được tạo (chờ); 'blocked' = ảnh chưa xong và chưa ai đang tạo (không chạy).
+  gate(job){
+    if(job.dependsOn!=='image')return 'ready';
+    const image=this.imageOf(job);
+    if(image&&image.status==='completed'&&image.output)return 'ready';
+    return image&&image.status==='running'?'wait':'blocked';
+  }
+  // Gắn ảnh đã tạo làm ảnh tham chiếu của clip. Prompt đã có thể gửi với ảnh cũ thì giữ nguyên bản đã khóa.
+  attachImage(job){
+    const image=this.imageOf(job);
+    if(!image||!image.output)return;
+    if(job.references?.length===1&&job.references[0]===image.output&&job.image===image.output)return;
+    job.references=[image.output];job.image=image.output;
+    if(!job.mayHaveSubmitted)delete job.lockedInput;
   }
   pause(){this.paused=true;}
   async stop(){this.paused=true;for(const c of this.controllers.values())c.abort();if(this.runningPromise)await this.runningPromise;}
@@ -48,11 +67,12 @@ class Queue {
       if(controller.signal.aborted)throw stoppedError();
       const output=await abortable(runner(job,controller.signal),controller.signal);
       if(controller.signal.aborted)throw stoppedError();
-      if(typeof output!=='string'||!output.trim())throw Error(job.kind==='image'?'Chưa xác nhận được tệp ảnh đã lưu.':'Chưa xác nhận được tệp video tải xuống.');
-      job.output=output;job.status='completed';job.stage='completed';job.stageMessage=job.kind==='image'?'Đã lưu ảnh về máy':'Đã tải và lưu video về máy';job.progress=100;
+      const photo=isPhoto(job);
+      if(typeof output!=='string'||!output.trim())throw Error(photo?'Chưa xác nhận được tệp ảnh đã lưu.':'Chưa xác nhận được tệp video tải xuống.');
+      job.output=output;job.status='completed';job.stage='completed';job.stageMessage=photo?'Đã lưu ảnh về máy':'Đã tải và lưu video về máy';job.progress=100;
     } catch(error) {
       job.status=controller.signal.aborted||error?.name==='AbortError'?'interrupted':'failed';
-      job.stage=job.status;job.error=error?.message||(job.kind==='image'?'Không xử lý được tác vụ ảnh.':'Không xử lý được tác vụ video.');job.stageMessage=job.error;this.paused=true;
+      job.stage=job.status;job.error=error?.message||(isPhoto(job)?'Không xử lý được tác vụ ảnh.':'Không xử lý được tác vụ video.');job.stageMessage=job.error;this.paused=true;
     } finally {job.finishedAt=new Date().toISOString();this.controllers.delete(job.id);}
     await this.publish();
   }
@@ -73,7 +93,15 @@ class Queue {
     this.runningPromise=(async()=>{
       const worker=async slot=>{
         while(!this.paused){
-          const job=this.jobs.find(x=>x.status==='pending'&&(!this.kind||x.kind===this.kind)&&(!x.resumeMode||this.concurrency===1||x.account===slot+1||!x.account));if(!job)break;
+          let job=null,waiting=false;
+          for(const x of this.jobs){
+            if(x.status!=='pending'||(this.kind&&x.kind!==this.kind)||!(!x.resumeMode||this.concurrency===1||x.account===slot+1||!x.account))continue;
+            const gate=this.gate(x);
+            if(gate==='ready'){job=x;break;}
+            if(gate==='wait')waiting=true;
+          }
+          if(!job){if(waiting&&!this.paused){await new Promise(r=>setTimeout(r,this.gateWaitMs??300));continue;}break;}
+          this.attachImage(job);
           const resume=job.resumeMode;await this.executeJob(job,(item,signal)=>this.run(item,slot,signal),!resume);
           if(job.status==='completed')delete job.resumeMode;
         }
@@ -102,6 +130,7 @@ class Queue {
     if(!job||job.status!=='completed'||!job.output)throw Error('Chỉ tạo lại cảnh đã hoàn thành.');
     job.previousOutputs=[...new Set([...(job.previousOutputs||[]),job.output])];
     job.previousOutput=job.output;job.resumeMode='resubmit';
+    if(job.dependsOn==='image'){job.mayHaveSubmitted=false;job.lockedInput&&delete job.lockedInput;this.attachImage(job);}
     this.paused=false;this.active=true;
     this.runningPromise=(async()=>{
       try{await this.executeJob(job,(item,signal)=>this.run(item,Math.max(0,Number(item.account||1)-1),signal),false);if(job.status==='completed')delete job.resumeMode;}

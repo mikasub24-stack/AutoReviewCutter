@@ -91,3 +91,16 @@ test('còn cảnh chưa xong thì không xuất; báo đúng số cảnh', async
   assert.match(svc.status().error, /Còn 2 cảnh/);
   await assert.rejects(() => svc.prepare({ storyId: 'khác', engine: 'none' }), /Chưa có cảnh nào/);
 });
+
+test('Mẹo vặt: việc «ảnh» không bị tính là clip khi ghép MP4; cảnh thiếu clip báo theo số bước', async () => {
+  const jobs = [
+    { kind: 'story', storyId: 'T', phase: 'image', number: 1, order: 1, status: 'completed', output: 'a1.png' },
+    { kind: 'story', storyId: 'T', phase: 'image', number: 2, order: 2, status: 'completed', output: 'a2.png' },
+    { kind: 'story', storyId: 'T', phase: 'clip', dependsOn: 'image', number: 1, order: 3, status: 'completed', output: 'c1.mp4' },
+    { kind: 'story', storyId: 'T', phase: 'clip', dependsOn: 'image', number: 2, order: 4, status: 'pending', output: '' }
+  ];
+  assert.deepEqual(storyJobs(jobs, 'T').map(j => j.number), [1, 2]);
+  assert.ok(storyJobs(jobs, 'T').every(j => j.phase === 'clip'));
+  const service = createStoryService({ getSettings: () => ({ output: os.tmpdir() }), getJobs: () => jobs, voice: {}, userDataDir: os.tmpdir() });
+  await assert.rejects(service.prepare({ storyId: 'T', engine: 'none' }), /Còn 1 cảnh chưa có clip \(cảnh 2\)/);
+});

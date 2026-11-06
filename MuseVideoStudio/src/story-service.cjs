@@ -10,7 +10,8 @@ const MAX_CHUNKS = 40;
 
 // Cảnh của một truyện, xếp theo số cảnh (không theo thứ tự xong khi chạy nhiều luồng).
 function storyJobs(jobs, storyId) {
-  return (jobs || []).filter(j => j.kind === 'story' && (!storyId || j.storyId === storyId))
+  // Việc «ảnh» của chế độ Mẹo vặt không phải clip: bỏ ra để chỉ ghép các clip.
+  return (jobs || []).filter(j => j.kind === 'story' && j.phase !== 'image' && (!storyId || j.storyId === storyId))
     .sort((a, b) => (a.order || 0) - (b.order || 0));
 }
 function storyFolder(output, storyId) {
@@ -27,7 +28,7 @@ function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async
   function pick(storyId) {
     const jobs = storyJobs(getJobs(), storyId);
     if (!jobs.length) throw Error('Chưa có cảnh nào của truyện này trong hàng đợi.');
-    const missing = jobs.filter(j => j.status !== 'completed' || !j.output).map(j => j.order || '?');
+    const missing = jobs.filter(j => j.status !== 'completed' || !j.output).map(j => j.number || j.order || '?');
     if (missing.length) throw Error(`Còn ${missing.length} cảnh chưa có clip (cảnh ${missing.slice(0, 12).join(', ')}${missing.length > 12 ? '…' : ''}). Chạy hàng đợi cho xong rồi xuất.`);
     return jobs;
   }
@@ -56,7 +57,7 @@ function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async
         voices = await voice.synth({ engine, voice: voiceId, tempo, dir, signal, onProgress: say, items: jobs.filter(j => String(j.voiceover || '').trim()).map(j => ({ id: j.id, text: j.voiceover })) });
       }
       const byId = new Map(voices.map(v => [v.id, v.file]));
-      const scenes = jobs.map(j => ({ id: j.id, number: j.order, clip: j.output, voice: byId.get(j.id) || null, text: j.voiceover || '' }));
+      const scenes = jobs.map(j => ({ id: j.id, number: j.number || j.order, clip: j.output, voice: byId.get(j.id) || null, text: j.voiceover || '' }));
       say('Đang đo độ dài từng cảnh…');
       const lengths = await measureScenes({ scenes, ffmpeg: settings.ffmpeg });
       prepared = { runId: path.basename(dir), dir, storyId, scenes };

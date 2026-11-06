@@ -887,3 +887,72 @@ test('tỉ lệ khung hình đã chọn luôn có trong prompt gửi video, cùn
   const short = sp.lintScenes([{ voiceover: 'Mai nhìn quanh.', prompt: 'Mai.\nTỷ lệ khung hình video: 16:9 (ngang).\n' + sp.NO_SPEECH }], { seconds: 10, aspect: '16:9' })[0];
   assert.ok(short.some(w => /Prompt quá ngắn/.test(w)), short.join(' | '));
 });
+
+// ---- Chế độ Mẹo vặt ----
+const tipText = 'Mẹo bóc tỏi nhanh trong 10 giây. Bước một: đặt tép tỏi lên thớt và dùng sống dao đập nhẹ. Vỏ tỏi sẽ bong ra ngay. Bước hai: cho tỏi vào hộp kín và lắc mạnh. Vỏ rơi hết ra ngoài.';
+const tipCfg = { seconds: 10, aspect: '9:16', tip: true };
+test('Mẹo vặt: tùy chọn tip chỉ bật khi không phải quảng cáo; không khóa hình dạng nhân vật', () => {
+  assert.equal(sp.options({ tip: true }).tip, true);
+  assert.equal(sp.options({}).tip, false);
+  assert.equal(sp.options({ tip: true, ad: { product: 'Ấm' } }).tip, false);
+  assert.equal(sp.lockLine({ ...tipCfg, reference: true, form: 'người que' }), '');
+});
+test('Mẹo vặt: câu lệnh gửi Muse yêu cầu ẢNH chụp thật + PROMPT chuyển động có mốc [câu N], không có luật truyện/nhân vật', () => {
+  const ask = sp.buildMuseInstruction(tipText, tipCfg, { marker: 'abc123' });
+  for (const part of ['MẸO VẶT', 'ẢNH: <', 'PROMPT: <', 'Tạo ảnh chụp thật', '[câu 5]', 'MỘT bước làm', 'khung hình ĐẦU', 'tỷ lệ 9:16', 'MSENDabc123', 'MSDONEabc123', 'NHÂN VẬT: <nơi làm cố định', '[1] (', '[5] (']) assert.ok(ask.includes(part), part);
+  assert.ok(ask.includes(sp.NO_SPEECH));
+  assert.ok(!/KHÓA HÌNH DẠNG|TRUYỆN KỂ|ảnh tham chiếu/.test(ask), 'không còn luật nhân vật/truyện');
+  // Chế độ truyện thường không bị đổi.
+  const story = sp.buildMuseInstruction(tipText, { seconds: 10, aspect: '16:9' }, {});
+  assert.ok(!/ẢNH: <|MẸO VẶT/.test(story));
+  // Sửa lỗi và nhân vật đã chốt vẫn được đưa kèm.
+  const fix = sp.buildMuseInstruction(tipText, tipCfg, { cast: 'Bếp gỗ sáng, thớt tròn', fix: '- Cảnh gồm câu 1–2: thiếu mốc' });
+  assert.ok(fix.includes('ĐÃ CHỐT') && fix.includes('Bếp gỗ sáng, thớt tròn') && fix.includes('SỬA LỖI') && fix.includes('kể cả dòng ẢNH'));
+});
+test('Mẹo vặt: tách trả lời của Muse thành ảnh + prompt chuyển động từng bước; ảnh luôn có tỉ lệ, cấm chữ; clip luôn có câu «ảnh là khung hình đầu»', () => {
+  const reply = 'NHÂN VẬT: Bếp gỗ sáng, thớt tròn\nCẢNH 1\nCÂU: 1-2\nẢNH: Tạo ảnh chụp thật cận cảnh bàn tay đặt tép tỏi lên thớt gỗ tròn, con dao nằm bên cạnh, ánh sáng cửa sổ\nPROMPT: Bếp sáng, thớt gỗ tròn. 0–4 giây [câu 1]: tay đưa tỏi vào khung. 4–8 giây [câu 2]: tay đặt tỏi lên thớt, sống dao đập xuống.\nCẢNH 2\nCÂU: 3-5\nẢNH: Hộp nhựa kín trong tay, tép tỏi bên trong\nPROMPT: Bếp sáng. 0–2 giây [câu 3]: nắp đóng lại. 2–5 giây [câu 4]: lắc mạnh. 5–7 giây [câu 5]: mở nắp, vỏ rơi ra.\nMSDONEabc123';
+  const got = sp.scenesFromReply(tipText, reply, tipCfg);
+  assert.equal(got.scenes.length, 2); assert.equal(got.cast, 'Bếp gỗ sáng, thớt tròn');
+  assert.ok(got.scenes.every(s => !s.offline && s.image && s.prompt));
+  const [a, b] = got.scenes;
+  assert.ok(a.image.startsWith('Tạo ảnh chụp thật cận cảnh bàn tay') && a.image.includes('9:16') && /Không có chữ/.test(a.image));
+  assert.ok(b.image.startsWith('Tạo ảnh chụp thật: Hộp nhựa kín'), 'thiếu động từ tạo ảnh thì app thêm');
+  for (const s of got.scenes) {
+    assert.ok(s.prompt.includes(sp.tipStartLine('vi')) && s.prompt.includes('9:16') && s.prompt.endsWith(sp.NO_SPEECH));
+    assert.equal(s.prompt.split(sp.tipStartLine('vi')).length, 2, 'không nhân đôi');
+  }
+  assert.equal(a.voiceover, 'Mẹo bóc tỏi nhanh trong 10 giây. Bước một: đặt tép tỏi lên thớt và dùng sống dao đập nhẹ.');
+  assert.deepEqual(a.units, [1, 2]); assert.deepEqual(b.units, [3, 5]);
+  // Gắn lại lần nữa không đổi gì (idempotent).
+  const again = sp.scenesFromReply(tipText, reply.replace(a.image.split('\n')[0], a.image).replace(/PROMPT: Bếp sáng, thớt gỗ tròn\./, 'PROMPT: ' + a.prompt.split('0–4')[0]), tipCfg);
+  assert.equal(sp.finalImagePrompt(a.image, tipCfg), a.image);
+  assert.equal(again.scenes.length, 2);
+  // Mốc chuyển động vẫn được soát như truyện thường: mốc đảo thứ tự câu thì báo lỗi cứng.
+  assert.equal(sp.motionIssues(a, tipCfg).length, 0);
+  assert.ok(sp.motionIssues({ ...a, prompt: '0–4 giây [câu 2]: x. 4–10 giây [câu 1]: y.' }, tipCfg).some(x => x.hard));
+});
+test('Mẹo vặt: Muse quên dòng ẢNH thì bước đó là cảnh mẫu (để hỏi lại), có ảnh mẫu dùng tạm', () => {
+  const reply = 'CẢNH 1\nCÂU: 1-2\nPROMPT: Bếp sáng. 0–5 giây [câu 1]: a. 5–10 giây [câu 2]: b.\nCẢNH 2\nCÂU: 3-5\nẢNH: Tạo ảnh chụp thật hộp kín\nPROMPT: Bếp sáng. 0–3 giây [câu 3]: a. 3–6 giây [câu 4]: b. 6–9 giây [câu 5]: c.';
+  const got = sp.scenesFromReply(tipText, reply, tipCfg);
+  assert.deepEqual(got.scenes.map(s => !!s.offline), [true, false]);
+  assert.ok(got.scenes[0].image.startsWith('Tạo ảnh chụp thật (photorealistic)') && got.scenes[0].image.includes('Bước một'));
+  assert.ok(got.scenes[0].prompt.includes(sp.tipStartLine('vi')));
+});
+test('Mẹo vặt: soát cảnh báo thiếu/ngắn prompt ảnh; chế độ khác không bị ảnh hưởng', () => {
+  const ok = { voiceover: 'Đập nhẹ tỏi.', image: 'Tạo ảnh chụp thật cận cảnh tay đặt tỏi lên thớt gỗ, dao bên cạnh.', prompt: 'Bếp sáng thớt gỗ, tay đập tỏi bằng sống dao thật nhẹ nhàng. ' + sp.NO_SPEECH, durationSeconds: 5 };
+  assert.deepEqual(sp.lintScenes([ok], tipCfg)[0], []);
+  assert.ok(sp.lintScenes([{ ...ok, image: '' }], tipCfg)[0].some(w => /Chưa có prompt ảnh/.test(w)));
+  assert.ok(sp.lintScenes([{ ...ok, image: 'Tỏi.' }], tipCfg)[0].some(w => /Prompt ảnh quá ngắn/.test(w)));
+  assert.ok(!sp.lintScenes([{ ...ok, image: '' }], { seconds: 10, aspect: '16:9' })[0].some(w => /prompt ảnh/i.test(w)));
+  // Câu «ảnh là khung hình đầu» do app thêm không làm prompt ngắn trông như đủ dài.
+  const tiny = sp.lintScenes([{ ...ok, prompt: 'Tỏi.\n' + sp.tipStartLine('vi') + '\n' + sp.NO_SPEECH }], tipCfg)[0];
+  assert.ok(tiny.some(w => /Prompt quá ngắn/.test(w)));
+});
+test('Mẹo vặt: tiếng Anh thì prompt ảnh và câu «khung hình đầu» cũng bằng tiếng Anh', () => {
+  const text = 'Peel garlic fast. Put the clove on the board and press it with the flat of a knife. The skin pops off. Then shake the cloves in a closed box.';
+  const reply = 'CẢNH 1\nCÂU: 1-4\nẢNH: Photorealistic close-up of a hand placing a garlic clove on a wooden board, knife beside it\nPROMPT: Bright kitchen. 0–3 seconds [câu 1]: a. 3–6 seconds [câu 2]: b. 6–8 seconds [câu 3]: c. 8–10 seconds [câu 4]: d.';
+  const got = sp.scenesFromReply(text, reply, { seconds: 10, aspect: '16:9', tip: true });
+  const s = got.scenes[0];
+  assert.ok(s.image.includes('Image aspect ratio: 16:9') && /No text/.test(s.image) && s.image.startsWith('Photorealistic') === false && s.image.startsWith('Create a photorealistic photo: Photorealistic'));
+  assert.ok(s.prompt.includes(sp.tipStartLine('en')) && !s.prompt.includes(sp.tipStartLine('vi')));
+});

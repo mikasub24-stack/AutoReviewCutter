@@ -194,7 +194,8 @@
     if (!Number.isFinite(seconds) || seconds < 3 || seconds > MAX_SECONDS) throw Error(`Muse chỉ tạo clip tối đa ${MAX_SECONDS} giây: chọn mỗi cảnh từ 3 đến ${MAX_SECONDS} giây.`);
     const aspect = input.aspect || '16:9';
     if (!ASPECTS.includes(aspect)) throw Error('Chọn tỷ lệ 16:9, 9:16 hoặc 1:1.');
-    return { seconds, aspect, style: String(input.style || '').trim(), character: String(input.character || '').trim(), form: String(input.form || '').trim().slice(0, 200), reference: Boolean(input.reference), ad: adOptions(input.ad) };
+    const ad = adOptions(input.ad);
+    return { seconds, aspect, style: String(input.style || '').trim(), character: String(input.character || '').trim(), form: String(input.form || '').trim().slice(0, 200), reference: Boolean(input.reference), ad, tip: Boolean(input.tip) && !ad };
   }
 
   // Toàn bộ văn bản người dùng dán chính là lời đọc: không tách nhãn, không bỏ chữ.
@@ -301,7 +302,7 @@
 
   /* Khóa hình dạng nhân vật: nhân vật chuẩn (ảnh tham chiếu và/hoặc kiểu người dùng mô tả) quyết định hình dạng của MỌI nhân vật;
      người khác chỉ được khác màu/kiểu quần áo, giới tính, tóc, phụ kiện. Câu khóa do app tự gắn vào MỌI prompt, không phụ thuộc Muse viết gì. */
-  const isLocked = config => !config.ad && Boolean(config.reference || config.form);
+  const isLocked = config => !config.ad && !config.tip && Boolean(config.reference || config.form);
   // Câu khóa do app tự thêm vào prompt: viết cùng ngôn ngữ với truyện (tiếng Việt khi truyện tiếng Việt, còn lại tiếng Anh)
   // để prompt gửi mô hình video không bị lẫn hai thứ tiếng.
   function lockLine(config, language = 'vi') {
@@ -320,9 +321,56 @@
     return language !== 'vi' ? `Video aspect ratio: ${config.aspect} (${words[1]}).` : `Tỷ lệ khung hình video: ${config.aspect} (${words[0]}).`;
   }
 
+  /* ---------- chế độ Mẹo vặt ----------
+     Mỗi bước của mẹo = một cảnh = MỘT ẢNH chụp thật (khung hình đầu) + MỘT clip chuyển động làm từ chính ảnh đó.
+     Lời đọc vẫn là nguyên văn mẹo; Muse chỉ chia bước và viết prompt ảnh + prompt chuyển động. */
+  const IMAGE_NO_TEXT = { vi: 'Không có chữ, chữ số, logo, hình mờ hay phụ đề trong ảnh.', en: 'No text, lettering, numbers, logos, watermarks or captions in the image.' };
+  const NO_TEXT_SEEN = /không (?:có )?chữ|no text/i;
+  const IMAGE_VERB = /^\s*(?:hãy\s+)?(?:tạo|vẽ|create|generate|draw|make)(?![\p{L}])/iu;
+  const TIP_START = {
+    vi: 'Ảnh đính kèm là khung hình đầu tiên của video: giữ nguyên đồ vật, màu sắc, bố cục và ánh sáng trong ảnh, chỉ thêm chuyển động tự nhiên; không đổi sang cảnh khác, không thêm vật hay người mới.',
+    en: 'The attached image is the first frame of the video: keep the objects, colors, composition and lighting of the image exactly as they are and only add natural motion; do not switch to a different scene or add new objects or people.'
+  };
+  const tipStartLine = (language = 'vi') => (language !== 'vi' ? TIP_START.en : TIP_START.vi);
+  const hasTipStart = text => [TIP_START.vi, TIP_START.en].some(line => String(text).includes(line));
+  function imageAspectLine(config, language = 'vi') {
+    const words = ASPECT_WORDS[config.aspect];
+    if (!words) return '';
+    return language !== 'vi' ? `Image aspect ratio: ${config.aspect} (${words[1]}).` : `Tỷ lệ khung hình ảnh: ${config.aspect} (${words[0]}).`;
+  }
+  // Prompt ảnh cuối cùng: mở đầu bằng động từ tạo ảnh, có tỉ lệ khung hình và câu cấm chữ trong ảnh (chỉ thêm khi Muse chưa ghi).
+  function finalImagePrompt(prompt, config, language = 'vi') {
+    let text = String(prompt || '').trim();
+    if (!text) return '';
+    const en = language !== 'vi';
+    if (!IMAGE_VERB.test(text)) text = (en ? 'Create a photorealistic photo: ' : 'Tạo ảnh chụp thật: ') + text;
+    const extra = [];
+    if (config.aspect && !text.includes(config.aspect)) extra.push(imageAspectLine(config, language));
+    if (!NO_TEXT_SEEN.test(text)) extra.push(IMAGE_NO_TEXT[en ? 'en' : 'vi']);
+    return extra.length ? text + '\n' + extra.join('\n') : text;
+  }
+  // Prompt ảnh mẫu (chưa qua Muse): dùng khi Muse chưa viết được; Muse viết lại tốt hơn nhiều.
+  function tipImagePrompt(voiceover, config, language = 'vi') {
+    const text = String(voiceover || '').trim();
+    const style = config.style ? ` Phong cách: ${config.style}.` : '';
+    return finalImagePrompt(`Tạo ảnh chụp thật (photorealistic), cận cảnh rõ nét, ánh sáng tự nhiên, bố cục gọn, thể hiện đúng bước sau: ${text}.${style}`, config, language);
+  }
+  function tipScenePrompt(voiceover, config, seconds) {
+    return [
+      `Tạo video dài ${seconds} giây, tỷ lệ ${config.aspect}, làm từ ảnh đính kèm (khung hình đầu tiên).`,
+      voiceover ? `NỘI DUNG BƯỚC (lời đọc, chỉ để hiểu bước; không ai nói): ${voiceover}` : '',
+      'Chuyển động: thể hiện đúng thao tác của bước này, tự nhiên và mượt: tay hoặc dụng cụ làm gì, vật thay đổi thế nào; không bỏ thao tác quan trọng.',
+      'Máy quay: cố định hoặc xê dịch rất nhẹ.',
+      tipStartLine('vi'),
+      NO_SPEECH,
+      'Không chèn chữ, phụ đề hoặc logo vào hình.'
+    ].filter(Boolean).join('\n');
+  }
+
   // `fixed` = số giây cố định của cảnh không có lời đọc (cảnh quay quảng cáo từ ảnh).
   function scenePrompt(voiceover, config, visual = '', fixed = 0) {
     const seconds = fixed || sceneSeconds(voiceover || visual, config.seconds);
+    if (config.tip) return tipScenePrompt(voiceover, config, seconds);
     const ad = config.ad;
     const camera = ad ? ad.camera.map(id => adPick(AD_CAMERA, id)?.prompt).filter(Boolean) : [];
     const look = ad ? (adPick(AD_LOOK, ad.look)?.prompt || '').replace(/^phong cách /, '') : '';
@@ -350,7 +398,7 @@
 
   // `range` = [câu đầu, câu cuối]. Cảnh `offline` là cảnh có prompt mẫu do tool ghép, chưa qua Muse.
   function makeScene(index, voiceover, visual, config, range) {
-    return { title: `Cảnh ${index}`, source: voiceover || visual, voiceover, visual: visual || '', prompt: scenePrompt(voiceover, config, visual), durationSeconds: sceneSeconds(voiceover || visual, config.seconds), ...(range ? { units: range } : {}), offline: true };
+    return { title: `Cảnh ${index}`, source: voiceover || visual, voiceover, visual: visual || '', prompt: scenePrompt(voiceover, config, visual), ...(config.tip ? { image: tipImagePrompt(voiceover, config) } : {}), durationSeconds: sceneSeconds(voiceover || visual, config.seconds), ...(range ? { units: range } : {}), offline: true };
   }
 
   // Chia nhanh ngay trên máy: gộp câu cho vừa thời lượng mỗi cảnh. Prompt là mẫu chung, chưa qua Muse.
@@ -478,6 +526,7 @@
     const numbered = list => list.map(u => `[${u.n}] (${u.seconds} giây) ${u.text}`);
     const first = picked[0].n, last = picked[picked.length - 1].n;
     const partNote = ctx.parts > 1 ? ` Đây là phần ${ctx.part}/${ctx.parts} của câu chuyện.` : '';
+    if (config.tip) return buildTipInstruction({ script, config, units, picked, whole, s, budget, marker, numbered, first, last, partNote, ctx });
     const ad = config.ad, lock = isLocked(config);
     return [
       ad ? `Bạn là đạo diễn hình ảnh cho video QUẢNG CÁO sản phẩm bán hàng. Mỗi cảnh sẽ được AI tạo thành MỘT video ngắn, dài tối đa ${s} giây, và mỗi lần tạo đều tốn lượt, nên sản phẩm, hành động và bố cục phải đúng ngay từ lần đầu.` : `Bạn là đạo diễn hình ảnh cho video minh họa một bài đọc (truyện kể, tâm sự, bài nói, bình luận, châm biếm…). Mỗi cảnh sẽ được AI tạo thành MỘT video ngắn, dài tối đa ${s} giây, và mỗi lần tạo đều tốn lượt, nên hình ảnh, hành động và nét mặt phải đúng ngay từ lần đầu.`,
@@ -519,6 +568,48 @@
     ].filter((line, index, lines) => line !== '' || (index > 0 && lines[index - 1] !== '' && index < lines.length - 1)).join('\n');
   }
 
+
+  /* Câu lệnh chế độ Mẹo vặt: Muse chia mẹo thành BƯỚC (mỗi bước một cảnh) và viết, cho từng bước, prompt ẢNH (khung hình đầu,
+     ảnh chụp thật) và PROMPT chuyển động (làm từ chính ảnh đó). */
+  function buildTipInstruction({ script, config, units, picked, whole, s, budget, marker, numbered, first, last, partNote, ctx }) {
+    const mid = Math.round(s * 0.3), end2 = Math.round(s * 0.7);
+    return [
+      `Bạn là đạo diễn hình ảnh cho video MẸO VẶT (hướng dẫn từng bước: nấu ăn, việc nhà, sửa chữa, làm đẹp, đời sống…). Mỗi BƯỚC được làm thành HAI thứ: (1) MỘT ẢNH chụp thật, rõ nét, là khung hình đầu tiên; (2) MỘT video ngắn, dài tối đa ${s} giây, làm từ chính ảnh đó để ảnh chuyển động. Mỗi lần tạo đều tốn lượt nên ảnh và chuyển động phải đúng ngay từ lần đầu.`,
+      FRESH,
+      '',
+      `BƯỚC 1 – ĐỌC HIỂU: đọc kỹ toàn bộ mẹo${whole ? ' ở cuối' : ' ở phần NGỮ CẢNH'} để nắm mẹo này làm gì, cần nguyên liệu hoặc dụng cụ nào, các bước theo đúng thứ tự, làm ở đâu, và ai hoặc cái gì xuất hiện (tay, đồ vật, nguyên liệu).${partNote}`,
+      `BƯỚC 2 – CHIA BƯỚC: ${whole ? '' : 'chỉ chia các câu ở phần CÁC CÂU CẦN CHIA CẢNH; phần còn lại chỉ để hiểu. '}Gom các câu đánh số LIÊN TIẾP thành cảnh, mỗi cảnh là MỘT bước làm (một thao tác chính, hoặc một ý), đủ mọi câu, đúng thứ tự, không bỏ sót, không lặp. Câu mở đầu giới thiệu mẹo và câu kết là cảnh riêng nếu đứng riêng. Số trong ngoặc là số giây đọc câu đó; tổng của mỗi cảnh không quá ${budget} giây. Độ dài video của cảnh tự theo lời đọc: tổng số giây các câu chia cho 0,9, làm tròn lên (tối thiểu ${MIN_SECONDS}, tối đa ${s} giây). KHÔNG chép lại lời: chỉ ghi số câu, giọng đọc sẽ đọc đúng nguyên văn các câu đó.`,
+      'BƯỚC 3 – VIẾT cho từng cảnh một ẢNH và một PROMPT theo quy tắc dưới đây.',
+      '',
+      'QUY TẮC',
+      '1. Mỗi cảnh chỉ là MỘT thao tác trong MỘT khung hình liên tục: một nơi, một góc máy, không nhảy thời gian, không cắt cảnh. Các câu liên tiếp mà đổi nơi làm hoặc sang thao tác khác hẳn thì tách thành cảnh khác.',
+      `2. ẢNH = khung hình ĐẦU của bước, viết như một lệnh tạo ảnh và mở đầu bằng «Tạo ảnh chụp thật…»: ảnh chụp thật (photorealistic), cận cảnh rõ nét, ánh sáng tự nhiên đẹp, cho thấy đúng vật và tư thế tay ở lúc BẮT ĐẦU thao tác của bước (chưa làm xong). Mô tả thật cụ thể: vật gì (loại, màu, kích cỡ, chất liệu), đặt ở đâu (mặt bàn, bồn rửa, thớt…), tay hay dụng cụ nào đang ở đâu, góc chụp. Tay người: tự nhiên, đủ năm ngón, chỉ 1–2 tay, không cần thấy mặt người. Không chữ, không số, không logo, không hình mờ trong ảnh${config.style ? `; phong cách hình ảnh: ${config.style}` : ''}; tỷ lệ ${config.aspect}.`,
+      `3. PROMPT = chuyển động làm từ ảnh đó: bắt đầu từ đúng khung hình của ẢNH, rồi mô tả CHUYỂN ĐỘNG theo thời gian đúng điều các câu của cảnh nói, chia mốc theo độ dài video của cảnh (video 5 giây: 0–2 giây…, 2–5 giây…; video ${s} giây: 0–${mid} giây…, ${mid}–${end2} giây…, ${end2}–${s} giây…). Mỗi mốc ứng với đúng điều của câu tương ứng theo thứ tự câu và GHI SỐ CÂU ngay sau mốc giờ, dạng «0–3 giây [câu 5]: …» (mốc gộp nhiều câu thì «[câu 5-6]»; một câu được có nhiều mốc; PROMPT viết bằng tiếng nào cũng giữ nguyên chữ «câu» trong thẻ): các mốc đi đúng thứ tự câu, KHÔNG đảo, mỗi câu của cảnh có ít nhất một mốc, mốc cuối kết thúc đúng độ dài video của cảnh (app dùng số câu để kiểm tra và tự bỏ khi tạo video). Mỗi mốc ghi rõ: tay hoặc dụng cụ làm gì (cắt, vắt, đổ, trộn, lau, xoay…), vật thay đổi thế nào, kết quả hiện ra ra sao. Giữ nguyên bối cảnh, đồ vật và màu sắc của ẢNH; không thêm vật mới hay người mới; máy quay cố định hoặc xê dịch rất nhẹ.`,
+      '4. NHẤT QUÁN giữa các bước: chốt MỘT mô tả cố định của nơi làm (bàn hoặc bếp, thớt, tông màu, ánh sáng) và của đồ vật hoặc nguyên liệu chính (loại, màu, kích cỡ) ở dòng NHÂN VẬT, rồi nhắc y nguyên trong ẢNH của mọi bước có chúng, để các ảnh trông như cùng một buổi quay. Mỗi ẢNH và PROMPT phải tự đủ ý, không viết «như bước trước».',
+      '5. Bước chỉ là lời nói chung (mở đầu, kết luận, lưu ý): dựng ảnh chụp thật của vật chính hoặc kết quả cuối, chuyển động nhẹ (hơi nước bay lên, ánh sáng đổi nhẹ, tay đưa vào khung).',
+      '6. ÂM THANH: video phải hoàn toàn IM LẶNG, không có âm thanh nào (không tiếng người, không nhạc, không tiếng động); lời đọc do người đọc, không phải ai trong cảnh.',
+      `7. Không chèn chữ, phụ đề hay logo vào ảnh và video; tỷ lệ ${config.aspect}.`,
+      '8. Viết ẢNH và PROMPT cùng ngôn ngữ với mẹo, riêng câu cuối của PROMPT luôn là đúng câu tiếng Anh này: ' + NO_SPEECH,
+      '',
+      'Trả lời đúng khuôn sau, KHÔNG viết thêm câu dẫn hay giải thích:',
+      ...(ctx.cast ? ['(Chỉ khi có đồ vật hoặc nơi làm MỚI xuất hiện ở phần này: thêm một dòng «NHÂN VẬT: …» ghi lại ĐỦ danh sách gồm cả mục đã chốt; không thì bỏ qua dòng này.)'] : ['NHÂN VẬT: <nơi làm cố định: bàn/bếp, tông màu, ánh sáng; đồ vật hoặc nguyên liệu chính: loại, màu, kích cỡ; tay người nếu có>']),
+      'CẢNH 1',
+      'CÂU: <số câu đầu>-<số câu cuối> (ví dụ 1-2; một câu thì chỉ ghi số đó)',
+      'ẢNH: <lệnh tạo ảnh chụp thật cho khung hình đầu của bước>',
+      'PROMPT: <bối cảnh cụ thể, rồi các mốc dạng «0–3 giây [câu 5]: …» theo quy tắc trên>',
+      'CẢNH 2',
+      'CÂU: …',
+      'ẢNH: …',
+      'PROMPT: …',
+      `(cứ thế đến câu số ${last}${marker ? `; dòng cuối cùng của trả lời chỉ gồm đúng một từ: MSDONE${marker}` : ''})`,
+      ctx.cast ? `\nĐÃ CHỐT (dùng y nguyên trong mọi ẢNH và PROMPT): ${ctx.cast}` : '',
+      ...(ctx.fix ? ['', 'SỬA LỖI – lần trước các cảnh dưới đây bị sai; viết lại ĐÚNG, vẫn đủ mọi câu của phần này, vẫn theo khuôn trên (kể cả dòng ẢNH):', ctx.fix] : []),
+      '',
+      ...(whole ? ['MẸO VẶT (đã đánh số câu):'] : ['NGỮ CẢNH – mẹo vặt (chỉ để hiểu, KHÔNG viết cảnh cho phần này):', contextText(script, units, first, last), '', 'CÁC CÂU CẦN CHIA CẢNH:']),
+      ...numbered(picked),
+      marker ? `MSEND${marker}` : ''
+    ].filter((line, index, lines) => line !== '' || (index > 0 && lines[index - 1] !== '' && index < lines.length - 1)).join('\n');
+  }
 
   const lockRule = config => `KHÓA HÌNH DẠNG: ${config.reference ? 'nhân vật trong ảnh tham chiếu' : 'nhân vật chuẩn do người dùng mô tả'}${config.form ? ` (hình dạng chuẩn: ${config.form})` : ''} là CHUẨN HÌNH DẠNG của MỌI nhân vật. Mọi nhân vật khác, kể cả người phụ, phải CÙNG hình dạng, tỉ lệ cơ thể, kiểu đầu và mặt, kiểu vẽ, độ chân thực và độ chi tiết (ví dụ chuẩn là người que thì mọi người đều là người que; là người thật thì mọi người đều là người thật; là con vật hoạt hình thì mọi nhân vật đều cùng kiểu hoạt hình đó); chỉ khác màu và kiểu quần áo, giới tính, kiểu tóc hoặc bộ lông, phụ kiện, chiều cao, và loài nếu câu chuyện nói rõ. Vì vậy mỗi nhân vật khác chỉ được mô tả phần ĐƯỢC KHÁC đó, theo đúng kiểu của nhân vật chuẩn; KHÔNG thêm chi tiết làm lệch kiểu (ví dụ không tả da, cơ bắp, nét mặt thật cho nhân vật hoạt hình; không tả nét vẽ hoạt hình cho người thật). Nhân vật chuẩn đóng vai chính của bài (bài nói/bình luận thì đóng vai kiểu người mà bài đang nói tới); các vai còn lại do nhân vật khác cùng hình dạng đóng. App tự thêm câu khóa hình dạng vào cuối mỗi PROMPT nên bạn không cần chép lại, nhưng mô tả nhân vật phải hợp kiểu đó.`;
 
@@ -781,8 +872,13 @@
       const language = detectLanguage(voice || prompt);
       const seconds = estimateSeconds(voice, language), own = sceneSeconds(voice || prompt, config.seconds);
       if (voice && seconds > config.seconds) w.push(`Lời đọc dài khoảng ${seconds.toFixed(1)} giây, hơn clip ${config.seconds} giây — sẽ phải giữ khung cuối. Nên tách cảnh.`);
+      if (config.tip) {
+        const image = String(scene.image || '').trim();
+        if (!image) w.push('Chưa có prompt ảnh: bước này sẽ không tạo được ảnh, nên cũng không có clip.');
+        else if (count(image) < 30) w.push('Prompt ảnh quá ngắn, dễ ra ảnh sai. Mô tả rõ vật gì, ở đâu, tay đang làm gì.');
+      }
       if (!prompt.trim()) w.push('Chưa có prompt: cảnh này sẽ không tạo được.');
-      else if (count(prompt.replace(NO_SPEECH, '').replace(lockLine(config, 'vi'), '').replace(lockLine(config, 'en'), '').replace(aspectLine(config, 'vi'), '').replace(aspectLine(config, 'en'), '').trim()) < 40) w.push('Prompt quá ngắn, dễ ra hình sai. Mô tả rõ ai, ở đâu, làm gì, nét mặt.');
+      else if (count(prompt.replace(NO_SPEECH, '').replace(tipStartLine('vi'), '').replace(tipStartLine('en'), '').replace(lockLine(config, 'vi'), '').replace(lockLine(config, 'en'), '').replace(aspectLine(config, 'vi'), '').replace(aspectLine(config, 'en'), '').trim()) < 40) w.push('Prompt quá ngắn, dễ ra hình sai. Mô tả rõ ai, ở đâu, làm gì, nét mặt.');
       if (prompt.trim() && !/no speech/i.test(prompt)) w.push('Prompt thiếu câu «no speech» — nhân vật có thể bị nói.');
       if (QUOTED.test(voice) || QUOTED.test(prompt)) w.push('Có lời thoại trong ngoặc kép — nhân vật sẽ không nói, chỉ thể hiện bằng cử chỉ và nét mặt.');
       if (TIME_SKIP.test(voice) || TIME_SKIP.test(prompt)) w.push(`Có chuyển mốc thời gian — ${own} giây khó chứa nhiều khoảnh khắc. Nên tách thành cảnh riêng.`);
@@ -794,7 +890,8 @@
   }
 
 
-  const PROMPT = /^(?:prompt|mô tả(?:\s*hình)?|hình ảnh|video prompt)$/i;
+  const PROMPT = /^(?:prompt(?:\s*(?:video|clip|chuyển động))?|chuyển động|mô tả(?:\s*hình)?|hình ảnh|video prompt)$/i;
+  const IMAGE = /^(?:ảnh|anh|ảnh đầu|khung hình đầu|image|image prompt|prompt ảnh|prompt anh|lệnh ảnh)$/i;
   const SENTENCES = /^(?:câu|cau|các câu|sentences?|lines?|dòng|dong)(?:\s*(?:số|so|nos?\.?))?$/i;
   const CAST = /^(?:nhân vật|nhan vat|characters?|cast)(?:\s*chính)?$/i;
   const LOI = /^(?:lời(?:\s*(?:đọc|kể|thoại))?|loi|voice(?:\s*over)?|voiceover|narration|thoại|lời dẫn)$/i;
@@ -811,7 +908,8 @@
     const lock = lockLine(config, language), text = String(prompt || '').trim();
     const hasLock = !lock || lockBoth(config).some(line => text.includes(line));
     const ratio = config.aspect && !text.includes(config.aspect) ? aspectLine(config, language) : '';
-    const extra = [ratio, hasLock ? '' : lock].filter(Boolean);
+    const start = config.tip && !hasTipStart(text) ? tipStartLine(language) : '';
+    const extra = [start, ratio, hasLock ? '' : lock].filter(Boolean);
     if (!extra.length) return ensureNoSpeech(text);
     const at = text.indexOf(NO_SPEECH);
     if (at >= 0) return text.slice(0, at).trimEnd() + '\n' + extra.join('\n') + '\n' + text.slice(at);
@@ -825,7 +923,7 @@
     const lines = String(reply || '').replace(/\r\n?/g, '\n').split('\n');
     const scenes = [];
     let current = null, field = null, cast = '', done = false;
-    const push = () => { if (current && (current.voiceover || current.prompt || current.units)) scenes.push(current); };
+    const push = () => { if (current && (current.voiceover || current.prompt || current.image || current.units)) scenes.push(current); };
     for (const raw of lines) {
       if (DONE.test(raw.trim())) { done = true; break; }
       // Bỏ chữ đậm/nghiêng và gạch đầu dòng của markdown trước khi nhận nhãn.
@@ -833,10 +931,10 @@
       const head = line.match(HEAD);
       if (head && !PROMPT.test(head[2].split(/[:：]/)[0].trim())) {
         push();
-        current = { title: `Cảnh ${head[1]}`, voiceover: '', prompt: '', units: null };
+        current = { title: `Cảnh ${head[1]}`, voiceover: '', prompt: '', image: '', units: null };
         field = null;
         const rest = head[2].trim();
-        if (rest) { const lab = rest.match(LABEL); if (lab && (LOI.test(lab[1].trim()) || PROMPT.test(lab[1].trim()))) { field = LOI.test(lab[1].trim()) ? 'voiceover' : 'prompt'; current[field] = lab[2]; } }
+        if (rest) { const lab = rest.match(LABEL); if (lab && (LOI.test(lab[1].trim()) || PROMPT.test(lab[1].trim()) || IMAGE.test(lab[1].trim()))) { field = LOI.test(lab[1].trim()) ? 'voiceover' : IMAGE.test(lab[1].trim()) ? 'image' : 'prompt'; current[field] = lab[2]; } }
         continue;
       }
       const label = line.match(LABEL);
@@ -853,13 +951,14 @@
           field = null; continue;
         }
         if (LOI.test(name)) { field = 'voiceover'; current.voiceover = label[2]; continue; }
+        if (IMAGE.test(name)) { field = 'image'; current.image = label[2]; continue; }
         if (PROMPT.test(name)) { field = 'prompt'; current.prompt = label[2]; continue; }
       }
       if (field && line.trim()) current[field] += (current[field] ? '\n' : '') + line.trim();
     }
     push();
-    const result = scenes.map((scene, index) => ({ title: `Cảnh ${index + 1}`, units: scene.units, voiceover: speechText(clean(scene.voiceover)), prompt: clean(scene.prompt) }))
-      .filter(scene => scene.units || scene.voiceover || scene.prompt);
+    const result = scenes.map((scene, index) => ({ title: `Cảnh ${index + 1}`, units: scene.units, voiceover: speechText(clean(scene.voiceover)), prompt: clean(scene.prompt), image: clean(scene.image) }))
+      .filter(scene => scene.units || scene.voiceover || scene.prompt || scene.image);
     if (!result.length) throw Error('Chưa thấy cảnh nào trong trả lời của Muse. Cần các dòng «CẢNH 1», «CÂU: 1-3», «PROMPT: …». Gửi lại yêu cầu cho Muse hoặc dùng nút chia cảnh nhanh.');
     return { scenes: result, cast: clean(cast), done };
   }
@@ -870,7 +969,8 @@
     const parsed = parseReply(reply, config).scenes, language = promptLanguage(parsed.map(scene => scene.voiceover || scene.prompt).join(' '));
     return parsed.map((scene, index) => {
       const prompt = scene.prompt ? finalPrompt(scene.prompt, config, language) : scenePrompt(scene.voiceover, config);
-      return { title: `Cảnh ${index + 1}`, source: scene.voiceover, voiceover: scene.voiceover, prompt, durationSeconds: sceneSeconds(scene.voiceover, config.seconds), ...(scene.units ? { units: scene.units } : {}) };
+      const image = config.tip ? (scene.image ? finalImagePrompt(scene.image, config, language) : tipImagePrompt(scene.voiceover, config, language)) : '';
+      return { title: `Cảnh ${index + 1}`, source: scene.voiceover, voiceover: scene.voiceover, prompt, ...(config.tip ? { image } : {}), durationSeconds: sceneSeconds(scene.voiceover, config.seconds), ...(scene.units ? { units: scene.units } : {}) };
     });
   }
 
@@ -895,7 +995,9 @@
       let end = a;
       while (end < b && count(unitsText(units, a, end + 1)) <= hard) end++;
       const voiceover = unitsText(units, a, end);
-      out.push({ title: '', source: voiceover, voiceover, visual: '', prompt: item.prompt ? finalPrompt(item.prompt, config, language) : scenePrompt(voiceover, config), durationSeconds: sceneSeconds(voiceover, config.seconds), units: [a, end], ...(item.prompt ? {} : { offline: true }) });
+      // Mẹo vặt: thiếu prompt ảnh thì cũng là cảnh mẫu (hỏi lại Muse), vì không có ảnh thì không làm được clip.
+      const complete = Boolean(item.prompt) && (!config.tip || Boolean(item.image));
+      out.push({ title: '', source: voiceover, voiceover, visual: '', prompt: item.prompt ? finalPrompt(item.prompt, config, language) : scenePrompt(voiceover, config), ...(config.tip ? { image: item.image ? finalImagePrompt(item.image, config, language) : tipImagePrompt(voiceover, config, language) } : {}), durationSeconds: sceneSeconds(voiceover, config.seconds), units: [a, end], ...(complete ? {} : { offline: true }) });
       if (end < b) fresh(end + 1, b);
       next = b + 1;
     }
@@ -983,5 +1085,5 @@
     return entries.map((entry, index) => `${index + 1}\n${srtTime(entry.start)} --> ${srtTime(entry.end)}\n${entry.text}\n`).join('\n');
   }
 
-  return { ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, MAX_SECONDS, MIN_SECONDS, sceneSeconds, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, lockLine, buildMuseInstruction, buildUnderstandInstruction, parseUnderstanding, understandRanges, understandingText, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, motionIssues, stripBeatTags, subtitleChunks, srtTime, toSrt };
+  return { ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, MAX_SECONDS, MIN_SECONDS, sceneSeconds, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, lockLine, buildMuseInstruction, buildUnderstandInstruction, parseUnderstanding, understandRanges, understandingText, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, motionIssues, stripBeatTags, tipImagePrompt, finalImagePrompt, tipStartLine, subtitleChunks, srtTime, toSrt };
 });

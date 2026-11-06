@@ -189,3 +189,77 @@ test('clearing one tab removes only that tab\'s pending scenes or list',async()=
  await q.clearAll('video');assert.deepEqual(q.jobs.map(j=>j.prompt),['image again']);
  await q.clearAll();assert.equal(q.jobs.length,0);
 });
+
+// ---- Chế độ Mẹo vặt: mỗi bước = việc «ảnh» rồi việc «clip» làm từ chính ảnh đó ----
+const tipJobs = (n, story = 'Truyen-tip') => [
+  ...Array.from({ length: n }, (_, i) => ({ kind: 'story', storyId: story, phase: 'image', number: i + 1, prompt: 'ảnh ' + (i + 1) })),
+  ...Array.from({ length: n }, (_, i) => ({ kind: 'story', storyId: story, phase: 'clip', dependsOn: 'image', number: i + 1, prompt: 'clip ' + (i + 1) }))
+];
+test('Mẹo vặt: clip chạy sau ảnh và nhận đúng ảnh của bước đó làm ảnh tham chiếu', async () => {
+  const seen = [];
+  const q = new Queue({ ...base, run: async j => { seen.push([j.phase, j.number, [...(j.references || [])]]); return j.phase === 'image' ? `C:/out/anh/00${j.number}.png` : `C:/out/00${j.number}.mp4`; } });
+  await q.add(tipJobs(3)); await q.start('story');
+  assert.deepEqual(seen.map(x => x.slice(0, 2)), [['image', 1], ['image', 2], ['image', 3], ['clip', 1], ['clip', 2], ['clip', 3]]);
+  assert.deepEqual(seen.filter(x => x[0] === 'clip').map(x => x[2]), [['C:/out/anh/001.png'], ['C:/out/anh/002.png'], ['C:/out/anh/003.png']]);
+  assert.deepEqual(seen.filter(x => x[0] === 'image').map(x => x[2]), [[], [], []]);
+  assert.ok(q.jobs.every(j => j.status === 'completed'));
+  assert.equal(q.jobs[3].image, 'C:/out/anh/001.png');
+});
+test('Mẹo vặt: ảnh lỗi thì dừng hẳn, không tạo clip nào (không tốn lượt video)', async () => {
+  const ran = [];
+  const q = new Queue({ ...base, run: async j => { ran.push(j.phase + j.number); if (j.phase === 'image' && j.number === 2) throw Error('Muse không tạo ảnh'); return j.phase === 'image' ? `a${j.number}.png` : `c${j.number}.mp4`; } });
+  await q.add(tipJobs(3)); await q.start('story');
+  assert.deepEqual(ran, ['image1', 'image2']);
+  assert.deepEqual(q.jobs.map(j => j.status), ['completed', 'failed', 'pending', 'pending', 'pending', 'pending']);
+  assert.equal(q.paused, true);
+  // Tiếp tục: ảnh 2 làm lại, rồi mới đến các clip.
+  q.run = async j => { ran.push(j.phase + j.number); return j.phase === 'image' ? `a${j.number}.png` : `c${j.number}.mp4`; };
+  q.prepareResume('story'); await q.start('story');
+  assert.deepEqual(ran.slice(2), ['image2', 'image3', 'clip1', 'clip2', 'clip3']);
+  assert.ok(q.jobs.every(j => j.status === 'completed'));
+});
+test('Mẹo vặt: clip chưa có ảnh xong thì không bao giờ chạy (kể cả khi chỉ còn clip trong hàng đợi)', async () => {
+  let ran = 0;
+  const q = new Queue({ ...base, run: async () => { ran++; return 'x.mp4'; } });
+  await q.add([{ kind: 'story', storyId: 'T', phase: 'clip', dependsOn: 'image', number: 1, prompt: 'clip 1' }]);
+  await q.start('story');
+  assert.equal(ran, 0); assert.equal(q.jobs[0].status, 'pending'); assert.equal(q.active, false);
+});
+test('Mẹo vặt: nhiều tài khoản song song — clip đợi ảnh đang tạo, không bao giờ chạy trước ảnh', async () => {
+  const order = [], releases = new Map();
+  const q = new Queue({ ...base, concurrency: 2, run: j => new Promise(resolve => { order.push('start ' + j.phase + j.number); releases.set(j.phase + j.number, () => { order.push('end ' + j.phase + j.number); resolve(j.phase === 'image' ? `a${j.number}.png` : `c${j.number}.mp4`); }); }) });
+  q.gateWaitMs = 5;
+  await q.add(tipJobs(1)); const running = q.start('story');
+  await new Promise(r => setTimeout(r, 40));
+  assert.deepEqual(order, ['start image1']);   // tài khoản thứ hai chờ, chưa gửi clip
+  releases.get('image1')();
+  await new Promise(r => setTimeout(r, 60));
+  assert.deepEqual(order, ['start image1', 'end image1', 'start clip1']);
+  releases.get('clip1')(); await running;
+  assert.ok(q.jobs.every(j => j.status === 'completed'));
+});
+test('Mẹo vặt: song song mà ảnh lỗi thì tài khoản đang chờ clip dừng theo, không treo', async () => {
+  const q = new Queue({ ...base, concurrency: 2, run: async j => { await new Promise(r => setTimeout(r, 20)); throw Error('hỏng'); } });
+  q.gateWaitMs = 5;
+  await q.add(tipJobs(1));
+  await Promise.race([q.start('story'), new Promise((_, rej) => setTimeout(() => rej(Error('hàng đợi bị treo')), 2000))]);
+  assert.deepEqual(q.jobs.map(j => j.status), ['failed', 'pending']); assert.equal(q.active, false);
+});
+test('Mẹo vặt: tạo lại ảnh rồi tạo lại clip thì clip dùng ảnh mới, không dùng bản đã khóa cũ', async () => {
+  const seen = [];
+  const q = new Queue({ ...base, run: async j => { seen.push([j.phase, [...(j.references || [])]]); return j.phase === 'image' ? `a${seen.length}.png` : `c${seen.length}.mp4`; } });
+  await q.add(tipJobs(1)); await q.start('story');
+  q.jobs[1].lockedInput = { prompt: 'clip 1', references: [{ path: 'locked-old.png' }] };
+  await q.regenerate(q.jobs[0].id);                       // ảnh mới
+  assert.equal(q.jobs[0].output, 'a3.png');
+  await q.regenerate(q.jobs[1].id);                       // clip làm lại từ ảnh mới
+  assert.deepEqual(seen.at(-1), ['clip', ['a3.png']]);
+  assert.equal(q.jobs[1].lockedInput, undefined);
+});
+test('Mẹo vặt: việc ảnh/clip giữ nguyên phase và dependsOn khi lưu và nạp lại', async () => {
+  const saved = [];
+  const q = new Queue({ ...base, save: async jobs => saved.push(JSON.parse(JSON.stringify(jobs))), run: async () => 'x' });
+  await q.add(tipJobs(1));
+  const again = new Queue({ ...base, jobs: saved.at(-1), run: async () => 'x' });
+  assert.deepEqual(again.jobs.map(j => [j.phase, j.dependsOn, j.number]), [['image', '', 1], ['clip', 'image', 1]]);
+});

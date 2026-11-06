@@ -488,6 +488,21 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
 Đã dừng Test|Opening message canceled
 Đã kích hoạt key.|License activated.
 Đã kích hoạt key.|License activated.
+Mẹo vặt|Tips
+Nơi làm và đồ vật cố định|Fixed setting and objects
+1. Mẹo vặt (các bước)|1. Tip (steps)
+Dán nguyên mẹo vặt: mỗi bước một hoặc vài câu ngắn, theo đúng thứ tự. Muse chia mỗi bước thành một cảnh, vẽ ảnh chụp thật cho bước đó rồi cho ảnh chuyển động; giọng đọc sẽ đọc đúng nguyên văn mẹo này.|Paste the whole tip: one or a few short sentences per step, in order. Muse turns each step into a scene, makes a photorealistic picture for it and then animates that picture; the voice reads this tip word for word.
+Mặc định là ảnh chụp thật. Ví dụ: ảnh chụp thật, bếp trắng, ánh sáng cửa sổ|Photorealistic by default. e.g. photorealistic, white kitchen, window light
+Dán mẹo vặt rồi bấm «Phân tích bằng Muse». Muse chia mỗi bước thành một cảnh: một ảnh chụp thật, rồi ảnh đó thành clip chuyển động. Mỗi bước tốn 2 lượt Muse (1 ảnh + 1 clip).|Paste the tip, then click “Analyze with Muse”. Muse makes each step a scene: one photorealistic picture, then that picture becomes a moving clip. Each step uses 2 Muse generations (1 image + 1 clip).
+▶ Tạo ảnh + clip|▶ Create images + clips
+Prompt ảnh (khung hình đầu)|Image prompt (first frame)
+Prompt chuyển động (làm từ ảnh)|Motion prompt (made from the image)
+Prompt ảnh gửi Muse|Image prompt sent to Muse
+Prompt chuyển động gửi Muse|Motion prompt sent to Muse
+Đổi chế độ sẽ xóa các cảnh đang có (mỗi chế độ chia cảnh khác nhau). Tiếp tục?|Switching mode clears the current scenes (each mode splits scenes differently). Continue?
+Bước nào cũng cần prompt ảnh.|Every step needs an image prompt.
+⚠ Chưa có prompt ảnh: bước này sẽ không tạo được ảnh, nên cũng không có clip.|⚠ No image prompt: this step cannot create its picture, so there will be no clip either.
+⚠ Prompt ảnh quá ngắn, dễ ra ảnh sai. Mô tả rõ vật gì, ở đâu, tay đang làm gì.|⚠ Image prompt too short; the picture may come out wrong. Say what object, where, and what the hands are doing.
 `.trim().split('\n').map(line=>line.split('|')));
   const norm=s=>String(s).replace(/\s+/g,' ').trim();
   let language='en';try{language=localStorage.getItem('museStudio.language')==='vi'?'vi':'en';}catch{}
@@ -528,7 +543,7 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
       [/^Thêm (\d+) prompt và chạy toàn bộ tác vụ đang chờ\?.*$/,m=>'Add '+m[1]+' prompts and run all pending scenes? This may use Muse credits. Exact reviewed prompts and scene references will be sent.'],
       [/^Dán ảnh tại đây cho (.+)$/,m=>'Paste references here for '+m[1]],
       [/^(\d+) cảnh$/,m=>m[1]+' scenes'],
-      [/^Muse đã chia (\d+) cảnh\.(?: (.+?))? Xem lại lời đọc và prompt, rồi bấm Tạo clip\.$/,m=>'Muse split the story into '+m[1]+' scenes.'+(m[2]?' '+m[2].replace(/^Muse chưa đọc hiểu được cả bài \(trả lời sai khuôn\) nên các lượt chia cảnh chỉ kèm truyện làm ngữ cảnh\.$/,'Muse could not read and summarize the whole text (wrong reply format), so each scene-splitting request only carries the story as context.').replace(/Còn (\d+) cảnh có mốc chuyển động lệch thứ tự câu hoặc thiếu câu \(xem ⚠ ở từng cảnh\)\./,(x,n)=>n+' scene(s) still have motion beats out of sentence order or missing a sentence (see the ⚠ on each scene).'):'')+' Review the narration and prompts, then click Create clips.'],
+      [/^Muse đã chia (\d+) cảnh\.(?: (.+?))? Xem lại lời đọc(?: và prompt, rồi bấm Tạo clip|, prompt ảnh và prompt chuyển động, rồi bấm Tạo ảnh \+ clip)\.$/,m=>'Muse split the story into '+m[1]+' scenes.'+(m[2]?' '+m[2].replace(/^Muse chưa đọc hiểu được cả bài \(trả lời sai khuôn\) nên các lượt chia cảnh chỉ kèm truyện làm ngữ cảnh\.$/,'Muse could not read and summarize the whole text (wrong reply format), so each scene-splitting request only carries the story as context.').replace(/Còn (\d+) cảnh có mốc chuyển động lệch thứ tự câu hoặc thiếu câu \(xem ⚠ ở từng cảnh\)\./,(x,n)=>n+' scene(s) still have motion beats out of sentence order or missing a sentence (see the ⚠ on each scene).'):'')+(/Tạo ảnh \+ clip\.$/.test(m[0])?' Review the narration, image prompts and motion prompts, then click Create images + clips.':' Review the narration and prompts, then click Create clips.')],
       [/^Muse đã chia (\d+) cảnh, dừng ở câu (\d+)\/(\d+)\. (.+) Bấm «Phân tích tiếp» để Muse làm tiếp từ đó \(giữ nguyên các cảnh đã có\)\.$/,m=>'Muse split '+m[1]+' scene(s) and stopped at sentence '+m[2]+'/'+m[3]+'. '+m[4].replace(/^Muse chưa chia đúng đoạn từ câu (\d+)\.$/,'Muse did not split the part from sentence $1 correctly.').replace(/^Muse trả lời không đúng khuôn \(không thấy số câu và prompt cho từng cảnh\)\.$/,'Muse replied in the wrong format (no sentence numbers and prompts per scene).').replace(/^Muse trả lời quá lâu\. Thử lại\.$/,'Muse took too long to reply. Try again.')+' Click “Continue analysis” so Muse carries on from there (the existing scenes are kept).'],
       [/^Muse dừng ở câu (\d+)\/(\d+)\. Bấm «Phân tích tiếp» để làm tiếp\.$/,m=>'Muse stopped at sentence '+m[1]+'/'+m[2]+'. Click “Continue analysis” to carry on.'],
       [/^Muse chưa chia được đoạn bắt đầu từ câu (\d+)\.$/,m=>'Muse could not split the part starting at sentence '+m[1]+'.'],
@@ -556,6 +571,7 @@ Chờ ô chat · đăng nhập Muse nếu cần|Waiting for chat · Sign in to M
       [/^Ảnh sản phẩm: (.+) — gắn vào mọi cảnh\.$/,m=>'Product image: '+m[1]+' — attached to every scene.'],
       [/^Chọn tối đa (\d+) chuyển động máy quay\.$/,m=>'Choose at most '+m[1]+' camera movements.'],
       [/^(.*)bấm «Muse viết lời quảng cáo» lại\.$/,m=>t(m[1]+'bấm Phân tích lại.').replace(/analy[sz]e again\.$/,'write the ad script again.')],
+      [/^Thêm (\d+) bước \((\d+) ảnh \+ (\d+) clip\) và chạy ngay\?.*$/,m=>'Add '+m[1]+' steps ('+m[2]+' images + '+m[3]+' clips) and run now? Each step uses 2 Muse generations (1 image, 1 clip), so this may use a lot of Muse credits. All images are created first, then each clip is made from its own image; the reviewed prompts are sent exactly as shown.'],
       [/^Thêm (\d+) cảnh và chạy toàn bộ clip kể chuyện đang chờ\?.*cùng ảnh sản phẩm\.$/,m=>'Add '+m[1]+' scenes and run all pending story clips? This may use Muse credits. The reviewed prompts are sent exactly as shown, with the product image.'],
       [/^Thêm (\d+) cảnh và chạy toàn bộ clip kể chuyện đang chờ\?.*$/,m=>'Add '+m[1]+' scenes and run all pending story clips? This may use Muse credits. The reviewed prompts are sent exactly as shown, with the character image.'],
       [/^Còn (\d+) cảnh chưa xong\. Chạy hàng đợi cho xong rồi xuất\.$/,m=>m[1]+' scene(s) are not finished. Finish the queue, then export.'],

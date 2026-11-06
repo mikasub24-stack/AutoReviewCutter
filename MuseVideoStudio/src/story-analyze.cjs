@@ -168,7 +168,8 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
       if (!muse) throw infra('Chưa mở được Muse tài khoản 1.');
       let cast = startCast, understanding = startUnderstanding, stop = null;
       // Truyện (không phải quảng cáo): Muse đọc hiểu cả bài trước, rồi mới chia cảnh theo hiểu biết đó.
-      if (!config.ad && !understanding) {
+      // Mẹo vặt ngắn và rõ ràng từng bước nên bỏ lượt đọc hiểu riêng (đỡ tốn lượt Muse); lượt chia bước đã tự đọc cả mẹo.
+      if (!config.ad && !config.tip && !understanding) {
         const read = await understandStory({ muse, script, config, units, signal });
         if (read) { understanding = read.understanding; if (!cast) cast = read.cast; }
         else notes.push('Muse chưa đọc hiểu được cả bài (trả lời sai khuôn) nên các lượt chia cảnh chỉ kèm truyện làm ngữ cảnh.');

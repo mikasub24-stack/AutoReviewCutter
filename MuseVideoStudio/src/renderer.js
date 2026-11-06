@@ -5,6 +5,8 @@ let mode='video';try{const saved=localStorage.getItem('museStudio.mode');if(save
 const isImage=()=>mode==='image';
 const isStory=()=>mode==='story';
 const kindOfJob=j=>j.kind==='image'?'image':j.kind==='story'?'story':'video';
+// Việc «ảnh» của chế độ Mẹo vặt nằm trong danh sách kể chuyện nhưng hiện như tác vụ ảnh.
+const isPhotoJob=j=>j.kind==='image'||j.phase==='image';
 const jobsOf=(list,kind=mode)=>(list||[]).filter(j=>kindOfJob(j)===kind);
 function imagePrefix(){return isImage()?String($('imagePrefix').value||'').replace(/^\s+/,''):'';}
 function withPrefix(prompt){const prefix=imagePrefix();return prefix&&!String(prompt).trimStart().startsWith(prefix.trim())?prefix+prompt:prompt;}
@@ -118,7 +120,7 @@ function makeCard(id){
   body.append(badge,title,meta,steps,stage,fileLine,disclosure,source,error,actions);card.append(preview,body);return row;
 }
 function updateMedia(row,job){
-  const photo=job.kind==='image',output=localFileUrl(job.output||job.previousOutput),image=localFileUrl(job.lockedInput?.references?.[0]?.path||job.image||job.references?.[0]);
+  const photo=isPhotoJob(job),output=localFileUrl(job.output||job.previousOutput),image=localFileUrl(job.lockedInput?.references?.[0]?.path||job.image||job.references?.[0]);
   const key=output?(photo?'photo:':'video:')+output:image?'image:'+image:'empty';
   text(row.mediaLabel,output?(!job.output&&job.previousOutput?(photo?'Ảnh trước':'Video trước'):(photo?'Ảnh đã lưu':'Video đã tải')):image?'Ảnh tham chiếu':(photo?'Chưa có ảnh':'Chưa có video'));
   if(row.mediaKey===key)return;
@@ -143,7 +145,7 @@ function updateCard(row,job,index){
   row.badge.className='badge '+job.status;text(row.badge,labels[job.status]||job.status);text(row.prompt,job.lockedInput?.prompt||job.prompt);
   text(row.meta,`${job.lockedInput?'🔒 Đã khóa · ':''}${job.references?.length||0} ảnh tham chiếu${job.account?' · TK '+job.account:''}${job.durationSeconds?' · '+job.durationSeconds+'s':''}`);
   const active=job.status==='running';
-  const photo=job.kind==='image';
+  const photo=isPhotoJob(job);
   const stageName=job.status==='completed'?(photo?'✓ Đã lưu xong ảnh':'✓ Đã tải xong video'):(photo&&imageStageLabels[job.stage])||stageLabels[job.stage]||labels[job.status]||'Đang chờ';
   text(row.reveal,photo?'Mở vị trí ảnh':'Mở vị trí video');text(row.recover,photo?'Tìm / lưu ảnh đã tạo':'Tìm / tải video đã tạo');text(row.regenerate,'Tạo lại');
   [...row.steps.children].forEach((step,i)=>text(step,(photo?['Đính kèm','Gửi','Tạo','Lưu']:['Ảnh','Gửi','Tạo','Tải'])[i]));

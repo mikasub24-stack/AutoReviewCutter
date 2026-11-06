@@ -249,6 +249,9 @@ async function download(muse,job,signal) {
   }catch(error){await fs.rm(temporary,{force:true}).catch(()=>{});throw error;}
 }
 const imageDirectory=()=>path.join(settings.output,'Anh');
+// Việc «ảnh» của chế độ Mẹo vặt (nằm trong hàng đợi kể chuyện): ảnh lưu cạnh clip của truyện, thư mục «anh».
+const isPhoto=job=>job.kind==='image'||job.phase==='image';
+const photoDirectory=job=>job.kind==='story'?path.join(storyFolder(settings.output,job.storyId),'anh'):imageDirectory();
 async function fetchImageInMain(muse,url,signal){
   // Built-in browser only: the main process reads the picture with the account's own
   // cookies, which also works when the page's CSP blocks fetch() to the image CDN.
@@ -259,7 +262,7 @@ async function fetchImageInMain(muse,url,signal){
   finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
 }
 async function saveImages(muse,job,signal,count) {
-  const directory=imageDirectory(),trackerId=job.trackerId||job.id,saved=[];
+  const directory=photoDirectory(job),trackerId=job.trackerId||job.id,saved=[];
   await fs.mkdir(directory,{recursive:true});
   for(let index=0;index<count;index++){
     if(signal.aborted)throw stoppedError();
@@ -343,14 +346,14 @@ async function runJob(job,worker,signal,{recover=false}={}) {
   }
   const trackerId=job.trackerId||job.id;
   try{
-    await step(dom(muse,beginTracking,{id:trackerId,prompt,mediaKind:job.kind==='image'?'image':'video',imageSelector:settings.image||'img',videoSelector:settings.video,messageSelector:settings.messageSelector,recover,echoKey:recover?job.echoKey||receipt?.echoKey:'',echoMarker:recover?job.echoMarker||receipt?.echoMarker:'',echoAliases:recover?[...new Set([...(job.echoAliases||[]),receipt?.echoKey].filter(Boolean))]:[],otherPrompts:recover?[...queue.jobs.filter(j=>j.id!==job.id).map(j=>j.lockedInput?.prompt||j.prompt),'Bắt đầu công việc mới nhé'].filter(Boolean):[]}));
+    await step(dom(muse,beginTracking,{id:trackerId,prompt,mediaKind:isPhoto(job)?'image':'video',imageSelector:settings.image||'img',videoSelector:settings.video,messageSelector:settings.messageSelector,recover,echoKey:recover?job.echoKey||receipt?.echoKey:'',echoMarker:recover?job.echoMarker||receipt?.echoMarker:'',echoAliases:recover?[...new Set([...(job.echoAliases||[]),receipt?.echoKey].filter(Boolean))]:[],otherPrompts:recover?[...queue.jobs.filter(j=>j.id!==job.id).map(j=>j.lockedInput?.prompt||j.prompt),'Bắt đầu công việc mới nhé'].filter(Boolean):[]}));
     if(!recover){
       stage('submitting','Đang gửi đúng prompt và ảnh đã khóa');
       job.submissionProfileKey=profileKey;job.submissionSessionId=currentSession;job.submissionProtocol=1;job.mayHaveSubmitted=true;job.submittedAt=null;await step(save());check();
       try{const sent=await step(dom(muse,submitPrompt,{id:trackerId,selector:settings.submit,composerSelector:settings.composer,attachmentTokens:job.preparedTokens}));if(!sent?.clicked)throw Error('Chưa bấm được Gửi. Cảnh chưa gửi; bấm Tiếp tục để gửi lại.');job.submittedAt=new Date().toISOString();await step(save());}
       catch(e){if(signal.aborted)throw e;if(!transientDOM(e)){job.mayHaveSubmitted=false;await step(save());throw e;}stage('confirming','Muse đang lag · chờ xác nhận, không bấm Gửi lần nữa');}
     }
-    const warnAt=Date.now()+settings.timeoutMinutes*60000,image=job.kind==='image';
+    const warnAt=Date.now()+settings.timeoutMinutes*60000,image=isPhoto(job);
     let warned=false,observedEcho=false;
     // A picture is saved only after Muse's own "generating" state has ended, so a
     // preview that is replaced by the final render is never stored.
@@ -519,7 +522,7 @@ app.whenReady().then(async () => {
     storyBuild:async data=>{await storyService.build({runId:String(data?.runId||''),name:String(data?.name||''),aspect:String(data?.aspect||'16:9'),subtitles:data?.subtitles!==false,srt:data?.srt===true,sfx:String(data?.sfx||'low'),scenes:Array.isArray(data?.scenes)?data.scenes:[]});return snapshot();},
     storyCancel:async()=>{storyService.cancel();return snapshot();},
     storyAnalyze:async data=>{
-      try{return await storyAnalyzer.run({script:String(data?.script||''),options:{seconds:Number(data?.seconds),reference:Boolean(data?.reference),aspect:String(data?.aspect||'16:9'),style:String(data?.style||''),character:String(data?.character||''),form:String(data?.form||''),ad:data?.ad},resume:data?.resume&&{from:Number(data.resume.from),cast:String(data.resume.cast||''),understanding:data.resume.understanding&&typeof data.resume.understanding==='object'?{summary:String(data.resume.understanding.summary||''),approach:String(data.resume.understanding.approach||''),setting:String(data.resume.understanding.setting||'')}:null}});}
+      try{return await storyAnalyzer.run({script:String(data?.script||''),options:{seconds:Number(data?.seconds),reference:Boolean(data?.reference),aspect:String(data?.aspect||'16:9'),style:String(data?.style||''),character:String(data?.character||''),form:String(data?.form||''),ad:data?.ad,tip:data?.tip===true},resume:data?.resume&&{from:Number(data.resume.from),cast:String(data.resume.cast||''),understanding:data.resume.understanding&&typeof data.resume.understanding==='object'?{summary:String(data.resume.understanding.summary||''),approach:String(data.resume.understanding.approach||''),setting:String(data.resume.understanding.setting||'')}:null}});}
       finally{if(!starting&&!queue.active&&!flushingQuit&&main&&!main.isDestroyed()){main.show();main.focus();}}
     },
     storyAdWrite:async data=>{

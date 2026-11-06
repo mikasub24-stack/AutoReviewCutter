@@ -39,6 +39,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
             listener(structuredClone(s));
             const units = data.script.split(/(?<=[.!?])\s+/);
             const result = { scenes: [{ title: 'Cảnh 1', source: units.slice(0, 2).join(' '), voiceover: units.slice(0, 2).join(' '), visual: '', prompt: 'Mai dắt trâu qua cánh đồng lúc bình minh, mỉm cười.\nAudio: no speech, no dialogue, no singing, no narration, no lip movement - characters stay silent with mouths closed.', durationSeconds: 10, units: [1, 2] }, { title: 'Cảnh 2', source: units.slice(2).join(' '), voiceover: units.slice(2).join(' '), visual: '', prompt: 'Chú cá vàng nhảy lên thuyền, Mai ngạc nhiên đưa tay đón.\nAudio: no speech, no dialogue, no singing, no narration, no lip movement - characters stay silent with mouths closed.', durationSeconds: 10, units: [3, 4] }].filter(sc => sc.voiceover.trim()), cast: 'Mai – theo ảnh', understanding: { summary: 'Mai dắt trâu, thả cá vàng về sông.', approach: 'Truyện kể nhẹ nhàng; dựng đúng diễn biến.', setting: 'Làng ven sông, buổi sáng.' }, notes: [] };
+            if (data.tip) { result.scenes = result.scenes.map((sc, i) => ({ ...sc, prompt: 'Bếp gỗ sáng. 0–5 giây [câu ' + sc.units[0] + ']: tay đặt tỏi lên thớt. 5–10 giây [câu ' + sc.units[1] + ']: dao đập nhẹ.\nAudio: no speech, no dialogue.', image: 'Tạo ảnh chụp thật cận cảnh tay đặt tép tỏi lên thớt gỗ tròn, ánh sáng cửa sổ, bước ' + (i + 1) + '.\nTỷ lệ khung hình ảnh: 16:9 (ngang).\nKhông có chữ, chữ số, logo, hình mờ hay phụ đề trong ảnh.' })); result.understanding = null; }
             if (window.analyzeStop && !data.resume) { result.scenes = result.scenes.slice(0, 1); result.incomplete = { from: 3, total: units.length, message: 'Muse chưa chia đúng đoạn từ câu 3.' }; }
             return result;
           }
@@ -358,6 +359,58 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await page.locator('#storyScript').fill(''); await page.locator('#storyAnalyze').click();
     assert.match(await page.locator('#toast').textContent(), /Paste the story first/);
     assert.equal((await called('storyAnalyze')).length, analyzeCalls, 'không gửi Muse khi chưa có truyện');
+    // Mẹo vặt: chế độ riêng. Mỗi bước có prompt ảnh + prompt chuyển động; thêm vào hàng đợi thành việc ảnh (trước) rồi việc clip (sau, phụ thuộc ảnh).
+    {
+      const tipText = 'Mẹo bóc tỏi nhanh. Đặt tép tỏi lên thớt và đập nhẹ. Vỏ tỏi bong ra ngay. Cho tỏi vào hộp kín và lắc mạnh.';
+      await page.locator('#storyScript').fill(''); 
+      await page.locator('#modeTip').click();   // hộp thoại xác nhận đổi chế độ tự đồng ý
+      assert.equal(await page.locator('#modeTip').getAttribute('aria-pressed'), 'true');
+      assert.equal(await page.locator('#modeStory').getAttribute('aria-pressed'), 'false');
+      assert.equal(await page.locator('#storyHead').textContent(), '1. Tip (steps)');
+      assert.equal(await page.locator('#storyCreate').textContent(), '▶ Create images + clips');
+      for (const id of ['storyRefRow', 'storyRefPaste', 'storyCharacter', 'storyForm']) assert.equal(await page.locator('#' + id).isVisible(), false, id + ' ẩn trong chế độ Mẹo vặt');
+      assert.match(await page.locator('#storyInfo').textContent(), /Each step uses 2 Muse generations/);
+      assert.match(await page.locator('#storyStyle').getAttribute('placeholder'), /Photorealistic by default/);
+      assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('museStudio.story')).mode), 'tip');
+      await page.locator('#storyScript').fill(tipText);
+      await page.locator('#storyAnalyze').click();
+      await page.waitForFunction(() => !document.getElementById('storyAnalyze').disabled && document.querySelectorAll('#storyScenes .draftRow').length === 2);
+      const call = (await called('storyAnalyze')).at(-1).data;
+      assert.equal(call.tip, true); assert.equal(call.reference, false);
+      assert.equal(await page.locator('#storyScenes .draftRow').first().locator('textarea').count(), 3, 'lời đọc + prompt ảnh + prompt chuyển động');
+      const labels = await page.locator('#storyScenes .draftRow').first().locator('label.storyLabel').allTextContents();
+      assert.deepEqual(labels, ['Narration', 'Image prompt (first frame)', 'Motion prompt (made from the image)']);
+      assert.match(await page.locator('#storyInfo').textContent(), /click Create images \+ clips/);
+      if (process.env.TIP_SHOT) { await page.locator('#storyCompose').scrollIntoViewIfNeeded(); await page.screenshot({ path: process.env.TIP_SHOT, clip: { x: 0, y: 0, width: 1450, height: 1500 } }); }
+      assert.equal(await page.locator('#storyScenes .draftRow').first().locator('textarea').nth(1).inputValue().then(v => v.startsWith('Tạo ảnh chụp thật cận cảnh')), true);
+      // Xóa prompt ảnh của một bước thì báo ngay và không cho thêm vào hàng đợi.
+      const image2 = page.locator('#storyScenes .draftRow').nth(1).locator('textarea').nth(1);
+      const keep = await image2.inputValue();
+      await image2.fill('');
+      await page.waitForFunction(() => /No image prompt/.test(document.getElementById('storyScenes').textContent));
+      const before = (await called('add')).length;
+      await page.locator('#storyCommit').click();
+      assert.match(await page.locator('#toast').textContent(), /Every step needs an image prompt/);
+      assert.equal((await called('add')).length, before, 'chưa gọi thêm vào hàng đợi');
+      await image2.fill(keep);
+      await page.locator('#storyCommit').click();
+      await page.waitForFunction(n => window.calls.filter(c => c.name === 'add').length > n, before);
+      const add = (await called('add')).at(-1).data;
+      assert.deepEqual(add.map(j => [j.phase, j.number, j.dependsOn || '']), [['image', 1, ''], ['image', 2, ''], ['clip', 1, 'image'], ['clip', 2, 'image']]);
+      assert.ok(add.every(j => j.kind === 'story' && /^Truyen-\d{8}-\d{6}$/.test(j.storyId) && j.storyId === add[0].storyId));
+      assert.ok(add.slice(0, 2).every(j => /^Tạo ảnh chụp thật cận cảnh/.test(j.prompt) && !j.voiceover && !j.references?.length && !j.image), 'việc ảnh: prompt ảnh, không lời đọc, không ảnh tham chiếu');
+      assert.ok(add.slice(2).every(j => /^Bếp gỗ sáng\./.test(j.prompt) && !/\[\s*câu/i.test(j.prompt) && j.voiceover && j.durationSeconds >= 3 && !j.references?.length), 'việc clip: prompt chuyển động bỏ thẻ [câu N], có lời đọc, ảnh sẽ do hàng đợi gắn');
+      assert.deepEqual(add.map(j => j.title), ['Cảnh 1 · ảnh', 'Cảnh 2 · ảnh', 'Cảnh 1 · clip', 'Cảnh 2 · clip']);
+      // Ghép MP4 chỉ đếm clip (không đếm việc ảnh).
+      await page.evaluate(() => { window.s.jobs.filter(j => j.kind === 'story' && j.phase).forEach(j => { j.status = 'completed'; j.output = 'C:\\Videos\\KeChuyen\\x\\' + j.number + (j.phase === 'image' ? '.png' : '.mp4'); }); window.push(); });
+      await page.waitForFunction(() => /· 2\/2$/.test([...document.querySelectorAll('#storyPick option')].at(-1)?.textContent || ''));
+      assert.equal(await page.locator('#storyExport').isDisabled(), false, 'đủ clip (2/2, không tính 2 việc ảnh) thì xuất MP4 được');
+      // Đổi lại chế độ Kể chuyện: hỏi trước vì sẽ xóa cảnh, rồi ô ảnh biến mất.
+      await page.evaluate(() => { document.getElementById('storyPanel').open = true; });   // sau khi thêm vào hàng đợi khung được thu lại
+      await page.locator('#modeStory').click();
+      assert.equal(await page.locator('#storyRefRow').isVisible(), true);
+      assert.equal(await page.locator('#storyCreate').textContent(), '▶ Create clips');
+    }
     assert.deepEqual(errors, []);
     console.log('PASS: story tab — own jobs/counts/folder, Muse analysis + pasted Muse reply parsing (no-speech rule kept), no quick split, character image on every scene, free voice setup/listen/clone with consent, subtitles on/off + .srt + PNG captions, auto-edit report, export errors, persistence, English labels.');
   } finally { await browser.close(); server.close(); }
