@@ -23,7 +23,7 @@ jobs:
       - name: Compile, test, package and verify installed app
         shell: pwsh
         run: |
-          try { ./VocalStudio/scripts/build-windows.ps1 }
+          try { & './VocalStudio/scripts/build-windows.ps1' }
           catch {
             '### Windows build failure' | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
             '```text' | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
@@ -37,7 +37,7 @@ jobs:
       - name: Archive corresponding source
         shell: pwsh
         run: |
-          git archive --format=zip --output=dist/VocalStudio-1.7.0-Source.zip HEAD VocalStudio .github/workflows/vocal-studio-preview.yml
+          & git archive '--format=zip' '--output=dist/VocalStudio-1.7.0-Source.zip' HEAD 'VocalStudio' '.github/workflows/vocal-studio-preview.yml'
           if ($LASTEXITCODE -ne 0) { throw 'Source archive failed' }
           Get-ChildItem dist -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content dist/SHA256SUMS.txt -Encoding ascii
       - uses: actions/upload-artifact@v4
