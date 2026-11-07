@@ -61,20 +61,21 @@ void VocalChain::prepare(double sr) {
 }
 void VocalChain::reset() noexcept {
     envelope=essEnvelope=reduction=0;compression=1;levelPower=levelDb=harshPower=harshGain=roomPower=0;levelAmount=tameAmount=duckAmount=0;wetLevel=wetTarget;
-    for(auto& c:channels){ c.high.reset();c.warmth.reset();c.presence.reset();c.ess.reset();c.tame.reset();c.harsh.reset();c.echo.reset();c.preDelay.reset();for(auto& d:c.comb)d.reset();for(auto& d:c.allpass)d.reset();c.damping.fill(0);c.shortDamping.fill(0);for(auto& d:c.shortComb)d.reset();for(auto& d:c.shortAllpass)d.reset(); }
+    for(auto& c:channels){ c.hiddenTone.reset();c.high.reset();c.warmth.reset();c.presence.reset();c.ess.reset();c.tame.reset();c.harsh.reset();c.echo.reset();c.preDelay.reset();for(auto& d:c.comb)d.reset();for(auto& d:c.allpass)d.reset();c.damping.fill(0);c.shortDamping.fill(0);for(auto& d:c.shortComb)d.reset();for(auto& d:c.shortAllpass)d.reset(); }
 }
 void VocalChain::setParameters(const VocalParameters& value) noexcept {
     p=value;p.ratio=std::clamp(p.ratio,1.0f,12.0f);p.deEss=std::clamp(p.deEss,0.0f,1.0f);p.reverb=std::clamp(p.reverb,0.0f,.4f);p.delay=std::clamp(p.delay,0.0f,.3f);
     p.decaySeconds=std::clamp(p.decaySeconds,.3f,4.0f);p.damping=std::clamp(p.damping,.05f,.95f);p.width=std::clamp(p.width,0.0f,1.5f);p.delayFeedback=std::clamp(p.delayFeedback,0.0f,.65f);p.deharsh=std::clamp(p.deharsh,0.0f,1.0f);
     p.leveling=std::clamp(p.leveling,0.0f,1.0f);p.dynamicTame=std::clamp(p.dynamicTame,0.0f,1.0f);p.reverbDuck=std::clamp(p.reverbDuck,0.0f,1.0f);
     p.wetReturnDb=std::clamp(p.wetReturnDb,-12.0f,12.0f);wetTarget=dbToGain(p.wetReturnDb);
+    p.hiddenReverb=std::clamp(p.hiddenReverb,0.0f,.2f);
     p.shortReverb=std::clamp(p.shortReverb,0.0f,.4f);p.shortDecaySeconds=std::clamp(p.shortDecaySeconds,.15f,.9f);
     constexpr double shortTimes[4]={.011,.0137,.0173,.0199};for(int j=0;j<4;++j)shortFeedback[j]=static_cast<float>(std::pow(.001,shortTimes[j]/p.shortDecaySeconds));
     preDelaySamples=static_cast<std::size_t>(rate*std::clamp(p.preDelayMs,0.0f,100.0f)/1000);
     constexpr double combTimes[4]={.0297,.0371,.0411,.0437};for(int j=0;j<4;++j)roomFeedback[j]=static_cast<float>(std::pow(.001,combTimes[j]/p.decaySeconds));
     preGain=dbToGain(p.inputDb);makeup=dbToGain(p.makeupDb);
     delaySamples=static_cast<std::size_t>(rate*std::clamp(p.delayMs,40.0f,1500.0f)/1000);
-    for(auto& c:channels) { c.high.configure(Biquad::highPass,rate,p.highPassHz,.707);c.warmth.configure(Biquad::lowShelf,rate,240,.707,p.warmthDb);c.presence.configure(Biquad::peak,rate,3200,.8,p.presenceDb);c.ess.configure(Biquad::bandPass,rate,std::min(6800.0,rate*.35),1.1);c.tame.configure(Biquad::lowPass,rate,14000-9000*p.deharsh,.707);c.harsh.configure(Biquad::bandPass,rate,std::min(3500.0,rate*.3),.75); }
+    for(auto& c:channels) { c.hiddenTone.configure(Biquad::lowPass,rate,std::min(4500.0,rate*.35),.707);c.high.configure(Biquad::highPass,rate,p.highPassHz,.707);c.warmth.configure(Biquad::lowShelf,rate,240,.707,p.warmthDb);c.presence.configure(Biquad::peak,rate,3200,.8,p.presenceDb);c.ess.configure(Biquad::bandPass,rate,std::min(6800.0,rate*.35),1.1);c.tame.configure(Biquad::lowPass,rate,14000-9000*p.deharsh,.707);c.harsh.configure(Biquad::bandPass,rate,std::min(3500.0,rate*.3),.75); }
 }
 void VocalChain::process(float& left,float& right) noexcept {processDry(left,right);processAmbience(left,right);}
 void VocalChain::processDry(float& left, float& right) noexcept {
@@ -124,7 +125,7 @@ void VocalChain::processAmbience(float& left,float& right) noexcept {
 
     }
     const float middle=(wet[0]+wet[1])*.5f,side=(wet[0]-wet[1])*.5f*p.width;
-    left=shortWet[0]*p.shortReverb*wetGain+drySignal[0]*(1-p.reverb*.3f)+(middle+side)*p.reverb*wetGain+echoWet[0]*p.delay*wetGain;right=shortWet[1]*p.shortReverb*wetGain+drySignal[1]*(1-p.reverb*.3f)+(middle-side)*p.reverb*wetGain+echoWet[1]*p.delay*wetGain;
+    left=(shortWet[0]*p.shortReverb+channels[0].hiddenTone.tick(shortWet[0])*p.hiddenReverb)*wetGain+drySignal[0]*(1-p.reverb*.3f)+(middle+side)*p.reverb*wetGain+echoWet[0]*p.delay*wetGain;right=(shortWet[1]*p.shortReverb+channels[1].hiddenTone.tick(shortWet[1])*p.hiddenReverb)*wetGain+drySignal[1]*(1-p.reverb*.3f)+(middle-side)*p.reverb*wetGain+echoWet[1]*p.delay*wetGain;
 }
 void MusicDucker::prepare(double sr) noexcept{
     sr=std::clamp(sr,8000.0,384000.0);

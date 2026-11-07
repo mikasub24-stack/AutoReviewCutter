@@ -11,7 +11,7 @@ struct VocalParameters {
     bool bypass = false;
     float inputDb = 0, highPassHz = 80, warmthDb = -2, presenceDb = 2;
     float thresholdDb = -18, ratio = 3, makeupDb = 2, deEss = .35f;
-    float shortReverb=0,shortDecaySeconds=.45f;
+    float hiddenReverb=0,shortReverb=0,shortDecaySeconds=.45f;
     float reverb = .10f, delay = .04f, delayMs = 240;
     float leveling=0,dynamicTame=0,reverbDuck=0,wetReturnDb=0;
     float decaySeconds=1.2f,preDelayMs=20,damping=.65f,width=1,delayFeedback=.27f,deharsh=0;
@@ -51,7 +51,7 @@ public:
     float gainReductionDb() const noexcept { return reduction; }
 private:
     struct Channel {
-        Biquad high, warmth, presence, ess, tame, harsh;
+        Biquad high, warmth, presence, ess, tame, harsh, hiddenTone;
         Delay echo,preDelay;
         std::array<Delay, 4> comb,shortComb;
         std::array<float, 4> damping {},shortDamping {};

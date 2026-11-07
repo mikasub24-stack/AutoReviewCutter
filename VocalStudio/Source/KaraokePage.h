@@ -17,13 +17,13 @@ public:
 private:
     StudioMain& owner;YouTubeBrowser browser;
     juce::TextEditor search;
-    juce::TextButton open,back,home,down,up,reset,advanced,devices,fx,antares,loadPlugin,mic,record,softReverb,autoEq,polish,fixTune,livePreset,loadReverb,editReverb,removeReverb,saveVoice,scanTune,scanEq,scanReverb,editEq,removeEq,lowLatency,enableTune,smoothPreset;
-    juce::Label reverbPluginMixLabel,monitorHint,title,offset,key,musicLabel,micLabel,reverbLabel,delayLabel,monitorLabel,shortLabel,compressionLabel,colourLabel,duckLabel;
+    juce::TextButton open,back,home,down,up,reset,advanced,devices,fx,antares,loadPlugin,mic,record,autoEq,polish,fixTune,livePreset,loadReverb,editReverb,removeReverb,saveVoice,scanTune,scanEq,scanReverb,editEq,removeEq,lowLatency,enableTune,smoothPreset;
+    juce::Label reverbPluginMixLabel,monitorHint,title,offset,key,musicLabel,micLabel,reverbLabel,delayLabel,monitorLabel,shortLabel,compressionLabel,colourLabel,duckLabel,phonesLabel,hiddenLabel;
     juce::TextEditor status;
     juce::Viewport sidebar;juce::Component controls;
     juce::ComboBox input,colour;
     juce::AudioPluginInstance* lastPlugin=nullptr;
-    juce::Slider music,micGain,reverb,delay,monitorLevel,shortRoom,compression,reverbMix,musicDuck;
+    juce::Slider music,micGain,reverb,delay,monitorLevel,shortRoom,compression,reverbMix,musicDuck,phonesLevel,hiddenRoom;
     juce::ComboBox keySelect,scaleSelect;
     juce::ToggleButton autoKey,keepPluginKey;
     std::uint64_t revision=~std::uint64_t(0);int lastKey=-2;bool lastMinor=false;

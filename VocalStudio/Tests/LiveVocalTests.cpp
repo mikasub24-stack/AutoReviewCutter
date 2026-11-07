@@ -6,9 +6,9 @@
 namespace {
 void check(bool value,const char* message){if(!value)throw std::runtime_error(message);}
 struct Tail {double early=0,late=0;};
-Tail tail(float shortMix,float longMix,float returnDb=0){
+Tail tail(float shortMix,float longMix,float returnDb=0,float hiddenMix=0){
     vocal::VocalChain chain;chain.prepare(48000);vocal::VocalParameters p;
-    p.wetReturnDb=returnDb;p.shortReverb=shortMix;p.shortDecaySeconds=.4f;p.reverb=longMix;p.decaySeconds=2;p.delay=0;
+    p.hiddenReverb=hiddenMix;p.wetReturnDb=returnDb;p.shortReverb=shortMix;p.shortDecaySeconds=.4f;p.reverb=longMix;p.decaySeconds=2;p.delay=0;
     chain.setParameters(p);Tail result;
     for(int i=0;i<48000*4;++i){float l=i==0?.5f:0,r=l;chain.processAmbience(l,r);
         check(std::isfinite(l)&&std::isfinite(r)&&std::abs(l)<1&&std::abs(r)<1,"finite bounded reverb impulse");
@@ -37,6 +37,7 @@ int main(){try{
         check(gain==1,"quiet noise does not duck backing");
         for(int i=0;i<1000;++i)check(duck.process(.2f,.2f,0)==1,"legacy disabled mode is unity");
     }
+    const auto hidden=tail(0,0,0,.15f);check(hidden.early>1e-10&&hidden.late<hidden.early*.0001,"hidden ambience produces a short return without a long tail");
     vocal::VocalChain chain;chain.prepare(48000);auto p=vocal::preset(5);p.reverb=p.shortReverb=p.delay=0;chain.setParameters(p);
     for(int i=0;i<48000;++i){float l=.3f*static_cast<float>(std::sin(2*vocal::pi*220*i/48000)),r=l;chain.processDry(l,r);}
     check(chain.gainReductionDb()>3,"live singing preset applies noticeable compression");

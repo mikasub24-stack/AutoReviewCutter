@@ -19,15 +19,16 @@ int StudioMain::persistenceProbe(const juce::String& mode){
             auto* active=slot==0?engine.pluginInstance():slot==1?engine.eqPluginInstance():engine.reverbPluginInstance();
             if(active)active->getParameters()[0]->setValue(values[slot]);
         }
-        engine.smoothLivePreset();
-        check(engine.pluginInstance()&&std::abs(engine.pluginInstance()->getParameters()[0]->getValue()-.31f)<.0001f,"smooth preset changed tuner controls");
-        check(engine.eqPluginInstance()&&std::abs(engine.eqPluginInstance()->getParameters()[0]->getValue()-.47f)<.0001f,"smooth preset changed EQ plugin controls");
-        check(engine.reverbPluginInstance()&&std::abs(engine.reverbPluginInstance()->getParameters()[0]->getValue()-.63f)<.0001f,"smooth preset changed reverb plugin controls");
-        engine.monitorDb=7;engine.shortReverb=.15f;engine.wetReturnDb=5;engine.musicDuckingDb=2.5f;engine.masterDb=-2;
+        engine.basicLivePreset();
+        check(engine.pluginInstance()&&std::abs(engine.pluginInstance()->getParameters()[0]->getValue()-.31f)<.0001f,"basic preset changed tuner controls");
+        check(engine.eqPluginInstance()&&std::abs(engine.eqPluginInstance()->getParameters()[0]->getValue()-.47f)<.0001f,"basic preset changed EQ plugin controls");
+        check(engine.reverbPluginInstance()&&std::abs(engine.reverbPluginInstance()->getParameters()[0]->getValue()-.63f)<.0001f,"basic preset changed reverb plugin controls");
+        engine.monitorDb=7;engine.shortReverb=.15f;engine.wetReturnDb=5;engine.musicDuckingDb=2.5f;engine.headphoneDb=2;engine.hiddenReverb=.035f;engine.masterDb=-2;
     }else{
         auto* tune=engine.pluginInstance();auto* eq=engine.eqPluginInstance();auto* verb=engine.reverbPluginInstance();
         const bool recovery=mode=="recovery";
         check(recovery?(!tune&&!eq&&!verb):(tune&&verb),"startup lost expected plugin slots");
+        check(std::abs(engine.headphoneDb.load()-2)<.001f&&std::abs(engine.hiddenReverb.load()-.035f)<.001f,"headphone/hidden room settings lost on restart");
         check(std::abs(engine.wetReturnDb.load()-5)<.001f&&std::abs(engine.musicDuckingDb.load()-2.5f)<.001f,"ambience return or music duck setting lost on app restart");
         if(!recovery){
             check(mode=="missing-eq"?!eq:eq!=nullptr,"EQ restore availability mismatch");

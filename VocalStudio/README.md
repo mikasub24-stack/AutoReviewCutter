@@ -245,21 +245,28 @@ resolution of browser reputation warnings. Icon assets are original project work
 and distributed under the project's license.
 
 
-### 1.9.3 — smooth live vocal and clearer vocal/music balance
+### 1.9.4 — basic vocal balance, headphone level and manual ambience
 
-**Mượt giọng · Vang ngân** is an optional listening preset. It preserves mic gain,
-personal tone EQ and vendor plugin controls, sets gentle compression/leveling and
-dynamic harshness reduction, and adds a 2.3 s built-in reverb with 40 ms pre-delay.
-A separate +6 dB wet-return control raises ambience without boosting the dry vocal
-or altering the feedback decay. External reverb stays loaded with a 15% insert
-crossfade to retain a clear direct vocal. The preset caps backing gain at 0.6.
+**Cân giọng · Nén rõ** keeps personal tone EQ, mic gain and vendor plugin controls,
+sets gentle compression/leveling and dynamic taming, and uses the original Clean
+preset's built-in ambience without the new +6 dB wet-return boost. External reverb
+stays selected with mix 0 (DSP and its latency are skipped), allowing manual
+re-enabling without losing vendor settings. Backing gain is capped at 0.65 and
+headphone trim is raised to at least +3 dB, with the output peak limiter retained.
+Headphone trim applies only to monitoring, not dry recordings or offline exports.
 
-**Nhạc lùi khi hát** reduces backing by up to the chosen 0–6 dB (3 dB in the new
-preset), using the pre-ambience vocal as sidechain, with a 30 ms attack and 450 ms
-release. This is level-based ducking, not speech recognition. It only runs for
-live microphone monitoring, is disabled during calibration, auditions and offline
-exports, and adds no delay/lookahead. Reverb tails do not hold music down. Select
-the real mic input rather than a music loopback. Existing sessions default to 0 dB
-music duck and 0 dB wet-return trim; changes persist through saves and recovery.
-The original natural preset remains available. This is not a voice-specific mix
-verified by listening to the user's recording.
+The main page has independent sliders for **Vang ẩn**, **Vang ngắn**, **Vang dài /
+Reverb**, **Delay / Echo** and external reverb mix. Hidden ambience is a darker
+filtered branch of the short-room return, sharing its decay setting; it is not an
+additional vendor plugin. New controls persist through restart and recovery.
+
+**Nhạc lùi khi hát** lowers backing by up to 0–6 dB (3 dB in the basic preset),
+using the pre-ambience vocal as sidechain with 30 ms attack / 450 ms release. It
+adds no lookahead or audio delay, only applies to live mic monitoring, and is off
+during calibration, auditions and offline export. This is level-based ducking,
+not voice recognition; use a real mic input, not a music loopback. Project decoding defaults missing duck/phones/hidden fields to zero. On the first
+normal app launch after upgrading, basic balance is applied once; later launches
+retain the user's saved faders and do not reapply the preset. Recovery skips that
+one-time initialization.
+The older singing preset remains available lower in the panel. This is not a
+voice-specific mix verified by listening to the user's recording.

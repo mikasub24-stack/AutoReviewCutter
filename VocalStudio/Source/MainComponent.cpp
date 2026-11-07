@@ -79,7 +79,15 @@ StudioMain::StudioMain(bool recoveryMode):canvas(*this){setLookAndFeel(&look);se
     }
     pluginLabel.setText(engine.pluginName(),juce::dontSendNotification);
     startupLoading=false;
-    if(deviceError.isNotEmpty())status(juce::String::fromUTF8("Chọn sound card và ngõ micro trong Sound card."));loadVoicePreference();syncKnobs();if(recoveryMode)status(juce::String::fromUTF8("PHỤC HỒI: tạm không nạp plugin ngoài. Lựa chọn và thiết lập đã lưu vẫn còn nguyên; bản thu vẫn được giữ."));setSize(1320,1000);addAndMakeVisible(quickButton);quickButton.onClick=[this]{showQuickMode(true);};showQuickMode(true);startTimerHz(30);
+    if(deviceError.isNotEmpty())status(juce::String::fromUTF8("Chọn sound card và ngõ micro trong Sound card."));loadVoicePreference();syncKnobs();if(recoveryMode)status(juce::String::fromUTF8("PHỤC HỒI: tạm không nạp plugin ngoài. Lựa chọn và thiết lập đã lưu vẫn còn nguyên; bản thu vẫn được giữ."));setSize(1320,1000);addAndMakeVisible(quickButton);quickButton.onClick=[this]{showQuickMode(true);};showQuickMode(true);
+    // Apply the requested basic balance once on upgrade, then leave every saved
+    // fader and vendor plugin control alone on subsequent launches.
+    if(!recoveryMode&&!prefs->getBoolValue("basicBalance194Applied",false)){
+        engine.basicLivePreset();prefs->setValue("basicBalance194Applied",true);
+        if(save())status(juce::String::fromUTF8("Đã đặt cân giọng cơ bản: nén rõ, tai nghe +3 dB, không thêm vang plugin. Kéo các thanh vang để chỉnh; lần mở sau giữ cấu hình đã lưu."));
+        else prefs->removeValue("basicBalance194Applied");
+    }
+    startTimerHz(30);
 }
 StudioMain::~StudioMain(){cancelAutoEq();eqPluginWindow.reset();reverbWindow.reset();tuneFixWindow.reset();polishWindow.reset();eqWindow.reset();karaoke.reset();stopTimer();cancelExport.store(true);jobs.removeAllJobs(true,-1);if(engine.isRecording()){juce::File f;double start=0;engine.finishRecording(f,start);}toolsWindow.reset();deviceWindow.reset();pluginWindow.reset();persistDeviceSettings();setLookAndFeel(nullptr);}
 void StudioMain::addKnob(int index,const juce::String& title,std::atomic<float>& value,double lo,double hi,double step,const juce::String& suffix){auto k=std::make_unique<Knob>();k->value=&value;k->label.setText(title,juce::dontSendNotification);k->label.setFont(12);k->label.setJustificationType(juce::Justification::centred);k->slider.setRange(lo,hi,step);k->slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);k->slider.setTextBoxStyle(juce::Slider::TextBoxBelow,false,66,21);k->slider.setTextValueSuffix(suffix);auto* ptr=k.get();k->slider.onValueChange=[ptr]{ptr->value->store(static_cast<float>(ptr->slider.getValue()));};addAndMakeVisible(k->label);addAndMakeVisible(k->slider);knobs[static_cast<std::size_t>(index)]=std::move(k);}

@@ -86,7 +86,7 @@ public:
     juce::Result setSongKey(int tonic,bool minor,const juce::String& source);
     juce::Result sendSongKey();
     void scanToneLink();
-    int effectivePluginLatency() const noexcept {return calibrationInputOnly.load()?0:(pluginBypassed.load()?0:pluginLatency.load())+reverbPluginLatency.load()+eqPluginLatency.load();}
+    int effectivePluginLatency() const noexcept {return calibrationInputOnly.load()?0:(pluginBypassed.load()?0:pluginLatency.load())+(reverbPluginMix.load()>0?reverbPluginLatency.load():0)+eqPluginLatency.load();}
     juce::Result installEqPlugin(std::unique_ptr<juce::AudioPluginInstance>);
     void removeEqPlugin();
     juce::AudioPluginInstance* eqPluginInstance() const noexcept{return eqPlugin.get();}
@@ -103,7 +103,7 @@ public:
     void selectPreset(int index);
     void studioPolish();
     void liveVocalPreset();
-    void smoothLivePreset();
+    void basicLivePreset();
     void setVoiceColour(int);
     juce::Result restoreSetup(const juce::var&);
     vocal::VocalParameters vocalSettings() const noexcept {return parameters();}
@@ -121,7 +121,7 @@ public:
     std::atomic<bool> monitor{false},fxBypass{false},latencyCompensation{true};
     std::atomic<int> inputChannel{0},recordingFault{0};
     std::atomic<float> inputDb{0},highPass{80},warmth{-2},presence{2},threshold{-18},ratio{3},makeup{2},deEss{.35f},reverb{.10f},delay{.04f},delayMs{240},masterDb{-3},manualOffsetMs{0};
-    std::atomic<float> wetReturnDb{0},musicDuckingDb{0},musicDuckReduction{0};
+    std::atomic<float> wetReturnDb{0},musicDuckingDb{0},musicDuckReduction{0},headphoneDb{0},hiddenReverb{0};
     std::atomic<float> reverbPluginMix{.2f};
     std::atomic<float> monitorDb{0},shortReverb{0},shortDecaySeconds{.45f};
     std::atomic<float> leveling{0},dynamicTame{0},reverbDuck{0};
@@ -166,7 +166,7 @@ private:
     std::array<vocal::Delay,2> musicDelay,reverbDryDelay;
     juce::File sessionDirectory,recordFile;
     double recordStart=0;
-    float currentReverbMix=.2f,currentMonitor=1,currentMaster=1,smoothing=.001f;
+    float currentReverbMix=.2f,currentPhones=1,currentMonitor=1,currentMaster=1,smoothing=.001f;
     bool callbackAttached=false,offline=false,testMode=false,heldForUnknownKey=false;
     std::atomic<bool> suspending{false};
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StudioEngine)

@@ -15,7 +15,7 @@ int runStudioSelfTests(const juce::String& commandLine);
 class VocalStudioApplication final : public juce::JUCEApplication {
 public:
     const juce::String getApplicationName() override {return "VocalStudio";}
-    const juce::String getApplicationVersion() override {return "1.9.3";}
+    const juce::String getApplicationVersion() override {return "1.9.4";}
     bool moreThanOneInstanceAllowed() override {return false;}
     void initialise(const juce::String& commandLine) override {
         juce::File::getCurrentWorkingDirectory().getChildFile("BrowserStartup.log").appendText("JUCE initialise\n");
