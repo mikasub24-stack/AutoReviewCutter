@@ -518,7 +518,7 @@ app.whenReady().then(async () => {
   mergedOutput = stored.mergedOutput || ''; mergeError = stored.mergeError || '';
   editPackageDir = stored.editPackageDir || ''; packageError = stored.packageError || '';
   queue = new Queue({ jobs: stored.jobs || [], save, run: runJob, notify });
-  voiceService=createVoiceService({dataDir:app.getPath('userData'),getFfmpeg:()=>settings.ffmpeg,notify});await voiceService.load();
+  voiceService=createVoiceService({dataDir:app.getPath('userData'),getFfmpeg:()=>settings.ffmpeg,notify});await voiceService.load();voiceService.refreshCatalog().catch(()=>{});
   storyService=createStoryService({getSettings:()=>settings,getJobs:()=>queue.jobs,voice:voiceService,ensureAllowed:()=>licenseManager.ensureAllowed(),notify,userDataDir:app.getPath('userData')});
   storyAnalyzer=createStoryAnalyzer({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.ensureAllowed()});
   await save();
@@ -537,7 +537,8 @@ app.whenReady().then(async () => {
   const handlers = {
     state: () => snapshot(),
     // Tab «Kể chuyện»: giọng miễn phí + ghép MP4.
-    storySetupVoice:async()=>{voiceService.setup().catch(()=>{}).finally(notify);notify();return snapshot();},
+    storySetupVoice:async()=>{voiceService.setup().then(()=>voiceService.refreshCatalog()).catch(()=>{}).finally(notify);notify();return snapshot();},
+    storyRefreshVoices:async()=>{await voiceService.refreshCatalog({force:true});return snapshot();},
     storyCancelSetup:async()=>{voiceService.cancelSetup();return snapshot();},
     storyWindowsVoices:async()=>{await voiceService.listWindowsVoices();return snapshot();},
     storyAddVoice:async data=>{

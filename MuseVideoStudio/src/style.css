@@ -302,6 +302,7 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .chip:hover { border-color: #52647f; background: #24344a; }
 .chip[aria-pressed="true"] { border-color: #49d8ca; background: #17403f; color: #bff3ec; }
 .adWrite { margin-top: 14px; }
+.adWrite #autoRestart { margin-left: 8px; }
 #storyCompose.adMode { display: flex; flex-direction: column; }
 #storyCompose.adMode .storyModes { order: -5; align-self: flex-start; }
 #storyCompose.adMode #storyRefRow, #storyCompose.adMode #storyRefPaste, #storyCompose.adMode #storyRefInfo { order: -4; }

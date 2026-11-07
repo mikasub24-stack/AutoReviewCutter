@@ -142,6 +142,14 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.6.2
+
+- **Sửa lỗi «Làm tự động» bắt đầu lại từ đầu khi đang dừng giữa chừng:** trước đây dừng ở bước tạo ảnh rồi bấm lại thì app viết lại bài, chia lại cảnh và **thêm một lượt nữa vào hàng đợi (việc gấp đôi)**. Nay nút đổi thành **«▶ Chạy tiếp»** và làm tiếp đúng bước đang dừng: dừng ở tạo ảnh/clip thì chỉ chạy lại hàng đợi (các cảnh lỗi hoặc bị dừng chạy lại, cảnh đã xong giữ nguyên) rồi tự xuất MP4; clip xong hết mà chưa xuất thì chỉ xuất lại; dừng ở chia cảnh thì giữ bài đã viết và chỉ chia cảnh (không viết lại). Bấm «Chạy tiếp» nhiều lần cũng **không thêm trùng** việc vào hàng đợi. Bước đang dừng được nhớ cả khi tắt và mở lại app (theo đúng tên cây đang nhập).
+- **«Làm lại từ đầu»:** nút riêng, chỉ hiện khi có việc dở; có hỏi lại vì viết bài mới và thêm một lượt mới vào hàng đợi sẽ tốn thêm lượt Muse (lượt dở cũ vẫn nằm trong hàng đợi).
+- **Thấy được lý do dừng:** khi dừng, thanh tiến trình hiện thêm một dòng lý do thật (ví dụ Muse báo hết lượt, chia cảnh lỗi, clip lỗi) thay vì chỉ «Đã dừng».
+- **Thêm nhiều giọng đọc:** chuyển từ bản Anim sang: **toàn bộ giọng Microsoft miễn phí** (khoảng 200+ giọng, hơn 70 ngôn ngữ; danh sách mới nhất lấy trực tiếp từ Microsoft khi có mạng, lưu 3 ngày, có sẵn bản dự phòng khi không có mạng; nút làm mới danh sách) và **25 giọng Việt có sẵn của VieNeu** (không cần mẫu giọng). Danh sách giọng chia nhóm theo ngôn ngữ. Giọng Azure trả phí của Anim **chưa** chuyển sang.
+- Lưu ý thật: test chỉ chạy với trang chat giả, máy chủ cục bộ, Electron giả và ffmpeg thật; **chưa thử với Muse thật, Edge TTS/VieNeu thật hay máy Windows thật.** Việc «chạy tiếp» dựa trên trạng thái hàng đợi của app; nếu Muse trả lỗi lạ thì dòng lý do sẽ hiện nguyên văn để bạn biết.
+
 ## Update 1.6.1
 
 - **Cây trồng phát triển chạy hoàn toàn tự động:** gõ tên cây (tiếng Việt hoặc tiếng Anh đều được; lời đọc, phụ đề và prompt mặc định bằng **tiếng Anh**) rồi bấm một nút **«Làm tự động»**. Muse viết bài → chia cảnh → thêm vào hàng đợi → tạo ảnh + clip từng cảnh → khi mọi clip xong, app tự **«Xuất MP4»** (giọng đọc, phụ đề, nối cảnh như nút Xuất MP4). Không còn hộp xác nhận ở giữa. Chỉ hiện **một thanh tiến trình %** gọn; bài, danh sách cảnh và nút phân tích được ẩn (tỉ lệ khung hình và phong cách nằm trong «Tùy chọn thêm»). Bỏ tick «Tự động làm hết» nếu muốn xem lại từng bước như trước.

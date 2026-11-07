@@ -66,7 +66,15 @@ async function fakeLibs(dir) {
   const libs = path.join(dir, 'fakelibs');
   await fs.mkdir(libs, { recursive: true });
   await fs.writeFile(path.join(libs, 'edge_tts.py'), `
-import wave, struct
+import wave, struct, os
+async def list_voices():
+    if os.environ.get('FAKE_VOICES_FAIL'):
+        raise RuntimeError('mạng lỗi')
+    rows = [dict(ShortName='vi-VN-HoaiMyNeural', Gender='Female', Locale='vi-VN', Status='GA'), dict(ShortName='vi-VN-NamMinhNeural', Gender='Male', Locale='vi-VN', Status='GA'),
+            dict(ShortName='fr-CA-SylvieNeural', Gender='Female', Locale='fr-CA', Status='GA'), dict(ShortName='zh-TW-HsiaoChenNeural', Gender='Female', Locale='zh-TW', Status='GA'),
+            dict(ShortName='en-US-AvaMultilingualNeural', Gender='Female', Locale='en-US', Status='GA'), dict(ShortName='xx-YY-CuNeural', Gender='Male', Locale='xx-YY', Status='Deprecated')]
+    rows += [dict(ShortName='en-GB-Fake%dNeural' % i, Gender='Male' if i % 2 else 'Female', Locale='en-GB', Status='GA') for i in range(25)]
+    return rows
 class Communicate:
     def __init__(self, text, voice):
         self.text, self.voice = text, voice
@@ -83,11 +91,12 @@ class Vieneu:
     sample_rate = 48000
     def __init__(self, *a, **k):
         self.voices = {}
+        self.mode = k.get('mode')
     def add_voice(self, name, ref):
         if not os.path.exists(ref): raise FileNotFoundError(ref)
         self.voices[name] = ref
     def infer(self, text, voice=None, ref_audio=None, denoise=False):
-        assert voice in self.voices or ref_audio, 'thiếu giọng'
+        assert voice in self.voices or ref_audio or (self.mode == 'v3turbo' and voice in ('Thiện Minh', 'Mai Anh', 'Adam bựa')), 'thiếu giọng'
         assert len(text) <= 200, 'đoạn quá dài: %d' % len(text)
         return np.full(int(48000 * 0.03 * len(text)), 0.2, dtype=np.float32)
     def save(self, audio, path):
@@ -119,6 +128,102 @@ test('giọng Microsoft (edge): đọc nhiều cảnh, báo tiến độ, thử 
   assert.ok(progress.includes('Đã đọc 2/2 cảnh'));
   await assert.rejects(() => svc.synth({ engine: 'edge', voice: 'vi-VN-HoaiMyNeural', items: [{ id: '1', text: 'LOI' }], dir: path.join(dir, 'run2') }), /Microsoft không trả giọng đọc.*403/);
   await assert.rejects(() => svc.synth({ engine: 'edge', voice: 'giong-la', items: [{ id: '1', text: 'a' }], dir: path.join(dir, 'run3') }), /Chọn một giọng Microsoft/);
+});
+
+test('giọng Microsoft: bản dự phòng có hơn 70 ngôn ngữ, Việt rồi Anh đứng đầu; danh sách thật được lọc và xếp theo ngôn ngữ', () => {
+  assert.ok(v.EDGE_VOICES.length >= 190, 'số giọng dự phòng: ' + v.EDGE_VOICES.length);
+  assert.ok(new Set(v.EDGE_VOICES.map(x => x.language)).size >= 70, 'số nhóm ngôn ngữ');
+  assert.deepEqual(v.EDGE_VOICES.slice(0, 2).map(x => [x.id, x.name, x.lang, x.language]), [['vi-VN-HoaiMyNeural', 'Hoài My (nữ)', 'vi', 'Tiếng Việt'], ['vi-VN-NamMinhNeural', 'Nam Minh (nam)', 'vi', 'Tiếng Việt']]);
+  assert.ok(v.EDGE_VOICES.some(x => x.id === 'en-US-AriaNeural' && x.lang === 'en'));
+  assert.ok(v.EDGE_VOICES.some(x => x.id === 'zh-TW-HsiaoChenNeural' && x.lang === 'zh' && /phồn thể/.test(x.language)), 'Trung phồn thể so khớp với tiếng Trung');
+  assert.ok(v.EDGE_VOICES.some(x => x.lang === '*' && /Multilingual/.test(x.id)), 'có nhóm giọng đa ngôn ngữ');
+  assert.equal(new Set(v.EDGE_VOICES.map(x => x.id)).size, v.EDGE_VOICES.length, 'không trùng giọng');
+  const rows = [
+    { ShortName: 'en-US-AvaMultilingualNeural', Gender: 'Female', Locale: 'en-US', Status: 'GA' }, { ShortName: 'fr-CA-SylvieNeural', Gender: 'Female', Locale: 'fr-CA', Status: 'GA' },
+    { ShortName: 'zh-TW-HsiaoChenNeural', Gender: 'Female', Locale: 'zh-TW', Status: 'GA' }, { ShortName: 'vi-VN-NamMinhNeural', Gender: 'Male', Locale: 'vi-VN', Status: 'GA' },
+    { ShortName: 'xx-YY-CuNeural', Gender: 'Male', Locale: 'xx-YY', Status: 'Deprecated' }, { ShortName: 'sw-KE-ZuriNeural', Gender: 'Female', Locale: 'sw-KE', Status: 'GA' },
+    { ShortName: 'zz-ZZ-LaNeural', Gender: 'Male', Locale: 'zz-ZZ' }, { ShortName: 'hỏng', Gender: 'Male', Locale: 'en-US' }, { ShortName: 'en-US-NoGender', Locale: 'en-US' },
+    ...Array.from({ length: 25 }, (_, i) => ({ ShortName: `en-GB-Fake${i}Neural`, Gender: i % 2 ? 'Male' : 'Female', Locale: 'en-GB', Status: 'GA' }))
+  ];
+  const list = v.buildEdgeVoices([...rows, rows[3]]);
+  assert.equal(list[0].id, 'vi-VN-NamMinhNeural', 'tiếng Việt đứng đầu');
+  assert.equal(list[1].lang, 'en', 'rồi tiếng Anh');
+  assert.equal(list.at(-1).id, 'en-US-AvaMultilingualNeural', 'nhóm đa ngôn ngữ xếp cuối cùng');
+  assert.equal(list.at(-1).lang, '*');
+  assert.equal(list.at(-2).id, 'zz-ZZ-LaNeural', 'ngôn ngữ lạ xếp trước nhóm đa ngôn ngữ');
+  assert.ok(!list.some(x => x.id === 'xx-YY-CuNeural'), 'giọng ngừng hỗ trợ bị bỏ');
+  assert.ok(!list.some(x => x.id === 'hỏng' || x.id === 'en-US-NoGender'), 'dòng hỏng bị bỏ');
+  assert.equal(list.filter(x => x.id === 'vi-VN-NamMinhNeural').length, 1, 'không trùng');
+  const fr = list.find(x => x.id === 'fr-CA-SylvieNeural');
+  assert.deepEqual([fr.lang, fr.language, fr.name], ['fr', 'Tiếng Pháp', 'Sylvie (nữ) · fr-CA']);
+  assert.equal(list.find(x => x.id === 'zz-ZZ-LaNeural').language, 'zz-ZZ', 'ngôn ngữ chưa có tên thì ghi mã vùng');
+  assert.deepEqual(v.buildEdgeVoices(rows.slice(0, 6)), [], 'danh sách quá ngắn (lỗi tải) không được tin');
+  assert.deepEqual(v.buildEdgeVoices(null), []);
+});
+
+test('danh sách giọng thật từ Microsoft: tải, lưu, dùng được giọng chỉ có trong danh sách thật; lỗi thì giữ danh sách cũ', { skip: !(hasFfmpeg && hasNumpy) && 'cần ffmpeg + python3 + numpy' }, async t => {
+  const dir = await temp(t);
+  const svc = await readyService(dir, await fakeLibs(dir));
+  assert.deepEqual([svc.status().catalog.live, svc.status().edgeVoices.length], [false, v.EDGE_VOICES.length], 'chưa tải thì dùng bản dự phòng');
+  await assert.rejects(() => svc.synth({ engine: 'edge', voice: 'fr-CA-SylvieNeural', items: [{ id: '1', text: 'a' }], dir: path.join(dir, 'a') }), /Chọn một giọng Microsoft/);
+  await svc.refreshCatalog({ force: true });
+  const st = svc.status();
+  assert.equal(st.catalog.live, true); assert.equal(st.catalog.busy, false); assert.equal(st.catalog.error, '');
+  assert.equal(st.catalog.count, st.edgeVoices.length);
+  assert.ok(st.edgeVoices.some(x => x.id === 'fr-CA-SylvieNeural'), 'giọng mới từ Microsoft có trong danh sách');
+  assert.equal(st.edgeVoices[0].lang, 'vi');
+  const saved = JSON.parse(await fs.readFile(path.join(dir, 'ms-voices.json'), 'utf8'));
+  assert.ok(saved.rows.length >= 30 && saved.at > 0, 'danh sách đã lưu');
+  const [one] = await svc.synth({ engine: 'edge', voice: 'fr-CA-SylvieNeural', items: [{ id: '1', text: 'Bonjour tout le monde' }], dir: path.join(dir, 'b') });
+  assert.ok(one.seconds > 0.3);
+  const again = v.createVoiceService({ dataDir: dir, platform: 'linux' });
+  const loaded = await again.load();
+  assert.equal(loaded.catalog.live, true, 'mở lại app vẫn dùng danh sách đã lưu');
+  assert.ok(loaded.edgeVoices.some(x => x.id === 'fr-CA-SylvieNeural'));
+  // Không ép tải khi danh sách còn mới: không chạy gì (đặt lỗi giả mà vẫn không báo lỗi).
+  process.env.FAKE_VOICES_FAIL = '1';
+  t.after(() => { delete process.env.FAKE_VOICES_FAIL; });
+  const fresh = await svc.refreshCatalog();
+  assert.equal(fresh.catalog.error, '', 'còn mới nên không tải lại');
+  await assert.rejects(() => svc.refreshCatalog({ force: true }), /Chưa tải được danh sách giọng Microsoft \(.*mạng lỗi.*\)\. Đang dùng danh sách có sẵn\./);
+  assert.match(svc.status().catalog.error, /Chưa tải được danh sách giọng Microsoft/);
+  assert.equal(svc.status().catalog.live, true, 'lỗi tải thì giữ danh sách đã có');
+  assert.equal(svc.status().catalog.busy, false);
+});
+
+test('danh sách giọng thật: chưa cài giọng Microsoft thì không tải (ép tải báo rõ)', async t => {
+  const dir = await temp(t);
+  const svc = v.createVoiceService({ dataDir: dir, platform: 'linux', runner: async () => { throw Error('không được chạy'); } });
+  await svc.load();
+  assert.equal((await svc.refreshCatalog()).catalog.live, false);
+  await assert.rejects(() => svc.refreshCatalog({ force: true }), /Chưa cài giọng Microsoft/);
+});
+
+test('giọng Việt có sẵn VieNeu: 25 giọng, đọc không cần file mẫu, nghe thử, chọn sai hoặc chưa cài thì báo; helper luôn là bản mới', { skip: !(hasFfmpeg && hasNumpy) && 'cần ffmpeg + python3 + numpy' }, async t => {
+  const dir = await temp(t);
+  const svc = await readyService(dir, await fakeLibs(dir));
+  const presets = svc.status().presets;
+  assert.equal(presets.length, 25);
+  assert.deepEqual(presets[0], { name: 'Adam bựa', desc: 'Nam · Bắc · Phong cách tự nhiên', gender: 'm', region: 'Bắc' });
+  assert.deepEqual([...new Set(presets.map(p => p.region))].sort(), ['Bắc', 'Nam', 'Trung']);
+  assert.ok(presets.some(p => p.name === 'Thiện Minh') && presets.some(p => p.name === 'Mai Anh'));
+  await fs.writeFile(path.join(dir, 'voice_helper.py'), 'raise SystemExit(5)\n');   // bản cũ của lần cài trước
+  const progress = [];
+  const [one] = await svc.synth({ engine: 'preset', voice: 'Thiện Minh', items: [{ id: '1', text: 'Xin chào các bạn. Hôm nay trời đẹp lắm.' }], dir: path.join(dir, 'p'), onProgress: m => progress.push(m) });
+  assert.ok(one.seconds > 0.5); assert.match(one.file, /\.wav$/);
+  assert.ok(progress.includes('Đã nạp mô hình giọng.') && progress.includes('Đã đọc 1/1 cảnh'));
+  assert.match(await fs.readFile(path.join(dir, 'voice_helper.py'), 'utf8'), /def run_preset/, 'helper được chép lại từ bản của app');
+  const file = await svc.preview({ engine: 'preset', voice: 'Mai Anh', text: 'Xin chào' });
+  assert.match(file, /nghe-.*\.wav$/); await fs.access(file);
+  await assert.rejects(() => svc.synth({ engine: 'preset', voice: 'Giọng không có', items: [{ id: '1', text: 'a' }], dir: path.join(dir, 'x') }), /Chọn một giọng Việt có sẵn/);
+  await assert.rejects(() => svc.synth({ engine: 'preset', voice: '', items: [{ id: '1', text: 'a' }], dir: path.join(dir, 'y') }), /Chọn một giọng Việt có sẵn/);
+  // Giọng có trong danh sách của app nhưng thư viện VieNeu không có: báo đúng tên giọng, không đổi sang giọng khác.
+  await assert.rejects(() => svc.synth({ engine: 'preset', voice: 'Ngọc Trân', items: [{ id: '1', text: 'a' }], dir: path.join(dir, 'z') }), /Giọng VieNeu «Ngọc Trân» chưa đọc được/);
+  // Chưa cài VieNeu (clone chưa sẵn sàng) thì báo cài.
+  const dir2 = await temp(t);
+  await fs.writeFile(path.join(dir2, 'voice-ready.json'), JSON.stringify({ engines: { edge: true, clone: false } }));
+  const bare = v.createVoiceService({ dataDir: dir2, platform: 'linux' }); await bare.load();
+  await assert.rejects(() => bare.synth({ engine: 'preset', voice: 'Thiện Minh', items: [{ id: '1', text: 'a' }], dir: path.join(dir2, 'p') }), /Chưa cài giọng VieNeu/);
 });
 
 test('tốc độ đọc: tempo 0.9 làm lời dài hơn đúng tỉ lệ', { skip: !(hasFfmpeg && hasNumpy) && 'cần ffmpeg + python3 + numpy' }, async t => {

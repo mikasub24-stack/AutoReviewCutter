@@ -24,7 +24,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
           job('story', 2, { storyId: 'Truyen-1', voiceover: 'Lời cảnh hai.', output: 'C:\\Videos\\KeChuyen\\Truyen-1\\002.mp4' }),
           job('story', 3, { storyId: 'Truyen-1', voiceover: 'Lời cảnh ba.', output: 'C:\\Videos\\KeChuyen\\Truyen-1\\003.mp4' })],
         license: { status: 'trial', device: 'TESTDEVICE', expiresAt: Date.now() + 86400000, message: 'Dùng thử 24 giờ' },
-        story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: false, clone: false }, platform: 'win32', edgeVoices: [{ id: 'vi-VN-HoaiMyNeural', lang: 'vi', language: 'Tiếng Việt', name: 'Hoài My (nữ)' }, { id: 'vi-VN-NamMinhNeural', lang: 'vi', language: 'Tiếng Việt', name: 'Nam Minh (nam)' }, { id: 'en-US-AriaNeural', lang: 'en', language: 'Tiếng Anh', name: 'Aria (nữ)' }], windowsVoices: [{ name: 'Microsoft An', culture: 'vi-VN', gender: 'Male' }], clones: [] } },
+        story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: false, clone: false }, platform: 'win32', edgeVoices: [{ id: 'vi-VN-HoaiMyNeural', lang: 'vi', language: 'Tiếng Việt', name: 'Hoài My (nữ)' }, { id: 'vi-VN-NamMinhNeural', lang: 'vi', language: 'Tiếng Việt', name: 'Nam Minh (nam)' }, { id: 'en-US-AriaNeural', lang: 'en', language: 'Tiếng Anh', name: 'Aria (nữ)' }], windowsVoices: [{ name: 'Microsoft An', culture: 'vi-VN', gender: 'Male' }], clones: [], presets: [{ name: 'Adam bựa', desc: 'Nam · Bắc · Phong cách tự nhiên', gender: 'm', region: 'Bắc' }, { name: 'Thiện Minh', desc: 'Nam · Bắc · Phong cách kể chuyện', gender: 'm', region: 'Bắc' }, { name: 'Quang Sơn', desc: 'Nam · Trung · Phong cách tự nhiên', gender: 'm', region: 'Trung' }, { name: 'Thái Sơn', desc: 'Nam · Nam · Phong cách kể chuyện', gender: 'm', region: 'Nam' }], catalog: { live: false, count: 3, at: 0, busy: false, error: '' } } },
         settings: { browserChoice: 'builtin', browserPath: '', output: 'C:\\Videos', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 2, composer: 'textarea', fileInput: 'input[type=file]', submit: '', video: 'video', image: 'img', attachmentReadySelector: '', timeoutMinutes: 15 }
       };
       window.calls = []; window.s = s; let listener, id = 100;
@@ -34,6 +34,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
         invoke: async (name, data) => {
           window.calls.push({ name, data: name === 'storyBuild' ? { ...data, scenes: data.scenes.map(sc => ({ id: sc.id, chunks: sc.chunks.map(c => ({ text: c.text, start: c.start, end: c.end, x: c.x, y: c.y, png: c.png ? [...c.png.slice(0, 4)] : null })) })) } : data });
           if (name === 'storyAnalyze') {
+            if (window.analyzeFail) throw Error("Error invoking remote method 'storyAnalyze': Error: Muse không trả lời, thử lại sau.");
             s.story.analyze = { busy: true, progress: 'Phần 1/1 · Muse đang viết (đã 2 cảnh)…', part: 1, parts: 1, error: '' }; listener(structuredClone(s));
             await new Promise(r => setTimeout(r, window.analyzeDelay || 300));
             s.story.analyze = { busy: false, progress: 'Muse đã chia 2 cảnh', part: 1, parts: 1, error: '' };
@@ -55,6 +56,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
           if (name === 'images') return ['C:\\Refs\\mai.png'];
           if (name === 'add') s.jobs.push(...data.map(j => ({ ...j, id: String(++id), status: 'pending', stage: 'pending', order: s.jobs.filter(x => x.kind === 'story').length + 1 })));
           if (name === 'start') { s.active = true; s.paused = false; }
+          if (name === 'storyRefreshVoices') { const vv = s.story.voice; vv.edgeVoices.push({ id: 'fr-CA-SylvieNeural', lang: 'fr', language: 'Tiếng Pháp', name: 'Sylvie (nữ) · fr-CA' }); vv.catalog = { live: true, count: vv.edgeVoices.length, at: 1, busy: false, error: '' }; }
           if (name === 'storySetupVoice') { s.story.voice.setupBusy = true; s.story.voice.setupMessage = 'Đang tìm Python…'; }
           if (name === 'storyAddVoice') s.story.voice.clones.push({ key: 'Giong-cua-toi', name: data.name });
           if (name === 'storyListen') return 'C:\\Data\\preview\\nghe.mp3';
@@ -184,7 +186,8 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.deepEqual(await page.locator('#storyScenes .draftRow .draftContent > textarea').evaluateAll(list => list.map(t => t.value)), ['Every morning, Tom rowed out to the middle of the lake. One day, a golden fish jumped into his boat.']);
     await page.locator('#storyEngine').selectOption('edge');
     await page.locator('#storyVoice').evaluate(e => { e.dispatchEvent(new Event('change')); });
-    assert.match(await page.locator('#storyVoice option').first().textContent(), /Aria.*Tiếng Anh ✓/, 'kịch bản tiếng Anh: giọng tiếng Anh đứng đầu');
+    assert.match(await page.locator('#storyVoice option').first().textContent(), /^Aria \(nữ\) ✓$/, 'kịch bản tiếng Anh: giọng tiếng Anh đứng đầu');
+    assert.equal(await page.locator('#storyVoice option').first().evaluate(o => o.parentElement.label), 'Tiếng Anh', 'giọng nhóm theo ngôn ngữ');
     await page.locator('#storyScript').fill('小明划船到湖中央等待日出。有一天，一条金鱼跳进了他的船里，请求他放它回去。小明轻轻地把金鱼放回水中。金鱼绕着小船转了三圈才消失。');
     await page.locator('#storyAnalyze').click();
     await page.waitForFunction(() => !document.getElementById('storyAnalyze').disabled && document.querySelectorAll('#storyScenes .draftRow').length >= 1);
@@ -204,6 +207,29 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.match(await page.locator('#storyVoiceInfo').textContent(), /Đang tìm Python/);
     assert.equal(await page.locator('#storySetup').isDisabled(), true);
     await page.evaluate(() => { Object.assign(window.s.story.voice, { setupBusy: false, setupMessage: '', ready: { edge: true, clone: true } }); window.push(); });
+    // Giọng Việt có sẵn VieNeu (25 giọng, offline, không cần file mẫu), nhóm theo vùng; mặc định giọng kể chuyện.
+    await page.locator('#storyEngine').selectOption('preset');
+    assert.match(await page.locator('#storyVoiceInfo').textContent(), /^25 giọng Việt có sẵn của VieNeu: miễn phí, chạy offline/);
+    assert.deepEqual(await page.locator('#storyVoice optgroup').evaluateAll(g => g.map(x => x.label)), ['Miền Bắc', 'Miền Trung', 'Miền Nam']);
+    assert.equal(await page.locator('#storyVoice option').count(), 4);
+    assert.equal(await page.locator('#storyVoice').inputValue(), 'Thiện Minh', 'giọng kể chuyện là mặc định');
+    assert.equal(await page.locator('#storyVoice option[value="Quang Sơn"]').textContent(), 'Quang Sơn — Nam · Trung · Phong cách tự nhiên');
+    assert.equal(await page.locator('#storyVoiceRefresh').isVisible(), false, 'nút tải lại danh sách chỉ có ở giọng Microsoft');
+    await page.locator('#storyListen').click();
+    await page.waitForFunction(() => window.calls.some(c => c.name === 'storyListen' && c.data.engine === 'preset'));
+    assert.equal((await called('storyListen')).at(-1).data.voice, 'Thiện Minh');
+    // Giọng Microsoft: nhóm theo ngôn ngữ; nút «Tải lại danh sách giọng» lấy danh sách thật từ Microsoft (thêm giọng, đổi thông báo).
+    await page.locator('#storyEngine').selectOption('edge');
+    assert.deepEqual(await page.locator('#storyVoice optgroup').evaluateAll(g => g.map(x => x.label)), ['Tiếng Việt', 'Tiếng Anh']);
+    assert.match(await page.locator('#storyVoiceInfo').textContent(), /^Giọng Microsoft miễn phí: 3 giọng, nhiều ngôn ngữ.*Đang dùng danh sách có sẵn; bấm «Tải lại danh sách giọng»/);
+    assert.equal(await page.locator('#storyVoiceRefresh').isVisible(), true);
+    assert.equal(await page.locator('#storyVoiceRefresh').isDisabled(), false);
+    await page.locator('#storyVoiceRefresh').click();
+    await page.waitForFunction(() => /Danh sách tải từ Microsoft/.test(document.getElementById('storyVoiceInfo').textContent));
+    assert.equal((await called('storyRefreshVoices')).length, 1);
+    assert.deepEqual(await page.locator('#storyVoice optgroup').evaluateAll(g => g.map(x => x.label)), ['Tiếng Việt', 'Tiếng Anh', 'Tiếng Pháp']);
+    assert.match(await page.locator('#storyVoiceInfo').textContent(), /^Giọng Microsoft miễn phí: 4 giọng/);
+    assert.match(await page.locator('#toast').textContent(), /Đã tải danh sách giọng Microsoft\./);
     await page.locator('#storyEngine').selectOption('clone');
     assert.match(await page.locator('#storyVoiceInfo').textContent(), /Chưa có giọng clone/);
     assert.equal(await page.locator('#storyListen').isDisabled(), true);
@@ -298,6 +324,21 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.match(await page.locator('#storyPanel summary').first().textContent(), /Story & character/);
     assert.equal(await page.locator('#navStory').textContent().then(t => t.replace(/\s+/g, '')), '✎Story3');
     assert.equal(await page.locator('#storyListen').textContent(), '▶ Listen to voice');
+    // Giọng mới (VieNeu có sẵn, danh sách Microsoft) cũng có bản tiếng Anh.
+    assert.equal(await page.locator('#storyEngine option[value=preset]').textContent(), 'Built-in Vietnamese voices (VieNeu, free, offline)');
+    await page.locator('#storyEngine').selectOption('preset');
+    assert.match(await page.locator('#storyVoiceInfo').textContent(), /^VieNeu voices are not installed\. Click “Install free voices”/);
+    await page.evaluate(() => { Object.assign(window.s.story.voice, { ready: { edge: true, clone: true } }); window.push(); });
+    assert.match(await page.locator('#storyVoiceInfo').textContent(), /^25 built-in Vietnamese VieNeu voices: free, run offline on this computer/);
+    await page.locator('#storyEngine').selectOption('edge');
+    assert.equal(await page.locator('#storyVoiceRefresh').textContent(), '↻ Reload voice list');
+    assert.match(await page.locator('#storyVoiceInfo').textContent(), /^Free Microsoft voices: 3 voices, many languages \(✓ = matches the script language\), internet needed when reading\. Using the built-in list; click “Reload voice list” when online to get every voice\.$/);
+    await page.locator('#storyVoiceRefresh').click();
+    await page.waitForFunction(() => /The list was loaded from Microsoft\.$/.test(document.getElementById('storyVoiceInfo').textContent));
+    assert.match(await page.locator('#storyVoiceInfo').textContent(), /^Free Microsoft voices: 4 voices/);
+    assert.match(await page.locator('#toast').textContent(), /Microsoft voice list loaded\./);
+    assert.equal(await page.evaluate(() => window.studioI18n.t('Chưa tải được danh sách giọng Microsoft (mạng lỗi). Đang dùng danh sách có sẵn.')), 'Could not load the Microsoft voice list (mạng lỗi). Using the built-in list.');
+    await page.locator('#storyEngine').selectOption('clone');
     assert.equal(await page.locator('#subOn').locator('xpath=..').textContent().then(t => t.trim()), 'Show subtitles in the video');
     assert.equal(await page.locator('#storySfx option[value=low]').textContent(), 'Low (background under narration)');
     // Phần kiểm tra kịch bản cũng được dịch sang tiếng Anh.
@@ -556,12 +597,77 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
           const sid2 = (await called('add')).at(-1).data[0].storyId;
           assert.notEqual(sid2, sid);
           await page.waitForFunction(() => /Creating images \+ clips/.test(document.getElementById('autoLabel').textContent));
-          await page.evaluate(id => { window.s.active = false; window.s.jobs.filter(j => j.storyId === id).forEach((j, i) => { j.status = i === 0 ? 'completed' : 'failed'; }); window.push(); }, sid2);
-          await page.waitForFunction(() => /The queue stopped with \d+ scene\(s\) unfinished\. Resume the queue, then click Export MP4\./.test(document.getElementById('autoLabel').textContent));
+          await page.evaluate(id => { window.s.active = false; window.s.jobs.filter(j => j.storyId === id).forEach((j, i) => { j.status = i === 0 ? 'completed' : 'failed'; if (i) j.error = 'Muse báo hết lượt hôm nay.'; }); window.push(); }, sid2);
+          await page.waitForFunction(() => /The queue stopped with \d+ scene\(s\) unfinished\. Click “Continue” to run on; the MP4 is exported automatically when done\./.test(document.getElementById('autoLabel').textContent));
           assert.equal(await page.locator('#autoText').evaluate(e => e.classList.contains('warn')), true);
+          assert.equal(await page.locator('#autoWhy').textContent(), 'Muse báo hết lượt hôm nay.', 'hiện lý do dừng ngay trên thanh tiến trình');
           assert.equal((await called('storyBuild')).length, builds1, 'còn clip chưa xong thì không tự xuất');
           assert.equal(await page.locator('#tipWrite').isDisabled(), false);
           page.off('dialog', rec);
+          // «Chạy tiếp»: đang dừng giữa chừng thì tiếp tục đúng bước dở. KHÔNG viết lại bài, KHÔNG chia lại cảnh, KHÔNG thêm trùng việc vào hàng đợi.
+          await page.waitForFunction(() => /^▶ Continue making images \+ clips \(3 scene\(s\) left\)$/.test(document.getElementById('tipWrite').textContent));
+          assert.equal(await page.locator('#autoRestart').isVisible(), true, 'có nút làm lại từ đầu riêng');
+          assert.equal(await page.locator('#autoRestart').textContent(), 'Start over');
+          const jobs0 = await page.evaluate(() => window.s.jobs.length), w0 = (await called('storyAdWrite')).length, a0 = (await called('storyAnalyze')).length, ad0 = (await called('add')).length, st0 = (await called('start')).length, b0 = (await called('storyBuild')).length;
+          await page.locator('#tipWrite').click();
+          await page.waitForFunction(n => window.calls.filter(c => c.name === 'start').length > n, st0);
+          assert.equal((await called('storyAdWrite')).length, w0, 'không viết lại bài');
+          assert.equal((await called('storyAnalyze')).length, a0, 'không chia lại cảnh');
+          assert.equal((await called('add')).length, ad0, 'không thêm trùng việc vào hàng đợi');
+          assert.deepEqual((await called('start')).at(-1).data, { kind: 'story' }, 'chỉ chạy lại hàng đợi kể chuyện');
+          await page.waitForFunction(() => /Creating images \+ clips/.test(document.getElementById('autoLabel').textContent));
+          assert.equal(await page.locator('#autoWhy').isVisible(), false, 'chạy lại thì xóa dòng lý do cũ');
+          assert.equal(await page.locator('#tipWrite').isDisabled(), true);
+          assert.equal(await page.evaluate(() => window.s.jobs.length), jobs0, 'số việc trong hàng đợi không đổi');
+          await page.evaluate(id => { window.s.active = false; window.s.jobs.filter(j => j.storyId === id).forEach(j => { j.status = 'completed'; j.output = 'C:\\Videos\\Cay\\' + j.number + (j.phase === 'image' ? '.png' : '.mp4'); }); window.push(); }, sid2);
+          await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyBuild').length > n, b0);
+          assert.equal((await called('storyPrepare')).at(-1).data.storyId, sid2, 'xuất đúng lượt đã chạy tiếp');
+          assert.equal((await called('storyBuild')).at(-1).data.aspect, '9:16');
+          await page.waitForFunction(() => /Done: MP4 exported/.test(document.getElementById('autoLabel').textContent));
+          assert.equal(await page.locator('#tipWrite').textContent(), '▶ Run automatically: write, draw, export MP4', 'xong rồi thì nút về lại «làm tự động» cho cây mới');
+          assert.equal(await page.locator('#autoRestart').isVisible(), false);
+          // Chia cảnh lỗi ngay từ đầu: bài đã viết được giữ lại, «Chạy tiếp» chỉ chia cảnh (không viết lại), rồi thêm vào hàng đợi đúng một lần.
+          await page.evaluate(() => { window.analyzeFail = true; });
+          await page.locator('#tipTitle').fill('Cà chua cherry');
+          const w1 = (await called('storyAdWrite')).length, a1 = (await called('storyAnalyze')).length, ad1 = (await called('add')).length, st1 = (await called('start')).length;
+          await page.locator('#tipWrite').click();
+          await page.waitForFunction(() => /Stopped at the scene-splitting step\./.test(document.getElementById('autoLabel').textContent));
+          assert.equal(await page.locator('#autoWhy').textContent(), 'Muse không trả lời, thử lại sau.', 'hiện đúng lý do Muse báo');
+          assert.equal((await called('storyAdWrite')).length, w1 + 1);
+          assert.equal((await called('add')).length, ad1, 'chưa chia được thì chưa thêm gì vào hàng đợi');
+          assert.equal(await page.locator('#tipWrite').textContent(), '▶ Continue: split scenes');
+          assert.equal(await page.locator('#autoRestart').isVisible(), true);
+          await page.evaluate(() => { window.analyzeFail = false; });
+          await page.locator('#tipWrite').click();
+          await page.waitForFunction(n => window.calls.filter(c => c.name === 'start').length > n, st1);
+          assert.equal((await called('storyAdWrite')).length, w1 + 1, 'chia lại cảnh nhưng không viết lại bài');
+          assert.equal((await called('storyAnalyze')).length, a1 + 2, 'một lần lỗi + một lần chia lại');
+          assert.equal((await called('add')).length, ad1 + 1, 'thêm vào hàng đợi đúng một lần');
+          const sid3 = (await called('add')).at(-1).data[0].storyId;
+          // Lỗi thêm vào hàng đợi / dừng giữa chừng rồi bấm «Chạy tiếp» lần nữa: vẫn không thêm trùng.
+          await page.waitForFunction(() => /Creating images \+ clips/.test(document.getElementById('autoLabel').textContent));
+          await page.evaluate(id => { window.s.active = false; window.s.jobs.filter(j => j.storyId === id).forEach(j => { j.status = 'interrupted'; }); window.push(); }, sid3);
+          await page.waitForFunction(() => /^▶ Continue making images \+ clips \(2 scene\(s\) left\)$/.test(document.getElementById('tipWrite').textContent));
+          const st2 = (await called('start')).length;
+          await page.locator('#tipWrite').click();
+          await page.waitForFunction(n => window.calls.filter(c => c.name === 'start').length > n, st2);
+          assert.equal((await called('add')).length, ad1 + 1, 'bấm «Chạy tiếp» nhiều lần cũng không thêm trùng');
+          // «Làm lại từ đầu» mới viết bài mới và thêm lượt mới (có hỏi lại vì tốn thêm lượt Muse).
+          await page.evaluate(id => { window.s.active = false; window.s.jobs.filter(j => j.storyId === id).forEach(j => { j.status = 'interrupted'; }); window.push(); }, sid3);
+          await page.waitForFunction(() => /^▶ Continue making/.test(document.getElementById('tipWrite').textContent) && !document.getElementById('autoRestart').hidden);
+          const asked2 = []; const rec2 = d => asked2.push(d.message()); page.on('dialog', rec2);
+          const w2 = (await called('storyAdWrite')).length;
+          await page.locator('#autoRestart').click();
+          await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyAdWrite').length > n, w2);
+          assert.ok(asked2.some(m => /^Starting over writes a new guide/.test(m)), 'hỏi lại trước khi làm lại từ đầu: ' + asked2.join(' | '));
+          await page.waitForFunction(n => window.calls.filter(c => c.name === 'add').length > n, ad1 + 1);
+          const sid4 = (await called('add')).at(-1).data[0].storyId;
+          assert.notEqual(sid4, sid3, 'lượt mới có mã riêng');
+          page.off('dialog', rec2);
+          // Cho lượt mới chạy hết (xuất MP4) để không dây sang các phần test sau.
+          await page.waitForFunction(() => /Creating images \+ clips/.test(document.getElementById('autoLabel').textContent));
+          await page.evaluate(id => { window.s.active = false; window.s.jobs.filter(j => j.storyId === id).forEach(j => { j.status = 'completed'; j.output = 'C:\\Videos\\Cay\\' + j.number + (j.phase === 'image' ? '.png' : '.mp4'); }); window.push(); }, sid4);
+          await page.waitForFunction(() => /Done: MP4 exported/.test(document.getElementById('autoLabel').textContent));
         }
         // Quay lại Mẹo vặt: tiêu đề, độ dài, số giây của Mẹo vặt vẫn còn nguyên.
         await page.locator('#modeTip').click();
@@ -622,7 +728,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
         assert.equal(histWrite.histLook, 'film', 'kiểu hình gửi cho Muse khi viết bài');
         assert.equal((await called('storyAnalyze')).at(-1).data.histLook, 'film', 'và khi chia cảnh');
         assert.equal((await called('storyAnalyze')).at(-1).data.character, 'Cô gái tóc đen búi, áo dài cam');
-        assert.deepEqual(await page.evaluate(() => { const v = JSON.parse(localStorage.getItem('museStudio.story')); return [v.mode, v.histTipTitle, v.plantTipTitle]; }), ['hist', 'Lịch sử Việt Nam', 'Cà chua bi']);
+        assert.deepEqual(await page.evaluate(() => { const v = JSON.parse(localStorage.getItem('museStudio.story')); return [v.mode, v.histTipTitle, v.plantTipTitle]; }), ['hist', 'Lịch sử Việt Nam', 'Cà chua cherry']);
         // Ảnh nhân vật dẫn chuyện gắn vào các việc ẢNH (không gắn vào clip: clip làm từ chính ảnh đó).
         await page.locator('#storyRefs').click();
         await page.waitForFunction(() => /mai\.png/.test(document.getElementById('storyRefInfo').textContent));

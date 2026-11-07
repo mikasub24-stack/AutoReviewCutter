@@ -183,7 +183,7 @@
   // Lượt phân tích dừng giữa chừng (Muse lỗi/không trả lời): giữ các cảnh Muse đã chia, nhớ chỗ dừng và nhân vật đã chốt để làm tiếp.
   // App không tự chia thay Muse.
   let resume = null;   // { script, from, cast, understanding }
-  let autoScript = '', pendingExport = null, autoRun = null, exportOk = false;   // autoRun: { phase: write|split|make|export|done|stopped|error, id, pct, msg }
+  let autoScript = '', pendingExport = null, autoRun = null, exportOk = false, autoWhy = '';   // autoRun: { phase: write|split|make|export|done|stopped|error, id, pct, msg, why }
   // Chạy tự động (Cây trồng): autoScript = bài Muse vừa viết; pendingExport = lượt đang chờ xuất MP4 { id, aspect, armed, since }.
   const canResume = () => Boolean(resume && scenes.length && $('storyScript').value === resume.script);
   async function analyze(fromStart, ctx = null) {
@@ -198,12 +198,12 @@
     const starter = !runMode; if (starter) setRun(owner);
     analyzing = true; renderAnalyze();
     try {
-      const result = await call('storyAnalyze', { script, ...opts, ...(resuming ? { resume: { from: resume.from, cast: resume.cast, understanding: resume.understanding } } : {}) });
+      const result = await callAuto('storyAnalyze', { script, ...opts, ...(resuming ? { resume: { from: resume.from, cast: resume.cast, understanding: resume.understanding } } : {}) });
       if (result?.scenes?.length) {
         const list = [...before, ...result.scenes].map((s, i) => ({ ...s, title: `Cảnh ${i + 1}` }));
         const u = result.understanding || (resuming ? resume.understanding : null);
         const know = u || result.cast ? { summary: u?.summary || '', approach: u?.approach || '', setting: u?.setting || '', cast: result.cast || (resuming ? resume.cast : '') || '' } : null;
-        const stop = result.incomplete;
+        const stop = result.incomplete; if (stop) autoWhy = stop.message || '';
         const next = stop ? { script, from: stop.from, cast: result.cast || (resuming ? resume.cast : ''), understanding: u || null } : null;
         const info = stop
           ? `Muse đã chia ${list.length} cảnh, dừng ở câu ${stop.from}/${stop.total}. ${stop.message} Bấm «Phân tích tiếp» để Muse làm tiếp từ đó (giữ nguyên các cảnh đã có).`
@@ -228,7 +228,9 @@
     $('storyAnalyze').disabled = busy; $('storyAnalyzeAgain').hidden = busy || !canResume(); $('adWrite').disabled = busy; $('tipWrite').disabled = busy || (isPlant() && autoLive()); $('adQuick').disabled = mine; $('storyAnalyzeStop').hidden = !mine;
     $('storyAnalyze').textContent = mine && !writingNow ? 'Muse đang phân tích…' : canResume() ? 'Phân tích tiếp' : 'Phân tích bằng Muse';
     $('adWrite').textContent = writingNow ? 'Muse đang viết…' : 'Muse viết lời quảng cáo';
-    $('tipWrite').textContent = isPlant() && autoLive() ? 'Đang chạy tự động…' : writingNow ? (isPlant() || isHist() ? 'Muse đang viết bài…' : 'Muse đang viết mẹo…') : mine ? 'Muse đang chia cảnh…' : isHist() ? 'Muse viết bài lịch sử và chia cảnh' : isPlant() ? (autoOn() ? '▶ Làm tự động: viết, vẽ, xuất MP4' : 'Muse viết bài và chia cảnh') : 'Muse viết mẹo và chia cảnh';
+    const again = isPlant() && autoOn() && !autoLive() && !busy ? autoResume() : null;   // đang dừng giữa chừng: nút thành «Chạy tiếp»
+    $('autoRestart').hidden = !again;
+    $('tipWrite').textContent = isPlant() && autoLive() ? 'Đang chạy tự động…' : again ? (again.step === 'make' ? `▶ Chạy tiếp tạo ảnh + clip (còn ${again.left} cảnh)` : again.step === 'export' ? '▶ Chạy tiếp: xuất MP4' : '▶ Chạy tiếp: chia cảnh') : writingNow ? (isPlant() || isHist() ? 'Muse đang viết bài…' : 'Muse đang viết mẹo…') : mine ? 'Muse đang chia cảnh…' : isHist() ? 'Muse viết bài lịch sử và chia cảnh' : isPlant() ? (autoOn() ? '▶ Làm tự động: viết, vẽ, xuất MP4' : 'Muse viết bài và chia cảnh') : 'Muse viết mẹo và chia cảnh';
     if (mine && a.progress) $('storyInfo').textContent = a.progress;
     else if (other) { $('storyInfo').textContent = `Muse đang bận ở tab «${MODE_NAME[runMode]}». Chờ xong rồi dùng tab này.`; busyHint = true; }
     else if (busyHint) { busyHint = false; $('storyInfo').textContent = spaces[mode]?.info || IDLE_INFO[idleIndex(mode)]; }   // Muse đã rảnh: bỏ dòng «đang bận»
@@ -297,21 +299,25 @@
     } catch { text = ''; }
     $('tipCount').textContent = text;
   }
-  async function writeTip() {
+  async function writeTip(o = {}) {
     if (analyzing || writing) return;
     if (!$('tipTitle').value.trim()) { $('tipTitle').focus(); return toast(isHist() ? 'Nhập chủ đề lịch sử trước.' : isPlant() ? 'Nhập loại cây hoặc tiêu đề trước.' : 'Nhập tiêu đề mẹo trước.'); }
     const auto = autoOn();
+    // Đang dừng giữa chừng thì «Chạy tiếp» đúng bước dở: không viết lại bài, không chia lại cảnh, không thêm trùng việc vào hàng đợi.
+    if (auto && !o.fresh) { const r = autoResume(); if (r) return resumeAuto(r); }
+    if (auto && o.fresh && !confirm('Làm lại từ đầu sẽ viết bài mới và thêm một lượt mới vào hàng đợi (tốn thêm lượt Muse). Lượt đang làm dở vẫn nằm trong hàng đợi. Tiếp tục?')) return;
     // Chạy tự động lần trước để lại đúng bài do Muse viết (chưa sửa) và các cảnh đã vào hàng đợi: viết lần mới không cần hỏi lại.
-    const untouched = auto && !scenes.length && $('storyScript').value === autoScript;
+    const untouched = o.fresh || (auto && !scenes.length && $('storyScript').value === autoScript);
     if (!untouched && ($('storyScript').value.trim() || scenes.length) && !confirm(isPlant() || isHist() ? 'Viết mới sẽ thay bài đang có trong ô và xóa các cảnh đã chia. Tiếp tục?' : 'Viết mới sẽ thay mẹo đang có trong ô và xóa các cảnh đã chia. Tiếp tục?')) return;
     const owner = mode, opts = options(), starter = !runMode; if (starter) setRun(owner);
-    if (auto) { autoRun = { phase: 'write', pct: 0 }; renderAutoRun(); }
+    autoWhy = '';
+    if (auto) { autoRun = { phase: 'write', pct: 0 }; plantRunSet({ title: $('tipTitle').value.trim(), stage: 'write', aspect: $('storyAspect').value, id: '' }); renderAutoRun(); }
     writing = true; renderAnalyze();
     let notes = [], script = '';
     try {
-      const result = await call('storyAdWrite', opts);
-      if (!result?.script) { if (auto) setAuto({ phase: 'error', msg: 'Dừng ở bước viết bài. Bấm «Làm tự động» để chạy lại.' }); return; }
-      script = result.script; setScript(owner, script); if (auto) { autoScript = script; autoRun = { ...autoRun, phase: 'split' }; }
+      const result = await callAuto('storyAdWrite', opts);
+      if (!result?.script) { if (auto) setAuto({ phase: 'error', msg: 'Dừng ở bước viết bài. Bấm «Làm tự động» để chạy lại.', why: autoWhy }); return; }
+      script = result.script; setScript(owner, script); if (auto) { autoScript = script; plantRunSet({ stage: 'split' }); autoRun = { ...autoRun, phase: 'split' }; }
       if (owner === mode) { scenes = []; resume = null; understood = null; renderScenes(); }
       else spaces[owner] = { ...spaces[owner], scenes: [], resume: null, understood: null };
       notes = result.notes || [];
@@ -321,17 +327,18 @@
       await analyze(false, { owner, script, opts });
     } finally { if (starter) setRun(''); renderAnalyze(); }
     if (notes.length && owner === mode && scenes.length) toast(notes[0]);
-    // Chạy tự động: chia cảnh đủ rồi thì tự thêm vào hàng đợi, tạo ảnh + clip, xong hết thì tự xuất MP4 (không hỏi thêm).
-    if (auto) {
-      // Muse chia dở dang (dừng giữa chừng) thì tự «Phân tích tiếp» tối đa 3 lần: chế độ tự động không hiện nút này.
-      for (let again = 0; again < 3 && owner === mode && scenes.length && resume; again++) await analyze(false);
-      if (owner !== mode) { toast('Tự động dừng vì bạn đã đổi tab. Quay lại «Cây trồng phát triển» rồi bấm «Tạo ảnh + clip».'); setAuto({ phase: 'stopped', msg: 'Dừng vì bạn đã đổi tab. Quay lại tab này rồi bấm «Tạo ảnh + clip».' }); }
-      else if (!scenes.length) setAuto({ phase: 'error', msg: 'Dừng ở bước chia cảnh. Bấm «Làm tự động» để chạy lại.' });
-      else if (resume) setAuto({ phase: 'stopped', msg: 'Muse chia cảnh dừng giữa chừng. Bỏ tick «Tự động làm hết» rồi bấm «Phân tích tiếp».' });
-      else {
-        await commit(true, { auto: true });
-        if (autoRun?.phase === 'split') setAuto({ phase: 'stopped', msg: 'Chưa thêm được vào hàng đợi. Xem thông báo rồi bấm «Làm tự động» lại.' });
-      }
+    if (auto) await autoAfterSplit(owner);
+  }
+  // Chạy tự động sau khi chia cảnh: chia tiếp nếu Muse dừng dở, thêm vào hàng đợi, chạy, xong hết thì tự xuất MP4 (không hỏi thêm).
+  async function autoAfterSplit(owner) {
+    // Muse chia dở dang (dừng giữa chừng) thì tự «Phân tích tiếp» tối đa 3 lần: chế độ tự động không hiện nút này.
+    for (let again = 0; again < 3 && owner === mode && scenes.length && resume; again++) await analyze(false);
+    if (owner !== mode) { toast('Tự động dừng vì bạn đã đổi tab. Quay lại «Cây trồng phát triển» rồi bấm «Chạy tiếp».'); setAuto({ phase: 'stopped', msg: 'Dừng vì bạn đã đổi tab. Quay lại tab này rồi bấm «Chạy tiếp».' }); }
+    else if (!scenes.length) setAuto({ phase: 'error', msg: 'Dừng ở bước chia cảnh. Bài đã viết được giữ lại: bấm «Chạy tiếp» để chia cảnh (không viết lại bài).', why: autoWhy || state?.story?.analyze?.error || '' });
+    else if (resume) setAuto({ phase: 'stopped', msg: 'Muse chia cảnh dừng giữa chừng. Bấm «Chạy tiếp» để chia tiếp từ chỗ dừng.', why: autoWhy });
+    else {
+      await commit(true, { auto: true });
+      if (autoRun?.phase === 'split') setAuto({ phase: 'stopped', msg: 'Chưa thêm được vào hàng đợi. Bấm «Chạy tiếp» để thử lại (không chia lại cảnh).', why: autoWhy });
     }
   }
   function ask() {
@@ -470,8 +477,8 @@
     if (scenes.some(s => !String(s.prompt || '').trim())) return toast('Cảnh nào cũng cần prompt.');
     if (isTip() && scenes.some(s => !String(s.image || '').trim())) return toast(isHist() ? 'Cảnh nào cũng cần prompt ảnh.' : 'Bước nào cũng cần prompt ảnh.');
     if (startNow) {
-      if (state.active || state.starting || state.stopping || state.merging || state.packaging) return toast('Dừng hàng đợi hiện tại trước khi tạo lượt mới.');
-      if (!state.settings.output) return toast('Chọn thư mục lưu video trước.');
+      if (state.active || state.starting || state.stopping || state.merging || state.packaging) { autoWhy = 'Hàng đợi đang chạy. Dừng hàng đợi hiện tại trước khi tạo lượt mới.'; return toast(autoWhy); }
+      if (!state.settings.output) { autoWhy = 'Chưa chọn thư mục lưu video.'; return toast('Chọn thư mục lưu video trước.'); }
       const question = isTip()
         ? `Thêm ${scenes.length} ${isHist() ? 'cảnh' : 'bước'} (${scenes.length} ảnh + ${scenes.length} clip) và chạy ngay? Mỗi ${isHist() ? 'cảnh' : 'bước'} tốn 2 lượt Muse (1 ảnh, 1 clip) nên có thể dùng nhiều credit Muse.${scenes.length > 200 ? ' Video dài nên Muse có thể chạy nhiều giờ đến nhiều ngày; bạn có thể bấm Dừng và chạy tiếp sau.' : ''} Tool tạo hết ảnh trước, rồi làm clip từ đúng ảnh đó, gửi nguyên prompt đã xem.`
         : `Thêm ${scenes.length} cảnh và chạy toàn bộ clip kể chuyện đang chờ? Tạo video có thể dùng credit Muse. Tool gửi nguyên prompt đã xem, cùng ảnh ${isAd() ? 'sản phẩm' : 'nhân vật'}.`;
@@ -487,12 +494,14 @@
         ...scenes.map((s, i) => ({ kind: 'story', storyId, phase: 'clip', dependsOn: 'image', number: i + 1, title: `${s.title} · clip`, source: s.voiceover || s.source || '', voiceover: s.voiceover || '', prompt: clipPrompt(s), durationSeconds: secondsOf(s) }))
       ]
       : scenes.map(s => ({ kind: 'story', storyId, title: s.title, source: s.voiceover || s.source || '', voiceover: s.voiceover || '', prompt: clipPrompt(s), durationSeconds: secondsOf(s), image: refs[0] || '', references: [...refs] }));
-    const result = await call('add', jobs);
+    const result = await callAuto('add', jobs);
     if (!result) return;
     scenes = []; renderScenes(); render(result);
+    if (opts.auto) plantRunSet({ stage: 'make', id: storyId, aspect: aspectNow });   // đã vào hàng đợi: lần sau chỉ chạy tiếp, không thêm lại
     if (startNow) {
-      const started = await call('start', { kind: 'story' });
+      const started = await callAuto('start', { kind: 'story' });
       render(started);
+      if (opts.auto && !started) setAuto({ phase: 'stopped', id: storyId, msg: 'Các cảnh đã vào hàng đợi nhưng chưa chạy được. Bấm «Chạy tiếp» để chạy (không thêm lại).', why: autoWhy });
       if (opts.auto && started) { pendingExport = { id: storyId, aspect: aspectNow, armed: Boolean(state?.active || state?.starting), since: Date.now() }; setAuto({ phase: 'make', id: storyId }); setTimeout(checkAutoExport, 21000); }   // hàng đợi dừng ngay mà không có cập nhật nào nữa thì vẫn báo
     }
     if (!opts.auto) {   // chạy tự động: giữ khung mở để còn thấy thanh tiến trình
@@ -513,8 +522,9 @@
     if (e === 'edge') {
       const lang = storyLanguage();
       const list = [...(v.edgeVoices || [])].sort((a, b) => (b.lang === lang) - (a.lang === lang));
-      return list.map(x => [x.id, `${x.name} · ${x.language}${x.lang === lang ? ' ✓' : ''}`, x.lang]);
+      return list.map(x => [x.id, `${x.name}${x.lang === lang ? ' ✓' : ''}`, x.lang, x.language]);   // nhóm theo ngôn ngữ (optgroup), giọng hợp ngôn ngữ kịch bản đứng đầu
     }
+    if (e === 'preset') return (v.presets || []).map(x => [x.name, `${x.name} — ${x.desc}`, 'vi', x.region ? 'Miền ' + x.region : '']);
     if (e === 'clone') return (v.clones || []).map(x => [x.key, x.name]);
     if (e === 'windows') return (v.windowsVoices || []).map(x => [x.name, `${x.name}${x.culture ? ' · ' + x.culture : ''}`]);
     return [];
@@ -529,11 +539,20 @@
     if (force || signature !== voiceSignature) {
       voiceSignature = signature;
       const remembered = (saved.voices || {})[e];
-      select.replaceChildren(...(choices.length ? choices : [[ '', e === 'none' ? '—' : e === 'clone' ? 'Chưa có giọng clone' : e === 'windows' ? 'Không thấy giọng Windows' : 'Chưa có giọng' ]]).map(([value, label]) => { const o = el('option', '', label); o.value = value; return o; }));
+      const nodes = []; let group = null, groupName;
+      for (const [value, label, , groupLabel] of (choices.length ? choices : [[ '', e === 'none' ? '—' : e === 'clone' ? 'Chưa có giọng clone' : e === 'windows' ? 'Không thấy giọng Windows' : 'Chưa có giọng' ]])) {
+        const o = el('option', '', label); o.value = value;
+        if (groupLabel) {
+          if (!group || groupName !== groupLabel) { group = document.createElement('optgroup'); group.label = groupLabel; groupName = groupLabel; nodes.push(group); }
+          group.append(o);
+        } else { group = null; nodes.push(o); }
+      }
+      select.replaceChildren(...nodes);
       const remembered_ = choices.find(([value]) => value === remembered);
       // Nhớ giọng đã chọn, trừ khi nó khác ngôn ngữ kịch bản mà đã có giọng hợp ngôn ngữ.
       if (remembered_ && (e !== 'edge' || remembered_[2] === storyLanguage() || !choices.some(c => c[2] === storyLanguage()))) select.value = remembered;
       else if (e === 'clone' && choices.length) select.value = choices[choices.length - 1][0];
+      else if (e === 'preset' && choices.length) select.value = (choices.find(c => c[0] === 'Thiện Minh') || choices[0])[0];
       else if (e === 'edge' && choices.length) select.value = choices[0][0];
     }
     select.disabled = !choices.length;
@@ -541,6 +560,9 @@
     $('storyListen').textContent = listening ? 'Đang tạo giọng…' : '▶ Nghe thử giọng';
     const ready = v.ready || {};
     $('storySetup').disabled = Boolean(v.setupBusy);
+    const catalog = v.catalog || {};
+    $('storyVoiceRefresh').hidden = e !== 'edge'; $('storyVoiceRefresh').disabled = !ready.edge || Boolean(catalog.busy || v.setupBusy);
+    $('storyVoiceRefresh').textContent = catalog.busy ? 'Đang tải danh sách…' : '↻ Tải lại danh sách giọng';
     $('storySetup').textContent = v.setupBusy ? 'Đang cài giọng…' : (ready.edge || ready.clone) ? 'Cài lại giọng miễn phí' : 'Cài giọng miễn phí';
     $('storySetupStop').hidden = !v.setupBusy;
     let info = '';
@@ -548,12 +570,14 @@
     else if (v.setupError) info = v.setupError;
     else if (e === 'none') info = 'Không lồng tiếng: video giữ tiếng động của clip, phụ đề lấy từ lời đọc của cảnh.';
     else if (e === 'edge' && !ready.edge) info = 'Chưa cài giọng Microsoft. Bấm «Cài giọng miễn phí» (cần Python 3.10–3.13 trên máy và mạng).';
+    else if (e === 'preset' && !ready.clone) info = 'Chưa cài giọng VieNeu. Bấm «Cài giọng miễn phí» (cần Python 3.10–3.13 và mạng; lần đầu tải mô hình nên lâu).';
+    else if (e === 'preset') info = '25 giọng Việt có sẵn của VieNeu: miễn phí, chạy offline trên máy, không cần file mẫu. Chỉ dành cho tiếng Việt (ngôn ngữ khác dùng giọng Microsoft). Lần nghe/xuất đầu tiên phải tải mô hình nên lâu.';
     else if (e === 'clone' && !ready.clone) info = 'Chưa cài giọng clone. Bấm «Cài giọng miễn phí» (cần Python 3.10–3.13 và mạng; lần đầu tải mô hình nên lâu).';
     else if (e === 'clone' && !choices.length) info = 'Chưa có giọng clone. Mở mục «Clone giọng của bạn» và thêm file ghi âm mẫu.';
     else if (e === 'windows' && v.platform !== 'win32') info = 'Giọng có sẵn chỉ có trên Windows.';
     else if (e === 'windows' && !choices.length) info = 'Windows chưa có giọng đọc nào. Thêm giọng tiếng Việt trong Cài đặt Windows → Ngôn ngữ, hoặc dùng giọng Microsoft.';
     else if (e === 'clone') info = 'Giọng clone chạy ngay trên máy, miễn phí, dành cho tiếng Việt (ngôn ngữ khác dùng giọng Microsoft hoặc giọng Windows). Lần nghe/xuất đầu tiên phải tải mô hình nên lâu.';
-    else if (e === 'edge') info = 'Giọng Microsoft miễn phí, nhiều ngôn ngữ (✓ = hợp ngôn ngữ kịch bản), cần có mạng khi đọc.';
+    else if (e === 'edge') info = `Giọng Microsoft miễn phí: ${catalog.count || choices.length} giọng, nhiều ngôn ngữ (✓ = hợp ngôn ngữ kịch bản), cần có mạng khi đọc. ${catalog.error ? catalog.error : catalog.live ? 'Danh sách tải từ Microsoft.' : ready.edge ? 'Đang dùng danh sách có sẵn; bấm «Tải lại danh sách giọng» khi có mạng để có đủ giọng.' : ''}`.trim();
     else info = 'Giọng Windows có sẵn, chạy offline. Chất lượng tiếng Việt tùy giọng bạn đã cài.';
     $('storyVoiceInfo').textContent = info;
     const box = $('storyClones');
@@ -572,6 +596,7 @@
   $('storyVoice').addEventListener('change', () => { saved.voices = { ...(saved.voices || {}), [engine()]: $('storyVoice').value }; persist(); });
   $('storyCloneConsent').addEventListener('change', () => renderVoice());
   $('storySetup').onclick = async () => { const r = await call('storySetupVoice'); if (r) render(r); };
+  $('storyVoiceRefresh').onclick = async () => { const r = await call('storyRefreshVoices'); if (r) { render(r); toast('Đã tải danh sách giọng Microsoft.'); } };
   $('storySetupStop').onclick = async () => { const r = await call('storyCancelSetup'); if (r) render(r); };
   $('storyCloneAdd').onclick = async () => {
     const r = await call('storyAddVoice', { name: $('storyCloneName').value, consent: $('storyCloneConsent').checked });
@@ -701,11 +726,53 @@
         out.push({ id: scene.id, chunks });
       }
       const result = await call('storyBuild', { runId: prep.runId, name: $('storyName').value.trim() || story.id, aspect, subtitles, srt, sfx: $('storySfx').value, scenes: out });
-      if (result) { exportOk = true; render(result); toast('Đã xuất MP4.'); }
+      if (result) { exportOk = true; render(result); toast('Đã xuất MP4.'); if (saved.plantRun?.id === story.id) plantRunSet({ stage: 'done' }); }
     } finally { exporting = false; renderStatus(); }
   }
   /* ---------- Cây trồng chạy tự động: bố cục gọn + thanh tiến trình % ---------- */
   const autoLive = () => Boolean(autoRun && ['write', 'split', 'make', 'export'].includes(autoRun.phase));
+  // Giống call() nhưng nhớ lý do lỗi để hiện ngay trên thanh tiến trình (chế độ tự động ẩn dòng thông tin).
+  async function callAuto(name, data) {
+    try { return await window.studio.invoke(name, data); }
+    catch (e) { autoWhy = String(e?.message || e).replace(/^Error invoking remote method '[^']+': Error: /, ''); toast(autoWhy); return null; }
+  }
+  // Bước đang làm của lượt tự động, lưu lại để «Chạy tiếp» đúng chỗ kể cả sau khi mở lại app: { title, stage: write|split|make|done, id, aspect }.
+  function plantRunSet(patch) { saved.plantRun = { ...(saved.plantRun || {}), ...patch }; persist(); }
+  // Còn việc dở của đúng cây đang nhập thì trả về bước cần chạy tiếp: {step: split|make|export}; không có thì null (làm mới từ đầu).
+  function autoResume() {
+    const run = saved.plantRun;
+    if (!autoOn() || !run || run.title !== $('tipTitle').value.trim()) return null;
+    if (run.stage === 'make') {
+      const g = run.id && groups().find(x => x.id === run.id);
+      if (!g || !g.total) return null;
+      return g.done < g.total ? { step: 'make', id: g.id, aspect: run.aspect, left: g.total - g.done } : { step: 'export', id: g.id, aspect: run.aspect };
+    }
+    if (run.stage === 'split' && ($('storyScript').value.trim() || scenes.length)) return { step: 'split' };
+    return null;
+  }
+  // Lý do clip lỗi (nếu có) để báo trên thanh tiến trình.
+  const whyFailed = id => (state?.jobs || []).find(j => j.storyId === id && j.status === 'failed' && j.error)?.error || '';
+  async function resumeAuto(r) {
+    autoWhy = '';
+    if (r.step === 'split') {
+      if (!scenes.length && !$('storyScript').value.trim()) return;
+      if (autoRun?.id) autoRun = null;
+      setAuto({ phase: 'split', msg: '', why: '' });
+      if (!scenes.length) await analyze(false, { owner: mode, script: $('storyScript').value, opts: options() });
+      return autoAfterSplit(mode);
+    }
+    if (state.stopping || state.merging || state.packaging) return toast('Hàng đợi đang dừng hoặc đang ghép. Chờ xong rồi bấm «Chạy tiếp».');
+    if (autoRun?.id !== r.id) autoRun = null;
+    setAuto({ phase: 'make', id: r.id, msg: '', why: '' });
+    if (r.step === 'make' && !(state.active || state.starting)) {
+      const started = await callAuto('start', { kind: 'story' });   // chạy lại các cảnh lỗi / bị dừng; không thêm việc mới
+      if (!started) return setAuto({ phase: 'stopped', msg: 'Chưa chạy tiếp được hàng đợi. Bấm «Chạy tiếp» để thử lại.', why: autoWhy });
+      render(started);
+    }
+    pendingExport = { id: r.id, aspect: r.aspect || $('storyAspect').value, armed: r.step === 'export' || Boolean(state?.active || state?.starting), since: Date.now() };
+    setTimeout(checkAutoExport, 21000);
+    checkAutoExport();
+  }
   function setAuto(next) { autoRun = next ? { ...(autoRun || {}), ...next } : null; renderAutoRun(); renderAnalyze(); }
   // Viết bài 0–15%, chia cảnh 15–25%, tạo ảnh + clip 25–90%, xuất MP4 90–100%.
   function autoPercent(r) {
@@ -738,6 +805,7 @@
     $('autoFill').style.width = (r.pct || 0) + '%'; $('autoBar').setAttribute('aria-valuenow', String(r.pct || 0));
     $('autoPct').textContent = (r.pct || 0) + '%'; $('autoLabel').textContent = autoLabel(r);
     $('autoText').classList.toggle('warn', stuck);
+    $('autoWhy').hidden = !(stuck && r.why); $('autoWhy').textContent = stuck && r.why ? r.why : '';
   }
   // Bố cục gọn khi chạy tự động: ẩn ô bài, danh sách cảnh và nút phân tích; «Tỉ lệ» và «Phong cách» chuyển vào «Tùy chọn thêm».
   function applyAutoLayout() {
@@ -761,16 +829,17 @@
       const pick = $('storyPick'); if ([...pick.options].some(o => o.value === g.id)) pick.value = g.id;
       toast('Xong hết clip. Đang tự xuất MP4…');
       if (autoRun?.id === g.id) setAuto({ phase: 'export' });
+      autoWhy = '';
       exportVideo({ aspect: p.aspect })
-        .catch(e => toast(e.message))
-        .then(() => { if (autoRun?.id === g.id && autoRun.phase === 'export') setAuto(exportOk ? { phase: 'done' } : { phase: 'error', msg: 'Xuất MP4 chưa xong. Xem thông báo rồi bấm Xuất MP4.' }); });
+        .catch(e => { autoWhy = e.message; toast(e.message); })
+        .then(() => { if (autoRun?.id === g.id && autoRun.phase === 'export') setAuto(exportOk ? { phase: 'done' } : { phase: 'error', msg: 'Xuất MP4 chưa xong. Bấm «Chạy tiếp» để xuất lại (không tạo lại clip).', why: autoWhy || state?.story?.error || '' }); });
       return;
     }
     if (state.active || state.starting) { p.armed = true; return; }
     if (p.armed || Date.now() - p.since > 20000) {
       pendingExport = null;
-      toast(`Hàng đợi đã dừng, còn ${g.total - g.done} cảnh chưa xong nên chưa tự xuất MP4. Chạy tiếp hàng đợi cho xong rồi bấm Xuất MP4.`);
-      if (autoRun?.id === g.id) setAuto({ phase: 'stopped', msg: `Hàng đợi đã dừng, còn ${g.total - g.done} cảnh chưa xong. Chạy tiếp hàng đợi rồi bấm Xuất MP4.` });
+      toast(`Hàng đợi đã dừng, còn ${g.total - g.done} cảnh chưa xong nên chưa tự xuất MP4. Bấm «Chạy tiếp» để làm tiếp.`);
+      if (autoRun?.id === g.id) setAuto({ phase: 'stopped', msg: `Hàng đợi đã dừng, còn ${g.total - g.done} cảnh chưa xong. Bấm «Chạy tiếp» để chạy tiếp, xong sẽ tự xuất MP4.`, why: whyFailed(g.id) });
     }
   }
   function notesText(notes) {
@@ -806,9 +875,10 @@
     }
     if (story && story.id !== lastStory) { lastStory = story.id; }
     checkAutoExport();
+    if (isPlant()) renderAnalyze();   // nhãn «Chạy tiếp (còn N cảnh)» theo hàng đợi
   }
 
-  $('modeStory').onclick = () => setMode('story'); $('modeAd').onclick = () => setMode('ad'); $('modeTip').onclick = () => setMode('tip'); $('modePlant').onclick = () => setMode('plant'); $('modeHist').onclick = () => setMode('hist'); $('adWrite').onclick = writeAd; $('tipWrite').onclick = writeTip; $('adQuick').onclick = quickAd;
+  $('modeStory').onclick = () => setMode('story'); $('modeAd').onclick = () => setMode('ad'); $('modeTip').onclick = () => setMode('tip'); $('modePlant').onclick = () => setMode('plant'); $('modeHist').onclick = () => setMode('hist'); $('adWrite').onclick = writeAd; $('tipWrite').onclick = () => writeTip(); $('autoRestart').onclick = () => writeTip({ fresh: true }); $('adQuick').onclick = quickAd;
   for (const id of ['tipMinutes', 'tipSecs', 'tipLanguage', 'storyAspect']) $(id).addEventListener('change', renderTipCount);
   $('tipLook').addEventListener('change', applyHistLook);
   $('tipAuto').addEventListener('change', () => { saved.plantAuto = $('tipAuto').checked; persist(); applyAutoLayout(); renderAnalyze(); });

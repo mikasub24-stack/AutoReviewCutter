@@ -531,7 +531,32 @@ Tự động làm hết: viết bài, tạo ảnh + clip rồi xuất MP4 (khôn
 Muse đã chia xong cảnh. Đang thêm vào hàng đợi và tạo ảnh + clip; xong hết sẽ tự xuất MP4…|Muse has split the scenes. Adding them to the queue and creating pictures + clips; the MP4 is exported automatically when all are done…
 Tự động dừng vì bạn đã đổi tab. Quay lại «Cây trồng phát triển» rồi bấm «Tạo ảnh + clip».|Automatic mode stopped because you changed tabs. Go back to “Growing plants” and click “Create images + clips”.
 Xong hết clip. Đang tự xuất MP4…|All clips are done. Exporting the MP4 automatically…
+Giọng Việt có sẵn VieNeu (miễn phí, offline)|Built-in Vietnamese voices (VieNeu, free, offline)
+↻ Tải lại danh sách giọng|↻ Reload voice list
+Đang tải danh sách…|Loading the list…
+Đã tải danh sách giọng Microsoft.|Microsoft voice list loaded.
+Danh sách tải từ Microsoft.|The list was loaded from Microsoft.
+Đang dùng danh sách có sẵn; bấm «Tải lại danh sách giọng» khi có mạng để có đủ giọng.|Using the built-in list; click “Reload voice list” when online to get every voice.
+Chưa cài giọng VieNeu. Bấm «Cài giọng miễn phí» (cần Python 3.10–3.13 và mạng; lần đầu tải mô hình nên lâu).|VieNeu voices are not installed. Click “Install free voices” (needs Python 3.10–3.13 and internet; the first run downloads the model, so it takes a while).
+25 giọng Việt có sẵn của VieNeu: miễn phí, chạy offline trên máy, không cần file mẫu. Chỉ dành cho tiếng Việt (ngôn ngữ khác dùng giọng Microsoft). Lần nghe/xuất đầu tiên phải tải mô hình nên lâu.|25 built-in Vietnamese VieNeu voices: free, run offline on this computer, no sample file needed. Vietnamese only (use Microsoft voices for other languages). The first listen/export downloads the model, so it takes a while.
+Chưa cài giọng VieNeu. Bấm «Cài giọng miễn phí» trước.|VieNeu voices are not installed. Click “Install free voices” first.
+Chọn một giọng Việt có sẵn trong danh sách.|Choose one of the built-in Vietnamese voices in the list.
 Đang chạy tự động…|Running automatically…
+▶ Chạy tiếp: chia cảnh|▶ Continue: split scenes
+▶ Chạy tiếp: xuất MP4|▶ Continue: export MP4
+Làm lại từ đầu|Start over
+Làm lại từ đầu sẽ viết bài mới và thêm một lượt mới vào hàng đợi (tốn thêm lượt Muse). Lượt đang làm dở vẫn nằm trong hàng đợi. Tiếp tục?|Starting over writes a new guide and adds a new run to the queue (uses more Muse turns). The unfinished run stays in the queue. Continue?
+Dừng ở bước chia cảnh. Bài đã viết được giữ lại: bấm «Chạy tiếp» để chia cảnh (không viết lại bài).|Stopped at the scene-splitting step. The written guide is kept: click “Continue” to split scenes (it is not rewritten).
+Muse chia cảnh dừng giữa chừng. Bấm «Chạy tiếp» để chia tiếp từ chỗ dừng.|Muse stopped splitting scenes midway. Click “Continue” to carry on from where it stopped.
+Chưa thêm được vào hàng đợi. Bấm «Chạy tiếp» để thử lại (không chia lại cảnh).|Could not add to the queue. Click “Continue” to try again (scenes are not split again).
+Các cảnh đã vào hàng đợi nhưng chưa chạy được. Bấm «Chạy tiếp» để chạy (không thêm lại).|The scenes are in the queue but did not start. Click “Continue” to run them (nothing is added again).
+Chưa chạy tiếp được hàng đợi. Bấm «Chạy tiếp» để thử lại.|Could not resume the queue. Click “Continue” to try again.
+Xuất MP4 chưa xong. Bấm «Chạy tiếp» để xuất lại (không tạo lại clip).|MP4 export did not finish. Click “Continue” to export again (clips are not made again).
+Dừng vì bạn đã đổi tab. Quay lại tab này rồi bấm «Chạy tiếp».|Stopped because you changed tabs. Come back to this tab and click “Continue”.
+Tự động dừng vì bạn đã đổi tab. Quay lại «Cây trồng phát triển» rồi bấm «Chạy tiếp».|Automatic run stopped because you changed tabs. Go back to “Growing plants” and click “Continue”.
+Hàng đợi đang dừng hoặc đang ghép. Chờ xong rồi bấm «Chạy tiếp».|The queue is stopping or merging. Wait until it finishes, then click “Continue”.
+Hàng đợi đang chạy. Dừng hàng đợi hiện tại trước khi tạo lượt mới.|The queue is running. Stop the current queue before creating a new run.
+Chưa chọn thư mục lưu video.|No video folder chosen yet.
 Đang xuất MP4…|Exporting MP4…
 Xong: MP4 đã xuất|Done: MP4 exported
 Dừng ở bước viết bài. Bấm «Làm tự động» để chạy lại.|Stopped at the writing step. Click “Run automatically” to run it again.
@@ -594,9 +619,13 @@ Bước nào cũng cần prompt ảnh.|Every step needs an image prompt.
     const expiry=key.match(/^(.*?) Hạn: (.+)$/);if(expiry)return t(expiry[1])+' Expires: '+expiry[2];
     const patterns=[
       [/^Phiên bản (.+)$/,m=>'Version '+m[1]],
+      [/^Giọng Microsoft miễn phí: (\d+) giọng, nhiều ngôn ngữ \(✓ = hợp ngôn ngữ kịch bản\), cần có mạng khi đọc\.(?: (.+))?$/,m=>'Free Microsoft voices: '+m[1]+' voices, many languages (✓ = matches the script language), internet needed when reading.'+(m[2]?' '+t(m[2]):'')],
+      [/^Chưa tải được danh sách giọng Microsoft \((.+)\)\. Đang dùng danh sách có sẵn\.$/,m=>'Could not load the Microsoft voice list ('+m[1]+'). Using the built-in list.'],
       [/^Đang tạo ảnh \+ clip \((\d+)\/(\d+)\)$/,m=>'Creating images + clips ('+m[1]+'/'+m[2]+')'],
+      [/^▶ Chạy tiếp tạo ảnh \+ clip \(còn (\d+) cảnh\)$/,m=>'▶ Continue making images + clips ('+m[1]+' scene(s) left)'],
+      [/^Hàng đợi đã dừng, còn (\d+) cảnh chưa xong\. Bấm «Chạy tiếp» để chạy tiếp, xong sẽ tự xuất MP4\.$/,m=>'The queue stopped with '+m[1]+' scene(s) unfinished. Click “Continue” to run on; the MP4 is exported automatically when done.'],
       [/^Hàng đợi đã dừng, còn (\d+) cảnh chưa xong\. Chạy tiếp hàng đợi rồi bấm Xuất MP4\.$/,m=>'The queue stopped with '+m[1]+' scene(s) unfinished. Resume the queue, then click Export MP4.'],
-      [/^Hàng đợi đã dừng, còn (\d+) cảnh chưa xong nên chưa tự xuất MP4\. .*$/,m=>'The queue stopped with '+m[1]+' scene(s) unfinished, so the MP4 was not exported automatically. Resume the queue, then click Export MP4.'],
+      [/^Hàng đợi đã dừng, còn (\d+) cảnh chưa xong nên chưa tự xuất MP4\. .*$/,m=>'The queue stopped with '+m[1]+' scene(s) unfinished, so the MP4 was not exported automatically. Click “Continue” to carry on.'],
       [/^Tài khoản (\d+)$/,m=>'Account '+m[1]],
       [/^Đã thấy tin nhắn · chờ Muse phản hồi \((.+)\)$/,m=>'Message found · Waiting for Muse response ('+t(m[1])+')'],
       [/^Đang bấm chuột phải → Tải xuống \(ảnh (\d+)\/(\d+)\)$/,m=>'Right-clicking the image → Download (image '+m[1]+'/'+m[2]+')'],

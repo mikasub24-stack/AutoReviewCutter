@@ -8,43 +8,53 @@ const { spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const { command } = require('./merge.cjs');
 
-const ENGINES = ['none', 'windows', 'edge', 'clone'];
-// Giọng Microsoft Edge miễn phí (edge-tts), theo ngôn ngữ. Giọng nào hợp ngôn ngữ kịch bản sẽ được chọn trước.
-const EDGE_VOICES = [
-  { id: 'vi-VN-HoaiMyNeural', lang: 'vi', language: 'Tiếng Việt', name: 'Hoài My (nữ)' },
-  { id: 'vi-VN-NamMinhNeural', lang: 'vi', language: 'Tiếng Việt', name: 'Nam Minh (nam)' },
-  { id: 'en-US-AriaNeural', lang: 'en', language: 'Tiếng Anh', name: 'Aria (nữ)' },
-  { id: 'en-US-GuyNeural', lang: 'en', language: 'Tiếng Anh', name: 'Guy (nam)' },
-  { id: 'en-US-JennyNeural', lang: 'en', language: 'Tiếng Anh', name: 'Jenny (nữ)' },
-  { id: 'en-GB-SoniaNeural', lang: 'en', language: 'Tiếng Anh', name: 'Sonia (Anh) (nữ)' },
-  { id: 'en-GB-RyanNeural', lang: 'en', language: 'Tiếng Anh', name: 'Ryan (Anh) (nam)' },
-  { id: 'zh-CN-XiaoxiaoNeural', lang: 'zh', language: 'Tiếng Trung', name: 'Xiaoxiao (nữ)' },
-  { id: 'zh-CN-YunxiNeural', lang: 'zh', language: 'Tiếng Trung', name: 'Yunxi (nam)' },
-  { id: 'ja-JP-NanamiNeural', lang: 'ja', language: 'Tiếng Nhật', name: 'Nanami (nữ)' },
-  { id: 'ja-JP-KeitaNeural', lang: 'ja', language: 'Tiếng Nhật', name: 'Keita (nam)' },
-  { id: 'ko-KR-SunHiNeural', lang: 'ko', language: 'Tiếng Hàn', name: 'SunHi (nữ)' },
-  { id: 'ko-KR-InJoonNeural', lang: 'ko', language: 'Tiếng Hàn', name: 'InJoon (nam)' },
-  { id: 'es-ES-ElviraNeural', lang: 'es', language: 'Tiếng Tây Ban Nha', name: 'Elvira (nữ)' },
-  { id: 'es-ES-AlvaroNeural', lang: 'es', language: 'Tiếng Tây Ban Nha', name: 'Alvaro (nam)' },
-  { id: 'fr-FR-DeniseNeural', lang: 'fr', language: 'Tiếng Pháp', name: 'Denise (nữ)' },
-  { id: 'fr-FR-HenriNeural', lang: 'fr', language: 'Tiếng Pháp', name: 'Henri (nam)' },
-  { id: 'de-DE-KatjaNeural', lang: 'de', language: 'Tiếng Đức', name: 'Katja (nữ)' },
-  { id: 'de-DE-ConradNeural', lang: 'de', language: 'Tiếng Đức', name: 'Conrad (nam)' },
-  { id: 'pt-BR-FranciscaNeural', lang: 'pt', language: 'Tiếng Bồ Đào Nha', name: 'Francisca (nữ)' },
-  { id: 'pt-BR-AntonioNeural', lang: 'pt', language: 'Tiếng Bồ Đào Nha', name: 'Antonio (nam)' },
-  { id: 'it-IT-ElsaNeural', lang: 'it', language: 'Tiếng Ý', name: 'Elsa (nữ)' },
-  { id: 'it-IT-DiegoNeural', lang: 'it', language: 'Tiếng Ý', name: 'Diego (nam)' },
-  { id: 'ru-RU-SvetlanaNeural', lang: 'ru', language: 'Tiếng Nga', name: 'Svetlana (nữ)' },
-  { id: 'ru-RU-DmitryNeural', lang: 'ru', language: 'Tiếng Nga', name: 'Dmitry (nam)' },
-  { id: 'th-TH-PremwadeeNeural', lang: 'th', language: 'Tiếng Thái', name: 'Premwadee (nữ)' },
-  { id: 'th-TH-NiwatNeural', lang: 'th', language: 'Tiếng Thái', name: 'Niwat (nam)' },
-  { id: 'id-ID-GadisNeural', lang: 'id', language: 'Tiếng Indonesia', name: 'Gadis (nữ)' },
-  { id: 'id-ID-ArdiNeural', lang: 'id', language: 'Tiếng Indonesia', name: 'Ardi (nam)' },
-  { id: 'hi-IN-SwaraNeural', lang: 'hi', language: 'Tiếng Hindi', name: 'Swara (nữ)' },
-  { id: 'hi-IN-MadhurNeural', lang: 'hi', language: 'Tiếng Hindi', name: 'Madhur (nam)' },
-  { id: 'ar-SA-ZariyahNeural', lang: 'ar', language: 'Tiếng Ả Rập', name: 'Zariyah (nữ)' },
-  { id: 'ar-SA-HamedNeural', lang: 'ar', language: 'Tiếng Ả Rập', name: 'Hamed (nam)' }
-];
+const ENGINES = ['none', 'windows', 'edge', 'clone', 'preset'];
+const { LANGS, MULTI_LABEL, STATIC, VIENEU_PRESETS } = require('./voice-data.cjs');
+
+// Giọng Microsoft Edge miễn phí (edge-tts), hơn 70 ngôn ngữ (lấy từ AnimStudio). Có danh sách THẬT tải từ Microsoft (ms-voices.json) thì dùng; chưa có thì dùng bản dự phòng bên dưới.
+// Mỗi giọng: { id, lang (mã để so với ngôn ngữ kịch bản; '*' = đa ngôn ngữ), language (tên nhóm), name, locale, gender }.
+const LANG_NAME = new Map(LANGS);
+const LANG_INDEX = new Map(LANGS.map(([code], i) => [code, i]));
+const matchCode = code => (code === 'tw' || code === 'hk' ? 'zh' : code);
+const VI_NAMES = { 'vi-VN-HoaiMyNeural': 'Hoài My', 'vi-VN-NamMinhNeural': 'Nam Minh' };
+function localeCode(locale, id) {
+  if (/Multilingual/.test(id)) return '*';
+  if (locale === 'zh-TW') return 'tw';
+  if (locale === 'zh-HK') return 'hk';
+  const c = String(locale || '').split('-')[0].toLowerCase();
+  if (c === 'zh' || c === 'wuu' || c === 'yue') return 'zh';
+  return LANG_NAME.has(c) ? c : '';
+}
+function edgeEntry(id, gender, code, locale) {
+  const parts = String(id).split('-');
+  const loc = locale || parts.slice(0, 2).join('-');
+  const base = VI_NAMES[id] || parts.slice(2).join('-').replace(/Neural$/, '').replace(/Multilingual$/, '') || id;
+  return {
+    id, lang: code === '*' ? '*' : matchCode(code), language: code === '*' ? MULTI_LABEL : (LANG_NAME.get(code) || loc),
+    name: `${base} (${gender === 'f' ? 'nữ' : 'nam'})${code === 'vi' ? '' : ' · ' + loc}`, locale: loc, gender
+  };
+}
+const orderOf = code => (code === '*' ? 1e6 : LANG_INDEX.has(code) ? LANG_INDEX.get(code) : 1e5);
+function sortVoices(list) { return list.sort((a, b) => a.order - b.order || a.locale.localeCompare(b.locale) || a.id.localeCompare(b.id)).map(({ order, ...rest }) => rest); }
+// Bản dự phòng (chưa tải được danh sách thật từ Microsoft).
+const EDGE_VOICES = STATIC.map(([id, g, code]) => edgeEntry(id, g, code));
+// rows: kết quả edge_tts.list_voices() ({ShortName, Gender, Locale, Status}); trả [] nếu danh sách quá ngắn / sai (không tin).
+function buildEdgeVoices(rows) {
+  const seen = new Set(), list = [];
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const id = String(r?.ShortName || '').trim(), g = /^f/i.test(r?.Gender || '') ? 'f' : /^m/i.test(r?.Gender || '') ? 'm' : '';
+    if (!id || !g || id.split('-').length < 3 || seen.has(id)) continue;
+    if (r.Status && !/^(ga|general availability)$/i.test(String(r.Status))) continue;
+    seen.add(id);
+    const locale = String(r.Locale || id.split('-').slice(0, 2).join('-'));
+    const code = localeCode(locale, id);
+    list.push({ ...edgeEntry(id, g, code, locale), order: orderOf(code) });
+  }
+  return list.length >= 20 ? sortVoices(list) : [];
+}
+const CATALOG_TTL = 3 * 86400000;
+// Giọng Việt có sẵn của VieNeu (25 giọng, chạy offline, không cần file mẫu).
+const PRESETS = VIENEU_PRESETS.map(([name, desc, gender, region]) => ({ name, desc, gender, region }));
 const TEMPOS = [0.9, 1, 1.15, 1.3];
 const CLONE_SECONDS = { min: 3, max: 15 };
 const PY_MIN = [3, 10], PY_MAX = [3, 13];
@@ -115,9 +125,11 @@ function createVoiceService({ dataDir, getFfmpeg = () => 'ffmpeg', platform = pr
   const voicesDir = path.join(dataDir, 'voices');
   const helperFile = path.join(dataDir, 'voice_helper.py');
   const readyFile = path.join(dataDir, 'voice-ready.json');
+  const catalogFile = path.join(dataDir, 'ms-voices.json');
   const win = platform === 'win32';
   const venvPython = win ? path.join(envDir, 'Scripts', 'python.exe') : path.join(envDir, 'bin', 'python');
-  const state = { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: false, clone: false }, clones: [], windowsVoices: [], loadedModel: false };
+  const state = { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: false, clone: false }, clones: [], windowsVoices: [], loadedModel: false, catalog: null, catalogBusy: false, catalogError: '' };
+  let edgeCache = { source: null, list: EDGE_VOICES };
   let setupController = null;
 
   const ffprobe = () => {
@@ -134,16 +146,56 @@ function createVoiceService({ dataDir, getFfmpeg = () => 'ffmpeg', platform = pr
   async function load() {
     try { state.ready = { edge: false, clone: false, ...(JSON.parse(await fs.readFile(readyFile, 'utf8')).engines || {}) }; } catch { state.ready = { edge: false, clone: false }; }
     try { state.clones = JSON.parse(await fs.readFile(path.join(voicesDir, 'index.json'), 'utf8')).filter(v => v && v.key && v.name); } catch { state.clones = []; }
+    try { const saved = JSON.parse(await fs.readFile(catalogFile, 'utf8')); state.catalog = buildEdgeVoices(saved.rows).length ? { rows: saved.rows, at: Number(saved.at) || 0 } : null; } catch { state.catalog = null; }
     return status();
+  }
+  // Danh sách giọng Microsoft đang dùng: bản THẬT tải từ Microsoft nếu có, không thì bản dự phòng.
+  function edgeList() {
+    const source = state.catalog?.rows || null;
+    if (edgeCache.source !== source) edgeCache = { source, list: source ? buildEdgeVoices(source) : EDGE_VOICES };
+    return edgeCache.list;
   }
   function status() {
     return {
       setupBusy: state.setupBusy, setupMessage: state.setupMessage, setupError: state.setupError,
-      ready: { ...state.ready }, platform, edgeVoices: EDGE_VOICES,
+      ready: { ...state.ready }, platform, edgeVoices: edgeList(), presets: PRESETS,
+      catalog: { live: Boolean(state.catalog), count: edgeList().length, at: state.catalog?.at || 0, busy: state.catalogBusy, error: state.catalogError },
       windowsVoices: state.windowsVoices, clones: state.clones.map(({ key, name }) => ({ key, name }))
     };
   }
   const say = message => { state.setupMessage = message; notify(); };
+  // Bản helper trong thư mục dữ liệu được ghi khi cài giọng; bản app mới có thể thêm kiểu giọng nên chép lại mỗi lần dùng.
+  async function ensureHelper() {
+    await fs.mkdir(dataDir, { recursive: true });
+    await fs.writeFile(helperFile, await fs.readFile(helperSource, 'utf8'), 'utf8');
+  }
+  // Tải danh sách giọng THẬT từ Microsoft (edge_tts.list_voices): nhiều ngôn ngữ và giọng vùng hơn bản dự phòng. Lưu ms-voices.json, làm mới sau 3 ngày.
+  async function refreshCatalog({ force = false } = {}) {
+    if (!state.ready.edge) { if (force) throw Error('Chưa cài giọng Microsoft. Bấm «Cài giọng miễn phí» trước.'); return status(); }
+    if (state.catalogBusy) return status();
+    if (!force && state.catalog && Date.now() - state.catalog.at < CATALOG_TTL) return status();
+    state.catalogBusy = true; state.catalogError = ''; notify();
+    const out = path.join(dataDir, 'ms-voices.tmp.json'), jobFile = path.join(dataDir, 'ms-voices-job.json');
+    try {
+      await ensureHelper();
+      await fs.writeFile(jobFile, JSON.stringify({ engine: 'list', out }), 'utf8');
+      const r = await runner(venvPython, [helperFile, jobFile], { timeout: 120000, env: { PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' } });
+      let failure = ''; for (const line of String(r.out || '').split(/\r?\n/)) { try { const m = JSON.parse(line); if (m.error) failure = m.error; } catch { /* dòng khác */ } }
+      if (failure) throw Error(failure);
+      if (r.code !== 0) throw Error(tail(r.err || r.out, 200) || 'mã lỗi ' + r.code);
+      const rows = JSON.parse(await fs.readFile(out, 'utf8'));
+      if (!buildEdgeVoices(rows).length) throw Error('danh sách tải về rỗng hoặc sai');
+      state.catalog = { rows, at: Date.now() };
+      await fs.writeFile(catalogFile, JSON.stringify({ at: state.catalog.at, rows }), 'utf8');
+    } catch (error) {
+      state.catalogError = 'Chưa tải được danh sách giọng Microsoft (' + String(error.message || error).slice(0, 160) + '). Đang dùng danh sách có sẵn.';
+      if (force) throw Error(state.catalogError);
+    } finally {
+      await fs.rm(out, { force: true }).catch(() => {}); await fs.rm(jobFile, { force: true }).catch(() => {});
+      state.catalogBusy = false; notify();
+    }
+    return status();
+  }
 
   async function findPython() {
     const names = win ? [['py', '-3.12'], ['py', '-3.11'], ['py', '-3.10'], ['py', '-3.13'], ['python'], ['python3']] : [['python3.12'], ['python3.11'], ['python3.10'], ['python3.13'], ['python3'], ['python']];
@@ -272,12 +324,15 @@ function createVoiceService({ dataDir, getFfmpeg = () => 'ffmpeg', platform = pr
       await fs.writeFile(script, SAPI_SCRIPT, 'utf8');
       run = { file: 'powershell.exe', args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Job', jobFile] };
     } else {
-      if (!state.ready[engine]) throw Error(engine === 'clone' ? 'Chưa cài giọng clone. Bấm «Cài giọng miễn phí» trước.' : 'Chưa cài giọng Microsoft. Bấm «Cài giọng miễn phí» trước.');
-      if (engine === 'clone') {
+      if (!state.ready[engine === 'preset' ? 'clone' : engine]) throw Error(engine === 'clone' ? 'Chưa cài giọng clone. Bấm «Cài giọng miễn phí» trước.' : engine === 'preset' ? 'Chưa cài giọng VieNeu. Bấm «Cài giọng miễn phí» trước.' : 'Chưa cài giọng Microsoft. Bấm «Cài giọng miễn phí» trước.');
+      await ensureHelper();
+      if (engine === 'preset') {
+        if (!PRESETS.some(p => p.name === voice)) throw Error('Chọn một giọng Việt có sẵn trong danh sách.');
+      } else if (engine === 'clone') {
         const found = state.clones.find(v => v.key === voice);
         if (!found) throw Error('Chưa chọn giọng clone. Thêm file giọng mẫu trước.');
         ref = found.file;
-      } else if (!EDGE_VOICES.some(v => v.id === voice)) throw Error('Chọn một giọng Microsoft trong danh sách.');
+      } else if (!edgeList().some(v => v.id === voice)) throw Error('Chọn một giọng Microsoft trong danh sách.');
       await fs.writeFile(jobFile, JSON.stringify({ engine, voice, ref, items: jobs }), 'utf8');
       run = { file: venvPython, args: [helperFile, jobFile] };
     }
@@ -315,7 +370,7 @@ function createVoiceService({ dataDir, getFfmpeg = () => 'ffmpeg', platform = pr
     return first.file;
   }
 
-  return { load, status, setup, cancelSetup, findPython, listWindowsVoices, addClone, removeClone, synth, preview, venvPython, helperFile };
+  return { load, status, setup, cancelSetup, refreshCatalog, findPython, listWindowsVoices, addClone, removeClone, synth, preview, venvPython, helperFile };
 }
 
-module.exports = { createVoiceService, exec, parseVersion, inRange, slug, ENGINES, EDGE_VOICES, TEMPOS, CLONE_SECONDS, MISSING_PYTHON };
+module.exports = { createVoiceService, exec, parseVersion, inRange, slug, ENGINES, EDGE_VOICES, PRESETS, buildEdgeVoices, localeCode, TEMPOS, CLONE_SECONDS, MISSING_PYTHON };
