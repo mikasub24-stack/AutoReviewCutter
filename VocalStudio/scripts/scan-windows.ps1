@@ -7,9 +7,10 @@ try {
     $state = Get-MpComputerStatus
     if (!$state.AMServiceEnabled) { Start-Service WinDefend; $state = Get-MpComputerStatus }
     if (!$state.AMServiceEnabled -or !$state.AntivirusEnabled) { throw 'Defender unavailable: package has no accepted scan verdict' }
-    Update-MpSignature
+    try { Update-MpSignature }
+    catch { $report['signatureUpdateWarning'] = $_.Exception.Message }
     $state = Get-MpComputerStatus
-    if ($state.AntivirusSignatureAge -gt 2) { throw 'Defender signatures are stale' }
+    if ($state.AntivirusSignatureAge -gt 2 -or !$state.AntivirusSignatureVersion) { throw 'Defender signatures are stale or unavailable' }
     $report.engine = $state.AMEngineVersion
     $report.signatures = $state.AntivirusSignatureVersion
     Start-MpScan -ScanType CustomScan -ScanPath $runtime
