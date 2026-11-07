@@ -26,7 +26,7 @@ Sửa đăng ký callback âm thanh: nếu thiết bị lúc khởi động khô
 
 App độc lập nạp được VST3 và VST2 effect `.dll` Windows 64-bit mono/stereo. **Chọn Auto-Tune VST2/3** là ô chỉnh giọng; **Nạp vang VST2/3** là ô độc lập sau Auto-Tune và FX tích hợp, dùng cho ArtsAcoustic/Lexicon tương thích. **Mở vang** mở giao diện plugin, **Bỏ vang plugin** giữ Auto-Tune. Chọn một DLL hoặc thư mục plugin để quét; menu liệt kê cả định dạng. Chuỗi, đường dẫn và trạng thái chunk/tham số của cả hai ô được lưu/khôi phục với phiên và cấu hình dự phòng. Latency của cả hai ô được bù với nhạc/xuất WAV; WAV micro gốc không đổi.
 
-Không có cầu nối 32-bit: app đọc header PE và báo rõ khi chọn DLL x86, ARM hoặc không phải DLL Windows. Không hỗ trợ VST2 synth, MIDI, shell, đa kênh hoặc plugin không có processReplacing. Một DLL bên thứ ba có thể lỗi/crash hoặc yêu cầu thư viện/giấy phép riêng; scanner hiện cùng tiến trình, không có sandbox cho plugin. Chỉ chọn thư mục plugin bạn tin cậy. Auto Key/Scale cho VST2 không được đoán từ chỉ số: plugin không công khai mapping xác minh được cần chọn Key/Scale trong giao diện riêng. Chưa kiểm thử ArtsAcoustic cụ thể trên máy người dùng. Nếu dùng vang plugin, giảm/tắt vang tích hợp khi không muốn chồng vang. Plugin thương mại không được kèm trong bộ cài.
+Từ 1.9 có cầu nối VST2 x86; DLL ARM hoặc không phải DLL Windows bị từ chối. Không hỗ trợ VST2 synth, MIDI, shell, đa kênh hoặc plugin không có processReplacing. Một DLL bên thứ ba có thể lỗi/crash hoặc yêu cầu thư viện/giấy phép riêng; x64 vẫn cùng tiến trình, x86 chạy helper riêng (không phải sandbox bảo mật). Chỉ chọn thư mục plugin bạn tin cậy. Auto Key/Scale cho VST2 không được đoán từ chỉ số: plugin không công khai mapping xác minh được cần chọn Key/Scale trong giao diện riêng. Chưa kiểm thử ArtsAcoustic cụ thể trên máy người dùng. Nếu dùng vang plugin, giảm/tắt vang tích hợp khi không muốn chồng vang. Plugin thương mại không được kèm trong bộ cài.
 
 
 Ứng dụng Windows x64 để hát trên beat, thu micro qua sound card và mix vocal tại máy. Dự án nằm trong `VocalStudio/`, nhánh `vocal-studio`, không sửa Chùa Việt Online.
@@ -189,7 +189,7 @@ CMake lấy JUCE và ASIO SDK ở commit cố định. Source ứng dụng AGPL-
 
 ## Build bản 1.7.0 trên Windows
 
-Cài Visual Studio 2022 với Desktop development with C++ và CMake, cùng Inno Setup 6. Mở Developer PowerShell tại thư mục gốc, chạy `./VocalStudio/scripts/build-windows.ps1`. Script tải dependency đã ghim, build x64, chạy CTest, thử Chromium audio/sandbox, chụp giao diện, tạo installer rồi thử bản đã cài. Chỉ sau khi tất cả thành công mới tạo ZIP portable và ghi SHA256. Sản phẩm nằm ở `dist/VocalStudio-1.7.0-Setup.exe`.
+Cài Visual Studio 2022 với Desktop development with C++ và CMake, cùng Inno Setup 6. Mở Developer PowerShell tại thư mục gốc, chạy `./VocalStudio/scripts/build-windows.ps1`. Script tải dependency đã ghim, build x64, chạy CTest, thử Chromium audio/sandbox, chụp giao diện, tạo installer rồi thử bản đã cài. Chỉ sau khi tất cả thành công mới tạo ZIP portable và ghi SHA256. Sản phẩm nằm ở `dist/VocalStudio-1.9.0-Setup.exe`.
 
 Có workflow thủ công `Vocal Studio 1.7 Windows preview` trong `.github/workflows/vocal-studio-preview.yml`; artifact chỉ được tải lên khi toàn bộ quy trình thành công. Workflow này chưa tự phát hành công khai. Antares thương mại không được kèm trong bộ cài.
 

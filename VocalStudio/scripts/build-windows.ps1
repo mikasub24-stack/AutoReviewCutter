@@ -13,7 +13,7 @@ if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
 $bridgeBuild = Join-Path $root 'build/vocal32'
 & cmake -S VocalStudio -B $bridgeBuild -A Win32 '-DVOCAL_BRIDGE_ONLY=ON'
 if ($LASTEXITCODE -ne 0) { throw '32-bit bridge configuration failed' }
-& cmake --build $bridgeBuild --config Release --parallel 2
+& cmake --build $bridgeBuild --config Release --parallel 2 2>&1 | Tee-Object -FilePath (Join-Path $build 'Compile32.log')
 if ($LASTEXITCODE -ne 0) { throw '32-bit bridge compilation failed' }
 $appDir = Join-Path $build 'VocalStudio_artefacts/Release'
 New-Item -ItemType Directory -Force $appDir | Out-Null

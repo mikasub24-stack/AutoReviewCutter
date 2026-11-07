@@ -51,7 +51,7 @@ jobs:
         if: failure()
         shell: pwsh
         run: |
-          foreach ($file in @('build/vocal/Compile.log','build/vocal/CTest.log','build/vocal/EngineSelfTest.json','build/vocal/Testing/Temporary/LastTest.log')) {
+          foreach ($file in @('build/vocal/Compile32.log','build/vocal/Compile.log','build/vocal/CTest.log','build/vocal/EngineSelfTest.json','build/vocal/Testing/Temporary/LastTest.log')) {
             if (Test-Path $file) {
               "### $file" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
               '```text' | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
@@ -69,6 +69,7 @@ jobs:
           name: VocalStudio-1.9.0-Diagnostics
           path: |
             build/vocal/Testing/Temporary/LastTest.log
+            build/vocal/Compile32.log
             build/vocal/Compile.log
             build/vocal/CTest.log
             build/vocal/EngineSelfTest.json
