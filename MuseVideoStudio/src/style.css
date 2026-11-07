@@ -288,7 +288,7 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .storyCheck button { margin-top: 6px; }
 
 /* Chế độ quảng cáo sản phẩm */
-.storyModes { display: inline-flex; gap: 3px; padding: 3px; margin-bottom: 14px; border: 1px solid #34445f; border-radius: 10px; background: #101b2a; }
+.storyModes { display: inline-flex; flex-wrap: wrap; gap: 3px; padding: 3px; margin-bottom: 14px; border: 1px solid #34445f; border-radius: 10px; background: #101b2a; }
 .modeBtn { padding: 8px 16px; font-size: 12px; font-weight: 500; color: #a9bad1; border-radius: 8px; }
 .modeBtn[aria-pressed="true"] { background: #1f3b43; border-color: #2f6b68; color: #bff3ec; }
 .adBox { margin: 0 0 16px; padding: 14px; border: 1px solid #2e3b52; border-radius: 10px; background: #121d2c; }

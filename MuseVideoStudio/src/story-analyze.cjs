@@ -294,7 +294,8 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
     await ensureAllowed();
     controller = new AbortController();
     const signal = controller.signal;
-    const label = tip ? 'Viết mẹo vặt' : 'Viết lời quảng cáo';
+    const plant = tip && config.tipKind === 'plant';
+    const label = plant ? 'Viết bài trồng cây' : tip ? 'Viết mẹo vặt' : 'Viết lời quảng cáo';
     Object.assign(state, { busy: true, kind: 'write', error: '', progress: 'Đang mở Muse…', part: 0, parts: 1 });
     notify();
     try {
@@ -304,7 +305,7 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
       if (!muse) throw infra('Chưa mở được Muse tài khoản 1.');
       if (tip) {
         const result = await writeTip(muse, config, signal, label);
-        say(`Muse đã viết xong mẹo vặt (${result.steps} bước)`);
+        say(`Muse đã viết xong ${plant ? 'bài trồng cây' : 'mẹo vặt'} (${result.steps} bước)`);
         return { script: result.script, notes: result.notes };
       }
       let script = '';

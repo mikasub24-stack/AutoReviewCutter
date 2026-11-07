@@ -449,6 +449,52 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
         assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('museStudio.story')).tipTitle), '  Mẹo khử mùi tủ lạnh  ', 'tiêu đề được nhớ');
         assert.equal(await page.locator('#storyCreate').isDisabled(), false);
       }
+      // Cây trồng phát triển: chế độ thứ 4, dùng chung quy trình với Mẹo vặt nhưng có tiêu đề/độ dài/số giây riêng (7–10 phút).
+      {
+        await page.locator('#modePlant').click();   // đang có cảnh của chế độ khác → hộp thoại xác nhận tự đồng ý
+        assert.equal(await page.locator('#modePlant').getAttribute('aria-pressed'), 'true');
+        for (const id of ['modeTip', 'modeStory', 'modeAd']) assert.equal(await page.locator('#' + id).getAttribute('aria-pressed'), 'false', id + ' không còn được chọn');
+        assert.equal(await page.locator('#modePlant').textContent(), 'Growing plants');
+        assert.equal(await page.locator('#storyHead').textContent(), '1. Plant guide (written by Muse, editable)');
+        assert.equal(await page.locator('#tipBox').isVisible(), true);
+        assert.equal(await page.locator('#tipTitleLabel').textContent(), 'What do you want to grow?');
+        assert.match(await page.locator('#tipTitle').getAttribute('placeholder'), /Growing tomatoes in a pot from seed to fruit/);
+        assert.match(await page.locator('#tipIntro').textContent(), /from preparing the pot and sowing seeds to fruit/);
+        assert.equal(await page.locator('#tipWrite').textContent(), 'Muse writes the guide and splits scenes');
+        assert.equal(await page.locator('#storyCreate').textContent(), '▶ Create images + clips');
+        for (const id of ['storyRefRow', 'storyRefPaste', 'storyCharacter', 'storyForm']) assert.equal(await page.locator('#' + id).isVisible(), false, id + ' ẩn trong chế độ Cây trồng');
+        assert.match(await page.locator('#storyStyle').getAttribute('placeholder'), /sunny windowsill, terracotta pot/);
+        assert.equal(await page.locator('#tipTitle').inputValue(), '', 'tiêu đề cây trồng lưu riêng, không lấy tiêu đề mẹo vặt');
+        assert.deepEqual(await page.locator('#tipMinutes option').allTextContents(), ['7 minutes', '8 minutes', '9 minutes', '10 minutes']);
+        assert.equal(await page.locator('#tipMinutes').inputValue(), '8'); assert.equal(await page.locator('#tipSecs').inputValue(), '10');
+        assert.match(await page.locator('#tipCount').textContent(), /^≈ 48 scenes \(1 intro \+ 46 steps \+ 1 ending\) = 48 pictures \+ 48 clips, each scene narrated for about 10 seconds\. Creating the pictures and clips uses about 96 Muse generations\.$/);
+        const before = (await called('storyAdWrite')).length;
+        await page.locator('#tipWrite').click();
+        assert.match(await page.locator('#toast').textContent(), /Enter the plant or title first/);
+        assert.equal((await called('storyAdWrite')).length, before, 'chưa có tiêu đề thì không gọi Muse');
+        await page.locator('#tipTitle').fill('Trồng cà chua trong chậu'); await page.locator('#tipMinutes').selectOption('10');
+        assert.match(await page.locator('#tipCount').textContent(), /^≈ 60 scenes \(1 intro \+ 58 steps \+ 1 ending\)/);
+        const analyzed = (await called('storyAnalyze')).length;
+        await page.locator('#tipWrite').click();   // ô bài đang có chữ → hộp thoại xác nhận tự đồng ý
+        await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyAnalyze').length > n && !document.getElementById('storyAnalyze').disabled && document.querySelectorAll('#storyScenes .draftRow').length === 2, analyzed);
+        const write = (await called('storyAdWrite')).at(-1).data;
+        assert.deepEqual([write.tip, write.tipKind, write.tipTitle, write.tipMinutes, write.seconds, write.reference], [true, 'plant', 'Trồng cà chua trong chậu', 10, 10, false]);
+        assert.equal((await called('storyAnalyze')).at(-1).data.tipKind, 'plant', 'chia cảnh cũng biết đây là cây trồng');
+        assert.deepEqual(await page.evaluate(() => { const v = JSON.parse(localStorage.getItem('museStudio.story')); return [v.mode, v.plantTipTitle, v.plantTipMinutes, v.tipTitle, v.tipMinutes, v.tipSecs]; }), ['plant', 'Trồng cà chua trong chậu', '10', '  Mẹo khử mùi tủ lạnh  ', '3', '6'], 'mỗi chế độ nhớ riêng, không ghi đè nhau');
+        // Quay lại Mẹo vặt: tiêu đề, độ dài, số giây của Mẹo vặt vẫn còn nguyên.
+        await page.locator('#modeTip').click();
+        assert.equal(await page.locator('#tipTitleLabel').textContent(), 'What tip do you want to show?');
+        assert.equal(await page.locator('#tipTitle').inputValue(), '  Mẹo khử mùi tủ lạnh  ');
+        assert.deepEqual(await page.locator('#tipMinutes option').allTextContents(), ['1 minute', '2 minutes', '3 minutes', '5 minutes', '10 minutes']);
+        assert.equal(await page.locator('#tipMinutes').inputValue(), '3'); assert.equal(await page.locator('#tipSecs').inputValue(), '6');
+        assert.equal(await page.locator('#modePlant').getAttribute('aria-pressed'), 'false');
+        assert.equal((await called('storyAdWrite')).at(-1).data.tipKind, 'plant');
+        // Viết lại mẹo vặt để có cảnh cho bước kiểm tra chế độ tiếp theo.
+        const again = (await called('storyAnalyze')).length;
+        await page.locator('#tipWrite').click();
+        await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyAnalyze').length > n && !document.getElementById('storyAnalyze').disabled && document.querySelectorAll('#storyScenes .draftRow').length === 2, again);
+        assert.equal((await called('storyAdWrite')).at(-1).data.tipKind, 'tip');
+      }
       // Đổi lại chế độ Kể chuyện: hỏi trước vì sẽ xóa cảnh, rồi ô ảnh biến mất.
       await page.locator('#modeStory').click();
       assert.equal(await page.locator('#storyRefRow').isVisible(), true);

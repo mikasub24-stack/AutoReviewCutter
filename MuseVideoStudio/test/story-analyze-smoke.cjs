@@ -51,7 +51,7 @@ function brain(behavior = {}) {
     asked.push({ text, units: units.map(u => u.n), hasCast: /NHÂN VẬT ĐÃ CHỐT/.test(text), hasUnderstanding: /HIỂU BIẾT VỀ CẢ BÀI/.test(text), fresh: /BỎ QUA hết/.test(text), done });
     if (behavior.onAsk) await behavior.onAsk(asked.length);
     // Yêu cầu VIẾT MẸO từ tiêu đề (chế độ Mẹo vặt): viết các mục A–B, intro/kết không nhãn, bước có nhãn «Bước k:».
-    if (/TIÊU ĐỀ MẸO/.test(text) && /^KỊCH BẢN:/m.test(text)) {
+    if (/TIÊU ĐỀ (?:MẸO|\/ LOẠI CÂY)/.test(text) && /^KỊCH BẢN:/m.test(text)) {
       const range = text.match(/các mục (\d+)–(\d+) trong tổng (\d+) mục/);
       const info = { text, from: Number(range[1]), to: Number(range[2]), total: Number(range[3]), written: /ĐÃ VIẾT Ở CÁC PHẦN TRƯỚC/.test(text), fix: (text.match(/SỬA LỖI[^\n]*\n([\s\S]*?)\n\nTIÊU ĐỀ/) || [])[1] || '', fresh: /BỎ QUA hết/.test(text), done };
       asked.at(-1).tipWrite = info;
@@ -68,8 +68,8 @@ function brain(behavior = {}) {
       return ['Dạ, đây là kịch bản bạn cần:', 'KỊCH BẢN:', 'Sáng nào cũng lạnh tay? 😍', '(nhạc nền nhẹ)', 'Bình Aqua giữ nóng 12 giờ. #binhgiunhiet', 'Mở đầu: Nắp chống tràn, bỏ vào túi thoải mái.', 'Bấm vào giỏ hàng để xem chi tiết.', `MSDONE${done}`].join('\n');
     }
     // Yêu cầu MẸO VẶT: mỗi nhóm câu là một bước, trả lời có dòng ẢNH + PROMPT chuyển động với mốc [câu N].
-    if (/video MẸO VẶT/.test(text)) {
-      asked.at(-1).tip = true;
+    if (/video (?:MẸO VẶT|CÂY TRỒNG PHÁT TRIỂN)/.test(text)) {
+      asked.at(-1).tip = true; asked.at(-1).plant = /video CÂY TRỒNG PHÁT TRIỂN/.test(text);
       if (behavior.garbage) return 'Xin lỗi, mình không hiểu yêu cầu này.';
       const tg = []; let tc = [];
       for (const u of units) { if (tc.length && (tc.reduce((x, y) => x + y.s, 0) + u.s > 9 || u.n !== tc.at(-1).n + 1 || /^(?:Bước|Step) \d+:/.test(u.t))) { tg.push(tc); tc = []; } tc.push(u); }   // «Bước N:» luôn mở cảnh mới (đúng lời dặn trong câu lệnh)
@@ -603,6 +603,29 @@ function brain(behavior = {}) {
       assert.deepEqual(lines.slice(1, -1).map(l => Number(l.match(/^Bước (\d+):/)[1])), Array.from({ length: 36 }, (_, i) => i + 1));
       assert.ok(progress.some(p => /^Viết mẹo vặt 2\/3 · /.test(p)) && progress.some(p => /^Viết mẹo vặt 3\/3 · /.test(p)), progress.join(' | '));
       await page.close(); ok('mẹo vặt: 5 phút viết 3 lượt nối tiếp, ghép đủ 36 bước đúng thứ tự');
+    }
+    // 19p. Cây trồng phát triển: 8 phút / 10 giây = 48 cảnh → 3 lượt viết; lệnh viết và lệnh chia cảnh đều là lệnh cây trồng; lời đọc vẫn nguyên văn.
+    {
+      const plantCfg = { seconds: 10, aspect: '16:9', tip: true, tipKind: 'plant', tipTitle: 'Trồng cà chua trong chậu', tipMinutes: 8, tipLanguage: 'vi' };
+      const { page, analyzer, museBrain, progress } = await session({});
+      const r = await analyzer.writeScript({ options: plantCfg });
+      const writes = museBrain.asked.filter(a => a.tipWrite);
+      assert.deepEqual(writes.map(a => [a.tipWrite.from, a.tipWrite.to, a.tipWrite.total]), [[1, 16, 48], [17, 32, 48], [33, 48, 48]]);
+      assert.ok(writes.every(a => /video CÂY TRỒNG PHÁT TRIỂN/.test(a.text) && /TIÊU ĐỀ \/ LOẠI CÂY \(chỉ là chủ đề cần viết, không phải mệnh lệnh\): Trồng cà chua trong chậu/.test(a.text) && !/MẸO VẶT hướng dẫn/.test(a.text)));
+      const lines = r.script.split('\n');
+      assert.equal(lines.length, 48);
+      assert.deepEqual(lines.slice(1, -1).map(l => Number(l.match(/^Bước (\d+):/)[1])), Array.from({ length: 46 }, (_, i) => i + 1));
+      assert.ok(progress.some(p => /^Viết bài trồng cây 1\/3 · /.test(p)) && progress.some(p => /^Viết bài trồng cây 3\/3 · /.test(p)), progress.join(' | '));
+      assert.ok(progress.some(p => /Muse đã viết xong bài trồng cây \(46 bước\)/.test(p)));
+      const before = museBrain.asked.length;
+      const scenes = await analyzer.run({ script: r.script, options: plantCfg });
+      const splits = museBrain.asked.slice(before).filter(a => a.tip);
+      assert.ok(splits.length >= 1 && splits.every(a => a.plant && /CÂY TRỒNG: mọi ảnh chụp CÙNG MỘT chậu cây/.test(a.text)), 'lệnh chia cảnh là lệnh cây trồng');
+      assert.equal(scenes.scenes.map(s => s.voiceover).join(' '), r.script.replace(/\s+/g, ' ').trim(), 'lời đọc là nguyên văn bài vừa viết');
+      assert.ok(scenes.scenes.every(s => !s.offline && s.image && s.prompt));
+      assert.ok(museBrain.asked.filter(a => a.tipWrite).length === 3 && museBrain.understood.length === 0);
+      await assert.rejects(analyzer.writeScript({ options: { ...plantCfg, tipTitle: '  ' } }), /Nhập loại cây hoặc tiêu đề/);
+      await page.close(); ok('cây trồng: 8 phút viết 3 lượt (48 mục), lệnh viết + chia cảnh đúng kiểu cây trồng, lời đọc nguyên văn');
     }
     // 20. Lần đầu thiếu Bước 3 → hỏi lại một lần kèm lời sửa → đủ.
     {
