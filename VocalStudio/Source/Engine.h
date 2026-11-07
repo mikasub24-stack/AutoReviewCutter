@@ -111,7 +111,7 @@ public:
     void setSessionDirectory(juce::File dir) {sessionDirectory=std::move(dir);}
     const juce::File& session() const noexcept {return sessionDirectory;}
     juce::Result saveProject(const juce::File&,const vocal::EqSettings* storedEq=nullptr);
-    juce::Result loadProject(const juce::File&);
+    juce::Result loadProject(const juce::File&,bool loadExternalPlugins=true);
     void newProject();
     juce::var projectState(const vocal::EqSettings* storedEq=nullptr) const;
     void createDemo();

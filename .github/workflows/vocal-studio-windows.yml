@@ -27,7 +27,7 @@ jobs:
       - name: Export corresponding source and workspace handoff
         shell: pwsh
         run: |
-          git archive --format=zip --output=dist/VocalStudio-1.9.0-Source.zip HEAD VocalStudio .github/workflows/vocal-studio-windows.yml
+          git archive --format=zip --output=dist/VocalStudio-1.9.1-Source.zip HEAD VocalStudio .github/workflows/vocal-studio-windows.yml
           git fetch --no-tags --unshallow origin vocal-studio
           if ($LASTEXITCODE -ne 0) { throw 'Source history fetch failed' }
           git bundle create dist/VocalStudio-source.bundle HEAD ^4da27243521a32aa05b77cccdfcff6b5de479efc

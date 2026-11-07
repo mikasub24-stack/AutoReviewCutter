@@ -39,6 +39,26 @@ function Test-Browser([string]$Directory, [string]$ReportName) {
     if (!$probe.passed) { throw 'Browser sandbox/audio probe failed' }
     Copy-Item $report (Join-Path $dist $ReportName)
 }
+function Test-Persistence([string]$Directory, [string]$ReportPrefix) {
+    $probeDir = Join-Path ([IO.Path]::GetTempPath()) ('VocalStudio-persistence-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Force $probeDir | Out-Null
+    $fixture64 = (Get-Content (Join-Path $build 'Vst2FixturePath-Release.txt') -Raw).Trim()
+    Copy-Item $fixture64 (Join-Path $probeDir 'Tune.dll')
+    Copy-Item $fixture64 (Join-Path $probeDir 'Eq.dll')
+    Copy-Item (Join-Path $build 'Vst2Fixture32.dll') (Join-Path $probeDir 'Verb32.dll')
+    foreach ($mode in @('seed','reopen','missing-eq','recovery','restored')) {
+        if ($mode -eq 'missing-eq') { Move-Item (Join-Path $probeDir 'Eq.dll') (Join-Path $probeDir 'Eq.hidden') }
+        if ($mode -eq 'recovery') { Set-Content (Join-Path $probeDir 'RunningSession.marker') 'simulate unclean exit' }
+        if ($mode -eq 'restored') { Move-Item (Join-Path $probeDir 'Eq.hidden') (Join-Path $probeDir 'Eq.dll') }
+        Invoke-Studio (Join-Path $Directory 'VocalStudio.exe') @('--test-settings-directory',"`"$probeDir`"",'--persistence-probe',$mode) 90000
+        $reportPath = Join-Path $probeDir "Persistence-$mode.json"
+        if (!(Test-Path $reportPath)) { throw "Persistence $mode report missing" }
+        $probe = Get-Content $reportPath -Raw | ConvertFrom-Json
+        if (!$probe.passed) { throw "Persistence $mode failed: $($probe.error)" }
+        Copy-Item $reportPath (Join-Path $dist "$ReportPrefix-$mode.json")
+    }
+}
+Test-Persistence $appDir 'Persistence'
 Test-Browser $appDir 'BrowserSelfTest.json'
 $shot = Join-Path $dist 'VocalStudio-preview.jpg'
 Invoke-Studio (Join-Path $appDir 'VocalStudio.exe') @('--safe-mode','--screenshot',"`"$shot`"")
@@ -48,7 +68,7 @@ if ($iscc) { $compiler = $iscc.Source } else { $compiler = Join-Path ${env:Progr
 if (!(Test-Path $compiler)) { throw 'Install Inno Setup 6 to package the installer; the built app is in the build folder.' }
 & $compiler "/DSourceDir=$appDir" "/DOutputDir=$dist" 'VocalStudio/installer/VocalStudio.iss'
 if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
-$setup = Join-Path $dist 'VocalStudio-1.9.0-Setup.exe'
+$setup = Join-Path $dist 'VocalStudio-1.9.1-Setup.exe'
 $installDir = Join-Path ([IO.Path]::GetTempPath()) ('VocalStudio-verify-' + [Guid]::NewGuid().ToString('N'))
 $process = Start-Process $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$installDir`"") -Wait -PassThru
 if ($process.ExitCode -ne 0) { throw 'Test installation failed' }
@@ -57,10 +77,11 @@ $vst2Fixture = (Get-Content (Join-Path $build 'Vst2FixturePath-Release.txt') -Ra
 if (!(Test-Path $vst2Fixture)) { throw 'VST2 test DLL missing' }
 Invoke-Studio (Join-Path $installDir 'VocalStudio.exe') @('--self-test','--vst2-32-fixture',"`"$(Join-Path $build 'Vst2Fixture32.dll')`"",'--vst2-fixture',"`"$vst2Fixture`"",'--report',"`"$report`"")
 if (!(Test-Path $report) -or !((Get-Content $report -Raw | ConvertFrom-Json).passed)) { throw 'Installed self-test failed' }
+Test-Persistence $installDir 'InstalledPersistence'
 Test-Browser $installDir 'InstalledBrowserSelfTest.json'
 $uninstaller = Join-Path $installDir 'unins000.exe'
 if (Test-Path $uninstaller) { Start-Process $uninstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait | Out-Null }
-Compress-Archive -Path "$appDir/*" -DestinationPath (Join-Path $dist 'VocalStudio-1.9.0-Windows.zip') -Force
+Compress-Archive -Path "$appDir/*" -DestinationPath (Join-Path $dist 'VocalStudio-1.9.1-Windows.zip') -Force
 Copy-Item (Join-Path $build 'EngineSelfTest.json') $dist
 Copy-Item (Join-Path $build 'Testing/Temporary/LastTest.log') (Join-Path $dist 'VocalStudio-Verification.log')
 Get-ChildItem $dist -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content (Join-Path $dist 'SHA256SUMS.txt') -Encoding ascii

@@ -208,8 +208,24 @@ The x64 VST2 path still runs in the main process. Specific commercial plugins,
 including ArtsAcoustic and LX480, require validation on the user's licensed setup.
 
 A running-session marker detects an unclean exit of the main app. On the next
-launch, preferences are backed up and a fresh session starts without external
-plugins; existing session files and recordings remain intact. The Start menu also
+launch, external plugins are temporarily skipped; saved selections, controls,
+session files and recordings remain intact. The Start menu also
 includes **Vocal Studio - Recovery** (`--safe-mode`). End a hung process in Task
 Manager before using this shortcut. Recovery does not assert which plugin caused
 the failure. Restore settings from the backup only after identifying the cause.
+
+
+### 1.9.1 — persistent voice setup
+
+Voice settings are written atomically to `VoiceSetup.json` beside the application
+preferences, with a `.previous` backup. Startup restores tuner, EQ and reverb
+independently. A missing effect retains its path and state across saves until
+explicitly removed or replaced. Recovery skips external plugin loading for that
+launch while retaining the saved selections and controls. Selected plugin names
+are shown on the scan buttons; unavailable saved effects are labelled accordingly.
+
+Windows packaging checks persistence through five separate app launches, both
+from the build directory and installed app: seed three plugins (including an x86
+reverb), reopen, remove the EQ DLL, simulate an unclean exit, restore the DLL and
+reopen. These checks use isolated preferences and fixture DLLs; commercial vendor
+plugins still require validation on the user's machine.

@@ -80,6 +80,9 @@ public:
     void chooseEqPlugin(){choosePlugin(2);}
     void openEqEditor();void clearEqPlugin();
     void scanPlugins(int slot);
+    juce::String selectedPluginName(int slot);
+    juce::String savedVoiceSummary();
+    int persistenceProbe(const juce::String&);
     void lowLatencyMonitoring();
     void openReverbEditor();
     void clearReverbPlugin();
@@ -128,7 +131,8 @@ private:
     std::atomic<float> exportProgress{0};
     bool busy=false,exporting=false,closing=false,calibrating=false;
     double calibrationDeadline=0;
-    bool setupRestoreFailed=false;
+    bool setupRestoreFailed=false,startupLoading=true;
+    juce::var retainedPluginSetup;
     int autosaveTicks=0;
     float shownInput=0,shownOutput=0;
     juce::String currentStatus;

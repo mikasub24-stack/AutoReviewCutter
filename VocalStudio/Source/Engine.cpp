@@ -232,8 +232,9 @@ juce::var StudioEngine::projectState(const vocal::EqSettings* storedEq) const {
     return juce::var(state);
 }
 juce::Result StudioEngine::saveProject(const juce::File& file,const vocal::EqSettings* storedEq){if(file.getParentDirectory().createDirectory().failed())return juce::Result::fail(juce::String::fromUTF8("Không tạo được thư mục dự án."));juce::TemporaryFile temp(file);if(!temp.getFile().replaceWithText(juce::JSON::toString(projectState(storedEq),true)))return juce::Result::fail(juce::String::fromUTF8("Không ghi được dự án tạm."));if(!temp.overwriteTargetFileWithTemporary())return juce::Result::fail(juce::String::fromUTF8("Không cập nhật được dự án. Dữ liệu cũ được giữ nguyên."));return juce::Result::ok();}
-juce::Result StudioEngine::loadProject(const juce::File& file){
-    if(isRecording())return juce::Result::fail(juce::String::fromUTF8("Dừng thu trước khi mở dự án."));playing.store(false);const auto state=juce::JSON::parse(file);if(!state.isObject()||static_cast<int>(state["schema"])!=1||!state["tracks"].isArray())return juce::Result::fail(juce::String::fromUTF8("Định dạng dự án không hợp lệ."));
+juce::Result StudioEngine::loadProject(const juce::File& file,bool loadExternalPlugins){
+    if(isRecording())return juce::Result::fail(juce::String::fromUTF8("Dừng thu trước khi mở dự án."));playing.store(false);auto state=juce::JSON::parse(file);if(!state.isObject()||static_cast<int>(state["schema"])!=1||!state["tracks"].isArray())return juce::Result::fail(juce::String::fromUTF8("Định dạng dự án không hợp lệ."));
+    if(!loadExternalPlugins)for(const auto* key:{"plugin","eqPlugin","reverbPlugin"})state.getDynamicObject()->removeProperty(key);
     std::vector<std::unique_ptr<StudioTrack>> loaded;
     for(const auto& row:*state["tracks"].getArray()){if(loaded.size()>=24)return juce::Result::fail(juce::String::fromUTF8("Giới hạn 24 track trong phiên bản này."));std::unique_ptr<StudioTrack> t;auto path=file.getParentDirectory().getChildFile(row["file"].toString());auto result=readTrack(path,static_cast<bool>(row["vocal"]),t);if(result.failed())return result;
         if(row.hasProperty("originalFile")){t->originalFile=file.getParentDirectory().getChildFile(row["originalFile"].toString());t->originalTrimIn=static_cast<double>(row["originalTrimIn"]);t->originalTrimOut=static_cast<double>(row["originalTrimOut"]);}
@@ -317,34 +318,24 @@ void StudioEngine::setVoiceColour(int colour){
 }
 juce::Result StudioEngine::restoreSetup(const juce::var& state){
     if(!state.isObject()||isRecording()||isPlaying())return juce::Result::fail("Invalid saved setup");
-    if(state["plugin"].isObject()){
-        juce::PluginDescription desc;auto xml=juce::parseXML(state["plugin"]["description"].toString());
+    juce::StringArray failures;
+    auto restoreSlot=[&](const char* key,int slot)->juce::Result{
+        if(!state[key].isObject())return juce::Result::ok();
+        juce::PluginDescription desc;auto xml=juce::parseXML(state[key]["description"].toString());
         if(!xml||!desc.loadFromXml(*xml))return juce::Result::fail("Invalid saved plugin description");
         juce::String error;auto next=pluginFormats.createPluginInstance(desc,rate(),blockSize(),error);
-        if(!next)return juce::Result::fail(error);
-        juce::MemoryBlock bytes;if(!bytes.fromBase64Encoding(state["plugin"]["state"].toString()))return juce::Result::fail("Invalid saved plugin state");
+        if(!next)return juce::Result::fail(desc.name+": "+error);
+        juce::MemoryBlock bytes;if(!bytes.fromBase64Encoding(state[key]["state"].toString()))return juce::Result::fail(desc.name+": invalid saved state");
         next->setStateInformation(bytes.getData(),static_cast<int>(bytes.getSize()));
-        auto installed=installPlugin(std::move(next));if(installed.failed())return installed;
-        withAudioStopped([]{},[&]{applyPluginState(*plugin,state["plugin"]);});
-        auto link=PluginToneLink::fromState(state["toneLink"]);if(link.complete()&&link.identity==pluginToneIdentity(*plugin))toneLink=link;
-        pluginBypassed=static_cast<bool>(state["pluginBypassed"]);heldForUnknownKey=static_cast<bool>(state["keyHold"])&&pluginBypassed.load();
-    }
-    if(state["reverbPlugin"].isObject()){
-        juce::PluginDescription desc;auto xml=juce::parseXML(state["reverbPlugin"]["description"].toString());
-        if(!xml||!desc.loadFromXml(*xml))return juce::Result::fail("Invalid reverb plugin description");
-        juce::String error;auto next=pluginFormats.createPluginInstance(desc,rate(),blockSize(),error);if(!next)return juce::Result::fail(error);
-        juce::MemoryBlock bytes;if(!bytes.fromBase64Encoding(state["reverbPlugin"]["state"].toString()))return juce::Result::fail("Invalid reverb plugin state");
-        next->setStateInformation(bytes.getData(),static_cast<int>(bytes.getSize()));auto result=installReverbPlugin(std::move(next));if(result.failed())return result;
-        withAudioStopped([]{},[&]{applyPluginState(*reverbPlugin,state["reverbPlugin"]);});
-    }
-    if(state["eqPlugin"].isObject()){
-        juce::PluginDescription desc;auto xml=juce::parseXML(state["eqPlugin"]["description"].toString());
-        if(!xml||!desc.loadFromXml(*xml))return juce::Result::fail("Invalid EQ plugin description");
-        juce::String error;auto next=pluginFormats.createPluginInstance(desc,rate(),blockSize(),error);if(!next)return juce::Result::fail(error);
-        juce::MemoryBlock bytes;if(!bytes.fromBase64Encoding(state["eqPlugin"]["state"].toString()))return juce::Result::fail("Invalid EQ plugin state");
-        next->setStateInformation(bytes.getData(),static_cast<int>(bytes.getSize()));auto result=installEqPlugin(std::move(next));if(result.failed())return result;
-        withAudioStopped([]{},[&]{applyPluginState(*eqPlugin,state["eqPlugin"]);});
-    }
+        const auto installed=slot==0?installPlugin(std::move(next)):slot==1?installEqPlugin(std::move(next)):installReverbPlugin(std::move(next));
+        if(installed.failed())return installed;
+        auto* instance=slot==0?plugin.get():slot==1?eqPlugin.get():reverbPlugin.get();
+        withAudioStopped([]{},[&]{applyPluginState(*instance,state[key]);});
+        if(slot==0){auto link=PluginToneLink::fromState(state["toneLink"]);if(link.complete()&&link.identity==pluginToneIdentity(*plugin))toneLink=link;pluginBypassed=static_cast<bool>(state["pluginBypassed"]);heldForUnknownKey=static_cast<bool>(state["keyHold"])&&pluginBypassed.load();}
+        return juce::Result::ok();
+    };
+    const char* slotNames[]={"plugin","eqPlugin","reverbPlugin"};
+    for(int slot=0;slot<3;++slot){try{const auto result=restoreSlot(slotNames[slot],slot);if(result.failed())failures.add(juce::String(slotNames[slot])+": "+result.getErrorMessage());}catch(const std::exception& error){failures.add(juce::String(slotNames[slot])+": "+error.what());}catch(...){failures.add(juce::String(slotNames[slot])+": plugin restore failed");}}
     auto p=parameters();const auto fx=state["fx"];
     if(fx.hasProperty("inputDb")){const float v=static_cast<float>(fx["inputDb"]);if(std::isfinite(v))p.inputDb=v;}
     if(fx.hasProperty("highPass")){const float v=static_cast<float>(fx["highPass"]);if(std::isfinite(v))p.highPassHz=v;}
@@ -372,7 +363,7 @@ juce::Result StudioEngine::restoreSetup(const juce::var& state){
     if(state.hasProperty("monitorDb"))monitorDb=juce::jlimit(-12.0f,18.0f,static_cast<float>(state["monitorDb"]));
     if(state.hasProperty("masterDb")){const float value=static_cast<float>(state["masterDb"]);if(std::isfinite(value))masterDb=juce::jlimit(-30.f,6.f,value);}
     withAudioStopped([]{},[&]{if(plugin&&state["plugin"].isObject())applyPluginState(*plugin,state["plugin"]);if(reverbPlugin&&state["reverbPlugin"].isObject())applyPluginState(*reverbPlugin,state["reverbPlugin"]);if(eqPlugin&&state["eqPlugin"].isObject())applyPluginState(*eqPlugin,state["eqPlugin"]);});
-    return juce::Result::ok();
+    return failures.isEmpty()?juce::Result::ok():juce::Result::fail(failures.joinIntoString("\n"));
 }
 
 juce::Result StudioEngine::installReverbPlugin(std::unique_ptr<juce::AudioPluginInstance> next){

@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "VoiceSetup.h"
 #include "YouTubeBrowser.h"
 #include "include/cef_app.h"
 #include "include/cef_sandbox_win.h"
@@ -14,18 +15,24 @@ int runStudioSelfTests(const juce::String& commandLine);
 class VocalStudioApplication final : public juce::JUCEApplication {
 public:
     const juce::String getApplicationName() override {return "VocalStudio";}
-    const juce::String getApplicationVersion() override {return "1.9.0";}
+    const juce::String getApplicationVersion() override {return "1.9.1";}
     bool moreThanOneInstanceAllowed() override {return false;}
     void initialise(const juce::String& commandLine) override {
         juce::File::getCurrentWorkingDirectory().getChildFile("BrowserStartup.log").appendText("JUCE initialise\n");
         if(commandLine.contains("--self-test")){const int code=runStudioSelfTests(commandLine);setApplicationReturnValue(code);quit();return;}
-        sessionMarker=juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("VocalStudio/RunningSession.marker");
+        sessionMarker=voiceSetup::argument("--test-settings-directory").isEmpty()?juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("VocalStudio/RunningSession.marker"):juce::File(voiceSetup::argument("--test-settings-directory")).getChildFile("RunningSession.marker");
         const bool recover=sessionMarker.existsAsFile()||commandLine.contains("--safe-mode");
         sessionMarker.getParentDirectory().createDirectory();
         if(!sessionMarker.replaceWithText("Unclean exit: start without saved plugins next time")){
             setApplicationReturnValue(3);quit();return;
         }
         window=std::make_unique<Window>(recover);
+        const auto persistenceMode=voiceSetup::argument("--persistence-probe");
+        if(persistenceMode.isNotEmpty()){
+            juce::Timer::callAfterDelay(500,[this,persistenceMode]{setApplicationReturnValue(window->main->persistenceProbe(persistenceMode));quit();});
+            return;
+        }
+
         juce::File::getCurrentWorkingDirectory().getChildFile("BrowserStartup.log").appendText("Window ready\n");
         if(commandLine.contains("--demo")){window->main->loadDemo();window->main->showQuickMode(false);}
         if(commandLine.contains("--browser-probe")){juce::Timer::callAfterDelay(4000,[this]{if(window)window->main->startBrowserProbe();});juce::Timer::callAfterDelay(11000,[this]{if(!window)return;auto* main=window->main;const auto frames=main->browserCaptured();const auto stats=main->engine.liveMusic->statistics();auto report=juce::File::getCurrentWorkingDirectory().getChildFile("BrowserSelfTest.json");auto* obj=new juce::DynamicObject;obj->setProperty("capturedFrames",static_cast<juce::int64>(frames));obj->setProperty("processedFrames",static_cast<juce::int64>(stats.outputFrames));obj->setProperty("inputFrames",static_cast<juce::int64>(stats.inputFrames));obj->setProperty("sandboxEnabled",true);obj->setProperty("capturePeak",main->browserPeak());obj->setProperty("passed",frames>48000&&stats.inputFrames>48000&&main->browserPeak()>.01f);report.replaceWithText(juce::JSON::toString(juce::var(obj)));setApplicationReturnValue(frames>48000&&stats.inputFrames>48000&&main->browserPeak()>.01f?0:1);quit();});}
