@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.6.4
+
+- **Tab «Kể chuyện»: chia ÍT cảnh hơn, gộp theo ý như bên AnimStudio.** Nguyên nhân: câu lệnh gửi Muse chỉ ghi «tối đa 9 giây/cảnh», không có mục tiêu, lại dặn «tách khi đổi địa điểm», «tối đa 2–3 hành động» và «cảnh ngắn thì video ngắn» nên Muse hay chia mỗi câu / mỗi hành động một cảnh. Nay câu lệnh dặn: **mỗi cảnh nên dài gần 9 giây (ít nhất 6 giây với clip 10 giây)**, cứ gom tiếp câu kế khi còn vừa và cùng địa điểm, cùng thời điểm, cùng mạch ý; câu ngắn gộp với câu kề bên; chỉ kết thúc sớm khi đổi địa điểm, nhảy thời gian rõ rệt hoặc sang ý khác hẳn; thêm một hành động (2–4 mốc thời gian trong cùng clip) hay một câu thoại không phải lý do để tách cảnh.
+- **App tự soát lại:** sau khi Muse chia, nếu có các cảnh liền nhau quá ngắn (dưới ~6 giây) mà gộp lại vẫn vừa một clip thì app **nhờ Muse gộp đúng những dải đó** (tối đa 4 lượt hỏi thêm mỗi phần; thanh tiến trình hiện «gộp N cảnh quá ngắn…»). Chỉ nhận bản mới khi **ít cảnh hơn** và đúng khuôn; Muse thấy thật sự đổi địa điểm / thời gian hoặc không chịu gộp thì giữ nguyên, không báo lỗi. Lời đọc vẫn là nguyên văn truyện.
+- Không đổi: quảng cáo, Mẹo vặt, Cây trồng, Lịch sử (các chế độ này chia theo bước / theo ý riêng). Gồm cả sửa 1.6.3 (tỉ lệ nằm ở đầu prompt, ô «Tỉ lệ» ở Mẹo vặt…).
+- Lưu ý thật: **số cảnh không thể thấp hơn tổng thời lượng lời đọc chia cho 9 giây** vì Muse chỉ tạo clip tối đa 10 giây (truyện đọc 30 phút thì ít nhất ~200 cảnh). Bản này chỉ làm cho cảnh dài gần đủ 9 giây thay vì vụn. Test chạy với trang chat Muse giả; **chưa thử với Muse thật**, nên Muse thật có nghe lời dặn gộp hay không cần bạn thử và báo lại.
+
 ## Update 1.6.3
 
 - **Tỉ lệ khung hình nằm ngay ĐẦU prompt gửi Muse.** Trước đây app chỉ thêm một câu tỉ lệ ở CUỐI prompt nên Muse hay bỏ qua và tạo ra khung 3:4. Nay prompt **video** mở đầu bằng dòng tỉ lệ rõ ràng («Video khung DỌC 9:16 (toàn màn hình điện thoại).» / «Vertical 9:16 portrait video…»), prompt **ảnh** (Mẹo vặt, Cây trồng, Lịch sử) giữ động từ «Tạo ảnh…» mở đầu và có câu tỉ lệ ngay sau câu đầu («Ảnh khung DỌC 9:16…» / «Vertical 9:16 portrait image…»); câu tỉ lệ ở cuối vẫn giữ. Truyện tiếng Anh thì toàn bộ câu này bằng tiếng Anh. Gắn lại nhiều lần không bị nhân đôi.

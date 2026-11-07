@@ -1355,3 +1355,56 @@ test('lịch sử: bỏ nhãn «Bước k:» khỏi bài Muse viết để giọ
   assert.equal(sp.stripStepLabels('Mở đầu.\nBước 1: Dựng nước.\n  Bước 2 - Chống giặc.\nKết.'), 'Mở đầu.\nDựng nước.\nChống giặc.\nKết.');
   assert.equal(sp.stripStepLabels('Step 3: Hello.'), 'Hello.');
 });
+
+test('chia cảnh truyện: câu lệnh đặt mục tiêu gần hết clip, dặn gộp câu ngắn, không tách vì thêm hành động (quảng cáo giữ nguyên)', () => {
+  const t = 'Mai ra đồng. Em dắt trâu. Trời nắng đẹp. Em hát khe khẽ.';
+  const ins = sp.buildMuseInstruction(t, { seconds: 10 });
+  assert.match(ins, /MỖI CẢNH NÊN DÀI GẦN 9 GIÂY \(ít nhất 6 giây\)/);
+  assert.match(ins, /KHÔNG tách mỗi câu hay mỗi hành động thành một cảnh, câu ngắn thì gộp với câu kề bên/);
+  assert.match(ins, /Chỉ kết thúc cảnh sớm hơn 6 giây khi câu kế đổi địa điểm, nhảy thời gian rõ rệt/);
+  assert.match(ins, /2–4 hành động nối tiếp/);
+  assert.match(ins, /thêm một hành động hay một câu thoại KHÔNG phải lý do để tách cảnh/);
+  assert.ok(!/tối đa 2–3 hành động/.test(ins));
+  const ad = sp.buildMuseInstruction('Bình giữ nóng 12 giờ. Nắp chống tràn.', { seconds: 10, ad: { product: 'Bình Aqua', points: 'Giữ nóng 12 giờ' } });
+  assert.ok(!/MỖI CẢNH NÊN DÀI GẦN/.test(ad), 'quảng cáo không đổi nhịp cảnh');
+  assert.match(ad, /tối đa 2–3 hành động nối tiếp/);
+  assert.equal(sp.sceneFloor(10), 6);
+  assert.equal(sp.sceneFloor(5), 3);
+});
+
+test('shortRuns: tìm dải cảnh liền nhau quá ngắn mà gộp vẫn vừa một clip; bỏ qua cảnh mẫu, cảnh dài, quảng cáo, mẹo vặt', () => {
+  const mk = (a, b, text) => ({ units: [a, b], voiceover: text, prompt: 'p' });
+  const w = n => Array.from({ length: n }, () => 'chữ').join(' ') + '.';
+  const sec = text => sp.estimateSeconds(text, sp.detectLanguage(text));
+  const cfg = { seconds: 10 };
+  const short = [mk(1, 1, w(4)), mk(2, 2, w(4)), mk(3, 3, w(4))];
+  assert.ok(short.every(x => sec(x.voiceover) < 6), 'mỗi cảnh thử phải ngắn hơn mức tối thiểu');
+  const runs = sp.shortRuns(short, cfg);
+  assert.equal(runs.length, 1);
+  assert.deepEqual([runs[0].start, runs[0].end, runs[0].from, runs[0].to, runs[0].count, runs[0].gain], [0, 2, 1, 3, 3, 2]);
+  assert.ok(runs[0].seconds <= 9);
+  // Cảnh dài đứng giữa: không gộp qua nó; hai cảnh dài liền nhau: không gộp.
+  const long = w(60);
+  assert.ok(sec(long) > 6);
+  assert.deepEqual(sp.shortRuns([mk(1, 1, w(4)), mk(2, 2, long), mk(3, 3, w(4))], cfg), []);
+  assert.deepEqual(sp.shortRuns([mk(1, 1, long), mk(2, 2, long)], cfg), []);
+  // Gộp lại vượt 90% clip thì thôi: chỉ gộp phần vừa.
+  const many = Array.from({ length: 10 }, (_, i) => mk(i + 1, i + 1, w(4)));
+  const manyRuns = sp.shortRuns(many, cfg);
+  assert.ok(manyRuns.length >= 2 && manyRuns.every(r => r.seconds <= 9 && r.count >= 2), JSON.stringify(manyRuns));
+  assert.equal(manyRuns.reduce((n, r) => n + r.count, 0), 10, 'phủ hết các cảnh ngắn, không chồng nhau');
+  // Số câu không liền nhau (có chỗ hở) / cảnh mẫu / cảnh dựng sẵn: không gộp.
+  assert.deepEqual(sp.shortRuns([mk(1, 1, w(4)), mk(3, 3, w(4))], cfg), []);
+  assert.deepEqual(sp.shortRuns([{ ...mk(1, 1, w(4)), offline: true }, mk(2, 2, w(4))], cfg), []);
+  assert.deepEqual(sp.shortRuns([{ ...mk(1, 1, w(4)), shot: true }, mk(2, 2, w(4))], cfg), []);
+  assert.deepEqual(sp.shortRuns(short, { seconds: 10, ad: { product: 'Bình' } }), []);
+  assert.deepEqual(sp.shortRuns(short, { seconds: 10, tip: true }), []);
+  assert.deepEqual(sp.shortRuns([], cfg), []);
+  // Lời dặn Muse nêu đúng các câu, số giây và cho phép giữ nguyên khi đổi địa điểm.
+  const fix = sp.shortFix(short, cfg);
+  assert.match(fix, /chia thành 3 cảnh quá ngắn: câu 1 \(\d+(?:,\d)? giây\); câu 2 /);
+  assert.match(fix, /GỘP thành MỘT cảnh/);
+  assert.match(fix, /chỉ giữ tách khi thật sự đổi địa điểm hoặc nhảy thời gian/);
+  // Câu lệnh chia cảnh mang lời dặn ở phần SỬA LỖI.
+  assert.match(sp.buildMuseInstruction('Câu một. Câu hai. Câu ba.', cfg, { fix }), /SỬA LỖI[^\n]*\n- Lần trước các câu này bị chia thành 3 cảnh/);
+});

@@ -222,6 +222,27 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
               }
             }
           }
+          // Truyện bị chia vụn (nhiều cảnh liền nhau ngắn hơn ~70% clip mà gộp lại vẫn vừa một clip) → nhờ Muse gộp đúng những dải đó, mỗi phần tối đa 4 dải
+          // (dải gộp được nhiều cảnh nhất trước). Chỉ nhận bản mới khi ít cảnh hơn và Muse chia đúng khuôn; Muse thấy đổi địa điểm / thời gian thì giữ nguyên.
+          if (!config.ad && !config.tip && !scenes.some(s => s.offline) && typeof plan.shortRuns === 'function') {
+            const runs = plan.shortRuns(scenes, config).sort((x, y) => y.gain - x.gain || x.start - y.start).slice(0, 4).sort((x, y) => y.start - x.start);
+            if (runs.length) {
+              say(`${label} · gộp ${runs.reduce((n, r) => n + r.count, 0)} cảnh quá ngắn…`);
+              for (const run of runs) {
+                try {
+                  const old = scenes.slice(run.start, run.end + 1);
+                  const reply = await ask1([[run.from, run.to]], { fix: plan.shortFix(old, config) });
+                  const got = plan.scenesFromReply(script, reply, config, { from: run.from, to: run.to });
+                  if (got.cast) cast = got.cast;
+                  if (got.scenes.length && got.scenes.length < old.length && !got.scenes.some(s => s.offline)) scenes.splice(run.start, old.length, ...got.scenes);
+                } catch (e) {
+                  if (e.name === 'AbortError') throw e;
+                  if (e.infra) break;   // Muse không trả lời: giữ các cảnh cũ
+                  /* trả lời hỏng: giữ bản cũ */
+                }
+              }
+            }
+          }
           // Cảnh Muse ghi mốc chuyển động sai (đảo thứ tự câu, thiếu câu, nhắc câu ngoài cảnh) → hỏi lại đúng những cảnh đó một lần,
           // chỉ nhận bản mới khi không tệ hơn bản cũ. Muse không ghi số câu thì không có gì để kiểm, không hỏi lại.
           if (!scenes.some(s => s.offline) && typeof plan.motionIssues === 'function') {

@@ -73,6 +73,11 @@
     return Math.min(cap, Math.max(MIN_SECONDS, need));
   }
 
+  // Mục tiêu độ dài một cảnh truyện: gần hết thời lượng clip (budget = 90% clip), không dưới ~70% budget. Cảnh vụn dưới mức này
+  // làm bài bị chia quá nhiều cảnh (mỗi cảnh tốn một lượt tạo video) nên Muse được dặn gộp, và app tự soát lại (shortRuns).
+  const sceneFloor = seconds => Math.max(MIN_SECONDS, Math.round(Number(seconds) * 0.9 * 0.7));
+  const fmtSeconds = n => String(Math.round(n * 10) / 10).replace('.', ',');
+
   /* ---------- chế độ quảng cáo sản phẩm (affiliate) ---------- */
   // `prompt` là câu đưa vào prompt gửi Muse; `label` / `en` là chữ trên nút chọn.
   const AD_CAMERA = [
@@ -698,7 +703,7 @@
     const ranges = ctx.ranges && ctx.ranges.length ? ctx.ranges : [[1, units.length]];
     const picked = ranges.flatMap(([a, b]) => units.slice(a - 1, b));
     const whole = picked.length === units.length;
-    const s = config.seconds, budget = Math.round(s * 0.9 * 10) / 10;
+    const s = config.seconds, budget = Math.round(s * 0.9 * 10) / 10, floor = sceneFloor(s);
     const marker = ctx.marker ? String(ctx.marker) : '';
     const numbered = list => list.map(u => `[${u.n}] (${u.seconds} giây) ${u.text}`);
     const first = picked[0].n, last = picked[picked.length - 1].n;
@@ -710,11 +715,11 @@
       FRESH,
       '',
       `BƯỚC 1 – ĐỌC HIỂU: đọc kỹ toàn bộ ${ad ? 'lời quảng cáo' : 'câu chuyện'}${whole ? ' ở cuối' : ' ở phần NGỮ CẢNH'} để nắm ${ad ? 'nhân vật, bối cảnh, thời điểm, diễn biến, cảm xúc và ý nghĩa của từng câu' : 'đây là truyện kể hay bài nói/bình luận, giọng điệu (nghiêm túc, cảm động, hài, châm biếm), ai là nhân vật hoặc kiểu người được nói tới, bối cảnh, diễn biến hoặc các ví dụ, và ý nghĩa của từng câu'}.${partNote}`,
-      `BƯỚC 2 – CHIA CẢNH: ${whole ? '' : 'chỉ chia các câu ở phần CÁC CÂU CẦN CHIA CẢNH; phần còn lại chỉ để hiểu. '}Gom các câu đánh số LIÊN TIẾP thành cảnh, đủ mọi câu, đúng thứ tự, không bỏ sót, không lặp. Số trong ngoặc là số giây đọc câu đó; tổng của mỗi cảnh không quá ${budget} giây. Độ dài video của cảnh tự theo lời kể: tổng số giây các câu chia cho 0,9, làm tròn lên (tối thiểu ${MIN_SECONDS}, tối đa ${s} giây); cảnh ngắn thì video ngắn, không kéo dài cho đủ ${s} giây. KHÔNG chép lại lời: chỉ ghi số câu, giọng đọc sẽ đọc đúng nguyên văn các câu đó.`,
+      `BƯỚC 2 – CHIA CẢNH: ${whole ? '' : 'chỉ chia các câu ở phần CÁC CÂU CẦN CHIA CẢNH; phần còn lại chỉ để hiểu. '}Gom các câu đánh số LIÊN TIẾP thành cảnh, đủ mọi câu, đúng thứ tự, không bỏ sót, không lặp. Số trong ngoặc là số giây đọc câu đó; tổng của mỗi cảnh không quá ${budget} giây. ${ad ? '' : `MỖI CẢNH NÊN DÀI GẦN ${fmtSeconds(budget)} GIÂY (ít nhất ${floor} giây): cứ gom tiếp câu kế vào cảnh khi còn vừa và vẫn cùng địa điểm, cùng thời điểm, cùng mạch ý; KHÔNG tách mỗi câu hay mỗi hành động thành một cảnh, câu ngắn thì gộp với câu kề bên. Chỉ kết thúc cảnh sớm hơn ${floor} giây khi câu kế đổi địa điểm, nhảy thời gian rõ rệt hoặc sang ý / nhân vật khác hẳn, và ở cảnh cuối của bài (ít cảnh hơn = ít lượt tạo video hơn, mạch truyện liền hơn). `}Độ dài video của cảnh tự theo lời kể: tổng số giây các câu chia cho 0,9, làm tròn lên (tối thiểu ${MIN_SECONDS}, tối đa ${s} giây); cảnh ngắn thì video ngắn, không kéo dài cho đủ ${s} giây. KHÔNG chép lại lời: chỉ ghi số câu, giọng đọc sẽ đọc đúng nguyên văn các câu đó.`,
       'BƯỚC 3 – VIẾT PROMPT cho từng cảnh theo quy tắc dưới đây.',
       '',
       'QUY TẮC',
-      `1. Mỗi cảnh chỉ là MỘT khoảnh khắc liên tục trong độ dài video của cảnh: một địa điểm, một nhóm nhân vật, tối đa 2–3 hành động nối tiếp; KHÔNG nhảy thời gian, KHÔNG đổi địa điểm, KHÔNG cắt cảnh trong cùng video. Các câu liên tiếp mà đổi địa điểm hoặc nhảy thời gian thì tách thành cảnh khác.`,
+      `1. Mỗi cảnh chỉ là MỘT đoạn liên tục trong độ dài video của cảnh: một địa điểm, một nhóm nhân vật, ${ad ? 'tối đa 2–3' : '2–4'} hành động nối tiếp (mỗi hành động một mốc thời gian); KHÔNG nhảy thời gian, KHÔNG đổi địa điểm, KHÔNG cắt cảnh trong cùng video. ${ad ? 'Các câu liên tiếp mà đổi địa điểm hoặc nhảy thời gian thì tách thành cảnh khác.' : 'Chỉ khi các câu liên tiếp đổi địa điểm hoặc nhảy thời gian rõ rệt thì mới tách thành cảnh khác; thêm một hành động hay một câu thoại KHÔNG phải lý do để tách cảnh.'}`,
       `2. PROMPT thể hiện đúng điều các câu của cảnh nói: ai, ở đâu, lúc nào, làm gì, theo thứ tự thời gian, chia mốc theo đúng độ dài video của cảnh (video 5 giây: 0–2 giây…, 2–5 giây…; video ${s} giây: 0–3 giây…, 3–7 giây…, 7–${s} giây…), kèm nét mặt, ánh mắt, cử chỉ, tư thế, cảm xúc, ánh sáng và góc máy. Dùng từ cụ thể, không mơ hồ. Mỗi mốc ứng với đúng điều của câu tương ứng theo thứ tự câu và GHI SỐ CÂU ngay sau mốc giờ, dạng «0–3 giây [câu 5]: …» (mốc gộp nhiều câu thì «[câu 5-6]»; một câu được có nhiều mốc; PROMPT viết bằng tiếng nào cũng giữ nguyên chữ «câu» trong thẻ, ví dụ «0–3 seconds [câu 5]: …»): các mốc đi đúng thứ tự câu, KHÔNG đảo, mỗi câu của cảnh có ít nhất một mốc, mốc cuối kết thúc đúng độ dài video của cảnh (app dùng số câu để kiểm tra và tự bỏ khi tạo video); mỗi mốc có chuyển động cụ thể của người hoặc vật (ai làm gì, mặt và tay thay đổi thế nào); tư thế, nét mặt, vị trí hoặc hướng nhìn phải THAY ĐỔI rõ giữa các mốc, không đứng yên một dáng cả cảnh; không chèn hình chung chung hay cảnh không liên quan tới câu.`,
       ad ? '3. Không bịa tính năng, thông số, công dụng, thành phần, chứng nhận hay kết quả mà lời quảng cáo không nói; không cảnh so sánh với sản phẩm khác; không cảnh «trước/sau» hay minh họa chữa bệnh, giảm cân, hiệu quả y tế. Ý trừu tượng thì thể hiện bằng hình cụ thể (người dùng thoải mái, sản phẩm đang được dùng).' : '3. TRUYỆN KỂ: không bịa thêm nhân vật, vật thể hay sự kiện; không đổi kết cục; không bỏ hành động quan trọng; suy nghĩ, cảm xúc hay ý trừu tượng thì thể hiện bằng nét mặt, cử chỉ hoặc vật cụ thể có trong câu. BÀI NÓI / BÌNH LUẬN / CHÂM BIẾM (nói về một kiểu người, một thói quen, một ý kiến, có ví dụ minh họa): dựng đúng TÌNH HUỐNG mà câu đang nói, bằng 1–3 vai cố định làm việc cụ thể trong bối cảnh đời thường (công ty, quán cà phê, nhà, đường phố); bối cảnh phải đúng nơi bài nói tới (ví dụ «trong công ty» → văn phòng có bàn làm việc, máy tính, đồng nghiệp), không dùng một căn phòng chung cho mọi cảnh; bài đã nêu ví dụ nào thì dựng đúng ví dụ đó, đúng thứ tự. Ý đối lập («trước mặt thân thiện, sau lưng nói xấu») thì cho thấy sự đối lập NGAY TRONG cảnh: cùng một người cười bắt tay người A, A vừa quay đi thì mặt đổi sang khinh bỉ và ghé sát tai người B, tay che miệng, mắt liếc về phía A (không có tiếng). Nói quá, ví von, ẩn dụ KHÔNG dựng theo nghĩa đen nếu phi lý hay đáng sợ: dựng tình huống thật đằng sau câu và thể hiện đúng ý bằng nét mặt, cử chỉ, đạo cụ cụ thể (có thể thêm MỘT chi tiết hài nhỏ hợp tinh thần câu). Câu mở bài, đặt câu hỏi, kết luận: dựng một hình ảnh chung nói lên đúng ý đó. Câu cảm thán rất ngắn: dựng phản ứng nét mặt, cử chỉ của người trong cảnh.',
       '4. Mỗi cảnh được tạo video riêng nên PROMPT phải tự đủ ý: mở đầu bằng bối cảnh cụ thể (nơi nào, ánh sáng gì), rồi nhắc lại tên, ngoại hình, trang phục của nhân vật theo cùng một cách ở mọi cảnh; không viết «như cảnh trước».',
@@ -1056,6 +1061,41 @@
     return out;
   }
 
+  /* Cảnh quá ngắn liền nhau mà gộp lại vẫn vừa một clip: Muse chia vụn (mỗi câu một cảnh) thì bài ra rất nhiều cảnh.
+     Trả mảng dải {start, end, from, to, count, seconds, gain}: start/end là chỉ số cảnh, from/to là số câu đầu / cuối. Mỗi dải ≥ 2 cảnh liên tiếp,
+     có ít nhất một cảnh dưới mức tối thiểu và tổng lời đọc không quá 90% clip. Chỉ xét cảnh do Muse chia (có số câu, không phải cảnh mẫu). */
+  function shortRuns(scenes, input = {}) {
+    const config = options(input);
+    if (config.ad || config.tip) return [];
+    const budget = config.seconds * 0.9, floor = sceneFloor(config.seconds);
+    const list = Array.isArray(scenes) ? scenes : [];
+    const secs = scene => estimateSeconds(scene.voiceover || '', detectLanguage(scene.voiceover || ''));
+    const usable = scene => Boolean(scene) && !scene.offline && !scene.shot && Array.isArray(scene.units) && String(scene.voiceover || '').trim();
+    const runs = [];
+    let i = 0;
+    while (i < list.length) {
+      if (!usable(list[i])) { i++; continue; }
+      let end = i, total = secs(list[i]);
+      while (end + 1 < list.length && usable(list[end + 1]) && list[end + 1].units[0] === list[end].units[1] + 1) {
+        const add = secs(list[end + 1]);
+        if (!(total < floor || add < floor) || total + add > budget) break;
+        total += add; end++;
+      }
+      if (end > i) runs.push({ start: i, end, from: list[i].units[0], to: list[end].units[1], count: end - i + 1, seconds: Math.round(total * 10) / 10, gain: end - i });
+      i = end + 1;
+    }
+    return runs;
+  }
+  // Lời dặn Muse gộp một dải cảnh quá ngắn (đưa vào phần SỬA LỖI của câu lệnh chia cảnh).
+  function shortFix(scenes, input = {}) {
+    const config = options(input);
+    const budget = fmtSeconds(config.seconds * 0.9);
+    const range = scene => (scene.units[0] === scene.units[1] ? String(scene.units[0]) : `${scene.units[0]}–${scene.units[1]}`);
+    const total = scenes.reduce((n, scene) => n + estimateSeconds(scene.voiceover || '', detectLanguage(scene.voiceover || '')), 0);
+    const parts = scenes.map(scene => `câu ${range(scene)} (${fmtSeconds(estimateSeconds(scene.voiceover || '', detectLanguage(scene.voiceover || '')))} giây)`).join('; ');
+    return `- Lần trước các câu này bị chia thành ${scenes.length} cảnh quá ngắn: ${parts}. Tổng lời đọc chỉ ${fmtSeconds(total)} giây, vừa MỘT clip (tối đa ${budget} giây). Nếu các câu này cùng địa điểm, cùng thời điểm và cùng mạch ý thì GỘP thành MỘT cảnh (một PROMPT, các mốc thời gian theo thứ tự câu); chỉ giữ tách khi thật sự đổi địa điểm hoặc nhảy thời gian.`;
+  }
+
   function lintScenes(scenes, input = {}) {
     const config = options(input);
     const warn = [];
@@ -1281,5 +1321,5 @@
     return entries.map((entry, index) => `${index + 1}\n${srtTime(entry.start)} --> ${srtTime(entry.end)}\n${entry.text}\n`).join('\n');
   }
 
-  return { ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, stripStepLabels, TIP_MINUTES, PLANT_MINUTES, HIST_MINUTES, TIP_SECS, tipPlan, tipParts, buildTipScriptInstruction, tipScriptFromReply, tipTrim, tipCheck, tipFix, MAX_SECONDS, MIN_SECONDS, sceneSeconds, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, lockLine, buildMuseInstruction, buildUnderstandInstruction, parseUnderstanding, understandRanges, understandingText, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, motionIssues, stripBeatTags, tipImagePrompt, finalImagePrompt, tipStartLine, subtitleChunks, srtTime, toSrt };
+  return { ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, stripStepLabels, TIP_MINUTES, PLANT_MINUTES, HIST_MINUTES, TIP_SECS, tipPlan, tipParts, buildTipScriptInstruction, tipScriptFromReply, tipTrim, tipCheck, tipFix, MAX_SECONDS, MIN_SECONDS, sceneSeconds, sceneFloor, shortRuns, shortFix, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, lockLine, buildMuseInstruction, buildUnderstandInstruction, parseUnderstanding, understandRanges, understandingText, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, motionIssues, stripBeatTags, tipImagePrompt, finalImagePrompt, tipStartLine, subtitleChunks, srtTime, toSrt };
 });

@@ -92,7 +92,11 @@ function brain(behavior = {}) {
     let list = units;
     if (behavior.skip && asked.length === 1) list = units.filter(u => !behavior.skip.includes(u.n));
     const groups = []; let cur = [];
-    for (const u of list) { if (cur.length && (cur.reduce((x, y) => x + y.s, 0) + u.s > 9 || u.n !== cur.at(-1).n + 1)) { groups.push(cur); cur = []; } cur.push(u); }
+    // behavior.fragment: Muse chia vụn, mỗi câu một cảnh (trừ khi được dặn gộp, hoặc behavior.stubborn: vẫn chia vụn dù được dặn).
+    const isMerge = /Lần trước các câu này bị chia thành \d+ cảnh quá ngắn/.test(text);
+    asked.at(-1).merge = isMerge;
+    const perScene = behavior.fragment && (!isMerge || behavior.stubborn) ? 1 : Infinity;
+    for (const u of list) { if (cur.length && (cur.length >= perScene || cur.reduce((x, y) => x + y.s, 0) + u.s > 9 || u.n !== cur.at(-1).n + 1)) { groups.push(cur); cur = []; } cur.push(u); }
     if (cur.length) groups.push(cur);
     const lines = [];
     if (!/NHÂN VẬT ĐÃ CHỐT/.test(text)) lines.push('NHÂN VẬT: Mai – theo ảnh tham chiếu; Bà Ba – 60 tuổi, tóc bạc búi, áo bà ba nâu');
@@ -184,6 +188,44 @@ function brain(behavior = {}) {
       assert.deepEqual(r.scenes.map(s => s.title), r.scenes.map((_, i) => `Cảnh ${i + 1}`));
       assert.ok(r.scenes.every(s => plan.estimateSeconds(s.voiceover) <= 10));
       await page.close(); ok('truyện dài: nhiều lượt, nhân vật chốt chuyển tiếp, đủ chữ đúng thứ tự');
+    }
+    // 3a. Muse chia vụn (mỗi câu một cảnh): app tự soát, nhờ Muse gộp đúng các dải ngắn; bản gộp ít cảnh hơn thì nhận, lời đọc vẫn nguyên văn.
+    {
+      const choppy = Array.from({ length: 12 }, (_, i) => `Mai bước chậm ${i + 1} bước.`).join(' ');
+      const { page, analyzer, museBrain, progress } = await session({ fragment: true });
+      const r = await analyzer.run({ script: choppy, options: cfg });
+      const merges = museBrain.asked.filter(a => a.merge);
+      assert.equal(merges.length, 2, 'hai dải ngắn (câu 1–6 và 7–11) → hai lượt nhờ gộp');
+      assert.deepEqual(merges.map(a => a.units), [[7, 8, 9, 10, 11], [1, 2, 3, 4, 5, 6]], 'gộp từ cuối bài về đầu để chỉ số cảnh không lệch');
+      assert.ok(merges.every(a => /SỬA LỖI/.test(a.text) && /GỘP thành MỘT cảnh/.test(a.text)), 'lượt gộp mang lời dặn gộp ở phần SỬA LỖI');
+      assert.ok(museBrain.asked[0].merge === false && museBrain.asked[0].units.length === 12, 'lượt đầu hỏi cả bài');
+      assert.equal(r.scenes.length, 3, 'từ 12 cảnh còn 3 (2 dải gộp + câu 12 đứng riêng vì gộp nữa thì vượt clip)');
+      assert.deepEqual(r.scenes.map(s => s.units), [[1, 6], [7, 11], [12, 12]]);
+      assert.equal(r.scenes.map(s => s.voiceover).join(' '), choppy, 'lời đọc vẫn nguyên văn, đúng thứ tự');
+      assert.ok(r.scenes.every(s => !s.offline && s.units && plan.estimateSeconds(s.voiceover) <= 10));
+      assert.deepEqual(r.scenes.map(s => s.title), r.scenes.map((_, i) => `Cảnh ${i + 1}`));
+      assert.ok(progress.some(p => /Phân tích · gộp \d+ cảnh quá ngắn…/.test(p)), progress.join(' | '));
+      await page.close(); ok('Muse chia vụn: app nhờ Muse gộp các cảnh quá ngắn, lời đọc vẫn nguyên văn');
+    }
+    // 3a2. Muse cứ chia vụn dù được dặn gộp: giữ nguyên bản cũ, không báo lỗi, không lặp vô hạn.
+    {
+      const choppy = Array.from({ length: 12 }, (_, i) => `Mai bước chậm ${i + 1} bước.`).join(' ');
+      const { page, analyzer, museBrain } = await session({ fragment: true, stubborn: true });
+      const r = await analyzer.run({ script: choppy, options: cfg });
+      assert.equal(r.scenes.length, 12, 'giữ nguyên các cảnh Muse đã chia');
+      assert.equal(r.scenes.map(s => s.voiceover).join(' '), choppy);
+      assert.ok(museBrain.asked.filter(a => a.merge).length <= 4, 'tối đa 4 lượt nhờ gộp');
+      assert.ok(!r.incomplete && r.scenes.every(s => !s.offline));
+      await page.close(); ok('Muse không chịu gộp: giữ nguyên, không báo lỗi, tối đa 4 lượt nhờ');
+    }
+    // 3a3. Muse chia vừa phải thì KHÔNG bị nhờ gộp (không tốn thêm lượt).
+    {
+      const { page, analyzer, museBrain } = await session({});
+      const r = await analyzer.run({ script: tale, options: cfg });
+      assert.equal(museBrain.asked.filter(a => a.merge).length, 0);
+      assert.equal(museBrain.asked.length, 1);
+      assert.equal(r.scenes.length, 3);
+      await page.close(); ok('cảnh đã đủ dài: không nhờ gộp thêm');
     }
     // 3b. Truyện RẤT dài (hơn 100 cảnh theo thời lượng): không giới hạn; Muse vẫn được hỏi từng lượt, app không chia nhanh trước.
     {
