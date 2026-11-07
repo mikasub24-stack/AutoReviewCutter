@@ -36,6 +36,12 @@ jobs:
             error = $null
           }
           try {
+            # Scan the runtime files directly as well as the original archives.
+            # The installer is copied unchanged from the original build.
+            Expand-Archive (Join-Path $root 'VocalStudio-1.9.1-Windows.zip') (Join-Path $root 'extracted-runtime')
+            $report['scope'] = 'Original package and extracted portable runtime'
+            $signature = Get-AuthenticodeSignature (Join-Path $root 'VocalStudio-1.9.1-Setup.exe')
+            $report['installerSignature'] = $signature.Status.ToString()
             $report.files = @(Get-ChildItem $root -File -Recurse | ForEach-Object {
               [ordered]@{ name = $_.FullName.Substring($root.Length + 1); sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); bytes = $_.Length }
             })
@@ -77,3 +83,21 @@ jobs:
           name: VocalStudio-1.9.1-DefenderReport
           path: reports/
           if-no-files-found: warn
+      - name: Package unchanged installer with scan evidence
+        if: success()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force installer | Out-Null
+          Copy-Item package/VocalStudio-1.9.1-Setup.exe installer/
+          Copy-Item reports/DefenderReport.json installer/
+          $expected = 'cdebc3221062eeae7da1cf9d22ea1d47e080c330cc077702375c7d64d6e8b587'
+          $actual = (Get-FileHash installer/VocalStudio-1.9.1-Setup.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw 'Installer hash differs from the original build' }
+          "$actual  VocalStudio-1.9.1-Setup.exe" | Set-Content installer/SHA256.txt -Encoding ascii
+      - name: Upload installer and evidence only
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: VocalStudio-1.9.1-Setup-DefenderChecked
+          path: installer/
+          if-no-files-found: error
