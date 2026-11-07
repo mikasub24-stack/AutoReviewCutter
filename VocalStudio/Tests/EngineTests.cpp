@@ -58,6 +58,11 @@ int runStudioSelfTests(const juce::String& commandLine){
             check(juce::Time::getMillisecondCounterHiRes()-began<1000&&std::abs(audio32.getSample(0,255)-.2f)<.00001f,"x86 helper crash preserves host and dry vocal within bounded time");
             bridged.reset();
             auto reopened=bridgeFormats.createPluginInstance(*found[0],48000,256,error);check(reopened!=nullptr,"restart bridge after plugin crash");reopened->setStateInformation(saved32.getData(),static_cast<int>(saved32.getSize()));check(std::abs(reopened->getParameters()[0]->getValue()-.5f)<.00001f,"restore x86 saved value in fresh helper");
+            StudioEngine session32;session32.prepareForTest();session32.setSessionDirectory(directory);
+            check(session32.installReverbPlugin(std::move(reopened)).wasOk(),"install x86 effect in reverb slot");
+            const auto project32=directory.getChildFile("Bridge32.vocalstudio");check(session32.saveProject(project32).wasOk(),"save x86 reverb session");
+            {StudioEngine restored32;restored32.prepareForTest();check(restored32.loadProject(project32).wasOk()&&restored32.reverbPluginInstance()!=nullptr,"restore x86 reverb in new engine");check(std::abs(restored32.reverbPluginInstance()->getParameters()[0]->getValue()-.5f)<.00001f,"x86 effect controls survive engine restart");
+             for(int c=0;c<2;++c)for(int i=0;i<256;++i)audio32.setSample(c,i,.2f);restored32.reverbPluginInstance()->processBlock(audio32,midi32);check(std::abs(audio32.getSample(0,255)-.1f)<.00001f,"restored x86 effect processor uses saved setting");}
             passed.add("real x86 VST2 scan, audio, timing, parameter/chunk restore, helper crash containment and restart");
         }
         const auto vst2Fixture=argument("--vst2-fixture");

@@ -4,10 +4,10 @@
 #if JUCE_WINDOWS && defined(_WIN64)
 namespace {
 class Bridge;
-class Parameter final:public juce::AudioPluginInstance::HostedParameter {
+class BridgeParameter final:public juce::AudioPluginInstance::HostedParameter {
     Bridge& owner;int index;juce::String title,label;float initial;
 public:
-    Parameter(Bridge& p,int i,const juce::var& meta);
+    BridgeParameter(Bridge& p,int i,const juce::var& meta);
     juce::String getParameterID() const override{return "vst2-"+juce::String(index);}
     float getValue() const override;void setValue(float) override;
     float getDefaultValue() const override{return initial;}
@@ -30,7 +30,12 @@ public:
         if(failed||!shared||!child.hProcess)return false;
         shared->success=0;shared->command=cmd;ResetEvent(response);SetEvent(request);
         HANDLE handles[]={response,child.hProcess};
-        if(WaitForMultipleObjects(2,handles,FALSE,timeout)!=WAIT_OBJECT_0){failed=true;return false;}
+        if(WaitForMultipleObjects(2,handles,FALSE,timeout)!=WAIT_OBJECT_0){
+            failed=true;
+            const auto pluginName=description.name;
+            if(pluginName.isNotEmpty())juce::MessageManager::callAsync([pluginName]{juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,juce::String::fromUTF8("Plugin 32-bit đã dừng"),pluginName+juce::String::fromUTF8(" không phản hồi hoặc bị lỗi. App giữ tiếng giọng khô. Hãy bỏ plugin rồi nạp lại, hoặc chọn vang khác."));});
+            return false;
+        }
         if(!shared->success){failed=true;return false;}return true;
     }
     bool initialise(const juce::File& file,juce::String& error){
@@ -51,7 +56,7 @@ public:
         if(!xml||!description.loadFromXml(*xml)||shared->inputs<1||shared->inputs>2||shared->outputs<1||shared->outputs>2||shared->parameterCount>vstbridge::maxParams){error="Invalid 32-bit plugin description";return false;}
         auto layout=getBusesLayout();layout.inputBuses.set(0,juce::AudioChannelSet::canonicalChannelSet(static_cast<int>(shared->inputs)));layout.outputBuses.set(0,juce::AudioChannelSet::canonicalChannelSet(static_cast<int>(shared->outputs)));if(!setBusesLayout(layout)){error="Unsupported bridge channel layout";return false;}
         const auto* params=meta["parameters"].getArray();if(!params||params->size()!=static_cast<int>(shared->parameterCount)){error="Invalid bridge parameter metadata";return false;}
-        for(int i=0;i<params->size();++i)addHostedParameter(std::make_unique<Parameter>(*this,i,(*params)[i]));
+        for(int i=0;i<params->size();++i)addHostedParameter(std::make_unique<BridgeParameter>(*this,i,(*params)[i]));
         setLatencySamples(static_cast<int>(shared->latency));getStateInformation(cachedState);return !failed;
     }
     const juce::String getName() const override{return description.name;}
@@ -61,7 +66,10 @@ public:
     void releaseResources() override{const juce::ScopedLock lock(mutex);if(prepared&&!failed)exchange(vstbridge::release);prepared=false;}
     void reset() override{const juce::ScopedLock lock(mutex);if(prepared&&!failed)exchange(vstbridge::reset);}
     void processBlock(juce::AudioBuffer<float>& audio,juce::MidiBuffer&) override{
-        const juce::ScopedLock lock(mutex);const auto n=audio.getNumSamples();
+        // Editor/state requests must not stall the sound card callback while
+        // the helper UI opens a window or a plugin performs slow file I/O.
+        const juce::ScopedTryLock lock(mutex);if(!lock.isLocked())return;
+        const auto n=audio.getNumSamples();
         // On helper crash or timeout leave the dry vocal audible; never wait
         // indefinitely on an external plugin from the audio callback.
         if(!prepared||failed||n>vstbridge::maxFrames)return;
@@ -81,9 +89,9 @@ public:
     void setStateInformation(const void* data,int size) override{const juce::ScopedLock lock(mutex);if(failed||size<0||size>vstbridge::stateCapacity)return;memcpy(shared->state,data,static_cast<size_t>(size));shared->stateBytes=static_cast<uint32_t>(size);if(exchange(vstbridge::setState))cachedState.replaceAll(data,static_cast<size_t>(size));}
     void show(bool visible){const juce::ScopedLock lock(mutex);if(!failed)exchange(visible?vstbridge::showEditor:vstbridge::hideEditor);}
 };
-Parameter::Parameter(Bridge& p,int i,const juce::var& meta):owner(p),index(i),title(meta["name"].toString()),label(meta["label"].toString()),initial(static_cast<float>(meta["default"])){}
-float Parameter::getValue() const{return vstbridge::number(InterlockedCompareExchange(&owner.shared->parameterValues[index],0,0));}
-void Parameter::setValue(float v){if(!std::isfinite(v))return;const auto b=vstbridge::bits(juce::jlimit(0.f,1.f,v));InterlockedExchange(&owner.shared->parameterValues[index],b);InterlockedExchange(&owner.shared->pendingValues[index],b);InterlockedExchange(&owner.shared->dirty[index],1);}
+BridgeParameter::BridgeParameter(Bridge& p,int i,const juce::var& meta):owner(p),index(i),title(meta["name"].toString()),label(meta["label"].toString()),initial(static_cast<float>(meta["default"])){}
+float BridgeParameter::getValue() const{return vstbridge::number(InterlockedCompareExchange(&owner.shared->parameterValues[index],0,0));}
+void BridgeParameter::setValue(float v){if(!std::isfinite(v))return;const auto b=vstbridge::bits(juce::jlimit(0.f,1.f,v));InterlockedExchange(&owner.shared->parameterValues[index],b);InterlockedExchange(&owner.shared->pendingValues[index],b);InterlockedExchange(&owner.shared->dirty[index],1);}
 class BridgeEditor final:public juce::AudioProcessorEditor {
     Bridge& bridge;juce::Label label;juce::TextButton open{juce::String::fromUTF8("Mở cửa sổ vang 32-bit")};
 public:

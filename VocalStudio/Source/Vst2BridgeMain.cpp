@@ -54,6 +54,11 @@ public:
         parent=OpenProcess(SYNCHRONIZE,FALSE,static_cast<DWORD>(arg("--parent").getLargeIntValue()));
         if(mapping)shared=static_cast<vstbridge::Shared*>(MapViewOfFile(mapping,FILE_MAP_ALL_ACCESS,0,0,sizeof(vstbridge::Shared)));
         if(!shared||!request||!response||!parent||shared->protocol!=vstbridge::version){setApplicationReturnValue(2);quit();return;}
+        // This helper hosts exactly one DLL. Its working directory may safely
+        // follow that DLL for older plugins with adjacent resources/dependencies.
+        const auto pluginFile=juce::File(arg("--plugin"));
+        pluginFile.getParentDirectory().setAsCurrentWorkingDirectory();
+        SetDllDirectoryW(pluginFile.getParentDirectory().getFullPathName().toWideCharPointer());
         auto format=createVst2Format();juce::OwnedArray<juce::PluginDescription> descriptions;format->findAllTypesForFile(descriptions,arg("--plugin"));
         if(descriptions.isEmpty()){setApplicationReturnValue(3);quit();return;}
         juce::String error;juce::AudioPluginFormatManager manager;manager.addFormat(format.release());plugin=manager.createPluginInstance(*descriptions[0],48000,256,error);
