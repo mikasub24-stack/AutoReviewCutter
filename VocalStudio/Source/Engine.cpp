@@ -1,5 +1,6 @@
 #include "Engine.h"
 #include "Vst2Host.h"
+#include "VoiceSetup.h"
 #include <algorithm>
 #include <cmath>
 
@@ -237,8 +238,9 @@ juce::var StudioEngine::projectState(const vocal::EqSettings* storedEq) const {
     return juce::var(state);
 }
 juce::Result StudioEngine::saveProject(const juce::File& file,const vocal::EqSettings* storedEq){if(file.getParentDirectory().createDirectory().failed())return juce::Result::fail(juce::String::fromUTF8("Không tạo được thư mục dự án."));juce::TemporaryFile temp(file);if(!temp.getFile().replaceWithText(juce::JSON::toString(projectState(storedEq),true)))return juce::Result::fail(juce::String::fromUTF8("Không ghi được dự án tạm."));if(!temp.overwriteTargetFileWithTemporary())return juce::Result::fail(juce::String::fromUTF8("Không cập nhật được dự án. Dữ liệu cũ được giữ nguyên."));return juce::Result::ok();}
-juce::Result StudioEngine::loadProject(const juce::File& file,bool loadExternalPlugins){
+juce::Result StudioEngine::loadProject(const juce::File& file,bool loadExternalPlugins,bool tunerOnly){
     if(isRecording())return juce::Result::fail(juce::String::fromUTF8("Dừng thu trước khi mở dự án."));playing.store(false);auto state=juce::JSON::parse(file);if(!state.isObject()||static_cast<int>(state["schema"])!=1||!state["tracks"].isArray())return juce::Result::fail(juce::String::fromUTF8("Định dạng dự án không hợp lệ."));
+    if(tunerOnly)state=voiceSetup::tunerOnly(state);
     if(!loadExternalPlugins)for(const auto* key:{"plugin","eqPlugin","reverbPlugin"})state.getDynamicObject()->removeProperty(key);
     std::vector<std::unique_ptr<StudioTrack>> loaded;
     for(const auto& row:*state["tracks"].getArray()){if(loaded.size()>=24)return juce::Result::fail(juce::String::fromUTF8("Giới hạn 24 track trong phiên bản này."));std::unique_ptr<StudioTrack> t;auto path=file.getParentDirectory().getChildFile(row["file"].toString());auto result=readTrack(path,static_cast<bool>(row["vocal"]),t);if(result.failed())return result;

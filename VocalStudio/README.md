@@ -270,3 +270,26 @@ retain the user's saved faders and do not reapply the preset. Recovery skips tha
 one-time initialization.
 The older singing preset remains available lower in the panel. This is not a
 voice-specific mix verified by listening to the user's recording.
+
+
+### 1.9.5 — built-in effects and tuner only
+
+The singing page contains direct faders for music, headphones, vocal monitoring,
+mic gain, compression, warmth/presence, hidden room, short room, long reverb and
+delay. Fixed sound-preset buttons and external EQ/reverb selectors/editors are
+removed from this page. Auto-Tune is the only third-party slot exposed; its scan
+list filters to Auto-Tune module names, with manual file selection when absent.
+
+Startup, explicit project opening and saves strip legacy external `eqPlugin` and
+`reverbPlugin` slots from the app's setup. They are not merely hidden or set to
+zero: they are not restored into the processing chain. The primary tuner's path,
+opaque state and parameter values, built-in FX, and headphone/music faders remain
+saved. No installed vendor plugin DLLs are deleted. Low-level compatibility host
+code remains for engine tests, but the production app has no auxiliary loaders.
+
+The process-restart verification now seeds a legacy three-slot profile and checks
+that the next launches retain the tuner and every built-in fader, discard the two
+auxiliary slots even when their files are present, survive recovery, and do not
+re-add those slots when old DLLs return. This runs for both built and installed
+executables. DSP/reverb choices are general-purpose; the user's video was not
+listened to or used as an isolated vocal EQ reference.

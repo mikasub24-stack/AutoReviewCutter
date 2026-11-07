@@ -46,7 +46,7 @@ function Test-Persistence([string]$Directory, [string]$ReportPrefix) {
     Copy-Item $fixture64 (Join-Path $probeDir 'Tune.dll')
     Copy-Item $fixture64 (Join-Path $probeDir 'Eq.dll')
     Copy-Item (Join-Path $build 'Vst2Fixture32.dll') (Join-Path $probeDir 'Verb32.dll')
-    foreach ($mode in @('seed','reopen','missing-eq','recovery','restored')) {
+    foreach ($mode in @('seed-legacy','reopen','missing-eq','recovery','restored')) {
         if ($mode -eq 'missing-eq') { Move-Item (Join-Path $probeDir 'Eq.dll') (Join-Path $probeDir 'Eq.hidden') }
         if ($mode -eq 'recovery') { Set-Content (Join-Path $probeDir 'RunningSession.marker') 'simulate unclean exit' }
         if ($mode -eq 'restored') { Move-Item (Join-Path $probeDir 'Eq.hidden') (Join-Path $probeDir 'Eq.dll') }
@@ -76,7 +76,7 @@ if ($iscc) { $compiler = $iscc.Source } else { $compiler = Join-Path ${env:Progr
 if (!(Test-Path $compiler)) { throw 'Install Inno Setup 6 to package the installer; the built app is in the build folder.' }
 & $compiler "/DSourceDir=$appDir" "/DOutputDir=$dist" 'VocalStudio/installer/VocalStudio.iss'
 if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
-$setup = Join-Path $dist 'VocalStudio-1.9.4-Setup.exe'
+$setup = Join-Path $dist 'VocalStudio-1.9.5-Setup.exe'
 $installDir = Join-Path ([IO.Path]::GetTempPath()) ('VocalStudio-verify-' + [Guid]::NewGuid().ToString('N'))
 $process = Start-Process $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$installDir`"") -Wait -PassThru
 if ($process.ExitCode -ne 0) { throw 'Test installation failed' }
@@ -89,7 +89,7 @@ Test-Persistence $installDir 'InstalledPersistence'
 Test-Browser $installDir 'InstalledBrowserSelfTest.json'
 $uninstaller = Join-Path $installDir 'unins000.exe'
 if (Test-Path $uninstaller) { Start-Process $uninstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait | Out-Null }
-Compress-Archive -Path "$appDir/*" -DestinationPath (Join-Path $dist 'VocalStudio-1.9.4-Windows.zip') -Force
+Compress-Archive -Path "$appDir/*" -DestinationPath (Join-Path $dist 'VocalStudio-1.9.5-Windows.zip') -Force
 Copy-Item (Join-Path $build 'EngineSelfTest.json') $dist
 Copy-Item (Join-Path $build 'Testing/Temporary/LastTest.log') (Join-Path $dist 'VocalStudio-Verification.log')
 & (Join-Path $PSScriptRoot 'scan-windows.ps1') -RuntimeDirectory $appDir -PackageDirectory $dist

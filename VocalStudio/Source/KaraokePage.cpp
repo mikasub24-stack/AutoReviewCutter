@@ -4,30 +4,22 @@ KaraokePage::KaraokePage(StudioMain& main):owner(main),browser(main.engine.liveM
     auto& e=owner.engine;auto* settings=owner.settings();e.liveMode=true;e.liveMusic->setSemitones(settings->getIntValue("liveTranspose",0));e.liveMusic->gain=static_cast<float>(settings->getDoubleValue("liveMusicGain",.7));e.monitor=settings->getBoolValue("liveMonitor",false);e.inputChannel=juce::jmax(0,settings->getIntValue("liveInputChannel",0));
     for(juce::Component* c:std::initializer_list<juce::Component*>{&browser,&search,&open,&back,&home,&advanced,&title})addAndMakeVisible(c);
     addAndMakeVisible(sidebar);sidebar.setViewedComponent(&controls,false);sidebar.setScrollBarsShown(true,false);
-    for(juce::Component* c:std::initializer_list<juce::Component*>{&phonesLevel,&phonesLabel,&hiddenRoom,&hiddenLabel,&smoothPreset,&musicDuck,&duckLabel,&reverbPluginMixLabel,&reverbMix,&monitorHint,&down,&up,&reset,&devices,&fx,&antares,&loadPlugin,&mic,&record,&autoEq,&polish,&fixTune,&scanTune,&scanEq,&scanReverb,&editEq,&removeEq,&lowLatency,&enableTune,&livePreset,&saveVoice,&loadReverb,&editReverb,&removeReverb,&monitorLabel,&shortLabel,&compressionLabel,&colourLabel,&monitorLevel,&shortRoom,&compression,&colour,&offset,&key,&status,&musicLabel,&micLabel,&reverbLabel,&delayLabel,&music,&micGain,&reverb,&delay,&keySelect,&scaleSelect,&autoKey,&keepPluginKey,&input})controls.addAndMakeVisible(c);
+    for(juce::Component* c:std::initializer_list<juce::Component*>{&warmthLevel,&presenceLevel,&warmthLabel,&presenceLabel,&phonesLevel,&phonesLabel,&hiddenRoom,&hiddenLabel,&musicDuck,&duckLabel,&monitorHint,&down,&up,&reset,&devices,&antares,&mic,&record,&scanTune,&lowLatency,&saveVoice,&monitorLabel,&shortLabel,&compressionLabel,&monitorLevel,&shortRoom,&compression,&offset,&key,&status,&musicLabel,&micLabel,&reverbLabel,&delayLabel,&music,&micGain,&reverb,&delay,&keySelect,&scaleSelect,&autoKey,&keepPluginKey,&input})controls.addAndMakeVisible(c);
     monitorHint.setText(u("Tai nghe: nghe FX qua app.\nDirect Monitor / DSP trên sound card: OFF."),juce::dontSendNotification);monitorHint.setFont(12);
     input.setTextWhenNothingSelected(u("Ngõ micro"));input.onChange=[this]{owner.engine.inputChannel=input.getSelectedItemIndex();};
     title.setText(u("VOCAL STUDIO  /  HÁT VỚI YOUTUBE"),juce::dontSendNotification);title.setFont(juce::Font(22,juce::Font::bold));title.setColour(juce::Label::textColourId,juce::Colour(0xff6fe1c7));
     auto button=[](juce::TextButton& b,const char* text,std::function<void()> action){b.setButtonText(u(text));b.onClick=std::move(action);};
     button(open,"Mở / Tìm",[this]{browser.navigate(search.getText());});button(back,"←",[this]{browser.back();});button(home,"YouTube",[this]{browser.home();});search.setTextToShowWhenEmpty(u("Dán link YouTube hoặc nhập tên bài karaoke…"),juce::Colour(0xff8290a3));search.onReturnKey=[this]{browser.navigate(search.getText());};
     button(down,"−½ cung",[this]{change(-1);});button(up,"+½ cung",[this]{change(1);});button(reset,"Về tone gốc",[this]{owner.engine.liveMusic->setSemitones(0);sendKey();});down.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff19564e));up.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff19564e));
-    button(advanced,"Studio nâng cao",[this]{leave();});button(devices,"Sound card",[this]{owner.openSoundCard();});button(fx,"Menu vang / verb / FX",[this]{owner.showVocalTools();});button(antares,"Mở Antares",[this]{owner.openAntaresEditor();});button(loadPlugin,"Chọn Auto-Tune VST2/3",[this]{owner.chooseAntaresPlugin();});button(mic,"Bật micro",[this]{auto& e=owner.engine;e.monitor=!e.monitor.load();});button(record,"Thu giọng",[this]{owner.record();});
-    button(scanTune,"Quét Auto-Tune",[this]{owner.scanPlugins(0);});button(scanEq,"Quét EQ / Pro-Q 3",[this]{owner.scanPlugins(2);});button(scanReverb,"Quét vang trên máy",[this]{owner.scanPlugins(1);});button(editEq,"Mở EQ",[this]{owner.openEqEditor();});button(removeEq,"Bỏ EQ plugin",[this]{owner.clearEqPlugin();});button(lowLatency,"Kiểm âm ít trễ",[this]{owner.lowLatencyMonitoring();});
-    button(enableTune,"Bật Auto-Tune · giữ cài đặt",[this]{if(!owner.engine.pluginInstance()){owner.scanPlugins(0);return;}keepPluginKey.setToggleState(true,juce::dontSendNotification);autoKey.setToggleState(false,juce::dontSendNotification);owner.engine.enableTunerForMonitoring();owner.save();owner.status(u("Auto-Tune đang bật · giữ Key/Scale và thiết lập trong plugin. Chọn đúng tone bài hoặc Chromatic trong Mở Antares."));});
+    button(advanced,"Studio nâng cao",[this]{leave();});button(devices,"Sound card",[this]{owner.openSoundCard();});button(antares,"Mở Antares",[this]{owner.openAntaresEditor();});button(mic,"Bật micro",[this]{auto& e=owner.engine;e.monitor=!e.monitor.load();});button(record,"Thu giọng",[this]{owner.record();});
+    button(scanTune,"Quét Auto-Tune",[this]{owner.scanPlugins(0);});button(lowLatency,"Kiểm âm ít trễ",[this]{owner.lowLatencyMonitoring();});
+
     button(saveVoice,"Lưu cấu hình giọng",[this]{if(owner.isBusy())return;if(owner.save())owner.status(owner.savedVoiceSummary());});
-    button(livePreset,"Preset hát có vang",[this]{if(owner.isBusy())return;owner.engine.liveVocalPreset();owner.engine.monitor=true;owner.save();owner.status(u("Đã đặt EQ nhẹ, nén vừa, vang nhẹ và giọng tai nghe +6 dB. Auto-Tune chỉ chỉnh Retune/Humanize/Flex nếu xác minh được đơn vị; giữ Key/Scale và Input Type. Nghe A/B và lưu khi phù hợp."));});
-    button(smoothPreset,"Cân giọng · Nén rõ",[this]{if(owner.isBusy())return;owner.engine.basicLivePreset();owner.engine.monitor=true;if(owner.save())owner.status(u("Đã cân giọng cơ bản: nén vừa, nhạc lùi tối đa 3 dB, mức tai nghe tối thiểu +3 dB. Dùng vang tích hợp cơ bản như bản cũ; vang plugin ở mức 0. Antares và EQ plugin giữ nguyên. Kéo các thanh vang để chỉnh thêm theo ý bạn."));});
-    smoothPreset.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff19564e));
-    colour.addItemList({u("Tự nhiên"),u("Ấm dày"),u("Sáng rõ")},1);
-    colour.setTextWhenNothingSelected(u("Màu giọng · Tùy chỉnh"));
-    colour.onChange=[this]{if(owner.isBusy())return;owner.engine.setVoiceColour(colour.getSelectedId());owner.save();};
-    colourLabel.setText(u("Màu giọng"),juce::dontSendNotification);
-    button(loadReverb,"Nạp vang VST2/3",[this]{owner.chooseReverbPlugin();});button(editReverb,"Mở vang",[this]{owner.openReverbEditor();});button(removeReverb,"Bỏ vang plugin",[this]{owner.clearReverbPlugin();});
-    button(fixTune,"Fix méo Auto-Tune",[this]{sendKey();owner.showTuneFix();});fixTune.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff19564e));
-    button(polish,"Tự mix vocal / Mượt giọng",[this]{owner.showPolish();});
-    button(autoEq,"Hát 1 bài → Cân EQ",[this]{owner.showAutoEq();});
+
     auto slider=[](juce::Slider& s,double lo,double hi,double step){s.setRange(lo,hi,step);s.setSliderStyle(juce::Slider::LinearHorizontal);s.setTextBoxStyle(juce::Slider::TextBoxRight,false,65,22);};slider(music,0,150,1);music.setTextValueSuffix(" %");music.setValue(e.liveMusic->gain.load()*100,juce::dontSendNotification);music.onValueChange=[this]{owner.engine.liveMusic->gain=static_cast<float>(music.getValue()*.01);};slider(micGain,-24,12,.1);micGain.setTextValueSuffix(" dB");micGain.setValue(e.inputDb.load(),juce::dontSendNotification);micGain.onValueChange=[this]{owner.engine.inputDb=static_cast<float>(micGain.getValue());};slider(reverb,0,40,1);reverb.setTextValueSuffix(" %");reverb.onValueChange=[this]{owner.engine.reverb=static_cast<float>(reverb.getValue()*.01);};slider(delay,0,30,1);delay.setTextValueSuffix(" %");delay.onValueChange=[this]{owner.engine.delay=static_cast<float>(delay.getValue()*.01);};
-    slider(reverbMix,0,100,1);reverbMix.setTextValueSuffix(" %");reverbMix.onValueChange=[this]{if(!owner.isBusy())owner.engine.reverbPluginMix=static_cast<float>(reverbMix.getValue()*.01);};reverbPluginMixLabel.setText(u("Vang plugin"),juce::dontSendNotification);
+
+    slider(warmthLevel,-8,6,.5);warmthLevel.setTextValueSuffix(" dB");warmthLevel.onValueChange=[this]{owner.engine.warmth=static_cast<float>(warmthLevel.getValue());};warmthLabel.setText(u("Ấm giọng"),juce::dontSendNotification);
+    slider(presenceLevel,-6,8,.5);presenceLevel.setTextValueSuffix(" dB");presenceLevel.onValueChange=[this]{owner.engine.presence=static_cast<float>(presenceLevel.getValue());};presenceLabel.setText(u("Sáng / Rõ"),juce::dontSendNotification);
     slider(phonesLevel,-12,6,.5);phonesLevel.setTextValueSuffix(" dB");phonesLevel.onValueChange=[this]{owner.engine.headphoneDb=static_cast<float>(phonesLevel.getValue());};phonesLabel.setText(u("Âm tai nghe"),juce::dontSendNotification);phonesLevel.setTooltip(u("Cùng tăng/giảm cả nhạc và giọng khi nghe; không tăng mức file xuất. Đỉnh âm vẫn được giới hạn."));
     slider(hiddenRoom,0,20,1);hiddenRoom.setTextValueSuffix(" %");hiddenRoom.onValueChange=[this]{owner.engine.hiddenReverb=static_cast<float>(hiddenRoom.getValue()*.01);};hiddenLabel.setText(u("Vang ẩn"),juce::dontSendNotification);hiddenRoom.setTooltip(u("Nhánh vang ngắn nhẹ, tối, nằm dưới giọng. Dùng chung độ dài với vang ngắn; không phải plugin khác."));
     slider(musicDuck,0,6,.1);musicDuck.setTextValueSuffix(" dB");musicDuck.onValueChange=[this]{owner.engine.musicDuckingDb=static_cast<float>(musicDuck.getValue());};duckLabel.setText(u("Nhạc lùi khi hát"),juce::dontSendNotification);musicDuck.setTooltip(u("0 = tắt. Hạ nhạc tối đa mức này theo giọng khô, không theo đuôi vang. Chọn đúng ngõ micro để tránh bắt nhạc loopback."));
@@ -47,21 +39,15 @@ void KaraokePage::leave(){if(owner.engine.isRecording()){owner.status(u("Dừng 
 void KaraokePage::change(int step){auto& m=*owner.engine.liveMusic;m.setSemitones(m.semitones()+step);sendKey();timerCallback();}
 void KaraokePage::sendKey(){auto& e=owner.engine;if(keepPluginKey.getToggleState()){e.usePluginKey();key.setText(u("Key/Scale: đặt trong Auto-Tune"),juce::dontSendNotification);return;}const auto source=e.liveMusic->key();const int base=autoKey.getToggleState()?(browser.advertisement()?-1:source.tonic):keySelect.getSelectedId()-1;const bool minor=autoKey.getToggleState()?source.minor:scaleSelect.getSelectedId()==2;const int note=base<0?-1:(base+e.liveMusic->semitones()+24)%12;if(note!=lastKey||minor!=lastMinor||revision!=source.revision||lastPlugin!=e.pluginInstance()){e.setLiveSongKey(note,minor);lastPlugin=e.pluginInstance();lastKey=note;lastMinor=minor;revision=source.revision;}key.setText(note<0?u("Đang nghe để dò tone…"):u("Tone đang hát: ")+juce::String(vocal::noteName(60+note))+(minor?" minor":" major"),juce::dontSendNotification);}
 void KaraokePage::timerCallback(){if(!isVisible())return;auto& e=owner.engine;e.liveMode=true;const auto names=e.inputNames();if(input.getNumItems()!=names.size()||(names.size()>0&&input.getItemText(0)!=names[0])){input.clear(juce::dontSendNotification);input.addItemList(names,1);}input.setSelectedItemIndex(e.inputChannel.load(),juce::dontSendNotification);sendKey();const int n=e.liveMusic->semitones();offset.setText((n>0?"+":"")+juce::String(n)+u(" bán âm"),juce::dontSendNotification);down.setEnabled(n>-12);up.setEnabled(n<12);keySelect.setEnabled(!autoKey.getToggleState()&&!keepPluginKey.getToggleState());scaleSelect.setEnabled(!autoKey.getToggleState()&&!keepPluginKey.getToggleState());mic.setButtonText(e.monitor.load()?u("Micro đang bật · Tắt"):u("Bật micro để hát"));record.setButtonText(e.isRecording()?u("Dừng thu giọng"):u("Thu giọng"));reverb.setValue(e.reverb.load()*100,juce::dontSendNotification);delay.setValue(e.delay.load()*100,juce::dontSendNotification);
-    for(juce::Component* control:std::initializer_list<juce::Component*>{&monitorLevel,&shortRoom,&compression,&colour,&livePreset,&smoothPreset,&musicDuck,&phonesLevel,&hiddenRoom})control->setEnabled(!owner.isBusy());
-    reverbMix.setEnabled(!owner.isBusy()&&e.reverbPluginInstance());if(!reverbMix.isMouseButtonDown())reverbMix.setValue(e.reverbPluginMix.load()*100,juce::dontSendNotification);lowLatency.setButtonText(u("Ít trễ · driver/plugin báo ~")+juce::String(e.latencyMs(),1)+" ms");
-    const auto tuneName=owner.selectedPluginName(0),eqName=owner.selectedPluginName(1),verbName=owner.selectedPluginName(2);
+    for(juce::Component* control:std::initializer_list<juce::Component*>{&warmthLevel,&presenceLevel,&monitorLevel,&shortRoom,&compression,&musicDuck,&phonesLevel,&hiddenRoom})control->setEnabled(!owner.isBusy());
+    const auto tuneName=owner.selectedPluginName(0);
     scanTune.setButtonText(tuneName.isEmpty()?u("Quét Auto-Tune"):tuneName);
-    scanEq.setButtonText(eqName.isEmpty()?u("Quét EQ / Pro-Q 3"):eqName);
-    scanReverb.setButtonText(verbName.isEmpty()?u("Quét vang trên máy"):verbName);
-    scanTune.setTooltip(u("Quét / chọn Auto-Tune. ")+tuneName);scanEq.setTooltip(u("Quét / chọn EQ. ")+eqName);scanReverb.setTooltip(u("Quét / chọn vang. ")+verbName);
-    scanTune.setEnabled(owner.canEdit());scanEq.setEnabled(owner.canEdit());scanReverb.setEnabled(owner.canEdit());editEq.setEnabled(!owner.isBusy()&&owner.engine.eqPluginInstance());removeEq.setEnabled(owner.canEdit()&&!eqName.isEmpty());lowLatency.setEnabled(owner.canEdit());enableTune.setEnabled(!owner.isBusy());
-    saveVoice.setEnabled(!owner.isBusy());loadReverb.setEnabled(owner.canEdit());editReverb.setEnabled(!owner.isBusy()&&e.reverbPluginInstance());removeReverb.setEnabled(owner.canEdit()&&!verbName.isEmpty());
-    int colourId=0;
-    const auto eq=e.eqSettings();
-    if(std::abs(eq.warmth)<.01f&&std::abs(eq.presence)<.01f)colourId=1;
-    if(std::abs(eq.warmth-2)<.01f&&std::abs(eq.presence-.5f)<.01f)colourId=2;
-    if(std::abs(eq.warmth+1)<.01f&&std::abs(eq.presence-2.5f)<.01f)colourId=3;
-    colour.setSelectedId(colourId,juce::dontSendNotification);
+
+    scanTune.setTooltip(u("Quét / chọn Auto-Tune. ")+tuneName);
+    scanTune.setEnabled(owner.canEdit());lowLatency.setEnabled(owner.canEdit());
+    saveVoice.setEnabled(!owner.isBusy());
+    if(!warmthLevel.isMouseButtonDown())warmthLevel.setValue(e.warmth.load(),juce::dontSendNotification);
+    if(!presenceLevel.isMouseButtonDown())presenceLevel.setValue(e.presence.load(),juce::dontSendNotification);
     if(!phonesLevel.isMouseButtonDown())phonesLevel.setValue(e.headphoneDb.load(),juce::dontSendNotification);
     if(!hiddenRoom.isMouseButtonDown())hiddenRoom.setValue(e.hiddenReverb.load()*100,juce::dontSendNotification);
     if(!musicDuck.isMouseButtonDown())musicDuck.setValue(e.musicDuckingDb.load(),juce::dontSendNotification);
@@ -71,8 +57,7 @@ void KaraokePage::timerCallback(){if(!isVisible())return;auto& e=owner.engine;e.
     if(!micGain.isMouseButtonDown())micGain.setValue(e.inputDb.load(),juce::dontSendNotification);
     if(!compression.isMouseButtonDown())compression.setValue((e.ratio.load()-1)/3*100,juce::dontSendNotification);
     juce::String info=u("Mở bài trên YouTube rồi hát. Mỗi lần bấm = 1 bán âm; tốc độ nhạc giữ nguyên.\n\n")+e.deviceSummary()+"\n\n"+e.pluginName()+"\n"+e.toneLinkStatus;
-    info+=u("\nEQ plugin: ")+(eqName.isEmpty()?u("chưa chọn"):eqName);
-    info+=u("\nVang plugin: ")+(verbName.isEmpty()?u("chưa chọn"):verbName);
+
     info+=u("\nNhạc đang lùi: ")+juce::String(e.musicDuckReduction.load(),1)+" dB";
     info+=u("\n\nNén đang giảm: ")+juce::String(e.gainReduction.load(),1)+" dB";
     if(e.fxBypass.load())info+=u("\nFX ĐANG TẮT: bấm Giọng tự nhiên để bật nén/vang.");
@@ -90,16 +75,16 @@ void KaraokePage::timerCallback(){if(!isVisible())return;auto& e=owner.engine;e.
 void KaraokePage::resized(){
     const int w=getWidth(),h=getHeight(),x=w-310;title.setBounds(20,12,w-330,40);advanced.setBounds(w-190,18,170,30);back.setBounds(20,66,40,32);home.setBounds(68,66,90,32);search.setBounds(168,66,x-282,32);open.setBounds(x-104,66,94,32);browser.setBounds(20,110,x-30,h-130);sidebar.setBounds(x,64,300,h-80);
     const int sx=0;int y=0;auto row=[&](juce::Component& c,int height=30){c.setBounds(sx,y,290,height);y+=height+8;};
-    devices.setBounds(sx,y,140,30);mic.setBounds(sx+146,y,144,30);y+=38;row(input,28);row(monitorHint,34);row(lowLatency);row(enableTune);row(smoothPreset,34);row(saveVoice);
-    scanTune.setBounds(sx,y,176,30);antares.setBounds(sx+182,y,108,30);y+=38;scanEq.setBounds(sx,y,176,30);editEq.setBounds(sx+182,y,108,30);y+=38;scanReverb.setBounds(sx,y,176,30);editReverb.setBounds(sx+182,y,108,30);y+=38;
-    for(auto pair:std::initializer_list<std::pair<juce::Label*,juce::Slider*>>{{&musicLabel,&music},{&phonesLabel,&phonesLevel},{&duckLabel,&musicDuck},{&monitorLabel,&monitorLevel},{&micLabel,&micGain},{&compressionLabel,&compression},{&hiddenLabel,&hiddenRoom},{&shortLabel,&shortRoom},{&reverbLabel,&reverb},{&delayLabel,&delay},{&reverbPluginMixLabel,&reverbMix}}){pair.first->setBounds(sx,y,92,27);pair.second->setBounds(sx+92,y,198,27);y+=32;}
-    colourLabel.setBounds(sx,y,92,28);colour.setBounds(sx+92,y,198,28);y+=36;row(offset,48);down.setBounds(sx,y,140,44);up.setBounds(sx+150,y,140,44);y+=52;row(reset);row(key,28);row(autoKey,26);row(keepPluginKey,26);keySelect.setBounds(sx,y,140,28);scaleSelect.setBounds(sx+150,y,140,28);y+=36;
-    row(livePreset,34);row(fixTune,34);row(polish);row(autoEq);fx.setBounds(sx,y,290,30);y+=38;row(loadPlugin);row(loadReverb);row(removeEq);row(removeReverb);row(record);status.setBounds(sx,y,290,340);controls.setSize(290,y+350);
+    devices.setBounds(sx,y,140,30);mic.setBounds(sx+146,y,144,30);y+=38;row(input,28);row(monitorHint,34);row(lowLatency);row(saveVoice);
+    scanTune.setBounds(sx,y,176,30);antares.setBounds(sx+182,y,108,30);y+=38;
+    for(auto pair:std::initializer_list<std::pair<juce::Label*,juce::Slider*>>{{&musicLabel,&music},{&phonesLabel,&phonesLevel},{&monitorLabel,&monitorLevel},{&micLabel,&micGain},{&compressionLabel,&compression},{&warmthLabel,&warmthLevel},{&presenceLabel,&presenceLevel},{&hiddenLabel,&hiddenRoom},{&shortLabel,&shortRoom},{&reverbLabel,&reverb},{&delayLabel,&delay},{&duckLabel,&musicDuck}}){pair.first->setBounds(sx,y,92,27);pair.second->setBounds(sx+92,y,198,27);y+=32;}
+    row(offset,48);down.setBounds(sx,y,140,44);up.setBounds(sx+150,y,140,44);y+=52;row(reset);row(key,28);row(autoKey,26);row(keepPluginKey,26);keySelect.setBounds(sx,y,140,28);scaleSelect.setBounds(sx+150,y,140,28);y+=36;
+    row(record);status.setBounds(sx,y,290,340);controls.setSize(290,y+350);
 }
 void KaraokePage::paint(juce::Graphics& g){g.fillAll(juce::Colour(0xff10151e));g.setColour(juce::Colour(0xff222c3a));g.drawVerticalLine(getWidth()-322,64,static_cast<float>(getHeight()-20));}
 
 bool KaraokePage::validateControls() const {
-    for(const juce::Component* c:std::initializer_list<const juce::Component*>{&phonesLevel,&hiddenRoom,&smoothPreset,&musicDuck,&scanTune,&scanEq,&scanReverb,&editEq,&removeEq,&lowLatency,&enableTune,&livePreset,&saveVoice,&monitorLevel,&shortRoom,&compression,&colour,&keepPluginKey,&loadReverb,&editReverb,&removeReverb})
+    for(const juce::Component* c:std::initializer_list<const juce::Component*>{&warmthLevel,&presenceLevel,&phonesLevel,&hiddenRoom,&musicDuck,&scanTune,&antares,&lowLatency,&saveVoice,&monitorLevel,&shortRoom,&compression,&reverb,&delay,&music,&micGain,&keepPluginKey})
         if(c->getParentComponent()!=&controls||c->getWidth()<=0||c->getHeight()<=0||!controls.getLocalBounds().contains(c->getBounds()))return false;
     return true;
 }

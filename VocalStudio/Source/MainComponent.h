@@ -81,7 +81,7 @@ public:
     void openEqEditor();void clearEqPlugin();
     void scanPlugins(int slot);
     juce::String selectedPluginName(int slot);
-    juce::String savedVoiceSummary();
+    juce::String savedVoiceSummary() const;
     int persistenceProbe(const juce::String&);
     void lowLatencyMonitoring();
     void openReverbEditor();
