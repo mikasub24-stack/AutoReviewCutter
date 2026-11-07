@@ -56,7 +56,7 @@ test('tách trả lời của Muse (đậm, chữ hoa/thường, nhiều dòng, 
   assert.equal(scenes[0].voiceover, 'Ngày xưa có cô bé tên Mai sống ở làng ven sông.');
   assert.match(scenes[0].prompt, /bến sông lúc bình minh, sương mỏng,\nmáy quay lia chậm/);
   assert.equal(scenes[1].voiceover, 'Một hôm có chú cá vàng nhảy lên thuyền.');
-  assert.match(scenes[1].prompt, /^Cá vàng bật lên/);
+  assert.match(scenes[1].prompt, /^Video khung [A-ZĐ]+ \d+:\d+[^\n]*\nCá vàng bật lên/, 'câu tỉ lệ là dòng đầu, rồi đến prompt Muse viết');
   assert.ok(scenes.every(s => s.prompt.includes(sp.NO_SPEECH)), 'prompt nào cũng có câu no speech, kể cả khi Muse quên');
   assert.equal(scenes[1].prompt.split(sp.NO_SPEECH).length, 2);
   assert.equal(scenes[2].voiceover, 'Mai thả cá về sông.');
@@ -304,7 +304,7 @@ test('trả lời của Muse theo số câu: lời đọc lấy từ truyện th
   assert.deepEqual(r.scenes.map(s => s.units), [[1, 2], [3, 3], [4, 5]]);
   assert.equal(r.scenes[0].voiceover, 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng, em dắt trâu ra đồng.');
   assert.equal(r.scenes.map(s => s.voiceover).join(' '), tale, 'ghép các cảnh lại ra đúng nguyên văn truyện');
-  assert.match(r.scenes[0].prompt, /^0–3 giây: Mai, bé gái tóc đen[^]*7?3–10 giây: em dắt/);
+  assert.match(r.scenes[0].prompt, /^Video khung [A-ZĐ]+ \d+:\d+[^\n]*\n0–3 giây: Mai, bé gái tóc đen[^]*7?3–10 giây: em dắt/);
   assert.ok(r.scenes.every(s => s.prompt.includes(sp.NO_SPEECH) && !s.offline), 'prompt nào cũng có no speech; không cảnh nào là mẫu');
   assert.ok(!r.scenes.some(s => /chúc thừa|MSDONE/.test(s.prompt)), 'nội dung sau mốc kết thúc bị bỏ');
   assert.equal(sp.checkAgainstScript(tale, r.scenes).ok, true);
@@ -731,7 +731,7 @@ test('khóa hình dạng: app tự gắn câu khóa vào MỌI prompt Muse viế
     assert.ok(scene.prompt.trimEnd().endsWith(sp.NO_SPEECH), 'câu cấm tiếng vẫn nằm cuối');
   }
   assert.equal(scenes.filter(s => !s.offline).length, 2);
-  assert.match(scenes[0].prompt, /^0–5 giây: nhân vật trắng bắt tay/);
+  assert.match(scenes[0].prompt, /^Video khung [A-ZĐ]+ \d+:\d+[^\n]*\n0–5 giây: nhân vật trắng bắt tay/);
   assert.ok(scenes.filter(s => s.offline).every(s => s.prompt.includes(lock)), 'cảnh mẫu cũng mang câu khóa');
   // Muse đã tự chép câu khóa thì không thêm lần nữa.
   const again = sp.assembleScenes(units, [{ units: [1, 3], prompt: 'Cảnh.\n' + lock + '\n' + sp.NO_SPEECH }], cfg);
@@ -886,6 +886,35 @@ test('tỉ lệ khung hình đã chọn luôn có trong prompt gửi video, cùn
   // Soát cảnh: câu tỉ lệ không làm prompt ngắn trông như đủ dài.
   const short = sp.lintScenes([{ voiceover: 'Mai nhìn quanh.', prompt: 'Mai.\nTỷ lệ khung hình video: 16:9 (ngang).\n' + sp.NO_SPEECH }], { seconds: 10, aspect: '16:9' })[0];
   assert.ok(short.some(w => /Prompt quá ngắn/.test(w)), short.join(' | '));
+});
+
+test('tỉ lệ nằm ngay ĐẦU prompt gửi Muse (video: dòng đầu; ảnh: ngay sau câu mở đầu «tạo ảnh»), không chỉ ở cuối', () => {
+  const vi = sp.storyUnits('Mai sống bên sông cùng bà. Sáng nào em cũng dắt trâu ra đồng.', { seconds: 10 });
+  const en = sp.storyUnits('Mai lived by the river with her grandmother. Every morning she walked the buffalo to the field.', { seconds: 10 });
+  const video = { '16:9': ['Video khung NGANG 16:9', 'Horizontal 16:9 widescreen video.'], '9:16': ['Video khung DỌC 9:16', 'Vertical 9:16 portrait video'], '1:1': ['Video khung VUÔNG 1:1', 'Square 1:1 video.'] };
+  for (const aspect of ['16:9', '9:16', '1:1']) {
+    const cfg = { seconds: 10, aspect };
+    const a = sp.assembleScenes(vi, [{ units: [1, 2], prompt: 'Bờ sông lúc bình minh.' }], cfg)[0].prompt;
+    assert.ok(a.startsWith(video[aspect][0]), a);
+    assert.equal(a.split(video[aspect][0]).length, 2, 'chỉ một câu tỉ lệ đầu prompt');
+    assert.ok(a.includes('Tỷ lệ khung hình video:'), 'vẫn còn câu tỉ lệ ở cuối');
+    const b = sp.assembleScenes(en, [{ units: [1, 2], prompt: 'River bank at dawn.' }], cfg)[0].prompt;
+    assert.ok(b.startsWith(video[aspect][1]), b);
+    assert.ok(!/khung|Tỷ lệ/.test(b.split('\n')[0]), 'truyện tiếng Anh: không lẫn tiếng Việt');
+  }
+  // Ảnh (Mẹo vặt / Cây trồng / Lịch sử): động từ tạo ảnh vẫn mở đầu, câu tỉ lệ nằm ngay sau câu đầu.
+  for (const [aspect, word] of [['16:9', 'Horizontal 16:9'], ['9:16', 'Vertical 9:16'], ['1:1', 'Square 1:1']]) {
+    const cfg = { seconds: 10, aspect, tip: true };
+    const image = sp.finalImagePrompt('Create a photorealistic photo of a hand pressing garlic. Close-up on a wooden board.', cfg, 'en');
+    const lines = image.split('\n');
+    assert.ok(lines[0].startsWith('Create a photorealistic photo of a hand pressing garlic.'), image);
+    assert.ok(lines[1].startsWith(word), image);
+    assert.equal(sp.finalImagePrompt(image, cfg, 'en'), image, 'gắn lại không nhân đôi');
+    const viImage = sp.finalImagePrompt('Tạo ảnh chụp thật bàn tay đặt tỏi lên thớt. Ánh sáng cửa sổ.', cfg, 'vi').split('\n');
+    assert.ok(/^Ảnh khung (NGANG|DỌC|VUÔNG) /.test(viImage[1]), viImage.join(' | '));
+  }
+  // Prompt ảnh không có dấu chấm câu: câu tỉ lệ xuống dòng ngay sau đó.
+  assert.equal(sp.finalImagePrompt('Create a photo of a cup', { aspect: '9:16' }, 'en').split('\n')[1].startsWith('Vertical 9:16'), true);
 });
 
 // ---- Chế độ Mẹo vặt ----

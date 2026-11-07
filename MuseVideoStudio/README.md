@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.6.3
+
+- **Tỉ lệ khung hình nằm ngay ĐẦU prompt gửi Muse.** Trước đây app chỉ thêm một câu tỉ lệ ở CUỐI prompt nên Muse hay bỏ qua và tạo ra khung 3:4. Nay prompt **video** mở đầu bằng dòng tỉ lệ rõ ràng («Video khung DỌC 9:16 (toàn màn hình điện thoại).» / «Vertical 9:16 portrait video…»), prompt **ảnh** (Mẹo vặt, Cây trồng, Lịch sử) giữ động từ «Tạo ảnh…» mở đầu và có câu tỉ lệ ngay sau câu đầu («Ảnh khung DỌC 9:16…» / «Vertical 9:16 portrait image…»); câu tỉ lệ ở cuối vẫn giữ. Truyện tiếng Anh thì toàn bộ câu này bằng tiếng Anh. Gắn lại nhiều lần không bị nhân đôi.
+- **Ô «Tỉ lệ» thấy ngay:** ở Mẹo vặt, Cây trồng và Lịch sử, ô «Tỉ lệ» nằm cạnh «Độ dài video» (trước đây nằm sâu bên dưới hoặc giấu trong «Tùy chọn thêm»).
+- Lưu ý thật: app chỉ nhập chữ vào khung chat Muse nên **chưa chắc Muse nghe theo** câu tỉ lệ; chưa thử với Muse thật. Clip tạo từ ảnh thì theo khung của ảnh, nên prompt ảnh cũng đã có câu tỉ lệ. Nếu Muse vẫn ra 3:4, cần biết Muse chọn khung bằng nút nào trên giao diện để app bấm giúp.
+
 ## Update 1.6.2
 
 - **Sửa lỗi «Làm tự động» bắt đầu lại từ đầu khi đang dừng giữa chừng:** trước đây dừng ở bước tạo ảnh rồi bấm lại thì app viết lại bài, chia lại cảnh và **thêm một lượt nữa vào hàng đợi (việc gấp đôi)**. Nay nút đổi thành **«▶ Chạy tiếp»** và làm tiếp đúng bước đang dừng: dừng ở tạo ảnh/clip thì chỉ chạy lại hàng đợi (các cảnh lỗi hoặc bị dừng chạy lại, cảnh đã xong giữ nguyên) rồi tự xuất MP4; clip xong hết mà chưa xuất thì chỉ xuất lại; dừng ở chia cảnh thì giữ bài đã viết và chỉ chia cảnh (không viết lại). Bấm «Chạy tiếp» nhiều lần cũng **không thêm trùng** việc vào hàng đợi. Bước đang dừng được nhớ cả khi tắt và mở lại app (theo đúng tên cây đang nhập).

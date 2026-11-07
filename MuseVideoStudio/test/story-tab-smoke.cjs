@@ -543,12 +543,15 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
         {
           const asked = []; const rec = d => asked.push(d.message()); page.on('dialog', rec);
           await page.locator('#tipAuto').check();
+          await page.evaluate(() => { document.getElementById('storyPanel').open = true; document.getElementById('tipMore').open = false; });
+          assert.equal(await page.locator('#storyAspect').isVisible(), true, 'Cây trồng: «Tỉ lệ» thấy ngay khi «Tùy chọn thêm» còn đóng');
           await page.evaluate(() => { document.getElementById('storyPanel').open = true; document.getElementById('tipMore').open = true; window.writeDelay = 400; window.analyzeDelay = 400; });
           assert.equal(await page.locator('#tipWrite').textContent(), '▶ Run automatically: write, draw, export MP4');
           for (const id of ['storyScript', 'storyScenes', 'storyAnalyze', 'storyInfo', 'storyCreate', 'storyCommit']) assert.equal(await page.locator('#' + id).isVisible(), false, id + ' được ẩn khi chạy tự động');
           assert.equal(await page.locator('#autoRun').isVisible(), false, 'chưa chạy thì chưa có thanh tiến trình');
-          assert.equal(await page.locator('#storyAspect').isVisible(), true, '«Tỉ lệ» nằm trong «Tùy chọn thêm»');
-          assert.equal(await page.locator('#tipExtra #storyAspect').count(), 1);
+          assert.equal(await page.locator('#storyAspect').isVisible(), true, '«Tỉ lệ» thấy ngay, không cần mở «Tùy chọn thêm»');
+          assert.equal(await page.locator('#tipMainRow #storyAspect').count(), 1, '«Tỉ lệ» nằm cạnh «Độ dài video», không giấu trong «Tùy chọn thêm»');
+          assert.equal(await page.locator('#tipExtra #storyAspect').count(), 0);
           assert.equal(await page.locator('#tipExtra #storyStyle').count(), 1);
           await page.locator('#storyAspect').selectOption('9:16');
           await page.locator('#tipTitle').fill('Tomato');   // gõ tiếng Anh cũng được

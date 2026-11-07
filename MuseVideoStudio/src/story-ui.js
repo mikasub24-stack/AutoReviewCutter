@@ -432,7 +432,7 @@
     $('storyCreate').textContent = tip ? '▶ Tạo ảnh + clip' : '▶ Tạo clip';
     $('adBox').hidden = !ad; $('tipBox').hidden = !tip; $('storyCompose').classList.toggle('adMode', ad);
     // Ô «Tỉ lệ» là một: ở chế độ quảng cáo nằm trong khung quảng cáo, ngược lại về chỗ cũ.
-    if (ad) $('adAspectSlot').append($('storyAspectLabel')); else if (!initial) $('storyOptionsRow').prepend($('storyAspectLabel'));
+    if (ad) $('adAspectSlot').append($('storyAspectLabel')); else if (tip) $('tipMainRow').insertBefore($('storyAspectLabel'), $('tipLookLabel')); else if (!initial || $('storyAspectLabel').parentElement !== $('storyOptionsRow')) $('storyOptionsRow').prepend($('storyAspectLabel'));
     applyAutoLayout();
     refInfo(); renderTipCount();
     if (!initial || ad || tip) $('storyInfo').textContent = spaces[mode]?.info || IDLE_INFO[idleIndex(mode)];
@@ -813,8 +813,11 @@
     $('storyPanel').classList.toggle('autoMode', auto);
     if (!isAd()) {
       const aspect = $('storyAspectLabel'), style = $('storyStyle').closest('label'), row = $('storyOptionsRow');
-      if (auto) $('tipExtra').append(aspect, style);
-      else { if (aspect.parentElement !== row) row.prepend(aspect); if (style.parentElement !== row) row.insertBefore(style, $('storyForm').closest('label')); }
+      // «Tỉ lệ» (khung Muse tạo ra) luôn thấy ngay, không giấu trong «Tùy chọn thêm»: ở các chế độ tip nằm cạnh «Độ dài video».
+      if (isTip()) { if (aspect.parentElement !== $('tipMainRow')) $('tipMainRow').insertBefore(aspect, $('tipLookLabel')); }
+      else if (aspect.parentElement !== row) row.prepend(aspect);
+      if (auto) $('tipExtra').append(style);
+      else if (style.parentElement !== row) row.insertBefore(style, $('storyForm').closest('label'));
     }
     renderAutoRun();
   }

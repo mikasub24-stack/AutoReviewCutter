@@ -389,8 +389,33 @@
     if (!words) return '';
     return language !== 'vi' ? `Image aspect ratio: ${config.aspect} (${words[1]}).` : `Tỷ lệ khung hình ảnh: ${config.aspect} (${words[0]}).`;
   }
+  // Câu tỉ lệ ĐẦU prompt gửi Muse: Muse hay bỏ qua câu tỉ lệ ở cuối prompt (ra 3:4), nên nói ngay từ đầu, rõ khung và hướng.
+  const RATIO_LEAD = {
+    video: {
+      vi: { '16:9': 'Video khung NGANG 16:9 (widescreen).', '9:16': 'Video khung DỌC 9:16 (toàn màn hình điện thoại).', '1:1': 'Video khung VUÔNG 1:1.' },
+      en: { '16:9': 'Horizontal 16:9 widescreen video.', '9:16': 'Vertical 9:16 portrait video (full-screen phone video).', '1:1': 'Square 1:1 video.' }
+    },
+    image: {
+      vi: { '16:9': 'Ảnh khung NGANG 16:9 (widescreen).', '9:16': 'Ảnh khung DỌC 9:16 (toàn màn hình điện thoại).', '1:1': 'Ảnh khung VUÔNG 1:1.' },
+      en: { '16:9': 'Horizontal 16:9 widescreen image.', '9:16': 'Vertical 9:16 portrait image (full-screen phone photo).', '1:1': 'Square 1:1 image.' }
+    }
+  };
+  const ratioLead = (config, language = 'vi', kind = 'video') => (config && RATIO_LEAD[kind][language !== 'vi' ? 'en' : 'vi'][config.aspect]) || '';
+  // Video: câu tỉ lệ là dòng ĐẦU. Ảnh: động từ tạo ảnh vẫn mở đầu (Muse nhận ra đây là lệnh vẽ ảnh), câu tỉ lệ ngay sau câu đầu tiên.
+  const withRatioLead = (text, config, language, kind) => {
+    const lead = ratioLead(config, language, kind), other = ratioLead(config, language !== 'vi' ? 'vi' : 'en', kind);
+    if (!lead || !text || text.includes(lead) || (other && text.includes(other))) return text;
+    if (kind === 'video') return lead + '\n' + text;
+    const nl = text.indexOf('\n'), line = nl < 0 ? text : text.slice(0, nl), rest = nl < 0 ? '' : text.slice(nl + 1);
+    const first = /^[^]*?[.!?。](?=\s|$)/.exec(line), head = first && first[0].length <= 400 ? first[0] : line;
+    const after = [line.slice(head.length).trim(), rest].filter(Boolean).join('\n');
+    return head + '\n' + lead + (after ? '\n' + after : '');
+  };
   // Prompt ảnh cuối cùng: mở đầu bằng động từ tạo ảnh, có tỉ lệ khung hình và câu cấm chữ trong ảnh (chỉ thêm khi Muse chưa ghi).
   function finalImagePrompt(prompt, config, language = 'vi') {
+    return withRatioLead(finalImageBody(prompt, config, language), config, language, 'image');
+  }
+  function finalImageBody(prompt, config, language = 'vi') {
     let text = String(prompt || '').trim();
     if (!text) return '';
     const en = language !== 'vi';
@@ -1046,7 +1071,7 @@
         else if (count(image) < 30) w.push('Prompt ảnh quá ngắn, dễ ra ảnh sai. Mô tả rõ vật gì, ở đâu, tay đang làm gì.');
       }
       if (!prompt.trim()) w.push('Chưa có prompt: cảnh này sẽ không tạo được.');
-      else if (count(prompt.replace(NO_SPEECH, '').replace(tipStartLine('vi'), '').replace(tipStartLine('en'), '').replace(lockLine(config, 'vi'), '').replace(lockLine(config, 'en'), '').replace(aspectLine(config, 'vi'), '').replace(aspectLine(config, 'en'), '').trim()) < 40) w.push('Prompt quá ngắn, dễ ra hình sai. Mô tả rõ ai, ở đâu, làm gì, nét mặt.');
+      else if (count(prompt.replace(NO_SPEECH, '').replace(tipStartLine('vi'), '').replace(tipStartLine('en'), '').replace(lockLine(config, 'vi'), '').replace(lockLine(config, 'en'), '').replace(aspectLine(config, 'vi'), '').replace(aspectLine(config, 'en'), '').replace(ratioLead(config, 'vi'), '').replace(ratioLead(config, 'en'), '').trim()) < 40) w.push('Prompt quá ngắn, dễ ra hình sai. Mô tả rõ ai, ở đâu, làm gì, nét mặt.');
       if (prompt.trim() && !/no speech/i.test(prompt)) w.push('Prompt thiếu câu «no speech» — nhân vật có thể bị nói.');
       if (QUOTED.test(voice) || QUOTED.test(prompt)) w.push('Có lời thoại trong ngoặc kép — nhân vật sẽ không nói, chỉ thể hiện bằng cử chỉ và nét mặt.');
       if (TIME_SKIP.test(voice) || TIME_SKIP.test(prompt)) w.push(`Có chuyển mốc thời gian — ${own} giây khó chứa nhiều khoảnh khắc. Nên tách thành cảnh riêng.`);
@@ -1073,6 +1098,9 @@
   const ensureNoSpeech = prompt => (/no speech/i.test(prompt) ? prompt : prompt + '\n' + NO_SPEECH);
   // Prompt Muse viết + câu khóa hình dạng (nếu có) + câu cấm tiếng ở cuối.
   function finalPrompt(prompt, config, language = 'vi') {
+    return withRatioLead(finalPromptBody(prompt, config, language), config, language, 'video');
+  }
+  function finalPromptBody(prompt, config, language = 'vi') {
     const lock = lockLine(config, language), text = String(prompt || '').trim();
     const hasLock = !lock || lockBoth(config).some(line => text.includes(line));
     const ratio = config.aspect && !text.includes(config.aspect) ? aspectLine(config, language) : '';
