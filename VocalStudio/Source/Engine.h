@@ -103,6 +103,7 @@ public:
     void selectPreset(int index);
     void studioPolish();
     void liveVocalPreset();
+    void smoothLivePreset();
     void setVoiceColour(int);
     juce::Result restoreSetup(const juce::var&);
     vocal::VocalParameters vocalSettings() const noexcept {return parameters();}
@@ -120,6 +121,7 @@ public:
     std::atomic<bool> monitor{false},fxBypass{false},latencyCompensation{true};
     std::atomic<int> inputChannel{0},recordingFault{0};
     std::atomic<float> inputDb{0},highPass{80},warmth{-2},presence{2},threshold{-18},ratio{3},makeup{2},deEss{.35f},reverb{.10f},delay{.04f},delayMs{240},masterDb{-3},manualOffsetMs{0};
+    std::atomic<float> wetReturnDb{0},musicDuckingDb{0},musicDuckReduction{0};
     std::atomic<float> reverbPluginMix{.2f};
     std::atomic<float> monitorDb{0},shortReverb{0},shortDecaySeconds{.45f};
     std::atomic<float> leveling{0},dynamicTame{0},reverbDuck{0};
@@ -156,10 +158,11 @@ private:
     std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> writer;
     std::atomic<juce::AudioFormatWriter::ThreadedWriter*> activeWriter{nullptr};
     std::unique_ptr<juce::AudioPluginInstance> plugin,reverbPlugin,eqPlugin;
-    juce::AudioBuffer<float> vocalBus,musicBus,monoInput,reverbDry;
+    juce::AudioBuffer<float> vocalBus,musicBus,monoInput,reverbDry,dryVocalSidechain;
     juce::MidiBuffer midi;
     vocal::VocalChain playbackFx,monitorFx,vocalAmbience;
     vocal::Limiter limiter;
+    vocal::MusicDucker musicDucker;
     std::array<vocal::Delay,2> musicDelay,reverbDryDelay;
     juce::File sessionDirectory,recordFile;
     double recordStart=0;

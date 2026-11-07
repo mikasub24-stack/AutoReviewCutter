@@ -243,3 +243,23 @@ shipping packages with current Microsoft Defender signatures and includes the
 report; a no-detections result is not a guarantee against every threat or a
 resolution of browser reputation warnings. Icon assets are original project work
 and distributed under the project's license.
+
+
+### 1.9.3 — smooth live vocal and clearer vocal/music balance
+
+**Mượt giọng · Vang ngân** is an optional listening preset. It preserves mic gain,
+personal tone EQ and vendor plugin controls, sets gentle compression/leveling and
+dynamic harshness reduction, and adds a 2.3 s built-in reverb with 40 ms pre-delay.
+A separate +6 dB wet-return control raises ambience without boosting the dry vocal
+or altering the feedback decay. External reverb stays loaded with a 15% insert
+crossfade to retain a clear direct vocal. The preset caps backing gain at 0.6.
+
+**Nhạc lùi khi hát** reduces backing by up to the chosen 0–6 dB (3 dB in the new
+preset), using the pre-ambience vocal as sidechain, with a 30 ms attack and 450 ms
+release. This is level-based ducking, not speech recognition. It only runs for
+live microphone monitoring, is disabled during calibration, auditions and offline
+exports, and adds no delay/lookahead. Reverb tails do not hold music down. Select
+the real mic input rather than a music loopback. Existing sessions default to 0 dB
+music duck and 0 dB wet-return trim; changes persist through saves and recovery.
+The original natural preset remains available. This is not a voice-specific mix
+verified by listening to the user's recording.

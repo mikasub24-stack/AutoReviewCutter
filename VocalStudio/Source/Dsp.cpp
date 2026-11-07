@@ -60,13 +60,14 @@ void VocalChain::prepare(double sr) {
     setParameters(p);reset();
 }
 void VocalChain::reset() noexcept {
-    envelope=essEnvelope=reduction=0;compression=1;levelPower=levelDb=harshPower=harshGain=roomPower=0;levelAmount=tameAmount=duckAmount=0;
+    envelope=essEnvelope=reduction=0;compression=1;levelPower=levelDb=harshPower=harshGain=roomPower=0;levelAmount=tameAmount=duckAmount=0;wetLevel=wetTarget;
     for(auto& c:channels){ c.high.reset();c.warmth.reset();c.presence.reset();c.ess.reset();c.tame.reset();c.harsh.reset();c.echo.reset();c.preDelay.reset();for(auto& d:c.comb)d.reset();for(auto& d:c.allpass)d.reset();c.damping.fill(0);c.shortDamping.fill(0);for(auto& d:c.shortComb)d.reset();for(auto& d:c.shortAllpass)d.reset(); }
 }
 void VocalChain::setParameters(const VocalParameters& value) noexcept {
     p=value;p.ratio=std::clamp(p.ratio,1.0f,12.0f);p.deEss=std::clamp(p.deEss,0.0f,1.0f);p.reverb=std::clamp(p.reverb,0.0f,.4f);p.delay=std::clamp(p.delay,0.0f,.3f);
     p.decaySeconds=std::clamp(p.decaySeconds,.3f,4.0f);p.damping=std::clamp(p.damping,.05f,.95f);p.width=std::clamp(p.width,0.0f,1.5f);p.delayFeedback=std::clamp(p.delayFeedback,0.0f,.65f);p.deharsh=std::clamp(p.deharsh,0.0f,1.0f);
     p.leveling=std::clamp(p.leveling,0.0f,1.0f);p.dynamicTame=std::clamp(p.dynamicTame,0.0f,1.0f);p.reverbDuck=std::clamp(p.reverbDuck,0.0f,1.0f);
+    p.wetReturnDb=std::clamp(p.wetReturnDb,-12.0f,12.0f);wetTarget=dbToGain(p.wetReturnDb);
     p.shortReverb=std::clamp(p.shortReverb,0.0f,.4f);p.shortDecaySeconds=std::clamp(p.shortDecaySeconds,.15f,.9f);
     constexpr double shortTimes[4]={.011,.0137,.0173,.0199};for(int j=0;j<4;++j)shortFeedback[j]=static_cast<float>(std::pow(.001,shortTimes[j]/p.shortDecaySeconds));
     preDelaySamples=static_cast<std::size_t>(rate*std::clamp(p.preDelayMs,0.0f,100.0f)/1000);
@@ -102,7 +103,7 @@ void VocalChain::processDry(float& left, float& right) noexcept {
 void VocalChain::processAmbience(float& left,float& right) noexcept {
     if(p.bypass)return;
     const float signal[2]={left,right};duckAmount+=(p.reverbDuck-duckAmount)*controlRate;
-    const float power=static_cast<float>(std::min(16.0,(static_cast<double>(left)*left+static_cast<double>(right)*right)*.5));roomPower+=(power-roomPower)*(power>roomPower?roomAttack:roomRelease);const float activity=std::clamp((10*std::log10(std::max(1e-12f,roomPower))+36)/20,0.0f,1.0f);const float wetGain=1-.75f*duckAmount*activity;
+    const float power=static_cast<float>(std::min(16.0,(static_cast<double>(left)*left+static_cast<double>(right)*right)*.5));roomPower+=(power-roomPower)*(power>roomPower?roomAttack:roomRelease);const float activity=std::clamp((10*std::log10(std::max(1e-12f,roomPower))+36)/20,0.0f,1.0f);wetLevel+=(wetTarget-wetLevel)*controlRate;const float wetGain=(1-.75f*duckAmount*activity)*wetLevel;
     constexpr double combTimes[4]={.0297,.0371,.0411,.0437};
     constexpr double allpassTimes[2]={.005,.0017};
     float shortWet[2]={0,0};
@@ -124,6 +125,24 @@ void VocalChain::processAmbience(float& left,float& right) noexcept {
     }
     const float middle=(wet[0]+wet[1])*.5f,side=(wet[0]-wet[1])*.5f*p.width;
     left=shortWet[0]*p.shortReverb*wetGain+drySignal[0]*(1-p.reverb*.3f)+(middle+side)*p.reverb*wetGain+echoWet[0]*p.delay*wetGain;right=shortWet[1]*p.shortReverb*wetGain+drySignal[1]*(1-p.reverb*.3f)+(middle-side)*p.reverb*wetGain+echoWet[1]*p.delay*wetGain;
+}
+void MusicDucker::prepare(double sr) noexcept{
+    sr=std::clamp(sr,8000.0,384000.0);
+    powerRate=static_cast<float>(1-std::exp(-1/(sr*.020)));
+    attack=static_cast<float>(1-std::exp(-1/(sr*.030)));
+    release=static_cast<float>(1-std::exp(-1/(sr*.450)));reset();
+}
+float MusicDucker::process(float l,float r,float maximumDb) noexcept{
+    const float limit=std::isfinite(maximumDb)?std::clamp(maximumDb,0.0f,6.0f):0;
+    if(limit==0&&attenuation<1e-6f){reset();return 1;}
+
+    if(!std::isfinite(l))l=0;if(!std::isfinite(r))r=0;
+    const float energy=static_cast<float>(std::min(16.0,(static_cast<double>(l)*l+static_cast<double>(r)*r)*.5));
+    power+=(energy-power)*powerRate;
+    const float activity=std::clamp((10*std::log10(std::max(1e-12f,power))+42)/18,0.0f,1.0f);
+    const float target=limit*activity;
+    attenuation+=(target-attenuation)*(target>attenuation?attack:release);
+    return dbToGain(-attenuation);
 }
 void Limiter::prepare(double sr) {lookahead=std::max<std::size_t>(1,static_cast<std::size_t>(sr*.001));for(auto& d:delay)d.prepare(sr,.003);recovery=static_cast<float>(std::exp(-1/(sr*.080)));reset();}
 void Limiter::reset() noexcept {gain=1;hold=0;for(auto& d:delay)d.reset();}

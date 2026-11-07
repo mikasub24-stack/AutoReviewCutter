@@ -13,7 +13,7 @@ struct VocalParameters {
     float thresholdDb = -18, ratio = 3, makeupDb = 2, deEss = .35f;
     float shortReverb=0,shortDecaySeconds=.45f;
     float reverb = .10f, delay = .04f, delayMs = 240;
-    float leveling=0,dynamicTame=0,reverbDuck=0;
+    float leveling=0,dynamicTame=0,reverbDuck=0,wetReturnDb=0;
     float decaySeconds=1.2f,preDelayMs=20,damping=.65f,width=1,delayFeedback=.27f,deharsh=0;
 };
 VocalParameters preset(int index) noexcept;
@@ -61,12 +61,21 @@ private:
     VocalParameters p;
     double rate = 48000;
     float envelope = 0, essEnvelope = 0, compression = 1, reduction = 0;
-    float levelPower=0,levelDb=0,harshPower=0,harshGain=0,roomPower=0;
+    float levelPower=0,levelDb=0,harshPower=0,harshGain=0,roomPower=0,wetLevel=1,wetTarget=1;
     float levelAmount=0,tameAmount=0,duckAmount=0,controlRate=.001f;
     float powerRate=.001f,levelUp=.001f,levelDown=.001f,tameAttack=.001f,tameRelease=.001f,roomAttack=.001f,roomRelease=.001f;
     float preGain = 1, makeup = 1, attack = .99f, release = .999f, essRelease = .999f;
     std::size_t delaySamples = 1,preDelaySamples=1;
     std::array<float,4> roomFeedback{},shortFeedback{};
+};
+// No lookahead or audio delay: a dry-vocal sidechain only attenuates music.
+class MusicDucker {
+public:
+    void prepare(double rate) noexcept;
+    void reset() noexcept {power=attenuation=0;}
+    float process(float dryLeft,float dryRight,float maximumDb) noexcept;
+private:
+    float power=0,attenuation=0,powerRate=.001f,attack=.001f,release=.001f;
 };
 class Limiter {
 public:
