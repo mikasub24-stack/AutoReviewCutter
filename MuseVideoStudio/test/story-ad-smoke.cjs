@@ -175,9 +175,11 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await page.locator('#modeStory').click();
     assert.equal(await page.locator('#adBox').isHidden(), true);
     assert.equal(await page.locator('#storyHead').textContent(), '1. Câu chuyện');
-    assert.match(await page.locator('#storyRefInfo').textContent(), /Ảnh nhân vật: aqua\.png/);
+    assert.equal(await page.locator('#storyRefInfo').textContent(), 'Chưa chọn ảnh nhân vật.', 'ảnh sản phẩm của tab Quảng cáo không sang tab Kể chuyện (mỗi tab giữ ảnh riêng)');
     assert.equal(await page.locator('#storyOptionsRow #storyAspect').count(), 1, 'về chế độ kể chuyện thì ô Tỉ lệ về chỗ cũ');
     assert.equal(await page.locator('#adBox #storyAspect').count(), 0);
+    assert.equal(await page.locator('#storyScript').inputValue(), '', 'lời quảng cáo không sang tab Kể chuyện');
+    await page.locator('#storyScript').fill('Mai ra bến sông lúc bình minh. Một chú cá vàng nhảy lên thuyền.');
     await page.locator('#storyAnalyze').click();
     await page.waitForFunction(() => window.calls.filter(c => c.name === 'storyAnalyze').length === 2);
     assert.equal('ad' in (await called('storyAnalyze')).at(-1).data, false, 'chế độ kể chuyện không gửi thông tin quảng cáo');
@@ -219,7 +221,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await page.waitForFunction(() => document.querySelectorAll('#storyScenes .draftRow').length === 5);
     assert.deepEqual(await page.locator('#storyScenes .draftRow strong').allTextContents(), ['Cảnh 1 · 6 giây', 'Cảnh 2 · 6 giây', 'Cảnh 3 · 6 giây', 'Cảnh 4 · 6 giây', 'Cảnh 5 · 6 giây']);
     assert.match(await page.locator('#storyInfo').textContent(), /Đã tạo 5 cảnh quảng cáo từ ảnh sản phẩm \(mẫu «Cao cấp, tinh tế»\)\. Không có lời đọc nên video giữ tiếng động của clip/);
-    assert.deepEqual(await page.locator('#storyScenes .draftRow textarea:nth-of-type(1)').evaluateAll(l => l.map(t => t.value)), ['', '', '', '', ''], 'không có lời đọc');
+    assert.deepEqual(await page.locator('#storyScenes .draftRow .draftContent > textarea').evaluateAll(l => l.map(t => t.value)), ['', '', '', '', ''], 'không có lời đọc');
     const shot = await page.locator('#storyScenes .draftRow').nth(0).locator('textarea').nth(1).inputValue();
     assert.match(shot, /^Tạo video quảng cáo sản phẩm dài 6 giây, tỷ lệ 16:9/); assert.match(shot, /Sản phẩm quảng cáo: Bình giữ nhiệt Aqua 500ml/);
     assert.match(shot, /Máy quay \(chọn hợp với cảnh\): chuyển động quay chậm[^\n]*; máy quay xoay chậm[^\n]*; máy quay lùi ra từ từ/);

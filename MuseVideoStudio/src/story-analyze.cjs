@@ -294,8 +294,8 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
     await ensureAllowed();
     controller = new AbortController();
     const signal = controller.signal;
-    const plant = tip && config.tipKind === 'plant';
-    const label = plant ? 'Viết bài trồng cây' : tip ? 'Viết mẹo vặt' : 'Viết lời quảng cáo';
+    const plant = tip && config.tipKind === 'plant', history = tip && config.tipKind === 'history';
+    const label = history ? 'Viết bài lịch sử' : plant ? 'Viết bài trồng cây' : tip ? 'Viết mẹo vặt' : 'Viết lời quảng cáo';
     Object.assign(state, { busy: true, kind: 'write', error: '', progress: 'Đang mở Muse…', part: 0, parts: 1 });
     notify();
     try {
@@ -305,8 +305,9 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
       if (!muse) throw infra('Chưa mở được Muse tài khoản 1.');
       if (tip) {
         const result = await writeTip(muse, config, signal, label);
-        say(`Muse đã viết xong ${plant ? 'bài trồng cây' : 'mẹo vặt'} (${result.steps} bước)`);
-        return { script: result.script, notes: result.notes };
+        say(history ? `Muse đã viết xong bài lịch sử (${result.steps} đoạn)` : `Muse đã viết xong ${plant ? 'bài trồng cây' : 'mẹo vặt'} (${result.steps} bước)`);
+        // Bài lịch sử không có nhãn «Bước k:» (nhãn chỉ để soát đủ mục): bỏ đi để lời đọc là bài kể liền mạch.
+        return { script: history ? plan.stripStepLabels(result.script) : result.script, notes: result.notes };
       }
       let script = '';
       for (let attempt = 0; attempt < 2 && !script; attempt++) {
@@ -361,7 +362,10 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
       written = written ? written + '\n' + best.text : best.text;
     }
     // Một ghi chú duy nhất (thiếu bước được ưu tiên hơn bước dài) để giao diện hiện gọn và dịch được.
-    if (missing.length) notes.push(`Muse còn thiếu ${missing.map(k => 'bước ' + k).join(', ')}: bổ sung vào ô mẹo hoặc bấm viết lại.`);
+    if (tp.history) {
+      if (missing.length) notes.push(`Muse còn thiếu ${missing.length} đoạn của bài: bổ sung vào ô bài hoặc bấm viết lại.`);
+      else if (long.length) notes.push(`${long.length} đoạn hơi dài, có thể bị chia thành 2 cảnh.`);
+    } else if (missing.length) notes.push(`Muse còn thiếu ${missing.map(k => 'bước ' + k).join(', ')}: bổ sung vào ô mẹo hoặc bấm viết lại.`);
     else if (long.length) notes.push(`${long.map(k => 'Bước ' + k).join(', ')} hơi dài, có thể bị chia thành 2 cảnh.`);
     return { script: written, steps: tp.steps, notes };
   }

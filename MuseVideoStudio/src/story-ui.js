@@ -14,7 +14,6 @@
     tipLanguage: ['tipLanguage', 'vi'], tipMotion: ['tipMotion', 'gentle'], tipPrompt: ['tipPrompt', 'en'],
     adProduct: ['adProduct', ''], adPoints: ['adPoints', ''], adAudience: ['adAudience', ''], adOffer: ['adOffer', ''], adCta: ['adCta', ''],
     adTone: ['adTone', AD.AD_TONE[0].id], adLength: ['adLength', '30'],
-    storyScript: ['script', ''], storyAspect: ['aspect', '16:9'], storyCharacter: ['character', ''], storyForm: ['form', ''], storyStyle: ['style', ''],
     storyEngine: ['engine', 'none'], storyTempo: ['tempo', '1'], subFont: ['subFont', 'Arial'], subSize: ['subSize', '54'], subColor: ['subColor', '#ffffff'],
     subOutline: ['subOutline', '#000000'], subPos: ['subPos', 'bottom'], storySfx: ['sfx', 'low'], storyName: ['name', '']
   };
@@ -34,7 +33,25 @@
   }
 
   /* ---------- chế độ: kể chuyện / quảng cáo sản phẩm ---------- */
-  let mode = ['ad', 'tip', 'plant'].includes(saved.mode) ? saved.mode : 'story';
+  let mode = ['ad', 'tip', 'plant', 'hist'].includes(saved.mode) ? saved.mode : 'story';
+  /* Mỗi chế độ (tab) có phần làm việc riêng: kịch bản, tỉ lệ, nhân vật, phong cách (lưu lại), cùng cảnh đã chia, chỗ dừng, ảnh tham chiếu
+     (giữ trong lúc mở app). Đổi tab không xóa gì và không mang chữ của tab này sang tab kia. */
+  const MODES = ['story', 'ad', 'tip', 'plant', 'hist'];
+  const MODE_NAME = { story: 'Kể chuyện', ad: 'Quảng cáo sản phẩm', tip: 'Mẹo vặt', plant: 'Cây trồng phát triển', hist: 'Lịch sử minh họa' };
+  const PER_MODE = { storyScript: ['script', ''], storyAspect: ['aspect', '16:9'], storyCharacter: ['character', ''], storyForm: ['form', ''], storyStyle: ['style', ''] };
+  if (!saved.modes || typeof saved.modes !== 'object') {   // bản cũ dùng chung: chuyển sang từng chế độ
+    saved.modes = {};
+    for (const m of MODES) saved.modes[m] = { aspect: saved.aspect, character: saved.character, form: saved.form, style: saved.style, ...(m === mode ? { script: saved.script } : {}) };
+  }
+  const modeVals = m => saved.modes[m] || (saved.modes[m] = {});
+  function loadModeFields() { const v = modeVals(mode); for (const [id, [key, fallback]] of Object.entries(PER_MODE)) $(id).value = v[key] ?? fallback; }
+  for (const [id, [key]] of Object.entries(PER_MODE)) for (const event of ['input', 'change']) $(id).addEventListener(event, () => { modeVals(mode)[key] = $(id).value; persist(); });
+  loadModeFields();
+  function setScript(owner, text) { modeVals(owner).script = text; persist(); if (owner === mode) $('storyScript').value = text; }
+  const spaces = {};   // phần làm việc của các chế độ đang không mở: { scenes, resume, understood, autoSnap, refs, info }
+  // Muse chỉ làm một việc một lúc (chung một cuộc chat): chế độ nào đã bắt đầu thì chế độ đó mới thấy tiến độ và nút Dừng.
+  let runMode = typeof saved.runMode === 'string' ? saved.runMode : '', busyHint = false;
+  const setRun = m => { runMode = m; if (m) saved.runMode = m; else delete saved.runMode; persist(); };
   let adCamera = (Array.isArray(saved.adCamera) ? saved.adCamera : []).filter(id => AD.AD_CAMERA.some(c => c.id === id)).slice(0, AD.AD_MAX_CAMERA);
   let adLook = AD.AD_LOOK.some(l => l.id === saved.adLook) ? saved.adLook : '';
   // Luôn có một mẫu đang chọn (mặc định mẫu đầu tiên) để thả ảnh vào là ra cảnh ngay.
@@ -46,26 +63,31 @@
   }
   const isAd = () => mode === 'ad';
   // «Cây trồng phát triển» là một kiểu của Mẹo vặt: cùng quy trình ảnh → clip, khác ở cách Muse viết và chia cảnh.
-  const isTip = () => mode === 'tip' || mode === 'plant';
+  // «Lịch sử minh họa» cũng cùng quy trình: Muse vẽ một tranh hoạt hình phẳng cho mỗi cảnh rồi cho tranh chuyển động nhẹ thành clip.
+  const isTip = () => mode === 'tip' || mode === 'plant' || mode === 'hist';
   const isPlant = () => mode === 'plant';
+  const isHist = () => mode === 'hist';
+  const TIP_MODES = ['tip', 'plant', 'hist'];
+  const KIND_OF = { tip: 'tip', plant: 'plant', hist: 'history' };   // giá trị tipKind gửi cho Muse
+  const idleIndex = m => ({ story: 0, ad: 1, tip: 2, plant: 3, hist: 4 })[m] ?? 0;
   // Tiêu đề, độ dài và số giây của «Mẹo vặt» và «Cây trồng phát triển» lưu riêng (cây trồng: 7–10 phút, mỗi ảnh 10 giây).
-  const KIND_DEFAULTS = { tip: { tipTitle: '', tipMinutes: '2', tipSecs: '8' }, plant: { tipTitle: '', tipMinutes: '8', tipSecs: '10' } };
+  const KIND_DEFAULTS = { tip: { tipTitle: '', tipMinutes: '2', tipSecs: '8' }, plant: { tipTitle: '', tipMinutes: '8', tipSecs: '10' }, hist: { tipTitle: '', tipMinutes: '3', tipSecs: '8' } };
   const KIND_IDS = ['tipTitle', 'tipMinutes', 'tipSecs'];
-  const kindKey = (id, plant) => (plant ? 'plant' + id[0].toUpperCase() + id.slice(1) : id);
+  const kindKey = (id, m) => (m === 'plant' || m === 'hist' ? m + id[0].toUpperCase() + id.slice(1) : id);
   function loadKindFields() {
-    const plant = isPlant(), def = KIND_DEFAULTS[plant ? 'plant' : 'tip'];
+    const plant = isPlant(), def = KIND_DEFAULTS[TIP_MODES.includes(mode) ? mode : 'tip'], key = TIP_MODES.includes(mode) ? mode : 'tip';
     $('tipMinutes').replaceChildren(...(plant ? AD.PLANT_MINUTES : AD.TIP_MINUTES).map(n => { const o = el('option', '', n + ' phút'); o.value = String(n); return o; }));
     for (const id of KIND_IDS) {
-      const value = saved[kindKey(id, plant)];
+      const value = saved[kindKey(id, key)];
       $(id).value = value !== undefined && value !== null ? value : def[id];
       if (id !== 'tipTitle' && !$(id).value) $(id).value = def[id];   // giá trị đã lưu không còn trong danh sách (đổi chế độ) thì dùng mặc định
     }
   }
-  for (const id of KIND_IDS) for (const event of ['input', 'change']) $(id).addEventListener(event, () => { saved[kindKey(id, isPlant())] = $(id).value; persist(); });
+  for (const id of KIND_IDS) for (const event of ['input', 'change']) $(id).addEventListener(event, () => { saved[kindKey(id, TIP_MODES.includes(mode) ? mode : 'tip')] = $(id).value; persist(); });
   const adFields = () => ({ product: $('adProduct').value, points: $('adPoints').value, audience: $('adAudience').value, offer: $('adOffer').value, cta: $('adCta').value, tone: $('adTone').value, length: Number($('adLength').value), camera: [...adCamera], look: adLook, template: adTemplate });
   // Mẹo vặt: mỗi ảnh/clip dài tối đa «Mỗi ảnh chuyển động» giây (ô chọn); các chế độ khác dùng mức tối đa của Muse.
   const capSeconds = () => (isTip() ? Number($('tipSecs').value) || plan().MAX_SECONDS : plan().MAX_SECONDS);
-  const tipFields = () => ({ tipTitle: $('tipTitle').value, tipMinutes: Number($('tipMinutes').value), tipLanguage: $('tipLanguage').value, tipMotion: $('tipMotion').value, tipPrompt: $('tipPrompt').value, tipKind: isPlant() ? 'plant' : 'tip' });
+  const tipFields = () => ({ tipTitle: $('tipTitle').value, tipMinutes: Number($('tipMinutes').value), tipLanguage: $('tipLanguage').value, tipMotion: $('tipMotion').value, tipPrompt: $('tipPrompt').value, tipKind: KIND_OF[mode] || 'tip' });
   const options = () => ({ seconds: capSeconds(), reference: refs.length > 0 && !isTip(), aspect: $('storyAspect').value, style: $('storyStyle').value, character: $('storyCharacter').value, form: $('storyForm').value, ...(isAd() ? { ad: adFields() } : {}), ...(isTip() ? { tip: true, ...tipFields() } : {}) });
   const plan = () => window.storyPlan;
   const dims = aspect => aspect === '9:16' ? [1080, 1920] : aspect === '1:1' ? [1080, 1080] : [1920, 1080];
@@ -83,7 +105,11 @@
       warnBoxes.forEach((box, i) => {
         const list = warnings[i] || [];
         box.hidden = !list.length; box.replaceChildren(...list.map(w => el('div', '', '⚠ ' + w)));
-        if (list.length) flagged++;
+        if (list.length) {
+          flagged++;
+          const fold = box.closest('.draftRow')?.querySelector('.sceneMore');
+          if (fold && !fold.dataset.shown) { fold.open = true; fold.dataset.shown = '1'; }   // cảnh có cảnh báo thì mở sẵn prompt để thấy chỗ cần sửa
+        }
       });
       const check = $('storyCheck'), script = $('storyScript').value;
       let result = null;
@@ -113,7 +139,7 @@
   // Muse đã hiểu bài thế nào (tóm tắt, cách minh họa, nhân vật/vai, bối cảnh): hiện để người dùng thấy ngay chỗ Muse hiểu sai.
   let understood = null;   // { summary, approach, cast, setting }
   function renderUnderstanding() {
-    const box = $('storyUnderstand'), rows = [['Tóm tắt', understood?.summary], ['Cách minh họa', understood?.approach], [isTip() ? 'Nơi làm và đồ vật cố định' : 'Nhân vật', understood?.cast], ['Bối cảnh', understood?.setting]].filter(r => r[1]);
+    const box = $('storyUnderstand'), rows = [['Tóm tắt', understood?.summary], ['Cách minh họa', understood?.approach], [isHist() ? 'Phong cách vẽ và nhân vật cố định' : isTip() ? 'Nơi làm và đồ vật cố định' : 'Nhân vật', understood?.cast], ['Bối cảnh', understood?.setting]].filter(r => r[1]);
     box.hidden = !rows.length || !scenes.length;
     $('storyUnderstandBody').replaceChildren(...rows.flatMap(([label, text]) => [el('h4', '', label), el('p', '', text)]));
   }
@@ -134,7 +160,10 @@
       const tools = el('div', 'draftTools'), remove = el('button', 'secondary', 'Xóa cảnh');
       remove.onclick = () => { scenes.splice(index, 1); scenes.forEach((s, i) => { s.title = 'Cảnh ' + (i + 1); }); renderScenes(); };
       tools.append(remove);
-      body.append(el('label', 'storyLabel', 'Lời đọc'), voice, ...(isTip() ? [el('label', 'storyLabel', 'Prompt ảnh (khung hình đầu)'), image] : []), el('label', 'storyLabel', isTip() ? 'Prompt chuyển động (làm từ ảnh)' : 'Prompt gửi Muse'), prompt, warn, tools);
+      // Mỗi cảnh chỉ hiện lời đọc cho gọn; prompt ảnh và chuyển động nằm trong mục thu gọn (tự mở khi cảnh có cảnh báo, và luôn mở ở chế độ quảng cáo vì không có lời đọc).
+      const more = el('details', 'more sceneMore'); more.open = isAd();
+      more.append(el('summary', '', isTip() ? 'Prompt ảnh và chuyển động (sửa nếu cần)' : 'Prompt gửi Muse (sửa nếu cần)'), ...(isTip() ? [el('label', 'storyLabel', 'Prompt ảnh (khung hình đầu)'), image] : []), el('label', 'storyLabel', isTip() ? 'Prompt chuyển động (làm từ ảnh)' : 'Prompt gửi Muse'), prompt);
+      body.append(el('label', 'storyLabel', 'Lời đọc'), voice, more, warn, tools);
       row.append(body); box.append(row);
     });
     $('storySceneCount').textContent = scenes.length ? `${scenes.length} cảnh` : '';
@@ -153,38 +182,52 @@
   // App không tự chia thay Muse.
   let resume = null;   // { script, from, cast, understanding }
   const canResume = () => Boolean(resume && scenes.length && $('storyScript').value === resume.script);
-  async function analyze(fromStart) {
+  async function analyze(fromStart, ctx = null) {
     if (analyzing) return;
-    const script = $('storyScript').value;
-    if (!script.trim()) return toast(isAd() ? 'Chưa có lời quảng cáo. Bấm «Muse viết lời quảng cáo» hoặc dán lời vào ô.' : 'Dán câu chuyện trước.');
-    if (fromStart && scenes.length && !confirm('Phân tích lại từ đầu sẽ thay toàn bộ các cảnh đang có. Tiếp tục?')) return;
-    const resuming = !fromStart && canResume(), before = resuming ? scenes : [];
+    // `ctx` (từ «Muse viết … và chia cảnh») giữ đúng kịch bản và tùy chọn của chế độ đã bắt đầu, kể cả khi bạn đã sang tab khác.
+    const owner = ctx?.owner || mode, ownerTip = TIP_MODES.includes(owner);
+    const script = ctx ? ctx.script : $('storyScript').value;
+    const opts = ctx ? ctx.opts : options();
+    if (!script.trim()) return toast(owner === 'ad' ? 'Chưa có lời quảng cáo. Bấm «Muse viết lời quảng cáo» hoặc dán lời vào ô.' : 'Dán câu chuyện trước.');
+    if (!ctx && fromStart && scenes.length && !confirm('Phân tích lại từ đầu sẽ thay toàn bộ các cảnh đang có. Tiếp tục?')) return;
+    const resuming = !ctx && !fromStart && canResume(), before = resuming ? scenes : [];
+    const starter = !runMode; if (starter) setRun(owner);
     analyzing = true; renderAnalyze();
     try {
-      const result = await call('storyAnalyze', { script, ...options(), ...(resuming ? { resume: { from: resume.from, cast: resume.cast, understanding: resume.understanding } } : {}) });
+      const result = await call('storyAnalyze', { script, ...opts, ...(resuming ? { resume: { from: resume.from, cast: resume.cast, understanding: resume.understanding } } : {}) });
       if (result?.scenes?.length) {
-        scenes = [...before, ...result.scenes].map((s, i) => ({ ...s, title: `Cảnh ${i + 1}` }));
+        const list = [...before, ...result.scenes].map((s, i) => ({ ...s, title: `Cảnh ${i + 1}` }));
         const u = result.understanding || (resuming ? resume.understanding : null);
-        understood = u || result.cast ? { summary: u?.summary || '', approach: u?.approach || '', setting: u?.setting || '', cast: result.cast || (resuming ? resume.cast : '') || '' } : null;
-        renderScenes();
+        const know = u || result.cast ? { summary: u?.summary || '', approach: u?.approach || '', setting: u?.setting || '', cast: result.cast || (resuming ? resume.cast : '') || '' } : null;
         const stop = result.incomplete;
-        resume = stop ? { script, from: stop.from, cast: result.cast || (resuming ? resume.cast : ''), understanding: u || null } : null;
-        $('storyInfo').textContent = stop
-          ? `Muse đã chia ${scenes.length} cảnh, dừng ở câu ${stop.from}/${stop.total}. ${stop.message} Bấm «Phân tích tiếp» để Muse làm tiếp từ đó (giữ nguyên các cảnh đã có).`
-          : `Muse đã chia ${scenes.length} cảnh.${result.notes?.length ? ' ' + result.notes.join(' ') : ''} ${isTip() ? 'Xem lại lời đọc, prompt ảnh và prompt chuyển động, rồi bấm Tạo ảnh + clip.' : 'Xem lại lời đọc và prompt, rồi bấm Tạo clip.'}`;
-        if (stop) toast(`Muse dừng ở câu ${stop.from}/${stop.total}. Bấm «Phân tích tiếp» để làm tiếp.`);
+        const next = stop ? { script, from: stop.from, cast: result.cast || (resuming ? resume.cast : ''), understanding: u || null } : null;
+        const info = stop
+          ? `Muse đã chia ${list.length} cảnh, dừng ở câu ${stop.from}/${stop.total}. ${stop.message} Bấm «Phân tích tiếp» để Muse làm tiếp từ đó (giữ nguyên các cảnh đã có).`
+          : `Muse đã chia ${list.length} cảnh.${result.notes?.length ? ' ' + result.notes.join(' ') : ''} ${ownerTip ? 'Xem lại lời đọc, prompt ảnh và prompt chuyển động, rồi bấm Tạo ảnh + clip.' : 'Xem lại lời đọc và prompt, rồi bấm Tạo clip.'}`;
+        if (owner === mode) {
+          scenes = list; understood = know; renderScenes(); resume = next;
+          $('storyInfo').textContent = info;
+          if (stop) toast(`Muse dừng ở câu ${stop.from}/${stop.total}. Bấm «Phân tích tiếp» để làm tiếp.`);
+        } else {
+          spaces[owner] = { ...spaces[owner], scenes: list, understood: know, resume: next, info };
+          toast(`Muse đã xong ở tab «${MODE_NAME[owner]}».`);
+        }
       }
-    } finally { analyzing = false; renderAnalyze(); }
+    } finally { analyzing = false; if (starter) setRun(''); renderAnalyze(); }
   }
   // Tiến độ lấy từ tiến trình chính (state.story.analyze) nên vẫn đúng khi tải lại giao diện.
   function renderAnalyze() {
     const a = state?.story?.analyze || {}, busy = analyzing || writing || Boolean(a.busy);
-    const writingNow = writing || (a.busy && a.kind === 'write');
-    $('storyAnalyze').disabled = busy; $('storyAnalyzeAgain').hidden = busy || !canResume(); $('adWrite').disabled = busy; $('tipWrite').disabled = busy; $('adQuick').disabled = busy; $('storyAnalyzeStop').hidden = !busy;
-    $('storyAnalyze').textContent = busy && !writingNow ? 'Muse đang phân tích…' : canResume() ? 'Phân tích tiếp' : 'Phân tích bằng Muse';
+    if (!busy && runMode && !analyzing && !writing) setRun('');
+    const other = busy && Boolean(runMode) && runMode !== mode, mine = busy && !other;   // other = Muse đang bận ở tab khác
+    const writingNow = mine && (writing || (a.busy && a.kind === 'write'));
+    $('storyAnalyze').disabled = busy; $('storyAnalyzeAgain').hidden = busy || !canResume(); $('adWrite').disabled = busy; $('tipWrite').disabled = busy; $('adQuick').disabled = mine; $('storyAnalyzeStop').hidden = !mine;
+    $('storyAnalyze').textContent = mine && !writingNow ? 'Muse đang phân tích…' : canResume() ? 'Phân tích tiếp' : 'Phân tích bằng Muse';
     $('adWrite').textContent = writingNow ? 'Muse đang viết…' : 'Muse viết lời quảng cáo';
-    $('tipWrite').textContent = writingNow ? (isPlant() ? 'Muse đang viết bài…' : 'Muse đang viết mẹo…') : busy ? 'Muse đang chia cảnh…' : isPlant() ? 'Muse viết bài và chia cảnh' : 'Muse viết mẹo và chia cảnh';
-    if (busy && a.progress) $('storyInfo').textContent = a.progress;
+    $('tipWrite').textContent = writingNow ? (isPlant() || isHist() ? 'Muse đang viết bài…' : 'Muse đang viết mẹo…') : mine ? 'Muse đang chia cảnh…' : isHist() ? 'Muse viết bài lịch sử và chia cảnh' : isPlant() ? 'Muse viết bài và chia cảnh' : 'Muse viết mẹo và chia cảnh';
+    if (mine && a.progress) $('storyInfo').textContent = a.progress;
+    else if (other) { $('storyInfo').textContent = `Muse đang bận ở tab «${MODE_NAME[runMode]}». Chờ xong rồi dùng tab này.`; busyHint = true; }
+    else if (busyHint) { busyHint = false; $('storyInfo').textContent = spaces[mode]?.info || IDLE_INFO[idleIndex(mode)]; }   // Muse đã rảnh: bỏ dòng «đang bận»
   }
   // Quảng cáo nhanh từ ảnh: cảnh quay dựng sẵn theo mẫu, không cần lời đọc hay Muse.
   // Cảnh tự tạo được ghi dấu (autoSnap); đổi ảnh/mẫu/độ dài… thì tạo lại ngay, trừ khi người dùng đã sửa hoặc xóa cảnh.
@@ -212,7 +255,7 @@
     clearTimeout(autoTimer);
     if (!isAd() || !refs.length) return;
     autoTimer = setTimeout(() => {
-      if (!isAd() || !refs.length || analyzing || writing) return;
+      if (!isAd() || !refs.length || ((analyzing || writing) && (!runMode || runMode === mode))) return;
       if (!pristine()) { $('storyInfo').textContent = 'Đã đổi tùy chọn. Bấm «Tạo lại cảnh» để áp dụng (sẽ thay các cảnh đang có).'; return; }
       buildAd(false);
     }, delay);
@@ -228,41 +271,47 @@
     if (analyzing || writing) return;
     if (!$('adProduct').value.trim()) { $('adMore').open = true; $('adProduct').focus(); return toast('Nhập tên sản phẩm trước.'); }
     if ($('storyScript').value.trim() && !confirm('Ô lời quảng cáo đang có chữ. Viết mới sẽ thay toàn bộ và xóa các cảnh đã chia. Tiếp tục?')) return;
+    const owner = mode, opts = options(), starter = !runMode; if (starter) setRun(owner);
     writing = true; renderAnalyze();
     try {
-      const result = await call('storyAdWrite', options());
+      const result = await call('storyAdWrite', opts);
       if (result?.script) {
-        $('storyScript').value = result.script; saved.script = result.script; persist();
-        scenes = []; resume = null; renderScenes();
-        $('storyInfo').textContent = 'Muse đã viết lời quảng cáo. Đọc và sửa cho đúng ý, rồi bấm «Phân tích bằng Muse» để chia cảnh.';
+        setScript(owner, result.script);
+        const info = 'Muse đã viết lời quảng cáo. Đọc và sửa cho đúng ý, rồi bấm «Phân tích bằng Muse» để chia cảnh.';
+        if (owner === mode) { scenes = []; resume = null; renderScenes(); $('storyInfo').textContent = info; }
+        else spaces[owner] = { ...spaces[owner], scenes: [], resume: null, info };
       }
-    } finally { writing = false; renderAnalyze(); }
+    } finally { writing = false; if (starter) setRun(''); renderAnalyze(); }
   }
   // Mẹo vặt: nhập tiêu đề → Muse viết mẹo theo bước → tự chia cảnh ngay (không cần dán gì). Xem lại cảnh rồi mới bấm «Tạo ảnh + clip».
   function renderTipCount() {
     let text = '';
     try {
       const tp = plan().tipPlan(options());
-      text = `≈ ${tp.total} cảnh (1 mở đầu + ${tp.steps} bước + 1 kết) = ${tp.total} ảnh + ${tp.total} clip, mỗi cảnh đọc khoảng ${tp.secs} giây. Tạo ảnh và clip tốn khoảng ${tp.total * 2} lượt Muse.`;
+      text = `≈ ${tp.total} cảnh (1 mở đầu + ${tp.steps} ${tp.history ? 'đoạn' : 'bước'} + 1 kết) = ${tp.total} ảnh + ${tp.total} clip, mỗi cảnh đọc khoảng ${tp.secs} giây. Tạo ảnh và clip tốn khoảng ${tp.total * 2} lượt Muse.`;
     } catch { text = ''; }
     $('tipCount').textContent = text;
   }
   async function writeTip() {
     if (analyzing || writing) return;
-    if (!$('tipTitle').value.trim()) { $('tipTitle').focus(); return toast(isPlant() ? 'Nhập loại cây hoặc tiêu đề trước.' : 'Nhập tiêu đề mẹo trước.'); }
-    if (($('storyScript').value.trim() || scenes.length) && !confirm(isPlant() ? 'Viết mới sẽ thay bài đang có trong ô và xóa các cảnh đã chia. Tiếp tục?' : 'Viết mới sẽ thay mẹo đang có trong ô và xóa các cảnh đã chia. Tiếp tục?')) return;
+    if (!$('tipTitle').value.trim()) { $('tipTitle').focus(); return toast(isHist() ? 'Nhập chủ đề lịch sử trước.' : isPlant() ? 'Nhập loại cây hoặc tiêu đề trước.' : 'Nhập tiêu đề mẹo trước.'); }
+    if (($('storyScript').value.trim() || scenes.length) && !confirm(isPlant() || isHist() ? 'Viết mới sẽ thay bài đang có trong ô và xóa các cảnh đã chia. Tiếp tục?' : 'Viết mới sẽ thay mẹo đang có trong ô và xóa các cảnh đã chia. Tiếp tục?')) return;
+    const owner = mode, opts = options(), starter = !runMode; if (starter) setRun(owner);
     writing = true; renderAnalyze();
-    let notes = [];
+    let notes = [], script = '';
     try {
-      const result = await call('storyAdWrite', options());
+      const result = await call('storyAdWrite', opts);
       if (!result?.script) return;
-      $('storyScript').value = result.script; saved.script = result.script; persist();
-      scenes = []; resume = null; understood = null; renderScenes();
+      script = result.script; setScript(owner, script);
+      if (owner === mode) { scenes = []; resume = null; understood = null; renderScenes(); }
+      else spaces[owner] = { ...spaces[owner], scenes: [], resume: null, understood: null };
       notes = result.notes || [];
-    } finally { writing = false; renderAnalyze(); }
-    $('storyInfo').textContent = isPlant() ? 'Muse đã viết xong bài. Đang nhờ Muse chia cảnh…' : 'Muse đã viết xong mẹo. Đang nhờ Muse chia cảnh…';
-    await analyze(false);
-    if (notes.length && scenes.length) toast(notes[0]);
+    } finally { writing = false; if (starter && !script) setRun(''); renderAnalyze(); }
+    try {
+      if (owner === mode) $('storyInfo').textContent = owner === 'plant' || owner === 'hist' ? 'Muse đã viết xong bài. Đang nhờ Muse chia cảnh…' : 'Muse đã viết xong mẹo. Đang nhờ Muse chia cảnh…';
+      await analyze(false, { owner, script, opts });
+    } finally { if (starter) setRun(''); renderAnalyze(); }
+    if (notes.length && owner === mode && scenes.length) toast(notes[0]);
   }
   function ask() {
     try {
@@ -311,41 +360,60 @@
     ['storyRefs', 'text', 'Chọn ảnh nhân vật', 'Chọn ảnh sản phẩm'],
     ['storyRefPaste', 'text', 'Dán hoặc kéo ảnh nhân vật chính vào đây. Ảnh này gắn vào mọi cảnh để nhân vật giữ nguyên; nhân vật khác do Muse nhận ra và vẽ cùng hình dạng với nhân vật này (chỉ khác màu áo, giới tính, tóc…).', 'Dán hoặc kéo ảnh sản phẩm vào đây (nên 1–2 ảnh rõ nét, nền sạch). Ảnh gắn vào mọi cảnh để sản phẩm giữ đúng hình dạng và màu sắc.']
   ];
-  const IDLE_INFO = ['Dán câu chuyện rồi bấm «Phân tích bằng Muse» (cần đã đăng nhập Muse tài khoản 1). Muse đọc hiểu cả truyện rồi mới chia cảnh và viết prompt hình.', 'Thả ảnh sản phẩm, chọn mẫu: các cảnh quay hiện ngay bên dưới. Muốn có lời đọc thì mở «Tùy chỉnh thêm», viết lời quảng cáo rồi bấm «Phân tích bằng Muse».', 'Nhập tiêu đề mẹo rồi bấm «Muse viết mẹo và chia cảnh» (cần đã đăng nhập Muse tài khoản 1). Muse viết mẹo theo từng bước và chia cảnh; bạn xem lại rồi bấm «Tạo ảnh + clip»: mỗi bước một ảnh chụp thật, rồi ảnh đó chuyển động thành clip.', 'Nhập loại cây rồi bấm «Muse viết bài và chia cảnh» (cần đã đăng nhập Muse tài khoản 1). Muse viết bài trồng cây từ chuẩn bị chậu đến ra quả và chia cảnh; bạn xem lại rồi bấm «Tạo ảnh + clip»: mỗi giai đoạn một ảnh chụp thật, rồi ảnh đó chuyển động nhẹ thành clip.'];
+  // Chữ riêng của chế độ «Lịch sử minh họa» (cùng khóa với MODE_TEXT).
+  const HIST_TEXT = {
+    storyHead: '1. Bài lịch sử (Muse viết, bạn sửa được)',
+    storyScript: 'Đã có sẵn bài? Dán vào đây rồi bấm «Phân tích bằng Muse». Chưa có thì nhập chủ đề ở trên: Muse viết bài lịch sử và hiện ở đây để bạn sửa. Giọng đọc sẽ đọc đúng nguyên văn bài này.',
+    storyStyle: 'Mặc định là tranh hoạt hình phẳng. Ví dụ: tranh hoạt hình phẳng, màu ấm, nét viền rõ',
+    tipIntro: 'Chỉ cần nhập chủ đề lịch sử: Muse viết bài và chia cảnh. Mỗi cảnh tạo một tranh hoạt hình rồi cho tranh chuyển động nhẹ. Đã có sẵn bài thì dán vào ô bên dưới.',
+    tipTitleLabel: 'Bạn muốn kể chủ đề lịch sử gì?',
+    tipTitle: 'Ví dụ: Lịch sử Việt Nam từ thời dựng nước đến nay',
+    storyCharLabel: 'Nhân vật dẫn chuyện (không bắt buộc)',
+    storyCharacter: 'Ví dụ: cô gái tóc đen búi, áo dài cam, nét mặt dịu dàng. Nhân vật này xuất hiện lại ở nhiều cảnh.',
+    storyRefs: 'Chọn ảnh nhân vật dẫn chuyện',
+    storyRefPaste: 'Dán hoặc kéo ảnh nhân vật dẫn chuyện vào đây (không bắt buộc). Ảnh gắn vào mọi ảnh minh họa để nhân vật giữ nguyên.'
+  };
+  const IDLE_INFO = ['Dán câu chuyện rồi bấm «Phân tích bằng Muse» (cần đã đăng nhập Muse tài khoản 1). Muse đọc hiểu cả truyện rồi mới chia cảnh và viết prompt hình.', 'Thả ảnh sản phẩm, chọn mẫu: các cảnh quay hiện ngay bên dưới. Muốn có lời đọc thì mở «Tùy chỉnh thêm», viết lời quảng cáo rồi bấm «Phân tích bằng Muse».', 'Nhập tiêu đề mẹo rồi bấm «Muse viết mẹo và chia cảnh» (cần đã đăng nhập Muse tài khoản 1). Muse viết mẹo theo từng bước và chia cảnh; bạn xem lại rồi bấm «Tạo ảnh + clip»: mỗi bước một ảnh chụp thật, rồi ảnh đó chuyển động thành clip.', 'Nhập loại cây rồi bấm «Muse viết bài và chia cảnh» (cần đã đăng nhập Muse tài khoản 1). Muse viết bài trồng cây từ chuẩn bị chậu đến ra quả và chia cảnh; bạn xem lại rồi bấm «Tạo ảnh + clip»: mỗi giai đoạn một ảnh chụp thật, rồi ảnh đó chuyển động nhẹ thành clip.', 'Nhập chủ đề lịch sử rồi bấm «Muse viết bài lịch sử và chia cảnh» (cần đã đăng nhập Muse tài khoản 1), hoặc dán sẵn bài vào ô rồi bấm «Phân tích bằng Muse». Xem lại cảnh rồi bấm «Tạo ảnh + clip»: mỗi cảnh một tranh hoạt hình cho chuyển động nhẹ.'];
   function applyMode(initial) {
-    const ad = isAd(), tip = isTip(), plant = isPlant();
+    const ad = isAd(), tip = isTip(), plant = isPlant(), hist = isHist();
     loadKindFields();
     for (const [id, kind, story, adText, tipText, plantText] of MODE_TEXT) {
       if (initial && !ad && !tip) continue;
-      const value = plant ? (plantText ?? tipText ?? story) : tip ? (tipText ?? story) : ad ? adText : story;
+      const value = hist && HIST_TEXT[id] !== undefined ? HIST_TEXT[id] : plant ? (plantText ?? tipText ?? story) : tip ? (tipText ?? story) : ad ? adText : story;
       if (kind === 'text') $(id).textContent = value; else $(id).placeholder = value;
     }
-    $('modeStory').setAttribute('aria-pressed', String(!ad && !tip)); $('modeAd').setAttribute('aria-pressed', String(ad)); $('modeTip').setAttribute('aria-pressed', String(tip && !plant)); $('modePlant').setAttribute('aria-pressed', String(plant));
+    $('modeStory').setAttribute('aria-pressed', String(!ad && !tip)); $('modeAd').setAttribute('aria-pressed', String(ad)); $('modeTip').setAttribute('aria-pressed', String(tip && !plant && !hist)); $('modePlant').setAttribute('aria-pressed', String(plant)); $('modeHist').setAttribute('aria-pressed', String(hist));
     // Mẹo vặt không dùng nhân vật: ảnh nào cũng do Muse vẽ từ prompt ảnh của bước.
-    for (const id of ['storyRefRow', 'storyRefPaste', 'storyRefInfo']) $(id).hidden = tip;
-    for (const id of ['storyCharacter', 'storyForm']) $(id).closest('label').hidden = tip;
+    // Riêng «Lịch sử minh họa» giữ nhân vật dẫn chuyện (mô tả và ảnh tham chiếu không bắt buộc) để nhân vật lặp lại ở nhiều cảnh.
+    for (const id of ['storyRefRow', 'storyRefPaste', 'storyRefInfo']) $(id).hidden = tip && !hist;
+    $('storyCharacter').closest('label').hidden = tip && !hist; $('storyForm').closest('label').hidden = tip;
+    $('tipMotionLabel').hidden = hist; $('tipPromptLabel').hidden = hist;   // lịch sử luôn chuyển động nhẹ và prompt tiếng Anh
     $('storyCreate').textContent = tip ? '▶ Tạo ảnh + clip' : '▶ Tạo clip';
     $('adBox').hidden = !ad; $('tipBox').hidden = !tip; $('storyCompose').classList.toggle('adMode', ad);
     // Ô «Tỉ lệ» là một: ở chế độ quảng cáo nằm trong khung quảng cáo, ngược lại về chỗ cũ.
     if (ad) $('adAspectSlot').append($('storyAspectLabel')); else if (!initial) $('storyOptionsRow').prepend($('storyAspectLabel'));
     refInfo(); renderTipCount();
-    if (!initial || ad || tip) { const a = state?.story?.analyze || {}; if (!analyzing && !writing && !a.busy) $('storyInfo').textContent = IDLE_INFO[plant ? 3 : tip ? 2 : ad ? 1 : 0]; }
+    if (!initial || ad || tip) $('storyInfo').textContent = spaces[mode]?.info || IDLE_INFO[idleIndex(mode)];
   }
   function setMode(next) {
     if (mode === next) return;
-    // Cảnh của chế độ Mẹo vặt có thêm prompt ảnh; cảnh của chế độ khác thì không: không trộn lẫn.
-    const reset = scenes.length > 0 && (next === 'tip' || next === 'plant' || scenes.some(s => s.image !== undefined));
-    if (reset && !confirm('Đổi chế độ sẽ xóa các cảnh đang có (mỗi chế độ chia cảnh khác nhau). Tiếp tục?')) return;
+    // Mỗi chế độ giữ phần làm việc riêng (cảnh, chỗ dừng, ảnh tham chiếu, dòng thông tin): cất phần đang mở, mở phần của chế độ mới.
+    const working = analyzing || writing || Boolean(state?.story?.analyze?.busy);
+    spaces[mode] = { scenes, resume, understood, autoSnap, refs, info: working || (runMode && runMode !== mode) ? '' : $('storyInfo').textContent };
+    clearTimeout(autoTimer);
     mode = next; saved.mode = mode; persist();
-    if (reset) { scenes = []; resume = null; understood = null; autoSnap = ''; }
+    const space = spaces[mode] || {};
+    scenes = space.scenes || []; resume = space.resume || null; understood = space.understood || null; autoSnap = space.autoSnap || ''; refs = space.refs || [];
+    loadModeFields();
     applyMode(false);
     renderScenes();
     refreshChecks();
+    renderAnalyze();
   }
 
   /* ---------- ảnh nhân vật ---------- */
   function refInfo() {
-    if (isTip()) { $('storyRefInfo').textContent = ''; return; }
+    if (isTip() && !isHist()) { $('storyRefInfo').textContent = ''; return; }
     $('storyRefInfo').textContent = refs.length ? `Ảnh ${isAd() ? 'sản phẩm' : 'nhân vật'}: ${refs.map(baseName).join(', ')} — gắn vào mọi cảnh.` : isAd() ? 'Chưa chọn ảnh sản phẩm. Nên thêm ảnh rõ nét để sản phẩm trong video giống thật.' : 'Chưa chọn ảnh nhân vật.';
   }
   async function pasteRefs(event) {
@@ -365,12 +433,12 @@
   async function commit(startNow) {
     if (!scenes.length) return toast('Chia cảnh trước.');
     if (scenes.some(s => !String(s.prompt || '').trim())) return toast('Cảnh nào cũng cần prompt.');
-    if (isTip() && scenes.some(s => !String(s.image || '').trim())) return toast('Bước nào cũng cần prompt ảnh.');
+    if (isTip() && scenes.some(s => !String(s.image || '').trim())) return toast(isHist() ? 'Cảnh nào cũng cần prompt ảnh.' : 'Bước nào cũng cần prompt ảnh.');
     if (startNow) {
       if (state.active || state.starting || state.stopping || state.merging || state.packaging) return toast('Dừng hàng đợi hiện tại trước khi tạo lượt mới.');
       if (!state.settings.output) return toast('Chọn thư mục lưu video trước.');
       const question = isTip()
-        ? `Thêm ${scenes.length} bước (${scenes.length} ảnh + ${scenes.length} clip) và chạy ngay? Mỗi bước tốn 2 lượt Muse (1 ảnh, 1 clip) nên có thể dùng nhiều credit Muse. Tool tạo hết ảnh trước, rồi làm clip từ đúng ảnh đó, gửi nguyên prompt đã xem.`
+        ? `Thêm ${scenes.length} ${isHist() ? 'cảnh' : 'bước'} (${scenes.length} ảnh + ${scenes.length} clip) và chạy ngay? Mỗi ${isHist() ? 'cảnh' : 'bước'} tốn 2 lượt Muse (1 ảnh, 1 clip) nên có thể dùng nhiều credit Muse. Tool tạo hết ảnh trước, rồi làm clip từ đúng ảnh đó, gửi nguyên prompt đã xem.`
         : `Thêm ${scenes.length} cảnh và chạy toàn bộ clip kể chuyện đang chờ? Tạo video có thể dùng credit Muse. Tool gửi nguyên prompt đã xem, cùng ảnh ${isAd() ? 'sản phẩm' : 'nhân vật'}.`;
       if (!confirm(question)) return;
     }
@@ -379,7 +447,7 @@
     // Mẹo vặt: mỗi bước thành một việc ảnh rồi một việc clip. Tạo hết ảnh trước (ảnh rẻ, hỏng thì dừng sớm), clip chỉ chạy khi ảnh cùng số bước đã lưu.
     const jobs = isTip()
       ? [
-        ...scenes.map((s, i) => ({ kind: 'story', storyId, phase: 'image', number: i + 1, title: `${s.title} · ảnh`, source: s.voiceover || s.source || '', prompt: s.image })),
+        ...scenes.map((s, i) => ({ kind: 'story', storyId, phase: 'image', number: i + 1, title: `${s.title} · ảnh`, source: s.voiceover || s.source || '', prompt: s.image, ...(isHist() && refs.length ? { image: refs[0], references: [...refs] } : {}) })),
         ...scenes.map((s, i) => ({ kind: 'story', storyId, phase: 'clip', dependsOn: 'image', number: i + 1, title: `${s.title} · clip`, source: s.voiceover || s.source || '', voiceover: s.voiceover || '', prompt: clipPrompt(s), durationSeconds: secondsOf(s) }))
       ]
       : scenes.map(s => ({ kind: 'story', storyId, title: s.title, source: s.voiceover || s.source || '', voiceover: s.voiceover || '', prompt: clipPrompt(s), durationSeconds: secondsOf(s), image: refs[0] || '', references: [...refs] }));
@@ -628,7 +696,7 @@
     if (story && story.id !== lastStory) { lastStory = story.id; }
   }
 
-  $('modeStory').onclick = () => setMode('story'); $('modeAd').onclick = () => setMode('ad'); $('modeTip').onclick = () => setMode('tip'); $('modePlant').onclick = () => setMode('plant'); $('adWrite').onclick = writeAd; $('tipWrite').onclick = writeTip; $('adQuick').onclick = quickAd;
+  $('modeStory').onclick = () => setMode('story'); $('modeAd').onclick = () => setMode('ad'); $('modeTip').onclick = () => setMode('tip'); $('modePlant').onclick = () => setMode('plant'); $('modeHist').onclick = () => setMode('hist'); $('adWrite').onclick = writeAd; $('tipWrite').onclick = writeTip; $('adQuick').onclick = quickAd;
   for (const id of ['tipMinutes', 'tipSecs', 'tipLanguage', 'storyAspect']) $(id).addEventListener('change', renderTipCount);
   $('storyAnalyze').onclick = () => analyze(false); $('storyAnalyzeAgain').onclick = () => analyze(true); $('storyScript').addEventListener('input', renderAnalyze);
   $('storyAnalyzeStop').onclick = async () => { const r = await call('storyAnalyzeCancel'); if (r) render(r); };

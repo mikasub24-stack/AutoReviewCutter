@@ -318,3 +318,13 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .storyUnderstand { margin: 0 0 12px; }
 .storyUnderstand h4 { margin: 10px 0 2px; font-size: 12px; color: #8fd8c8; font-weight: 600; }
 .storyUnderstand p { margin: 0; font-size: 13px; line-height: 1.5; white-space: pre-wrap; color: #dbe6f6; }
+
+/* Mục thu gọn «Tùy chọn thêm»: giữ giao diện gọn, mở ra khi cần. */
+.more { margin: 10px 0 0; }
+.more > summary { cursor: pointer; width: fit-content; font-size: 12px; color: #8fa5c3; list-style: none; padding: 4px 0; }
+.more > summary::before { content: '＋ '; }
+.more[open] > summary::before { content: '－ '; }
+.more > summary:hover { color: #cbd7e9; }
+.more > summary::-webkit-details-marker { display: none; }
+.more[open] > summary { margin-bottom: 4px; }
+.sceneMore { margin: 6px 0 0; }
