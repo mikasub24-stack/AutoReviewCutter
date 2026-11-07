@@ -68,6 +68,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     });
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
     await page.waitForFunction(() => document.querySelectorAll('.card').length > 0);
+    await page.evaluate(() => { document.getElementById('autoExport').checked = false; });   // các bước thủ công bên dưới tự bấm «Xuất MP4»; phần tự xuất có khối kiểm thử riêng ở cuối
     const called = name => page.evaluate(n => window.calls.filter(c => c.name === n), name);
     // Giao diện gọn: các ô phụ nằm trong «Tùy chọn thêm» và đều đóng sẵn.
     assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('details.more')].map(d => [d.id || 'scene', d.open])), [['tipMore', false], ['subMore', false]]);
@@ -835,6 +836,36 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       assert.equal(await page.locator('#storyRefRow').isVisible(), true);
       assert.equal(await page.locator('#storyCreate').textContent(), '▶ Create clips');
       assert.equal(await page.locator('#tipBox').isVisible(), false, 'ô tiêu đề ẩn ngoài chế độ Mẹo vặt');
+    }
+    // Tự đọc giọng + edit khớp + xuất MP4 ngay khi tạo xong hết clip (mọi chế độ, kể cả chạy hàng đợi tay); tắt được bằng ô «Tự đọc giọng…».
+    {
+      await page.locator('#modeStory').click();
+      const setAuto = on => page.evaluate(v => { const c = document.getElementById('autoExport'); c.checked = v; c.dispatchEvent(new Event('change', { bubbles: true })); }, on);
+      const addGroup = (sid, status) => page.evaluate(({ sid, status }) => { for (const n of [1, 2]) window.s.jobs.push({ id: sid + n, kind: 'story', storyId: sid, status, stage: status, order: n, number: n, prompt: 'p' + n, title: 'Cảnh ' + n, references: [], voiceover: 'Lời ' + n + '.', output: status === 'completed' ? 'C:\\Videos\\' + sid + '\\' + n + '.mp4' : '' }); window.push(); }, { sid, status });
+      const finish = sid => page.evaluate(sid => { window.s.jobs.filter(j => j.storyId === sid).forEach(j => { j.status = 'completed'; j.stage = 'completed'; j.output = 'C:\\Videos\\' + sid + '\\' + j.number + '.mp4'; }); window.push(); }, sid);
+      const builds = async () => (await called('storyBuild')).length, nap = ms => page.waitForTimeout(ms);
+      assert.equal(await page.evaluate(() => document.getElementById('autoExport').parentElement.textContent.trim()), 'Auto narrate, edit to match and export MP4 when all clips are done');   // cuối bài kiểm thử đang ở tiếng Anh
+      // Bật: chạy dở → xong hết → tự đọc giọng + dựng + xuất đúng lượt đó, đúng một lần.
+      await setAuto(true);
+      let b0 = await builds();
+      await addGroup('Truyen-AUTO', 'pending'); await nap(500);
+      assert.equal(await builds(), b0, 'còn clip chưa xong thì chưa xuất');
+      await finish('Truyen-AUTO');
+      await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyBuild').length > n, b0);
+      assert.equal((await called('storyPrepare')).at(-1).data.storyId, 'Truyen-AUTO', 'tự xuất đúng lượt vừa xong');
+      assert.deepEqual((await called('storyBuild')).at(-1).data.scenes.map(sc => sc.id), ['Truyen-AUTO1', 'Truyen-AUTO2'], 'các cảnh đúng thứ tự → lời đọc khớp clip');
+      await page.evaluate(() => window.push()); await nap(800);
+      assert.equal(await builds(), b0 + 1, 'xuất đúng một lần, cập nhật trạng thái tiếp theo không xuất lại');
+      assert.match(await page.locator('#storyStatus').textContent(), /✓ Truyen-1\.mp4/);
+      // Tắt: xong hết clip thì KHÔNG tự xuất, và bật lại sau đó cũng không xuất bù lượt cũ.
+      await setAuto(false); b0 = await builds();
+      await addGroup('Truyen-OFF', 'pending'); await nap(300); await finish('Truyen-OFF'); await nap(1200);
+      assert.equal(await builds(), b0, 'tắt ô tự xuất thì để nguyên cho bạn bấm «Xuất MP4»');
+      await setAuto(true); await page.evaluate(() => window.push()); await nap(1000);
+      assert.equal(await builds(), b0, 'bật lại không xuất bù lượt đã xong lúc đang tắt');
+      // Lượt đã xong sẵn từ trước (chưa từng thấy chạy dở) không tự xuất.
+      await addGroup('Truyen-OLD', 'completed'); await nap(1200);
+      assert.equal(await builds(), b0, 'lượt xong sẵn từ trước không tự xuất');
     }
     assert.deepEqual(errors, []);
     console.log('PASS: story tab — own jobs/counts/folder, Muse analysis + pasted Muse reply parsing (no-speech rule kept), no quick split, character image on every scene, free voice setup/listen/clone with consent, subtitles on/off + .srt + PNG captions, auto-edit report, export errors, persistence, English labels.');

@@ -17,7 +17,7 @@
     storyEngine: ['engine', 'none'], storyTempo: ['tempo', '1'], subFont: ['subFont', 'Arial'], subSize: ['subSize', '54'], subColor: ['subColor', '#ffffff'],
     subOutline: ['subOutline', '#000000'], subPos: ['subPos', 'bottom'], storySfx: ['sfx', 'low'], storyName: ['name', '']
   };
-  const CHECKS = { subOn: ['subOn', true], subSrt: ['subSrt', false], subBox: ['subBox', false] };
+  const CHECKS = { subOn: ['subOn', true], subSrt: ['subSrt', false], subBox: ['subBox', false], autoExport: ['autoExport', true] };
   let saved = {}, scenes = [], refs = [], analyzing = false, writing = false, exporting = false, listening = false, voiceSignature = '', windowsAsked = false, lastStory = '', lastVideo = '';
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { saved = {}; }
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch { /* không lưu được thì bỏ qua */ } };
@@ -183,6 +183,7 @@
   // Lượt phân tích dừng giữa chừng (Muse lỗi/không trả lời): giữ các cảnh Muse đã chia, nhớ chỗ dừng và nhân vật đã chốt để làm tiếp.
   // App không tự chia thay Muse.
   let resume = null;   // { script, from, cast, understanding }
+  const exportWatch = new Set(), exportDone = new Set(), exportAspect = {};   // tự xuất MP4: lượt đã thấy chạy dở / đã xuất rồi / khung hình lúc tạo
   let autoScript = '', pendingExport = null, autoRun = null, exportOk = false, autoWhy = '';   // autoRun: { phase: write|split|make|export|done|stopped|error, id, pct, msg, why }
   // Chạy tự động (Cây trồng): autoScript = bài Muse vừa viết; pendingExport = lượt đang chờ xuất MP4 { id, aspect, armed, since }.
   const canResume = () => Boolean(resume && scenes.length && $('storyScript').value === resume.script);
@@ -486,6 +487,7 @@
     }
     const aspectNow = $('storyAspect').value;
     const storyId = newStoryId();
+    exportAspect[storyId] = aspectNow; exportWatch.add(storyId);
     const clipPrompt = s => (plan().stripBeatTags ? plan().stripBeatTags(s.prompt) : s.prompt);
     // Mẹo vặt: mỗi bước thành một việc ảnh rồi một việc clip. Tạo hết ảnh trước (ảnh rẻ, hỏng thì dừng sớm), clip chỉ chạy khi ảnh cùng số bước đã lưu.
     const jobs = isTip()
@@ -697,6 +699,7 @@
     const story = currentStory();
     if (!story) return toast('Chưa có clip kể chuyện nào trong hàng đợi.');
     if (story.done < story.total) return toast(`Còn ${story.total - story.done} cảnh chưa xong. Chạy hàng đợi cho xong rồi xuất.`);
+    exportDone.add(story.id); exportWatch.delete(story.id);   // đã xuất (tay hoặc tự) thì không tự xuất lại lần nữa
     exportOk = false; exporting = true; renderStatus();
     try {
       const subtitles = $('subOn').checked, srt = $('subSrt').checked, aspect = opts.aspect || $('storyAspect').value;
@@ -822,15 +825,30 @@
     renderAutoRun();
   }
   // Chạy tự động: khi MỌI clip của lượt vừa tạo đã xong thì tự xuất MP4. Hàng đợi dừng (lỗi / bạn bấm Dừng) mà còn thiếu clip thì thôi, báo rõ.
+  // Mọi chế độ: lượt nào đã thấy chạy dở rồi xong hết clip (kể cả bấm «Chạy hàng đợi» tay) thì tự đọc giọng + edit khớp + xuất MP4, giống tab Vẽ bên AnimStudio. Tắt bằng ô «Tự xuất MP4».
+  function watchGroups() {
+    if (pendingExport || exporting || !state || state.story?.busy) return;
+    const on = $('autoExport').checked;
+    for (const g of groups()) {
+      if (g.total > 0 && g.done < g.total) { exportWatch.add(g.id); continue; }
+      if (g.total > 0 && exportWatch.has(g.id) && !exportDone.has(g.id)) {
+        exportWatch.delete(g.id); exportDone.add(g.id);   // tắt ô «Tự xuất» vẫn ghi nhận lượt đã xong, để bật lại sau không xuất bù lượt cũ
+        if (!on) continue;
+        pendingExport = { id: g.id, aspect: exportAspect[g.id] || $('storyAspect').value, armed: true, since: Date.now() };
+        return;
+      }
+    }
+  }
   function checkAutoExport() {
+    watchGroups();
     const p = pendingExport;
     if (!p || exporting || !state) return;
     const g = groups().find(x => x.id === p.id);
     if (!g) { pendingExport = null; if (autoRun?.id === p.id) setAuto(null); return; }          // lượt đã bị xóa khỏi hàng đợi
     if (g.total > 0 && g.done >= g.total) {
-      pendingExport = null;
+      pendingExport = null; exportDone.add(g.id); exportWatch.delete(g.id);
       const pick = $('storyPick'); if ([...pick.options].some(o => o.value === g.id)) pick.value = g.id;
-      toast('Xong hết clip. Đang tự xuất MP4…');
+      toast('Xong hết clip. Đang tự đọc giọng, edit khớp và xuất MP4…');
       if (autoRun?.id === g.id) setAuto({ phase: 'export' });
       autoWhy = '';
       exportVideo({ aspect: p.aspect })

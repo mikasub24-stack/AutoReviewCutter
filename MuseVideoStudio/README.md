@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.6.5
+
+- **Tạo xong hết clip là tự đọc giọng, edit khớp và xuất MP4 — giống tab «Vẽ» bên AnimStudio.** Trước đây chỉ chế độ «Làm tự động» (Cây trồng / Mẹo vặt / Lịch sử) mới tự xuất; tab «Kể chuyện» (và quảng cáo) tạo xong clip rồi dừng, phải bấm «Xuất MP4». Nay mọi chế độ: lượt nào đang chạy dở mà **xong hết clip** (kể cả khi bạn tự bấm «Chạy hàng đợi» hoặc «Chạy tiếp») thì app tự đọc giọng bằng giọng/tốc độ đang chọn, vẽ phụ đề, edit khớp (cắt phần thừa, giữ khung cuối khi lời dài hơn clip, âm thanh, tên, .srt) và xuất MP4, đúng tỉ lệ đã chọn lúc bấm tạo.
+- Ô **«Tự đọc giọng, edit khớp và xuất MP4 khi tạo xong hết clip»** (trong khung «Giọng, phụ đề & xuất MP4», mặc định BẬT). Bỏ chọn nếu muốn tự bấm «Xuất MP4». Đổi giọng / phụ đề / tốc độ **trước khi** clip cuối xong để áp dụng cho lần tự xuất.
+- Không xuất đúp: mỗi lượt chỉ tự xuất một lần. Lượt đã xong sẵn từ trước khi mở app (ví dụ truyện 211 cảnh đã tạo xong) **không** tự xuất — bấm «Xuất MP4» một lần cho lượt đó. Tắt ô rồi bật lại cũng không xuất bù lượt cũ.
+- Test: kiểm thử UI với IPC giả (bật → tự gọi đọc giọng + dựng đúng một lần, đúng lượt, đúng thứ tự cảnh; tắt → không xuất; lượt xong sẵn → không xuất). **Chưa thử với Muse / giọng đọc thật trên máy bạn.**
+
 ## Update 1.6.4
 
 - **Tab «Kể chuyện»: chia ÍT cảnh hơn, gộp theo ý như bên AnimStudio.** Nguyên nhân: câu lệnh gửi Muse chỉ ghi «tối đa 9 giây/cảnh», không có mục tiêu, lại dặn «tách khi đổi địa điểm», «tối đa 2–3 hành động» và «cảnh ngắn thì video ngắn» nên Muse hay chia mỗi câu / mỗi hành động một cảnh. Nay câu lệnh dặn: **mỗi cảnh nên dài gần 9 giây (ít nhất 6 giây với clip 10 giây)**, cứ gom tiếp câu kế khi còn vừa và cùng địa điểm, cùng thời điểm, cùng mạch ý; câu ngắn gộp với câu kề bên; chỉ kết thúc sớm khi đổi địa điểm, nhảy thời gian rõ rệt hoặc sang ý khác hẳn; thêm một hành động (2–4 mốc thời gian trong cùng clip) hay một câu thoại không phải lý do để tách cảnh.
