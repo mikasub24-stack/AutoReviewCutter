@@ -500,6 +500,11 @@ Bạn muốn hướng dẫn mẹo gì?|What tip do you want to show?
 Ví dụ: Mẹo khử mùi tủ lạnh bằng baking soda|e.g. How to deodorize a fridge with baking soda
 Mỗi ảnh chuyển động|Each picture moves for
 Ngôn ngữ lời đọc|Narration language
+Chuyển động clip|Clip motion
+Nhẹ, ổn định (ít méo hình)|Gentle and steady (less distortion)
+Theo từng thao tác (dễ méo)|Follow each action (more distortion)
+Prompt gửi Muse|Prompts sent to Muse
+Tiếng Anh (tối ưu cho Muse)|English (optimized for Muse)
 6 giây|6 seconds
 8 giây|8 seconds
 10 giây|10 seconds

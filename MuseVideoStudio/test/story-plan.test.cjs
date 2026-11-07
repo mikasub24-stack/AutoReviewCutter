@@ -890,7 +890,7 @@ test('tỉ lệ khung hình đã chọn luôn có trong prompt gửi video, cùn
 
 // ---- Chế độ Mẹo vặt ----
 const tipText = 'Mẹo bóc tỏi nhanh trong 10 giây. Bước một: đặt tép tỏi lên thớt và dùng sống dao đập nhẹ. Vỏ tỏi sẽ bong ra ngay. Bước hai: cho tỏi vào hộp kín và lắc mạnh. Vỏ rơi hết ra ngoài.';
-const tipCfg = { seconds: 10, aspect: '9:16', tip: true };
+const tipCfg = { seconds: 10, aspect: '9:16', tip: true, tipPrompt: 'vi' };   // các bài dưới đây kiểm tra đường prompt tiếng Việt
 test('Mẹo vặt: tùy chọn tip chỉ bật khi không phải quảng cáo; không khóa hình dạng nhân vật', () => {
   assert.equal(sp.options({ tip: true }).tip, true);
   assert.equal(sp.options({}).tip, false);
@@ -1002,6 +1002,63 @@ test('mẹo vặt từ tiêu đề: câu lệnh gửi Muse có tiêu đề, đ�
   assert.match(en, /Step 13: <lời đọc của bước>/);
   assert.match(en, /tiếng Anh tự nhiên/);
   assert.match(en, /khoảng 61–108 ký tự/);
+});
+
+test('mẹo vặt: chuyển động clip mặc định là «nhẹ, ổn định» (không xin cắt/đổ/trộn làm AI méo hình), chọn «đầy đủ» thì giữ kiểu cũ', () => {
+  const script = 'Bước 1: Cắt đôi quả chanh. Bước 2: Vắt nước chanh vào bát. Bước 3: Lau mặt bếp bằng khăn.';
+  const gentle = sp.buildMuseInstruction(script, { ...tipBase, tipPrompt: 'vi' });
+  assert.equal(sp.tipPlan(tipBase).total, sp.tipPlan({ ...tipBase, tipMotion: 'gentle' }).total, 'chế độ chuyển động không đổi số cảnh');
+  assert.match(gentle, /CHUYỂN ĐỘNG NHẸ, ỔN ĐỊNH/);
+  assert.match(gentle, /TUYỆT ĐỐI KHÔNG yêu cầu thao tác nhanh hay làm đổi vật \(cắt, thái, vắt, đổ mạnh, trộn, lau, xoay/);
+  assert.match(gentle, /khoảnh khắc nổi bật của bước/);
+  assert.ok(!gentle.includes('Mỗi mốc ghi rõ: tay hoặc dụng cụ làm gì'), 'không xin tay/dụng cụ làm thao tác');
+  assert.ok(!gentle.includes('ở lúc BẮT ĐẦU thao tác của bước (chưa làm xong)'));
+  assert.match(gentle, /«0–3 giây \[câu 5\]: …»/, 'vẫn giữ mốc giờ và thẻ số câu để app kiểm tra');
+  const full = sp.buildMuseInstruction(script, { ...tipBase, tipMotion: 'full', tipPrompt: 'vi' });
+  assert.match(full, /Mỗi mốc ghi rõ: tay hoặc dụng cụ làm gì \(cắt, vắt, đổ, trộn, lau, xoay…\)/);
+  assert.match(full, /ở lúc BẮT ĐẦU thao tác của bước \(chưa làm xong\)/);
+  assert.ok(!full.includes('CHUYỂN ĐỘNG NHẸ, ỔN ĐỊNH'));
+  assert.ok(sp.buildMuseInstruction(script, { ...tipBase, tipMotion: 'bậy', tipPrompt: 'vi' }).includes('CHUYỂN ĐỘNG NHẸ, ỔN ĐỊNH'), 'giá trị lạ → nhẹ');
+});
+
+test('mẹo vặt: mặc định Muse viết ẢNH và PROMPT bằng TIẾNG ANH (tối ưu Muse), lời đọc giữ nguyên; chọn «Tiếng Việt» thì giữ kiểu cũ', () => {
+  const script = 'Bước 1: Cắt đôi quả chanh. Bước 2: Vắt nước chanh vào bát. Bước 3: Lau mặt bếp bằng khăn.';
+  const en = sp.buildMuseInstruction(script, tipBase);
+  assert.match(en, /ẢNH \(viết bằng TIẾNG ANH\)/); assert.match(en, /PROMPT \(viết bằng TIẾNG ANH\)/);
+  assert.match(en, /«Create a photorealistic photo of…»/); assert.match(en, /shallow depth of field/);
+  assert.match(en, /«0–3 s \[line 5\]: …»/, 'mốc giờ và thẻ số câu bằng tiếng Anh vẫn đủ để app kiểm tra');
+  assert.match(en, /Realistic, physically plausible motion at natural speed\. Every object keeps exactly the same shape, size and color as in the first frame\. Hands have exactly five fingers; no extra hands, no morphing/);
+  assert.match(en, /slow smooth push-in/); assert.match(en, /TUYỆT ĐỐI KHÔNG yêu cầu cắt, thái, vắt/);
+  assert.match(en, /ẢNH: <English: Create a photorealistic photo of …>/); assert.match(en, /NHÂN VẬT: <English:/);
+  assert.match(en, /Viết ẢNH, PROMPT và dòng NHÂN VẬT bằng TIẾNG ANH/);
+  assert.ok(en.includes(sp.NO_SPEECH));
+  assert.ok(!en.includes('Tạo ảnh chụp thật…'), 'không còn bắt viết «Tạo ảnh chụp thật» tiếng Việt');
+  const full = sp.buildMuseInstruction(script, { ...tipBase, tipMotion: 'full' });
+  assert.match(full, /cut, squeeze, pour, mix, wipe, twist/); assert.ok(!full.includes('slow smooth push-in'));
+  assert.match(full, /Realistic, physically plausible motion at natural speed/, 'kiểu đầy đủ cũng dặn hợp lý, đúng vật lý');
+  const vi = sp.buildMuseInstruction(script, { ...tipBase, tipPrompt: 'vi' });
+  assert.match(vi, /Viết ẢNH và PROMPT cùng ngôn ngữ với mẹo/); assert.match(vi, /Tạo ảnh chụp thật…/); assert.ok(!vi.includes('Create a photorealistic photo of…'));
+});
+test('mẹo vặt: Muse trả prompt tiếng Anh thì mọi câu app tự thêm cũng bằng tiếng Anh (không trộn tiếng Việt), thẻ [line N] vẫn được soát và bị bỏ khi gửi', () => {
+  const cfg = { seconds: 10, aspect: '9:16', tip: true };   // mặc định tiếng Anh
+  const reply = 'NHÂN VẬT: Bright wooden kitchen, round chopping board\nCẢNH 1\nCÂU: 1-2\nẢNH: Create a photorealistic photo of a hand placing a garlic clove on a round wooden board, knife beside it, close-up, soft window light\nPROMPT: Bright kitchen, round wooden board. 0–4 s [line 1]: a hand slowly enters the frame. 4–8 s [line 2]: slow push-in on the clove. Realistic, physically plausible motion at natural speed.\nCẢNH 2\nCÂU: 3-5\nẢNH: Garlic cloves inside a clear plastic box on a wooden counter, soft light\nPROMPT: Bright kitchen. 0–2 s [line 3]: steady camera. 2–4 s [line 4]: slow pan. 4–6 s [line 5]: gentle push-in.';
+  const got = sp.scenesFromReply(tipText, reply, cfg);
+  assert.equal(got.scenes.length, 2); assert.ok(got.scenes.every(s => !s.offline && s.image && s.prompt));
+  const [a, b] = got.scenes;
+  assert.ok(a.image.startsWith('Create a photorealistic photo of a hand') && a.image.includes('9:16') && /No text, lettering/.test(a.image));
+  assert.ok(b.image.startsWith('Create a photorealistic photo: Garlic cloves'), 'thiếu động từ tạo ảnh thì app thêm câu tiếng Anh');
+  assert.ok(!/Không có chữ|Tạo ảnh|Tỷ lệ/.test(a.image + b.image), 'ảnh không lẫn tiếng Việt');
+  for (const s of got.scenes) {
+    assert.ok(s.prompt.includes(sp.tipStartLine('en')) && !s.prompt.includes(sp.tipStartLine('vi')) && s.prompt.endsWith(sp.NO_SPEECH));
+    assert.ok(s.prompt.includes('Video aspect ratio: 9:16') && !/Tỷ lệ khung hình/.test(s.prompt));
+    assert.equal(sp.motionIssues(s, cfg).length, 0, 'mốc «0–4 s [line 1]» đi đúng thứ tự câu');
+  }
+  assert.ok(sp.motionIssues({ ...a, prompt: '0–4 s [line 2]: x. 4–10 s [line 1]: y.' }, cfg).some(x => x.hard), 'đảo thứ tự câu vẫn bị bắt');
+  assert.equal(sp.stripBeatTags(a.prompt).includes('[line'), false, 'thẻ số câu bị bỏ khi gửi Muse');
+  assert.equal(a.voiceover, 'Mẹo bóc tỏi nhanh trong 10 giây. Bước một: đặt tép tỏi lên thớt và dùng sống dao đập nhẹ.', 'lời đọc vẫn nguyên văn tiếng Việt');
+  // Kiểu «Tiếng Việt» giữ nguyên câu app thêm tiếng Việt.
+  const viGot = sp.scenesFromReply(tipText, 'CẢNH 1\nCÂU: 1-2\nẢNH: Tạo ảnh chụp thật tay đặt tỏi lên thớt, dao bên cạnh, ánh sáng cửa sổ rõ nét\nPROMPT: Bếp sáng. 0–4 giây [câu 1]: tay đưa tỏi vào khung. 4–8 giây [câu 2]: máy quay đẩy chậm.\nCẢNH 2\nCÂU: 3-5\nẢNH: Tạo ảnh chụp thật hộp kín\nPROMPT: Bếp sáng. 0–3 giây [câu 3]: a. 3–6 giây [câu 4]: b. 6–9 giây [câu 5]: c.', { ...cfg, tipPrompt: 'vi' });
+  assert.ok(viGot.scenes[0].prompt.includes(sp.tipStartLine('vi')) && viGot.scenes[0].image.includes('Không có chữ'));
 });
 
 test('mẹo vặt từ tiêu đề: phần sau chỉ viết đúng các mục của mình và thấy phần đã viết để nối tiếp', () => {

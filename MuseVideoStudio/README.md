@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.4.6
+
+- **Mẹo vặt: chuyển động clip «nhẹ, ổn định» (mặc định).** Video AI của Muse hay méo hình, giật khi phải vẽ tay hoặc dụng cụ làm thao tác phức tạp (cắt, thái, vắt, đổ, trộn, lau, xoay…). Nay app dặn Muse viết prompt chuyển động chỉ gồm MỘT chuyển động nhỏ, chậm (máy quay đẩy vào chậm hoặc lia nhẹ, hơi nước bay, ánh sáng đổi nhẹ, tay đưa vào khung chậm rãi), cấm thao tác nhanh hay làm đổi vật, giữ đúng hình dạng/màu/số lượng vật, tay đủ năm ngón. Vì clip chuyển động nhẹ, **ảnh** được dặn chọn đúng khoảnh khắc nổi bật của bước (đang làm hoặc vừa làm xong) để chính ảnh thể hiện thao tác; hành động do lời đọc kể.
+- Ô mới **«Chuyển động clip»** trong khung Mẹo vặt: «Nhẹ, ổn định (ít méo hình)» (mặc định) hoặc «Theo từng thao tác (dễ méo)» (kiểu cũ của 1.4.x). Số cảnh, số lượt Muse, mốc giờ và thẻ số câu không đổi; app vẫn tự cắt/giữ khung, thêm lời đọc, phụ đề và nối thành MP4 như trước.
+- **Prompt gửi Muse bằng tiếng Anh (mặc định).** Ô mới **«Prompt gửi Muse»**: «Tiếng Anh (tối ưu cho Muse)» hoặc «Tiếng Việt». Ở chế độ tiếng Anh, Muse viết **prompt ảnh** («Create a photorealistic photo of…», góc máy, ống kính, ánh sáng, «No text, numbers, logos or watermarks») và **prompt chuyển động** (mốc «0–3 s [line 5]: …») bằng tiếng Anh; mọi câu app tự thêm (ảnh là khung hình đầu, tỉ lệ khung hình, cấm chữ trong ảnh, cấm tiếng) cũng bằng tiếng Anh, không trộn tiếng Việt. Lời đọc, phụ đề và giọng vẫn là tiếng Việt như bạn chọn. Prompt chuyển động luôn kết bằng câu dặn «Realistic, physically plausible motion at natural speed… no extra hands, no morphing, no new objects, no cuts…».
+- Chỉ đổi lời dặn Muse nên **không xoá được hết lỗi AI**: Muse vẫn có thể làm méo. Cảnh nào méo thì bấm «Tạo lại» cho cảnh đó. **Chưa thử với Muse thật.**
+
 ## Update 1.4.5
 
 - **Sửa nút «Tìm / lưu ảnh đã tạo» (tab Tạo ảnh và ảnh của Mẹo vặt).** Nút này lưu lại ảnh Muse đã tạo mà không gửi lại prompt. Trước đây, nếu chat có **nhiều tin nhắn trùng prompt** (thử lại nhiều lần) và dấu cũ đã mất (tải lại trang, Muse dựng lại tin nhắn), nút báo «Có nhiều tin nhắn trùng prompt nhưng ID cũ đã thay đổi» và không lưu gì. Nay với **ảnh**, app lấy bản **mới nhất** của prompt đó và chỉ lấy ảnh nằm ngay sau nó; không bao giờ lấy ảnh trả lời cho bản cũ hơn. Nếu bản mới nhất chưa có ảnh thì báo chưa thấy ảnh. Việc lưu vẫn chuột phải → «Tải xuống» như 1.4.4. Video giữ nguyên quy tắc chặt cũ.

@@ -75,13 +75,15 @@ function brain(behavior = {}) {
       for (const u of units) { if (tc.length && (tc.reduce((x, y) => x + y.s, 0) + u.s > 9 || u.n !== tc.at(-1).n + 1 || /^(?:Bước|Step) \d+:/.test(u.t))) { tg.push(tc); tc = []; } tc.push(u); }   // «Bước N:» luôn mở cảnh mới (đúng lời dặn trong câu lệnh)
       if (tc.length) tg.push(tc);
       const out = [];
-      if (!/ĐÃ CHỐT/.test(text)) out.push('NHÂN VẬT: Bếp gỗ sáng, thớt tròn, tỏi trắng');
+      const en = /ẢNH \(viết bằng TIẾNG ANH\)/.test(text);   // câu lệnh dặn viết ẢNH + PROMPT bằng tiếng Anh → Muse giả trả tiếng Anh
+      asked.at(-1).tipEnglish = en;
+      if (!/ĐÃ CHỐT/.test(text)) out.push(en ? 'NHÂN VẬT: Bright wooden kitchen, round chopping board, white garlic' : 'NHÂN VẬT: Bếp gỗ sáng, thớt tròn, tỏi trắng');
       tg.forEach((g, i) => {
         const sec = Math.max(3, Math.ceil(g.reduce((x, y) => x + y.s, 0) / 0.9));
         out.push(`CẢNH ${i + 1}`, `CÂU: ${g[0].n}${g.length > 1 ? '-' + g.at(-1).n : ''}`);
-        if (!(behavior.noImage && behavior.noImage(asked.length, g))) out.push(`ẢNH: Tạo ảnh chụp thật cận cảnh bàn tay làm bước câu ${g[0].n} trên thớt gỗ tròn, ánh sáng cửa sổ`);
-        const beats = g.map((u, k) => `${Math.round(k * sec / g.length)}–${Math.round((k + 1) * sec / g.length)} giây [câu ${u.n}]: tay làm đúng câu ${u.n}`);
-        out.push(`PROMPT: Bếp gỗ sáng, thớt tròn. ${beats.join('. ')}.`);
+        if (!(behavior.noImage && behavior.noImage(asked.length, g))) out.push(en ? `ẢNH: Create a photorealistic photo of a hand on step ${g[0].n} over a round wooden board, soft window light` : `ẢNH: Tạo ảnh chụp thật cận cảnh bàn tay làm bước câu ${g[0].n} trên thớt gỗ tròn, ánh sáng cửa sổ`);
+        const beats = g.map((u, k) => en ? `${Math.round(k * sec / g.length)}–${Math.round((k + 1) * sec / g.length)} s [line ${u.n}]: slow gentle motion for line ${u.n}` : `${Math.round(k * sec / g.length)}–${Math.round((k + 1) * sec / g.length)} giây [câu ${u.n}]: tay làm đúng câu ${u.n}`);
+        out.push(en ? `PROMPT: Bright wooden kitchen, round board. ${beats.join('. ')}. Realistic, physically plausible motion at natural speed.` : `PROMPT: Bếp gỗ sáng, thớt tròn. ${beats.join('. ')}.`);
       });
       if (!behavior.noDone) out.push(`MSDONE${done}`);
       return out.join('\n');
@@ -440,7 +442,7 @@ function brain(behavior = {}) {
     // 11m. Mẹo vặt: không đọc hiểu riêng; mỗi bước có ẢNH + PROMPT; lời đọc nguyên văn; không có khóa nhân vật.
     {
       const tip = 'Mẹo bóc tỏi nhanh trong mười giây. Bước một: đặt tép tỏi lên thớt rồi dùng sống dao đập nhẹ. Vỏ tỏi sẽ bong ra ngay. Bước hai: cho tỏi vào hộp kín và lắc thật mạnh. Vỏ tỏi rơi hết ra ngoài. Bước ba: đổ tỏi ra đĩa sạch. Tỏi trắng sạch sẵn sàng để nấu.';
-      const tipCfg = { seconds: 10, aspect: '9:16', tip: true, reference: true, form: 'người que' };
+      const tipCfg = { seconds: 10, aspect: '9:16', tip: true, tipPrompt: 'vi', reference: true, form: 'người que' };
       const { page, analyzer, museBrain } = await session({});
       const r = await analyzer.run({ script: tip, options: tipCfg });
       assert.equal(museBrain.understood.length, 0, 'mẹo vặt không tốn lượt đọc hiểu riêng');
@@ -454,6 +456,21 @@ function brain(behavior = {}) {
       assert.equal(r.understanding, null);
       await page.close(); ok('mẹo vặt: mỗi bước có ảnh + prompt chuyển động, lời nguyên văn, không đọc hiểu riêng, không khóa nhân vật');
     }
+    // 11m-en. Mẹo vặt mặc định: Muse viết ẢNH + PROMPT bằng tiếng Anh; câu app tự thêm bằng tiếng Anh; lời đọc vẫn nguyên văn tiếng Việt.
+    {
+      const tip = 'Mẹo bóc tỏi nhanh trong mười giây. Bước một: đặt tép tỏi lên thớt rồi dùng sống dao đập nhẹ. Vỏ tỏi sẽ bong ra ngay. Bước hai: cho tỏi vào hộp kín và lắc thật mạnh. Vỏ tỏi rơi hết ra ngoài.';
+      const tipCfg = { seconds: 10, aspect: '9:16', tip: true };
+      const { page, analyzer, museBrain } = await session({});
+      const r = await analyzer.run({ script: tip, options: tipCfg });
+      assert.ok(museBrain.asked.length >= 1 && museBrain.asked.every(a => a.tip && a.tipEnglish), 'câu lệnh gửi Muse dặn viết bằng tiếng Anh');
+      assert.equal(r.scenes.map(s => s.voiceover).join(' '), tip, 'lời đọc vẫn là nguyên văn tiếng Việt');
+      assert.ok(r.scenes.every(s => !s.offline && s.image && s.prompt));
+      assert.ok(r.scenes.every(s => s.image.startsWith('Create a photorealistic photo of a hand') && s.image.includes('9:16') && /No text, lettering/.test(s.image) && !/Không|Tạo ảnh/.test(s.image)), r.scenes[0].image);
+      assert.ok(r.scenes.every(s => s.prompt.includes(plan.tipStartLine('en')) && !s.prompt.includes(plan.tipStartLine('vi')) && s.prompt.trimEnd().endsWith(plan.NO_SPEECH) && /Video aspect ratio: 9:16/.test(s.prompt) && /Realistic, physically plausible motion/.test(s.prompt)));
+      assert.ok(r.scenes.every(s => !plan.motionIssues(s, tipCfg).some(x => x.hard)), 'mốc [line N] đúng thứ tự');
+      assert.match(r.cast, /Bright wooden kitchen/);
+      await page.close(); ok('mẹo vặt tiếng Anh: Muse viết ảnh + chuyển động bằng tiếng Anh, câu app thêm bằng tiếng Anh, lời đọc nguyên văn');
+    }
     // 11n. Mẹo vặt: Muse quên dòng ẢNH ở một bước → app chỉ hỏi lại đúng bước đó (không bỏ qua, không tự bịa ảnh).
     {
       const tip = 'Mẹo bóc tỏi nhanh trong mười giây. Bước một: đặt tép tỏi lên thớt rồi dùng sống dao đập nhẹ. Vỏ tỏi sẽ bong ra ngay. Bước hai: cho tỏi vào hộp kín và lắc thật mạnh. Vỏ tỏi rơi hết ra ngoài. Bước ba: đổ tỏi ra đĩa sạch. Tỏi trắng sạch sẵn sàng để nấu.';
@@ -463,7 +480,7 @@ function brain(behavior = {}) {
       assert.ok(museBrain.asked.length >= 2, 'hỏi lại bước thiếu ảnh');
       const again = museBrain.asked.at(-1);
       assert.ok(again.units.includes(4) && !again.units.includes(1), 'chỉ hỏi lại đoạn thiếu: ' + again.units.join(','));
-      assert.ok(r.scenes.every(s => !s.offline && s.image && /^Tạo ảnh chụp thật cận cảnh/.test(s.image)));
+      assert.ok(r.scenes.every(s => !s.offline && s.image && /^Create a photorealistic photo of a hand/.test(s.image)), 'mặc định Muse trả ảnh bằng tiếng Anh');
       assert.equal(r.incomplete, undefined);
       assert.equal(r.scenes.map(s => s.voiceover).join(' '), tip);
       await page.close(); ok('mẹo vặt: thiếu dòng ẢNH thì hỏi lại đúng bước đó');

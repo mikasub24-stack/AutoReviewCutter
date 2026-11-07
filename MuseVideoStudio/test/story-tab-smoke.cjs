@@ -435,6 +435,8 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
         await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyAnalyze').length > n && !document.getElementById('storyAnalyze').disabled && document.querySelectorAll('#storyScenes .draftRow').length === 2, analyzed);
         const write = (await called('storyAdWrite')).at(-1).data;
         assert.deepEqual([write.tip, write.tipTitle, write.tipMinutes, write.tipLanguage, write.seconds, write.reference, write.aspect], [true, '  Mẹo khử mùi tủ lạnh  ', 3, 'en', 6, false, '16:9']);
+        assert.equal(write.tipMotion, 'gentle', 'mặc định chuyển động nhẹ, ổn định');
+        assert.equal(write.tipPrompt, 'en', 'mặc định prompt gửi Muse bằng tiếng Anh');
         assert.equal(write.ad, undefined);
         const script = await page.locator('#storyScript').inputValue();
         assert.match(script, /^Tủ lạnh có mùi thì thử cách này\. Bước 1:/);
