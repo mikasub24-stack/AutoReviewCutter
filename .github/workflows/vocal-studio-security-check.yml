@@ -1,0 +1,79 @@
+name: Verify existing Vocal Studio package with Defender
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/vst3-discovery]
+    paths: ['.github/workflows/vocal-studio-security-check.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  scan:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Download the exact 1.9.1 build, without rebuilding or running it
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '13558274135'
+          run-id: '42332804226'
+          github-token: ${{ github.token }}
+          path: package
+          merge-multiple: true
+      - name: Scan package and record engine, signatures and file hashes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force reports | Out-Null
+          $root = (Resolve-Path package).Path
+          $report = [ordered]@{
+            sourceRun = '42332804226'
+            sourceArtifact = '13558274135'
+            status = 'not-scanned'
+            engine = $null
+            threats = @()
+            files = @()
+            error = $null
+          }
+          try {
+            $report.files = @(Get-ChildItem $root -File -Recurse | ForEach-Object {
+              [ordered]@{ name = $_.FullName.Substring($root.Length + 1); sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); bytes = $_.Length }
+            })
+            if (!(Get-Command Get-MpComputerStatus -ErrorAction SilentlyContinue)) { throw 'Defender cmdlets unavailable on this runner; no scan verdict.' }
+            $state = Get-MpComputerStatus
+            if (!$state.AMServiceEnabled) {
+              Start-Service WinDefend
+              $state = Get-MpComputerStatus
+            }
+            if (!$state.AMServiceEnabled -or !$state.AntivirusEnabled) { throw 'Defender is disabled on this runner; no scan verdict.' }
+            Update-MpSignature
+            $state = Get-MpComputerStatus
+            $report.engine = [ordered]@{ version = $state.AMEngineVersion; signatures = $state.AntivirusSignatureVersion; updated = $state.AntivirusSignatureLastUpdated.ToString('o'); enabled = $state.AntivirusEnabled }
+            if ($state.AntivirusSignatureAge -gt 2) { throw 'Defender signatures are stale; no accepted scan verdict.' }
+            Start-MpScan -ScanType CustomScan -ScanPath $root
+            $detections = @(Get-MpThreatDetection | Where-Object { @($_.Resources | Where-Object { $_ -like "*$root*" }).Count -gt 0 })
+            $report.threats = @($detections | ForEach-Object {
+              $detection = $_
+              $threat = Get-MpThreat -ThreatID $detection.ThreatID -ErrorAction SilentlyContinue
+              [ordered]@{ id = $detection.ThreatID; name = $threat.ThreatName; resources = @($detection.Resources); actionSuccess = $detection.ActionSuccess }
+            })
+            if ($detections.Count -gt 0) { $report.status = 'detected'; throw 'Defender detected threats in the package. Do not install.' }
+            $report.status = 'no-detections'
+          }
+          catch {
+            $report.error = $_.Exception.Message
+            if ($report.status -ne 'detected') { $report.status = 'scan-unavailable-or-failed' }
+          }
+          $json = $report | ConvertTo-Json -Depth 10
+          $json | Set-Content reports/DefenderReport.json -Encoding utf8
+          $json | Out-File $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          $detail = $json.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+          if ($report.status -ne 'no-detections') { Write-Host "::error title=Defender verification::$detail"; exit 1 }
+          Write-Host "::notice title=Defender verification::$detail"
+      - name: Preserve verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: VocalStudio-1.9.1-DefenderReport
+          path: reports/
+          if-no-files-found: warn
