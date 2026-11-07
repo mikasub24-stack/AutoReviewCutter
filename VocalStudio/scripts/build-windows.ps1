@@ -50,8 +50,16 @@ function Test-Persistence([string]$Directory, [string]$ReportPrefix) {
         if ($mode -eq 'missing-eq') { Move-Item (Join-Path $probeDir 'Eq.dll') (Join-Path $probeDir 'Eq.hidden') }
         if ($mode -eq 'recovery') { Set-Content (Join-Path $probeDir 'RunningSession.marker') 'simulate unclean exit' }
         if ($mode -eq 'restored') { Move-Item (Join-Path $probeDir 'Eq.hidden') (Join-Path $probeDir 'Eq.dll') }
-        Invoke-Studio (Join-Path $Directory 'VocalStudio.exe') @('--test-settings-directory',"`"$probeDir`"",'--persistence-probe',$mode) 90000
         $reportPath = Join-Path $probeDir "Persistence-$mode.json"
+        try { Invoke-Studio (Join-Path $Directory 'VocalStudio.exe') @('--test-settings-directory',"`"$probeDir`"",'--persistence-probe',$mode) 90000 }
+        catch {
+            if (Test-Path $reportPath) {
+                Copy-Item $reportPath (Join-Path $dist "$ReportPrefix-$mode.json")
+                $detail = (Get-Content $reportPath -Raw).Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+                Write-Host "::error title=Persistence probe failed::$detail"
+            }
+            throw
+        }
         if (!(Test-Path $reportPath)) { throw "Persistence $mode report missing" }
         $probe = Get-Content $reportPath -Raw | ConvertFrom-Json
         if (!$probe.passed) { throw "Persistence $mode failed: $($probe.error)" }
