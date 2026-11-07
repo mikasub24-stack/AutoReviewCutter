@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cstring>
 #include <cstddef>
+#include <cstdlib>
 #if defined(_WIN64)
 static_assert(offsetof(AEffect,processReplacing)==120);
 #endif
@@ -26,6 +27,9 @@ struct Fixture {
     static void __cdecl set(AEffect* e,int,float v){self(e).gain=v;}
     static float __cdecl get(AEffect* e,int){return self(e).gain;}
     static void __cdecl process(AEffect* e,float** in,float** out,int n){auto& s=self(e);
+#if defined(_WIN32) && !defined(_WIN64)
+        if(s.gain>.99f)std::_Exit(77);
+#endif
         const bool valid=s.host(e,audioMasterGetSampleRate,0,0,nullptr,0)==static_cast<intptr_t>(s.rate)&&s.host(e,audioMasterGetBlockSize,0,0,nullptr,0)==s.block&&s.host(e,audioMasterGetTime,0,0,nullptr,0)!=0;
         for(int i=0;i<n;++i){for(int c=0;c<2;++c){out[c][i]=valid?s.delay[c][s.pos]*s.gain:-.9f;s.delay[c][s.pos]=in[c][i];}s.pos=(s.pos+1)%16;}
     }

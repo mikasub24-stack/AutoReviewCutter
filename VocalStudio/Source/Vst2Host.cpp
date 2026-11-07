@@ -1,4 +1,6 @@
 #include "Vst2Host.h"
+#include "Vst2Bridge.h"
+#include "Vst2BridgeProtocol.h"
 namespace legacy {
 #include "vestige/vestige.h"
 }
@@ -39,6 +41,7 @@ public:
     static intptr_t __cdecl host(legacy::AEffect*,int32_t,int32_t,intptr_t,void*,float);
     bool initialise(const juce::File& file,juce::String& error){
         error=checkVst2Binary(file);if(error.isNotEmpty())return false;
+        if(isVst2Binary32(file)!=(sizeof(void*)==4)){error="VST2 architecture mismatch";return false;}
         directory=file.getParentDirectory().getFullPathName();
         if(!module.open(file.getFullPathName())){error=juce::String::fromUTF8("Không mở được DLL hoặc thiếu thư viện phụ thuộc: ")+file.getFileName();return false;}
         using Entry=legacy::AEffect* (__cdecl*)(legacy::audioMasterCallback);
@@ -158,7 +161,7 @@ intptr_t __cdecl Vst2Instance::host(legacy::AEffect* effect,int32_t opcode,int32
 class Vst2Format final : public juce::AudioPluginFormat {
 public:
     juce::String getName() const override{return "VST2";}
-    void findAllTypesForFile(juce::OwnedArray<juce::PluginDescription>& results,const juce::String& path) override{juce::String error;auto plugin=load(path,error);if(plugin)results.add(new juce::PluginDescription(plugin->description));}
+    void findAllTypesForFile(juce::OwnedArray<juce::PluginDescription>& results,const juce::String& path) override{juce::String error;auto plugin=load(path,error);if(plugin)results.add(new juce::PluginDescription(plugin->getPluginDescription()));}
     bool fileMightContainThisPluginType(const juce::String& path) override{return juce::File(path).hasFileExtension("dll")&&checkVst2Binary(juce::File(path)).isEmpty();}
     juce::String getNameOfPluginFromIdentifier(const juce::String& path) override{return juce::File(path).getFileNameWithoutExtension();}
     bool pluginNeedsRescanning(const juce::PluginDescription& d) override{return juce::File(d.fileOrIdentifier).getLastModificationTime()!=d.lastFileModTime;}
@@ -168,9 +171,13 @@ public:
     juce::FileSearchPath getDefaultLocationsToSearch() override{juce::FileSearchPath paths;const auto root=juce::File::getSpecialLocation(juce::File::globalApplicationsDirectory);paths.add(root.getChildFile("VstPlugins"));paths.add(root.getChildFile("Steinberg/VstPlugins"));return paths;}
     bool requiresUnblockedMessageThreadDuringCreation(const juce::PluginDescription&) const override{return false;}
 protected:
-    void createPluginInstance(const juce::PluginDescription& desc,double rate,int size,PluginCreationCallback callback) override{juce::String error;auto instance=load(desc.fileOrIdentifier,error);if(instance&&instance->description.uniqueId!=desc.uniqueId){instance.reset();error="VST2 plugin identity changed";}if(instance)instance->setRateAndBufferSizeDetails(rate,size);callback(std::move(instance),error);}
+    void createPluginInstance(const juce::PluginDescription& desc,double rate,int size,PluginCreationCallback callback) override{juce::String error;auto instance=load(desc.fileOrIdentifier,error);if(instance&&instance->getPluginDescription().uniqueId!=desc.uniqueId){instance.reset();error="VST2 plugin identity changed";}if(instance)instance->setRateAndBufferSizeDetails(rate,size);callback(std::move(instance),error);}
 private:
-    static std::unique_ptr<Vst2Instance> load(const juce::String& path,juce::String& error){auto result=std::make_unique<Vst2Instance>();if(!result->initialise(juce::File(path),error))return {};return result;}
+    static std::unique_ptr<juce::AudioPluginInstance> load(const juce::String& path,juce::String& error){
+#if JUCE_WINDOWS && defined(_WIN64) && !defined(VOCAL_BRIDGE_HELPER)
+        if(isVst2Binary32(juce::File(path)))return createBridgedVst2(juce::File(path),error);
+#endif
+        auto result=std::make_unique<Vst2Instance>();if(!result->initialise(juce::File(path),error))return {};return result;}
 };
 }
 juce::String checkVst2Binary(const juce::File& file){
@@ -179,16 +186,18 @@ juce::String checkVst2Binary(const juce::File& file){
     input.setPosition(0x3c);const auto offset=input.readInt();if(offset<64||offset>file.getSize()-24)return "Invalid PE header";
     input.setPosition(offset);if(input.readInt()!=0x4550)return "Invalid PE signature";
     const auto machine=static_cast<unsigned short>(input.readShort());
-    if(machine==0x14c)return juce::String::fromUTF8("Đây là VST2 32-bit. App x64 cần DLL 64-bit; chưa có cầu nối 32-bit.");
-    if(machine!=0x8664)return juce::String::fromUTF8("Chỉ hỗ trợ VST2 DLL Windows x64.");
+    if(machine!=0x14c&&machine!=0x8664)return "Unsupported VST2 CPU architecture";
+#if JUCE_WINDOWS && defined(_WIN64) && !defined(VOCAL_BRIDGE_HELPER)
+    if(machine==0x14c&&!vstbridge::helper().existsAsFile())return juce::String::fromUTF8("Thiếu VocalStudioBridge32.exe; cài lại bộ cài đầy đủ để nạp DLL 32-bit.");
+#endif
     // Check exports without executing DllMain when scanning a folder full of
     // dependency DLLs. Only load binaries exposing the VST entry point.
     const auto optional=static_cast<juce::int64>(offset)+24;
     input.setPosition(offset+6);const int sectionCount=static_cast<unsigned short>(input.readShort());
     input.setPosition(offset+20);const int optionalSize=static_cast<unsigned short>(input.readShort());
-    if(sectionCount<1||sectionCount>96||optionalSize<120)return "Invalid PE sections";
-    input.setPosition(optional);if(static_cast<unsigned short>(input.readShort())!=0x20b)return "Invalid x64 PE optional header";
-    input.setPosition(optional+112);const auto exportRva=static_cast<juce::uint32>(input.readInt());
+    if(sectionCount<1||sectionCount>96||optionalSize<(machine==0x14c?104:120))return "Invalid PE sections";
+    input.setPosition(optional);if(static_cast<unsigned short>(input.readShort())!=(machine==0x14c?0x10b:0x20b))return "Invalid PE optional header";
+    input.setPosition(optional+(machine==0x14c?96:112));const auto exportRva=static_cast<juce::uint32>(input.readInt());
     const auto sections=optional+optionalSize;
     auto offsetFor=[&](juce::uint32 rva)->juce::int64{
         for(int n=0;n<sectionCount;++n){input.setPosition(sections+40*n+12);const auto address=static_cast<juce::uint32>(input.readInt());const auto length=static_cast<juce::uint32>(input.readInt());const auto raw=static_cast<juce::uint32>(input.readInt());if(rva>=address&&static_cast<juce::uint64>(rva)-address<length){const auto value=static_cast<juce::int64>(raw)+rva-address;if(value>=0&&value<file.getSize())return value;}}
@@ -201,3 +210,5 @@ juce::String checkVst2Binary(const juce::File& file){
     return juce::String::fromUTF8("DLL không có VSTPluginMain; không phải VST2 effect.");
 }
 std::unique_ptr<juce::AudioPluginFormat> createVst2Format(){return std::make_unique<Vst2Format>();}
+
+bool isVst2Binary32(const juce::File& file){juce::FileInputStream input(file);if(!input.openedOk()||input.readShort()!=0x5a4d)return false;input.setPosition(0x3c);const auto offset=input.readInt();if(offset<64||offset>file.getSize()-24)return false;input.setPosition(offset);return input.readInt()==0x4550&&static_cast<unsigned short>(input.readShort())==0x14c;}

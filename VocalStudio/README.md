@@ -192,3 +192,24 @@ CMake lấy JUCE và ASIO SDK ở commit cố định. Source ứng dụng AGPL-
 Cài Visual Studio 2022 với Desktop development with C++ và CMake, cùng Inno Setup 6. Mở Developer PowerShell tại thư mục gốc, chạy `./VocalStudio/scripts/build-windows.ps1`. Script tải dependency đã ghim, build x64, chạy CTest, thử Chromium audio/sandbox, chụp giao diện, tạo installer rồi thử bản đã cài. Chỉ sau khi tất cả thành công mới tạo ZIP portable và ghi SHA256. Sản phẩm nằm ở `dist/VocalStudio-1.7.0-Setup.exe`.
 
 Có workflow thủ công `Vocal Studio 1.7 Windows preview` trong `.github/workflows/vocal-studio-preview.yml`; artifact chỉ được tải lên khi toàn bộ quy trình thành công. Workflow này chưa tự phát hành công khai. Antares thương mại không được kèm trong bộ cài.
+
+
+### VST2 32-bit bridge and recovery (1.9)
+
+The Windows installer includes `VocalStudioBridge32.exe`. VST2 DLLs with an x86
+PE header run in this separate process; VST3 remains x64. Use **Quét vang trên máy**
+or select the effect DLL, then **Mở vang**. The x86 plugin editor opens in its own
+window. Keep the helper with the app; it is required at runtime. VST2 synths,
+shell plugins and MIDI effects remain unsupported.
+
+If the helper exits or stops responding, the proxy keeps the dry input audible
+and stops waiting for that helper. This does not automatically restart the effect.
+The x64 VST2 path still runs in the main process. Specific commercial plugins,
+including ArtsAcoustic and LX480, require validation on the user's licensed setup.
+
+A running-session marker detects an unclean exit of the main app. On the next
+launch, preferences are backed up and a fresh session starts without external
+plugins; existing session files and recordings remain intact. The Start menu also
+includes **Vocal Studio - Recovery** (`--safe-mode`). End a hung process in Task
+Manager before using this shortcut. Recovery does not assert which plugin caused
+the failure. Restore settings from the backup only after identifying the cause.

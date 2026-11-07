@@ -28,7 +28,7 @@ private:
 struct SongFitPlan {vocal::SongFit fit;std::vector<int> beats;std::vector<juce::String> beatTokens;int melody=-1,tonic=-1;bool minor=false;juce::String melodyToken;vocal::VoiceProfile profile;};
 class StudioMain final : public juce::Component,private juce::Timer,private juce::ScrollBar::Listener,public juce::FileDragAndDropTarget {
 public:
-    StudioMain();
+    explicit StudioMain(bool recoveryMode=false);
     ~StudioMain() override;
     void paint(juce::Graphics&) override;
     void resized() override;

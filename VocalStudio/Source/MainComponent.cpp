@@ -6,6 +6,7 @@ extern juce::Component* createAutoEqPanel(StudioMain&);
 extern juce::Component* createPolishPanel(StudioMain&);
 extern juce::Component* createTuneFixPanel(StudioMain&);
 #include <cmath>
+#include <stdexcept>
 namespace {
 const juce::Colour bg{0xff10151e},panel{0xff19212d},line{0xff2a3545},text{0xffe9eef6},mutedText{0xff8d9bb0},accent{0xff50d0bf},vocalColour{0xffeaa76a},red{0xffed6574};
 juce::String clockText(double seconds){const int milliseconds=static_cast<int>(juce::jmax(0.0,seconds)*1000);return juce::String(milliseconds/60000).paddedLeft('0',2)+":"+juce::String((milliseconds/1000)%60).paddedLeft('0',2)+"."+juce::String(milliseconds%1000).paddedLeft('0',3);}
@@ -38,7 +39,7 @@ void TrackCanvas::mouseDrag(const juce::MouseEvent& e){if(!dragging||!owner.canE
 void TrackCanvas::mouseUp(const juce::MouseEvent&){if(dragging){const auto& t=*owner.engine.getTracks()[static_cast<std::size_t>(dragTrack)];owner.rememberEdit(dragTrack,originalStart,originalIn,originalOut,t.start,t.trimIn,t.trimOut);dragging=false;owner.refreshTracks();}}
 void TrackCanvas::mouseWheelMove(const juce::MouseEvent& e,const juce::MouseWheelDetails& wheel){if(e.mods.isCtrlDown()){zoom=juce::jlimit(15.0,240.0,zoom*(wheel.deltaY>0?1.15:.87));owner.refreshTracks();}else Component::mouseWheelMove(e,wheel);}
 
-StudioMain::StudioMain():canvas(*this){setLookAndFeel(&look);setWantsKeyboardFocus(true);juce::PropertiesFile::Options options;options.applicationName="VocalStudio";options.folderName="VocalStudio";options.filenameSuffix="settings";options.osxLibrarySubFolder="Application Support";preferences.setStorageParameters(options);
+StudioMain::StudioMain(bool recoveryMode):canvas(*this){setLookAndFeel(&look);setWantsKeyboardFocus(true);juce::PropertiesFile::Options options;options.applicationName="VocalStudio";options.folderName="VocalStudio";options.filenameSuffix="settings";options.osxLibrarySubFolder="Application Support";preferences.setStorageParameters(options);
     for(auto* button:{&playButton,&stopButton,&recordButton,&importButton,&saveButton,&openButton,&newButton,&exportButton,&deviceButton,&undoButton,&pluginButton,&editorButton,&removePluginButton,&toolsButton})addAndMakeVisible(button);
     for(juce::Component* c:std::initializer_list<juce::Component*>{&monitoring,&bypass,&mute,&solo,&vocalType,&inputSelect,&presetSelect,&trackGain,&trackPan,&master,&zoom,&trackTitle,&trackInfo,&positionLabel,&deviceLabel,&statusLabel,&pluginLabel,&gainLabel,&panLabel,&masterLabel})addAndMakeVisible(c);
     addAndMakeVisible(viewport);viewport.setViewedComponent(&canvas,false);viewport.setScrollBarsShown(true,false);addAndMakeVisible(horizontal);horizontal.setAutoHide(false);horizontal.addListener(this);
@@ -52,6 +53,16 @@ StudioMain::StudioMain():canvas(*this){setLookAndFeel(&look);setWantsKeyboardFoc
     mute.onClick=[this]{if(selected>=0)engine.getTracks()[static_cast<std::size_t>(selected)]->mute.store(mute.getToggleState());canvas.repaint();};solo.onClick=[this]{if(selected>=0)engine.getTracks()[static_cast<std::size_t>(selected)]->solo.store(solo.getToggleState());canvas.repaint();};vocalType.onClick=[this]{if(!canEdit()||selected<0)return;engine.withAudioStopped([this]{engine.getTracks()[static_cast<std::size_t>(selected)]->vocal=vocalType.getToggleState();});canvas.repaint();save();};
     addKnob(0,"High-pass",engine.highPass,40,180,1," Hz");addKnob(1,"Warmth",engine.warmth,-8,6,.1," dB");addKnob(2,"Presence",engine.presence,-6,8,.1," dB");addKnob(3,"Threshold",engine.threshold,-40,0,.5," dB");addKnob(4,"Ratio",engine.ratio,1,8,.1,":1");addKnob(5,"Make-up",engine.makeup,0,12,.1," dB");addKnob(6,"De-ess",engine.deEss,0,1,.01,"");addKnob(7,"Reverb",engine.reverb,0,.4,.01,"");addKnob(8,"Delay",engine.delay,0,.3,.01,"");addKnob(9,"Delay time",engine.delayMs,40,800,1," ms");
     positionLabel.setFont(juce::Font(27,juce::Font::bold));trackTitle.setFont(juce::Font(17,juce::Font::bold));statusLabel.setColour(juce::Label::textColourId,mutedText);deviceLabel.setColour(juce::Label::textColourId,mutedText);pluginLabel.setText(engine.pluginName(),juce::dontSendNotification);trackInfo.setColour(juce::Label::textColourId,mutedText);trackInfo.setJustificationType(juce::Justification::topLeft);
+    if(recoveryMode){
+        auto* prefs=preferences.getUserSettings();
+        const auto backup=prefs->getFile().getNonexistentSibling(true);
+        // Preserve the complete old preferences and original session before
+        // starting a clean session without any third-party DLLs.
+        if(prefs->getFile().existsAsFile()&&!prefs->getFile().copyFileTo(backup))
+            throw std::runtime_error("Cannot back up preferences for recovery");
+        prefs->removeValue("lastProject");prefs->removeValue("rememberedSetup");
+        if(!prefs->saveIfNeeded())throw std::runtime_error("Cannot save recovery preferences");
+    }
     const auto rememberedSetup=juce::JSON::parse(preferences.getUserSettings()->getValue("rememberedSetup"));
     const juce::File previous(preferences.getUserSettings()->getValue("lastProject"));
     const auto deviceError=engine.openDevice(preferences.getUserSettings()->getValue("deviceXml"));
@@ -67,7 +78,7 @@ StudioMain::StudioMain():canvas(*this){setLookAndFeel(&look);setWantsKeyboardFoc
             status(juce::String::fromUTF8("Chưa khôi phục được Auto-Tune đã lưu: ")+restored.getErrorMessage()+juce::String::fromUTF8(" · Thiết lập cũ được giữ lại; kiểm tra plugin/giấy phép."));
         }else{pluginLabel.setText(engine.pluginName(),juce::dontSendNotification);}
     }
-    if(deviceError.isNotEmpty())status(juce::String::fromUTF8("Chọn sound card và ngõ micro trong Sound card."));loadVoicePreference();syncKnobs();setSize(1320,1000);addAndMakeVisible(quickButton);quickButton.onClick=[this]{showQuickMode(true);};showQuickMode(true);startTimerHz(30);
+    if(deviceError.isNotEmpty())status(juce::String::fromUTF8("Chọn sound card và ngõ micro trong Sound card."));loadVoicePreference();syncKnobs();if(recoveryMode)status(juce::String::fromUTF8("PHỤC HỒI: đã mở phiên mới không nạp plugin ngoài. Bản thu và phiên cũ còn nguyên; cấu hình cũ đã sao lưu. Chưa nạp lại plugin vừa gây lỗi."));setSize(1320,1000);addAndMakeVisible(quickButton);quickButton.onClick=[this]{showQuickMode(true);};showQuickMode(true);startTimerHz(30);
 }
 StudioMain::~StudioMain(){cancelAutoEq();eqPluginWindow.reset();reverbWindow.reset();tuneFixWindow.reset();polishWindow.reset();eqWindow.reset();karaoke.reset();stopTimer();cancelExport.store(true);jobs.removeAllJobs(true,-1);if(engine.isRecording()){juce::File f;double start=0;engine.finishRecording(f,start);}toolsWindow.reset();deviceWindow.reset();pluginWindow.reset();persistDeviceSettings();setLookAndFeel(nullptr);}
 void StudioMain::addKnob(int index,const juce::String& title,std::atomic<float>& value,double lo,double hi,double step,const juce::String& suffix){auto k=std::make_unique<Knob>();k->value=&value;k->label.setText(title,juce::dontSendNotification);k->label.setFont(12);k->label.setJustificationType(juce::Justification::centred);k->slider.setRange(lo,hi,step);k->slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);k->slider.setTextBoxStyle(juce::Slider::TextBoxBelow,false,66,21);k->slider.setTextValueSuffix(suffix);auto* ptr=k.get();k->slider.onValueChange=[ptr]{ptr->value->store(static_cast<float>(ptr->slider.getValue()));};addAndMakeVisible(k->label);addAndMakeVisible(k->slider);knobs[static_cast<std::size_t>(index)]=std::move(k);}
@@ -120,7 +131,7 @@ void StudioMain::choosePlugin(int slot){
     const auto previous=settings()->getValue(eqSlot?"eqDirectory":reverbSlot?"reverbDirectory":"vst3Directory");
     if(previous.isNotEmpty()&&juce::File(previous).isDirectory())start=juce::File(previous);
     if(!start.isDirectory())start=juce::File::getSpecialLocation(juce::File::globalApplicationsDirectory);
-    chooser=std::make_unique<juce::FileChooser>(juce::String::fromUTF8("Chọn VST3 hoặc VST2 .dll 64-bit / thư mục plugin"),start,"*",false);
+    chooser=std::make_unique<juce::FileChooser>(juce::String::fromUTF8("Chọn VST3 x64 hoặc VST2 .dll x64/x86 / thư mục plugin"),start,"*",false);
     juce::Component::SafePointer<StudioMain> safe(this);
     chooser->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectFiles|juce::FileBrowserComponent::canSelectDirectories,[safe,slot](const juce::FileChooser& c){if(safe&&c.getResult()!=juce::File{})safe->loadPluginPath(c.getResult(),slot);});
 }
@@ -142,7 +153,7 @@ void StudioMain::loadPluginPath(const juce::File& path,int slot){
             }
         }
         if(descriptions->isEmpty()){
-            safe->status(juce::String::fromUTF8("Không tìm thấy effect VST2/VST3 x64. Chọn đúng DLL plugin 64-bit; không chọn DLL 32-bit hoặc DLL phụ trợ."));return;
+            safe->status(juce::String::fromUTF8("Không tìm thấy effect VST2/VST3. Chọn đúng DLL plugin x64 hoặc x86, không chọn DLL phụ trợ."));return;
         }
         auto load=[safe,descriptions,reverbSlot,eqSlot](int choice){
             if(!safe||!safe->canEdit()||!juce::isPositiveAndBelow(choice-1,descriptions->size()))return;
@@ -217,7 +228,7 @@ void StudioMain::showTuneFix(){if(tuneFixWindow){tuneFixWindow->setVisible(true)
 
 void StudioMain::openReverbEditor(){
     if(busy)return;if(reverbWindow){reverbWindow->setVisible(true);reverbWindow->toFront(true);return;}
-    auto* plugin=engine.reverbPluginInstance();if(!plugin){status(juce::String::fromUTF8("Chưa nạp vang plugin. Chọn ArtsAcoustic .dll x64 hoặc VST3 trước."));return;}
+    auto* plugin=engine.reverbPluginInstance();if(!plugin){status(juce::String::fromUTF8("Chưa nạp vang plugin. Chọn ArtsAcoustic .dll hoặc VST3 trước."));return;}
     auto* editor=plugin->createEditorIfNeeded();if(!editor)editor=new juce::GenericAudioProcessorEditor(*plugin);
     reverbWindow=std::make_unique<FloatingWindow>(plugin->getName(),editor,true);static_cast<FloatingWindow*>(reverbWindow.get())->closed=[this]{if(!busy&&save())status(juce::String::fromUTF8("Đã lưu thiết lập plugin."));};
 }
@@ -238,9 +249,9 @@ void StudioMain::scanPlugins(int slot){
     }
     juce::StringArray files;
     for(int i=0;i<engine.pluginFormats.getNumFormats();++i)for(const auto& file:engine.pluginFormats.getFormat(i)->searchPathsForPlugins(paths,true,false))files.addIfNotAlreadyThere(file);
-    files.sort(true);if(files.isEmpty()){status(juce::String::fromUTF8("Chưa tìm thấy plugin x64 trong thư mục VST chuẩn. Dùng Chọn plugin để thêm thư mục cài riêng; DLL 32-bit chưa hỗ trợ."));return;}
-    auto candidates=std::make_shared<juce::StringArray>(files);juce::PopupMenu menu;menu.addSectionHeader(juce::String::fromUTF8("VST2/VST3 x64 · DLL 32-bit chưa hỗ trợ"));
-    const int count=juce::jmin(1000,files.size());for(int i=0;i<count;++i){juce::File file(files[i]);menu.addItem(i+1,file.getFileNameWithoutExtension()+" ["+(file.hasFileExtension("dll")?"VST2 x64":"VST3")+"] · "+file.getParentDirectory().getFileName());}
+    files.sort(true);if(files.isEmpty()){status(juce::String::fromUTF8("Chưa tìm thấy plugin trong thư mục VST chuẩn. Dùng Chọn plugin để thêm thư mục cài riêng."));return;}
+    auto candidates=std::make_shared<juce::StringArray>(files);juce::PopupMenu menu;menu.addSectionHeader(juce::String::fromUTF8("VST3 x64 · VST2 x64 / x86 (bridge)"));
+    const int count=juce::jmin(1000,files.size());for(int i=0;i<count;++i){juce::File file(files[i]);menu.addItem(i+1,file.getFileNameWithoutExtension()+" ["+(file.hasFileExtension("dll")?(isVst2Binary32(file)?"VST2 x86 · bridge":"VST2 x64"):"VST3")+"] · "+file.getParentDirectory().getFileName());}
     juce::Component::SafePointer<StudioMain> safe(this);status(juce::String::fromUTF8("Đã quét thấy ")+juce::String(files.size())+juce::String::fromUTF8(" module plugin; chọn plugin cần dùng."));
     menu.showMenuAsync(juce::PopupMenu::Options{},[safe,candidates,slot](int choice){if(safe&&juce::isPositiveAndBelow(choice-1,candidates->size()))safe->loadPluginPath(juce::File((*candidates)[choice-1]),slot);});
 }

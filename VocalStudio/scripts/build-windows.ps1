@@ -9,6 +9,17 @@ $dist = [IO.Path]::GetFullPath((Join-Path $root $OutputDirectory))
 New-Item -ItemType Directory -Force $dist | Out-Null
 & cmake -S VocalStudio -B $build -A x64 "-DVOCAL_BUILD_TESTS=ON"
 if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
+# Build the x86 helper separately; the main app and CEF remain x64.
+$bridgeBuild = Join-Path $root 'build/vocal32'
+& cmake -S VocalStudio -B $bridgeBuild -A Win32 '-DVOCAL_BRIDGE_ONLY=ON'
+if ($LASTEXITCODE -ne 0) { throw '32-bit bridge configuration failed' }
+& cmake --build $bridgeBuild --config Release --parallel 2
+if ($LASTEXITCODE -ne 0) { throw '32-bit bridge compilation failed' }
+$appDir = Join-Path $build 'VocalStudio_artefacts/Release'
+New-Item -ItemType Directory -Force $appDir | Out-Null
+Copy-Item (Join-Path $bridgeBuild 'VocalStudioBridge32_artefacts/Release/VocalStudioBridge32.exe') $appDir
+$fixture32 = (Get-Content (Join-Path $bridgeBuild 'Vst2FixturePath-Release.txt') -Raw).Trim()
+Copy-Item $fixture32 (Join-Path $build 'Vst2Fixture32.dll')
 & cmake --build $build --config Release --parallel 2 2>&1 | Tee-Object -FilePath (Join-Path $build 'Compile.log')
 if ($LASTEXITCODE -ne 0) { throw 'Windows compilation failed' }
 & ctest --test-dir $build -C Release --output-on-failure 2>&1 | Tee-Object -FilePath (Join-Path $build 'CTest.log')
@@ -30,26 +41,26 @@ function Test-Browser([string]$Directory, [string]$ReportName) {
 }
 Test-Browser $appDir 'BrowserSelfTest.json'
 $shot = Join-Path $dist 'VocalStudio-preview.jpg'
-Invoke-Studio (Join-Path $appDir 'VocalStudio.exe') @('--screenshot',"`"$shot`"")
+Invoke-Studio (Join-Path $appDir 'VocalStudio.exe') @('--safe-mode','--screenshot',"`"$shot`"")
 if (!(Test-Path $shot)) { throw 'UI screenshot missing' }
 $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
 if ($iscc) { $compiler = $iscc.Source } else { $compiler = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe' }
 if (!(Test-Path $compiler)) { throw 'Install Inno Setup 6 to package the installer; the built app is in the build folder.' }
 & $compiler "/DSourceDir=$appDir" "/DOutputDir=$dist" 'VocalStudio/installer/VocalStudio.iss'
 if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
-$setup = Join-Path $dist 'VocalStudio-1.8.0-Setup.exe'
+$setup = Join-Path $dist 'VocalStudio-1.9.0-Setup.exe'
 $installDir = Join-Path ([IO.Path]::GetTempPath()) ('VocalStudio-verify-' + [Guid]::NewGuid().ToString('N'))
 $process = Start-Process $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$installDir`"") -Wait -PassThru
 if ($process.ExitCode -ne 0) { throw 'Test installation failed' }
 $report = Join-Path $dist 'InstalledSelfTest.json'
 $vst2Fixture = (Get-Content (Join-Path $build 'Vst2FixturePath-Release.txt') -Raw).Trim()
 if (!(Test-Path $vst2Fixture)) { throw 'VST2 test DLL missing' }
-Invoke-Studio (Join-Path $installDir 'VocalStudio.exe') @('--self-test','--vst2-fixture',"`"$vst2Fixture`"",'--report',"`"$report`"")
+Invoke-Studio (Join-Path $installDir 'VocalStudio.exe') @('--self-test','--vst2-32-fixture',"`"$(Join-Path $build 'Vst2Fixture32.dll')`"",'--vst2-fixture',"`"$vst2Fixture`"",'--report',"`"$report`"")
 if (!(Test-Path $report) -or !((Get-Content $report -Raw | ConvertFrom-Json).passed)) { throw 'Installed self-test failed' }
 Test-Browser $installDir 'InstalledBrowserSelfTest.json'
 $uninstaller = Join-Path $installDir 'unins000.exe'
 if (Test-Path $uninstaller) { Start-Process $uninstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait | Out-Null }
-Compress-Archive -Path "$appDir/*" -DestinationPath (Join-Path $dist 'VocalStudio-1.8.0-Windows.zip') -Force
+Compress-Archive -Path "$appDir/*" -DestinationPath (Join-Path $dist 'VocalStudio-1.9.0-Windows.zip') -Force
 Copy-Item (Join-Path $build 'EngineSelfTest.json') $dist
 Copy-Item (Join-Path $build 'Testing/Temporary/LastTest.log') (Join-Path $dist 'VocalStudio-Verification.log')
 Get-ChildItem $dist -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content (Join-Path $dist 'SHA256SUMS.txt') -Encoding ascii

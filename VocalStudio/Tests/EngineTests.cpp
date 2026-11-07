@@ -37,6 +37,28 @@ int runStudioSelfTests(const juce::String& commandLine){
         std::atomic<bool> cancel{false};std::atomic<float> progress{0};const auto mix=directory.getChildFile("Mix.wav");engine.monitorDb=12;check(engine.exportMix(mix,cancel,progress).wasOk(),"export mix with headphone boost");engine.monitorDb=0;std::unique_ptr<juce::AudioFormatReader> reader(engine.formats.createReaderFor(mix));check(reader&&reader->bitsPerSample==24&&reader->numChannels==2,"stereo 24-bit export");juce::AudioBuffer<float> first(2,block*blocks);check(reader->read(&first,0,first.getNumSamples(),0,true,true),"read export");for(int i=100;i<first.getNumSamples()-100;++i)check(std::abs(first.getSample(0,i)-dry.getSample(0,i)*.70710678f)<.00001,"export alignment: compensate limiter latency");reader.reset();passed.add("offline WAV export and sample-aligned limiter compensation");
         engine.fxBypass=false;engine.reverb=0;engine.delay=.3f;engine.delayMs=800;engine.delayFeedback=.65f;engine.threshold=0;engine.ratio=1;engine.makeup=0;const auto tailMix=directory.getChildFile("LongEcho.wav");check(engine.exportMix(tailMix,cancel,progress).wasOk(),"export extended echo tail");{std::unique_ptr<juce::AudioFormatReader> tail(engine.formats.createReaderFor(tailMix));juce::AudioBuffer<float> late(2,4096);check(tail&&tail->lengthInSamples>48000*10&&tail->read(&late,0,4096,static_cast<juce::int64>(48000*4.8),true,true),"extended tail length and read");check(late.getMagnitude(0,4096)>.00001f,"late echo beyond three seconds must remain in mix");}engine.selectPreset(0);engine.fxBypass=true;passed.add("extended delay/reverb export tail preserves audible late echoes");
         const auto preserved=directory.getChildFile("Preserve.wav");preserved.replaceWithText("existing data");cancel.store(true);check(engine.exportMix(preserved,cancel,progress).failed(),"export cancellation");check(preserved.loadFileAsString()=="existing data","cancel must preserve destination");cancel.store(false);passed.add("cancel-safe output without replacing existing file");
+        const auto fixture32=argument("--vst2-32-fixture");
+        if(fixture32.isNotEmpty()){
+            check(isVst2Binary32(juce::File(fixture32))&&checkVst2Binary(juce::File(fixture32)).isEmpty(),"recognise x86 fixture through bridge");
+            auto format=createVst2Format();juce::OwnedArray<juce::PluginDescription> found;format->findAllTypesForFile(found,fixture32);
+            check(found.size()==1,"scan x86 VST2 without loading DLL into x64 process");
+            juce::AudioPluginFormatManager bridgeFormats;bridgeFormats.addFormat(format.release());juce::String error;
+            auto bridged=bridgeFormats.createPluginInstance(*found[0],48000,256,error);check(bridged!=nullptr,"create x86 bridge: "+error);
+            bridged->setPlayConfigDetails(2,2,48000,256);bridged->prepareToPlay(48000,256);check(bridged->getLatencySamples()==16,"x86 latency reported");
+            juce::AudioBuffer<float> audio32(2,256);juce::MidiBuffer midi32;
+            auto render32=[&](float gain){for(int c=0;c<2;++c)for(int i=0;i<256;++i)audio32.setSample(c,i,.2f);bridged->processBlock(audio32,midi32);check(std::abs(audio32.getSample(0,255)-.2f*gain)<.00001f,"x86 bridge processed samples, not dry fallback");};
+            render32(.25f);bridged->getParameters()[0]->setValue(.5f);render32(.5f);
+            juce::MemoryBlock saved32;bridged->getStateInformation(saved32);check(saved32.getSize()>0,"x86 state saved");
+            bridged->getParameters()[0]->setValue(.1f);render32(.1f);bridged->setStateInformation(saved32.getData(),static_cast<int>(saved32.getSize()));render32(.5f);
+            bridged->reset();render32(.5f);bridged->releaseResources();bridged->prepareToPlay(44100,256);render32(.5f);
+            // Only the x86 test fixture deliberately aborts at this value.
+            bridged->getParameters()[0]->setValue(1.f);for(int c=0;c<2;++c)for(int i=0;i<256;++i)audio32.setSample(c,i,.2f);
+            const auto began=juce::Time::getMillisecondCounterHiRes();bridged->processBlock(audio32,midi32);
+            check(juce::Time::getMillisecondCounterHiRes()-began<1000&&std::abs(audio32.getSample(0,255)-.2f)<.00001f,"x86 helper crash preserves host and dry vocal within bounded time");
+            bridged.reset();
+            auto reopened=bridgeFormats.createPluginInstance(*found[0],48000,256,error);check(reopened!=nullptr,"restart bridge after plugin crash");reopened->setStateInformation(saved32.getData(),static_cast<int>(saved32.getSize()));check(std::abs(reopened->getParameters()[0]->getValue()-.5f)<.00001f,"restore x86 saved value in fresh helper");
+            passed.add("real x86 VST2 scan, audio, timing, parameter/chunk restore, helper crash containment and restart");
+        }
         const auto vst2Fixture=argument("--vst2-fixture");
         if(vst2Fixture.isNotEmpty()){
             const auto bad=directory.getChildFile("Wrong32.dll");juce::MemoryBlock header(128,true);auto* bytes=static_cast<unsigned char*>(header.getData());bytes[0]='M';bytes[1]='Z';bytes[0x3c]=64;bytes[64]='P';bytes[65]='E';bytes[68]=0x4c;bytes[69]=1;bad.replaceWithData(bytes,header.getSize());

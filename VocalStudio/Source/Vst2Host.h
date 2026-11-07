@@ -3,3 +3,5 @@
 // Native mono/stereo VST2 effects. No proprietary VST2 SDK is required.
 std::unique_ptr<juce::AudioPluginFormat> createVst2Format();
 juce::String checkVst2Binary(const juce::File&);
+
+bool isVst2Binary32(const juce::File&);
