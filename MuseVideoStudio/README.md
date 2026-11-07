@@ -142,6 +142,11 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.4.5
+
+- **Sửa nút «Tìm / lưu ảnh đã tạo» (tab Tạo ảnh và ảnh của Mẹo vặt).** Nút này lưu lại ảnh Muse đã tạo mà không gửi lại prompt. Trước đây, nếu chat có **nhiều tin nhắn trùng prompt** (thử lại nhiều lần) và dấu cũ đã mất (tải lại trang, Muse dựng lại tin nhắn), nút báo «Có nhiều tin nhắn trùng prompt nhưng ID cũ đã thay đổi» và không lưu gì. Nay với **ảnh**, app lấy bản **mới nhất** của prompt đó và chỉ lấy ảnh nằm ngay sau nó; không bao giờ lấy ảnh trả lời cho bản cũ hơn. Nếu bản mới nhất chưa có ảnh thì báo chưa thấy ảnh. Việc lưu vẫn chuột phải → «Tải xuống» như 1.4.4. Video giữ nguyên quy tắc chặt cũ.
+- Thử bằng trang chat giả trong Chromium thật: 3 bản trùng prompt, mất dấu cũ, bản mới nhất có ảnh / chưa có ảnh. **Chưa thử với Muse thật.**
+
 ## Update 1.4.4
 
 - **Lưu ảnh bằng đúng thao tác của bạn: chuột phải vào ảnh → «Tải xuống».** Từ bản 1.4.0 app chỉ đọc ảnh đang hiện trong chat (có thể là bản thu nhỏ). Nay app **bấm chuột phải vào ảnh của đúng cảnh, chọn dòng «Tải xuống»** (menu: emoji, Trả lời, Chia sẻ, Sao chép, Tải xuống) rồi lưu file Muse đưa ra, giống cách tải video. Chỉ bấm đúng dòng có chữ «Tải xuống» nằm trong menu vừa mở; không bấm nút «Tải xuống» nào khác trong trang. Ảnh được kiểm tra bằng byte đầu (PNG/JPG/WEBP/GIF) trước khi lưu; nếu file tải về không phải ảnh thì không lưu. Nếu menu không dùng được, app mới quay lại cách cũ (đọc ảnh đang hiện) và thẻ ghi rõ.

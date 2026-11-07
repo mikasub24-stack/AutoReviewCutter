@@ -6,7 +6,7 @@
 // Does not contact Muse.
 const { chromium } = require('playwright-core');
 const crypto = require('node:crypto'), zlib = require('node:zlib'), assert = require('node:assert/strict');
-const { beginTracking, pollTracking, downloadAction, endTracking } = require('../src/muse-tracker.cjs');
+const { beginTracking, pollTracking, downloadAction, endTracking, readTrackedImage } = require('../src/muse-tracker.cjs');
 const { triggerDownload } = require('../src/download-trigger.cjs');
 const table = [...Array(256)].map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
 const crc32 = buf => { let c = 0xffffffff; for (const b of buf) c = table[(c ^ b) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
@@ -58,6 +58,25 @@ const replyRow = (src, extra) => `<div class="row"><div class="bubble">Xong rồ
   const lost = await page.evaluate(pollTracking, { id: 'b' });
   assert.equal(lost.ready, false); assert.match(lost.hint || '', /thấy 1 tin nhắn giống prompt, lúc gửi có 1/, 'the card says what the tool sees');
   await page.evaluate(endTracking, { id: 'b' });
+
+  // ---- 3) "Tìm / lưu ảnh đã tạo" (recover): the old marker is gone and the chat holds the prompt three times ----------------
+  for (const [label, withReplyOnLast] of [['newest copy has its picture', true], ['newest copy still has no picture', false]]) {
+    await reset();
+    await add(userRow() + replyRow('/c0.png') + userRow() + replyRow('/c1.png') + userRow() + (withReplyOnLast ? replyRow('/c2.png') : ''));
+    await loaded();
+    await page.evaluate(beginTracking, { id: 'r', prompt: PROMPT, mediaKind: 'image', recover: true, echoKey: 'old-key', echoMarker: 'old-marker', settleMs: 300 });
+    const state = await settle('r');
+    if (withReplyOnLast) {
+      assert.equal(state.error, undefined, `3 ${label}: ${state.error}`);
+      assert.equal(state.ready, true, `3 ${label}: ${state.stage} | ${state.hint}`);
+      const item = await page.evaluate(readTrackedImage, { id: 'r', index: 0 });
+      assert.match(item.url || '', /\/c2\.png/, '3: the picture after the newest copy is taken, never an older reply');
+    } else {
+      assert.equal(state.error, undefined, `3 ${label}: ${state.error}`);
+      assert.equal(state.ready, false, '3: an older copy\'s picture is never taken for a newer copy without a picture');
+    }
+    await page.evaluate(endTracking, { id: 'r' });
+  }
 
   // ---- 2) right-click menu ---------------------------------------------------------------------------------------------
   const stopped = () => Object.assign(Error('stopped'), { name: 'AbortError' });

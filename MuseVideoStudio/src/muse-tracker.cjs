@@ -231,6 +231,9 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     // Pictures, live send: the chat may already hold the same prompt from earlier tries, and Muse can
     // rebuild old rows as new nodes. The copy sent now is the first one after those that were there before.
     if(imageMode&&!recover&&!s.echo){const all=echoCandidates(true);echoes=all.length>s.baselineMatches?[all[s.baselineMatches]]:[];}
+    // Pictures, "Tìm / lưu ảnh đã tạo": the old marker is gone after a reload or re-render and the chat may hold the same prompt
+    // several times. The newest copy is the latest send of this prompt, so its reply is the picture to save; an older reply is never taken.
+    if(imageMode&&recover&&!recoverRequireAnchor&&!s.echo&&echoes.length!==1){const pool=echoes.length?echoes:echoCandidates(true);if(pool.length)echoes=[pool[pool.length-1]];}
     if(!s.echo&&!echoes.length&&recover&&!recoverRequireAnchor&&(echoKey||echoMarker)){const exact=echoCandidates(true);if(exact.length===1)echoes=exact;else if(exact.length>1)throw Error('Có nhiều tin nhắn trùng prompt nhưng ID cũ đã thay đổi. Không chọn clip khi chưa xác định được cảnh.');}
     if(!s.echo&&echoes.length>1&&!(imageMode&&!recover&&echoes.every(e=>resend(e.leaf)||resend(e.root))))throw Error('Có nhiều tin nhắn trùng chính xác prompt. Không xác định được video của tác vụ; hãy dùng chat riêng hoặc xử lý thủ công.');
     if(!s.echo) {
@@ -243,6 +246,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       // Pictures, live send: the copy sent now is counted from the copies that were there before sending; a single
       // remaining copy may be an old one from history, so the "only one match" rule is not used for them.
       if(imageMode&&!recover){if(!anchored.length&&all.length>s.baselineMatches)anchored=[all[s.baselineMatches]];}
+      else if(imageMode&&!recoverRequireAnchor&&!anchored.length&&all.length){anchored=[all[all.length-1]];}
       else if(!recoverRequireAnchor&&!anchored.length&&all.length===1&&s.echoContexts?.some(parent=>parent.isConnected&&parent.contains(all[0].root)))anchored=all;
       if(anchored.length!==1)return {...result('waiting-response','Muse đang dựng lại tin nhắn · chờ khôi phục đúng cảnh gốc',null),hint:`thấy ${all.length} tin nhắn giống prompt, lúc gửi có ${s.baselineMatches??'?'}`};
       s.echo=anchored[0].leaf;s.echoRoot=anchored[0].root;s.echoContexts=rememberContext(s.echoRoot);s.echoNativeKey=s.echoRoot.id||s.echoRoot.getAttribute('data-message-id')||s.echoRoot.getAttribute('data-id')||'';if(s.echoNativeKey)s.echoAliases.add(s.echoNativeKey);s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.ready=false;s.responseRoot=null;s.video=null;
