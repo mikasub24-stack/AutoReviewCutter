@@ -24,6 +24,9 @@ add_custom_command(TARGET VocalStudio POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${CEF_ROOT}/Release" "$<TARGET_FILE_DIR:VocalStudio>"
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${CEF_ROOT}/Resources" "$<TARGET_FILE_DIR:VocalStudio>"
   COMMAND ${CMAKE_COMMAND} -E copy "${CEF_ROOT}/Release/bootstrap.exe" "$<TARGET_FILE_DIR:VocalStudio>/VocalStudio.exe"
+  COMMAND "$<TARGET_FILE:VocalSetWindowsIcon>" "$<TARGET_FILE_DIR:VocalStudio>/VocalStudio.exe" "${CMAKE_CURRENT_SOURCE_DIR}/Assets/VocalStudio.ico"
+  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/Assets/VocalStudio.ico" "$<TARGET_FILE_DIR:VocalStudio>/VocalStudio.ico"
+  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/Assets/VocalStudio.png" "$<TARGET_FILE_DIR:VocalStudio>/VocalStudio.png"
   COMMAND ${CMAKE_COMMAND} -E copy "${CEF_ROOT}/LICENSE.txt" "$<TARGET_FILE_DIR:VocalStudio>/CEF-LICENSE.txt")
 # Low-privilege AppContainer access is required by Chromium's renderer sandbox.
 add_custom_command(TARGET VocalStudio POST_BUILD COMMAND icacls "$<TARGET_FILE_DIR:VocalStudio>" /grant "*S-1-15-2-2:(OI)(CI)(RX)")

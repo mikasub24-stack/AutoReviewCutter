@@ -229,3 +229,17 @@ from the build directory and installed app: seed three plugins (including an x86
 reverb), reopen, remove the EQ DLL, simulate an unclean exit, restore the DLL and
 reopen. These checks use isolated preferences and fixture DLLs; commercial vendor
 plugins still require validation on the user's machine.
+
+
+### 1.9.2 — application icon
+
+Original microphone/wave icon in `Assets/VocalStudio.svg`, PNG and multi-resolution
+ICO (16–256 px). The app DLL, copied CEF launcher, x86 helper, installer, desktop
+and Start menu shortcuts use the same mark. `VocalSetWindowsIcon` changes only
+icon resources in our launcher copy and verifies the written group resources;
+the upstream CEF distribution stays unchanged. Browser/engine tests still run
+against that customized launcher. The Windows packaging script scans runtime and
+shipping packages with current Microsoft Defender signatures and includes the
+report; a no-detections result is not a guarantee against every threat or a
+resolution of browser reputation warnings. Icon assets are original project work
+and distributed under the project's license.

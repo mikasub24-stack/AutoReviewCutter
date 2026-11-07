@@ -15,7 +15,7 @@ int runStudioSelfTests(const juce::String& commandLine);
 class VocalStudioApplication final : public juce::JUCEApplication {
 public:
     const juce::String getApplicationName() override {return "VocalStudio";}
-    const juce::String getApplicationVersion() override {return "1.9.1";}
+    const juce::String getApplicationVersion() override {return "1.9.2";}
     bool moreThanOneInstanceAllowed() override {return false;}
     void initialise(const juce::String& commandLine) override {
         juce::File::getCurrentWorkingDirectory().getChildFile("BrowserStartup.log").appendText("JUCE initialise\n");
@@ -45,7 +45,7 @@ public:
 private:
     class Window final : public juce::DocumentWindow {
     public:
-        explicit Window(bool recoveryMode):DocumentWindow(juce::String::fromUTF8("Vocal Studio · Thu hát và mix vocal"),juce::Colour(0xff10151e),DocumentWindow::allButtons){setUsingNativeTitleBar(true);main=new StudioMain(recoveryMode);setContentOwned(main,true);setResizable(true,true);setResizeLimits(1000,620,2560,1600);const auto* display=juce::Desktop::getInstance().getDisplays().getPrimaryDisplay();const auto area=display?display->userArea:juce::Rectangle<int>(0,0,1360,950);centreWithSize(juce::jmin(getWidth(),area.getWidth()-30),juce::jmin(getHeight(),area.getHeight()-50));setVisible(true);main->grabKeyboardFocus();}
+        explicit Window(bool recoveryMode):DocumentWindow(juce::String::fromUTF8("Vocal Studio · Thu hát và mix vocal"),juce::Colour(0xff10151e),DocumentWindow::allButtons){setUsingNativeTitleBar(true);setIcon(juce::ImageFileFormat::loadFrom(juce::File::getSpecialLocation(juce::File::currentExecutableFile).getSiblingFile("VocalStudio.png")));main=new StudioMain(recoveryMode);setContentOwned(main,true);setResizable(true,true);setResizeLimits(1000,620,2560,1600);const auto* display=juce::Desktop::getInstance().getDisplays().getPrimaryDisplay();const auto area=display?display->userArea:juce::Rectangle<int>(0,0,1360,950);centreWithSize(juce::jmin(getWidth(),area.getWidth()-30),juce::jmin(getHeight(),area.getHeight()-50));setVisible(true);main->grabKeyboardFocus();}
         void closeButtonPressed() override {juce::JUCEApplication::getInstance()->systemRequestedQuit();}
         StudioMain* main=nullptr;
     };
