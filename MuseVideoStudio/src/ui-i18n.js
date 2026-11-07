@@ -525,7 +525,21 @@ Mặc định là ảnh chụp thật. Ví dụ: ảnh chụp thật, bệ cửa
 Chỉ cần nhập loại cây hoặc tiêu đề: Muse viết bài trồng cây từ chuẩn bị chậu, gieo hạt đến ra quả rồi chia cảnh. Mỗi giai đoạn tạo một ảnh chụp thật của chậu cây và cho ảnh đó chuyển động nhẹ.|Just enter a plant or a title: Muse writes a growing guide from preparing the pot and sowing seeds to fruit, then splits it into scenes. Each stage gets a photorealistic picture of the potted plant, and that picture is gently animated.
 Bạn muốn trồng cây gì?|What do you want to grow?
 Ví dụ: Trồng cà chua trong chậu từ hạt đến khi ra quả|e.g. Growing tomatoes in a pot from seed to fruit
-Nhập loại cây rồi bấm «Muse viết bài và chia cảnh» (cần đã đăng nhập Muse tài khoản 1). Muse viết bài trồng cây từ chuẩn bị chậu đến ra quả và chia cảnh; bạn xem lại rồi bấm «Tạo ảnh + clip»: mỗi giai đoạn một ảnh chụp thật, rồi ảnh đó chuyển động nhẹ thành clip.|Enter a plant, then click “Muse writes the guide and splits scenes” (you need to be signed in to Muse account 1). Muse writes a growing guide from preparing the pot to fruit and splits the scenes; review them, then click “Create images + clips”: each stage gets one photorealistic picture, and that picture becomes a gently moving clip.
+Nhập tên cây (tiếng Việt hay tiếng Anh) rồi bấm «Làm tự động» (cần đã đăng nhập Muse tài khoản 1): Muse viết bài, chia cảnh, tạo ảnh + clip rồi tự xuất MP4. Bỏ tick «Tự động làm hết» nếu muốn xem lại từng bước (bấm «Muse viết bài và chia cảnh», xem lại, rồi «Tạo ảnh + clip»).|Enter a plant name (English or Vietnamese), then click “Run automatically” (you need to be signed in to Muse account 1): Muse writes the text, splits the scenes, creates the pictures + clips and exports the MP4 by itself. Untick “Do everything automatically” if you want to review each step (click “Muse writes the guide and splits scenes”, review, then “Create images + clips”).
+Tự động làm hết: viết bài, tạo ảnh + clip rồi xuất MP4 (không cần bấm thêm)|Do everything automatically: write the text, create pictures + clips, then export the MP4 (no more clicks)
+▶ Làm tự động: viết, vẽ, xuất MP4|▶ Run automatically: write, draw, export MP4
+Muse đã chia xong cảnh. Đang thêm vào hàng đợi và tạo ảnh + clip; xong hết sẽ tự xuất MP4…|Muse has split the scenes. Adding them to the queue and creating pictures + clips; the MP4 is exported automatically when all are done…
+Tự động dừng vì bạn đã đổi tab. Quay lại «Cây trồng phát triển» rồi bấm «Tạo ảnh + clip».|Automatic mode stopped because you changed tabs. Go back to “Growing plants” and click “Create images + clips”.
+Xong hết clip. Đang tự xuất MP4…|All clips are done. Exporting the MP4 automatically…
+Đang chạy tự động…|Running automatically…
+Đang xuất MP4…|Exporting MP4…
+Xong: MP4 đã xuất|Done: MP4 exported
+Dừng ở bước viết bài. Bấm «Làm tự động» để chạy lại.|Stopped at the writing step. Click “Run automatically” to run it again.
+Dừng ở bước chia cảnh. Bấm «Làm tự động» để chạy lại.|Stopped at the scene-splitting step. Click “Run automatically” to run it again.
+Dừng vì bạn đã đổi tab. Quay lại tab này rồi bấm «Tạo ảnh + clip».|Stopped because you changed tabs. Come back to this tab and click “Create images + clips”.
+Muse chia cảnh dừng giữa chừng. Bỏ tick «Tự động làm hết» rồi bấm «Phân tích tiếp».|Muse stopped splitting scenes midway. Untick “Do everything automatically” and click “Continue analysis”.
+Chưa thêm được vào hàng đợi. Xem thông báo rồi bấm «Làm tự động» lại.|Could not add to the queue. Read the message, then click “Run automatically” again.
+Xuất MP4 chưa xong. Xem thông báo rồi bấm Xuất MP4.|MP4 export did not finish. Read the message, then click Export MP4.
 Muse đang viết bài…|Muse is writing the guide…
 Muse viết bài và chia cảnh|Muse writes the guide and splits scenes
 Nhập loại cây hoặc tiêu đề trước.|Enter the plant or title first.
@@ -536,7 +550,12 @@ Lịch sử minh họa|Illustrated history
 1. Bài lịch sử (Muse viết, bạn sửa được)|1. History text (written by Muse, editable)
 Đã có sẵn bài? Dán vào đây rồi bấm «Phân tích bằng Muse». Chưa có thì nhập chủ đề ở trên: Muse viết bài lịch sử và hiện ở đây để bạn sửa. Giọng đọc sẽ đọc đúng nguyên văn bài này.|Already have a text? Paste it here, then click “Analyze with Muse”. If not, enter a topic above: Muse writes the history text and shows it here for you to edit. The voice reads this text word for word.
 Mặc định là tranh hoạt hình phẳng. Ví dụ: tranh hoạt hình phẳng, màu ấm, nét viền rõ|Flat cartoon illustration by default. e.g. flat cartoon illustration, warm colors, clear outlines
-Chỉ cần nhập chủ đề lịch sử: Muse viết bài và chia cảnh. Mỗi cảnh tạo một tranh hoạt hình rồi cho tranh chuyển động nhẹ. Đã có sẵn bài thì dán vào ô bên dưới.|Just enter a history topic: Muse writes the text and splits it into scenes. Each scene gets a cartoon illustration, and the illustration is gently animated. If you already have a text, paste it in the box below.
+Kiểu hình|Look
+Tranh hoạt hình phẳng|Flat cartoon illustration
+Ảnh phim tư liệu chân thực (màu phục chế)|Realistic archival-film look (restored colour)
+Mặc định là ảnh phim tư liệu chân thực, màu phục chế. Ví dụ: ảnh phim tư liệu, màu phục chế nhẹ, hạt phim mịn|Realistic archival-film look with restored colour by default. e.g. archival film still, gently restored colour, fine film grain
+Chỉ cần nhập chủ đề lịch sử: Muse viết bài và chia cảnh (chọn độ dài đến 180 phút). Đã có sẵn bài, dài bao nhiêu cũng được, thì dán vào ô bên dưới: số cảnh tự theo độ dài bài. Mỗi cảnh tạo một ảnh phim tư liệu chân thực (màu phục chế) rồi cho ảnh chuyển động nhẹ. Người trong ảnh là người vô danh đúng thời kỳ, đây là cảnh dựng lại để minh họa, không phải ảnh gốc.|Just enter a history topic: Muse writes the text and splits scenes (choose up to 180 minutes). If you already have a text, of any length, paste it in the box below: the number of scenes follows the text length. Each scene creates a realistic archival-film picture (restored colour) and then gives it gentle motion. The people shown are anonymous and period-correct; these are re-enactments for illustration, not original photographs.
+Chỉ cần nhập chủ đề lịch sử: Muse viết bài và chia cảnh (chọn độ dài đến 180 phút). Đã có sẵn bài, dài bao nhiêu cũng được, thì dán vào ô bên dưới: số cảnh tự theo độ dài bài. Mỗi cảnh tạo một tranh hoạt hình rồi cho tranh chuyển động nhẹ.|Just enter a history topic: Muse writes the text and splits it into scenes (choose a length of up to 180 minutes). If you already have a text, of any length, paste it in the box below: the number of scenes follows the length of your text. Each scene gets a cartoon illustration, and the illustration is gently animated.
 Bạn muốn kể chủ đề lịch sử gì?|Which history topic do you want to tell?
 Ví dụ: Lịch sử Việt Nam từ thời dựng nước đến nay|e.g. The history of Vietnam from its founding to today
 Nhân vật dẫn chuyện (không bắt buộc)|Guide character (optional)
@@ -575,6 +594,9 @@ Bước nào cũng cần prompt ảnh.|Every step needs an image prompt.
     const expiry=key.match(/^(.*?) Hạn: (.+)$/);if(expiry)return t(expiry[1])+' Expires: '+expiry[2];
     const patterns=[
       [/^Phiên bản (.+)$/,m=>'Version '+m[1]],
+      [/^Đang tạo ảnh \+ clip \((\d+)\/(\d+)\)$/,m=>'Creating images + clips ('+m[1]+'/'+m[2]+')'],
+      [/^Hàng đợi đã dừng, còn (\d+) cảnh chưa xong\. Chạy tiếp hàng đợi rồi bấm Xuất MP4\.$/,m=>'The queue stopped with '+m[1]+' scene(s) unfinished. Resume the queue, then click Export MP4.'],
+      [/^Hàng đợi đã dừng, còn (\d+) cảnh chưa xong nên chưa tự xuất MP4\. .*$/,m=>'The queue stopped with '+m[1]+' scene(s) unfinished, so the MP4 was not exported automatically. Resume the queue, then click Export MP4.'],
       [/^Tài khoản (\d+)$/,m=>'Account '+m[1]],
       [/^Đã thấy tin nhắn · chờ Muse phản hồi \((.+)\)$/,m=>'Message found · Waiting for Muse response ('+t(m[1])+')'],
       [/^Đang bấm chuột phải → Tải xuống \(ảnh (\d+)\/(\d+)\)$/,m=>'Right-clicking the image → Download (image '+m[1]+'/'+m[2]+')'],
@@ -610,7 +632,10 @@ Bước nào cũng cần prompt ảnh.|Every step needs an image prompt.
       [/^Muse đang bận ở tab «(.+)»\. Chờ xong rồi dùng tab này\.$/,m=>'Muse is busy in the “'+({'Kể chuyện':'Story','Quảng cáo sản phẩm':'Product ad','Mẹo vặt':'Tips','Cây trồng phát triển':'Growing plants','Lịch sử minh họa':'Illustrated history'}[m[1]]||m[1])+'” tab. Wait for it to finish, then use this tab.'],
       [/^Muse đã xong ở tab «(.+)»\.$/,m=>'Muse finished in the “'+({'Kể chuyện':'Story','Quảng cáo sản phẩm':'Product ad','Mẹo vặt':'Tips','Cây trồng phát triển':'Growing plants','Lịch sử minh họa':'Illustrated history'}[m[1]]||m[1])+'” tab.'],
       [/^Muse đã viết xong bài trồng cây \((\d+) bước\)$/,m=>'Muse finished writing the plant guide ('+m[1]+' steps)'],
+      [/^Hàng đợi đã dừng, còn (\d+) cảnh chưa xong nên chưa tự xuất MP4\. Chạy tiếp hàng đợi cho xong rồi bấm Xuất MP4\.$/,m=>'The queue has stopped with '+m[1]+' scene(s) unfinished, so the MP4 was not exported automatically. Finish the queue, then click Export MP4.'],
       [/^Muse đã viết xong bài lịch sử \((\d+) đoạn\)$/,m=>'Muse finished writing the history text ('+m[1]+' parts)'],
+      [/^Muse dừng ở phần (\d+)\/(\d+) nên bài mới có phần đầu\. Dán nốt phần còn lại vào cuối ô bài hoặc bấm viết lại\.$/,m=>'Muse stopped at part '+m[1]+'/'+m[2]+', so the text only has its first part. Paste the rest at the end of the text box or write again.'],
+      [/^Muse dừng ở phần (\d+)\/(\d+), giữ phần đã viết$/,m=>'Muse stopped at part '+m[1]+'/'+m[2]+', keeping what was written'],
       [/^Muse còn thiếu (\d+) đoạn của bài: bổ sung vào ô bài hoặc bấm viết lại\.$/,m=>'Muse left out '+m[1]+' part(s) of the text: add them to the text box or write again.'],
       [/^(\d+) đoạn hơi dài, có thể bị chia thành 2 cảnh\.$/,m=>m[1]+' part(s) are a bit long and may be split into 2 scenes.'],
       [/^Muse viết thiếu nhiều bước \(thiếu (\d+)\/(\d+) bước ở phần (\d+)\)\. Bấm «Muse viết mẹo» lại\.$/,m=>'Muse left out too many steps ('+m[1]+'/'+m[2]+' steps missing in part '+m[3]+'). Click “Muse writes the tip” again.'],
@@ -644,7 +669,7 @@ Bước nào cũng cần prompt ảnh.|Every step needs an image prompt.
       [/^Ảnh sản phẩm: (.+) — gắn vào mọi cảnh\.$/,m=>'Product image: '+m[1]+' — attached to every scene.'],
       [/^Chọn tối đa (\d+) chuyển động máy quay\.$/,m=>'Choose at most '+m[1]+' camera movements.'],
       [/^(.*)bấm «Muse viết lời quảng cáo» lại\.$/,m=>t(m[1]+'bấm Phân tích lại.').replace(/analy[sz]e again\.$/,'write the ad script again.')],
-      [/^Thêm (\d+) bước \((\d+) ảnh \+ (\d+) clip\) và chạy ngay\?.*$/,m=>'Add '+m[1]+' steps ('+m[2]+' images + '+m[3]+' clips) and run now? Each step uses 2 Muse generations (1 image, 1 clip), so this may use a lot of Muse credits. All images are created first, then each clip is made from its own image; the reviewed prompts are sent exactly as shown.'],
+      [/^Thêm (\d+) (bước|cảnh) \((\d+) ảnh \+ (\d+) clip\) và chạy ngay\?(.*)$/,m=>'Add '+m[1]+(m[2]==='cảnh'?' scenes (':' steps (')+m[3]+' images + '+m[4]+' clips) and run now? Each '+(m[2]==='cảnh'?'scene':'step')+' uses 2 Muse generations (1 image, 1 clip), so this may use a lot of Muse credits.'+(/Video dài/.test(m[5])?' This is a long video, so Muse may run for many hours or even days; you can press Stop and continue later.':'')+' All images are created first, then each clip is made from its own image; the reviewed prompts are sent exactly as shown.'],
       [/^Thêm (\d+) cảnh và chạy toàn bộ clip kể chuyện đang chờ\?.*cùng ảnh sản phẩm\.$/,m=>'Add '+m[1]+' scenes and run all pending story clips? This may use Muse credits. The reviewed prompts are sent exactly as shown, with the product image.'],
       [/^Thêm (\d+) cảnh và chạy toàn bộ clip kể chuyện đang chờ\?.*$/,m=>'Add '+m[1]+' scenes and run all pending story clips? This may use Muse credits. The reviewed prompts are sent exactly as shown, with the character image.'],
       [/^Còn (\d+) cảnh chưa xong\. Chạy hàng đợi cho xong rồi xuất\.$/,m=>m[1]+' scene(s) are not finished. Finish the queue, then export.'],

@@ -51,7 +51,7 @@ function brain(behavior = {}) {
     asked.push({ text, units: units.map(u => u.n), hasCast: /NHÂN VẬT ĐÃ CHỐT/.test(text), hasUnderstanding: /HIỂU BIẾT VỀ CẢ BÀI/.test(text), fresh: /BỎ QUA hết/.test(text), done });
     if (behavior.onAsk) await behavior.onAsk(asked.length);
     // Yêu cầu VIẾT MẸO từ tiêu đề (chế độ Mẹo vặt): viết các mục A–B, intro/kết không nhãn, bước có nhãn «Bước k:».
-    if (/TIÊU ĐỀ (?:MẸO|\/ LOẠI CÂY)/.test(text) && /^KỊCH BẢN:/m.test(text)) {
+    if (/(?:TIÊU ĐỀ (?:MẸO|\/ LOẠI CÂY)|CHỦ ĐỀ LỊCH SỬ)/.test(text) && /^KỊCH BẢN:/m.test(text)) {
       const range = text.match(/các mục (\d+)–(\d+) trong tổng (\d+) mục/);
       const info = { text, from: Number(range[1]), to: Number(range[2]), total: Number(range[3]), written: /ĐÃ VIẾT Ở CÁC PHẦN TRƯỚC/.test(text), fix: (text.match(/SỬA LỖI[^\n]*\n([\s\S]*?)\n\nTIÊU ĐỀ/) || [])[1] || '', fresh: /BỎ QUA hết/.test(text), done };
       asked.at(-1).tipWrite = info;
@@ -694,6 +694,43 @@ function brain(behavior = {}) {
       assert.equal(analyzer.status().busy, false);
       assert.equal(analyzer.status().error, '');
       await page.close(); ok('mẹo vặt: không viết trùng; hủy được');
+    }
+    // 26. Lịch sử minh họa dài (30 phút / 8 giây = 225 mục → 15 lượt): mỗi lượt biết mình ở đâu trong bài; lượt cuối không bị dặn «chưa kết».
+    const histLong = { seconds: 8, aspect: '16:9', tip: true, tipKind: 'history', tipTitle: 'Lịch sử nhà Trần', tipMinutes: 30, tipLanguage: 'vi' };
+    {
+      const { page, analyzer, museBrain } = await session({});
+      const r = await analyzer.writeScript({ options: histLong });
+      const writes = museBrain.asked.filter(a => a.tipWrite);
+      assert.equal(writes.length, 15);
+      assert.deepEqual([writes[0].tipWrite.from, writes.at(-1).tipWrite.to, writes[0].tipWrite.total], [1, 225, 225]);
+      assert.ok(writes.slice(0, -1).every(w => /Bài RẤT DÀI \(225 mục\)/.test(w.text) && /KHÔNG chuyển sang kết luận trước mục 225/.test(w.text)), 'lượt giữa được dặn trải đều, chưa kết');
+      assert.ok(!/RẤT DÀI/.test(writes.at(-1).text), 'lượt cuối không bị dặn chưa kết');
+      assert.match(writes[1].text, /phần này mới ở khoảng 7–13% bài/);
+      assert.equal(r.script.split('\n').length, 225);
+      assert.ok(!/^Bước/m.test(r.script), 'bài lịch sử bỏ nhãn Bước');
+      assert.deepEqual(r.notes, []);
+      await page.close(); ok('lịch sử dài: 30 phút viết 15 lượt, mỗi lượt biết vị trí trong bài, ghép đủ 225 mục');
+    }
+    // 27. Lịch sử dài bị lỗi giữa chừng (Muse trả lời rỗng ở lượt 4) → giữ 3 lượt đã viết kèm ghi chú, không mất hết; mẹo vặt vẫn báo lỗi như cũ.
+    {
+      const writeLines = info => { const lines = []; for (let i = info.from; i <= info.to; i++) lines.push(i === 1 ? 'Nhà Trần mở đầu một thời kỳ oai hùng.' : i === info.total ? 'Câu chuyện nhà Trần khép lại ở đây.' : `Bước ${i - 1}: Sự kiện số ${i - 1} của nhà Trần diễn ra ở kinh thành.`); return ['KỊCH BẢN:', ...lines, `MSDONE${info.done}`].join('\n'); };
+      const { page, analyzer, museBrain, progress } = await session({ tipReply: (n, info) => n >= 4 ? `MSDONE${info.done}` : writeLines(info) });
+      const r = await analyzer.writeScript({ options: histLong });
+      assert.equal(r.script.split('\n').length, 45, '3 lượt × 15 mục được giữ lại');
+      assert.deepEqual(r.notes, ['Muse dừng ở phần 4/15 nên bài mới có phần đầu. Dán nốt phần còn lại vào cuối ô bài hoặc bấm viết lại.']);
+      assert.ok(progress.some(p => /Muse dừng ở phần 4\/15, giữ phần đã viết/.test(p)) && !progress.some(p => /Muse đã viết xong bài lịch sử/.test(p)), progress.join(' | '));
+      assert.equal(museBrain.asked.filter(a => a.tipWrite).length, 5, 'lượt 4 hỏi lại một lần rồi dừng');
+      assert.equal(analyzer.status().busy, false);
+      assert.equal(analyzer.status().error, '');
+      await page.close();
+      const first = await session({ tipReply: (n, info) => `MSDONE${info.done}` });
+      await assert.rejects(first.analyzer.writeScript({ options: histLong }), /Muse chưa viết mẹo/, 'lỗi ngay lượt đầu (chưa có gì để giữ) thì vẫn báo lỗi');
+      await first.page.close();
+      let live;
+      const stop = await session({ onAsk: n => { if (n === 3) live.cancel(); } });
+      live = stop.analyzer;
+      await assert.rejects(live.writeScript({ options: histLong }), e => e.name === 'AbortError', 'bấm Dừng thì dừng hẳn, không trả bài dở');
+      await stop.page.close(); ok('lịch sử dài: lỗi giữa chừng giữ phần đã viết + ghi chú; lỗi ngay đầu và bấm Dừng thì như cũ');
     }
   } finally { await browser.close(); }
   console.log(`PASS: ${passed} story analysis scenarios against a fake Muse chat page (not the real Muse).`);

@@ -328,3 +328,11 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .more > summary::-webkit-details-marker { display: none; }
 .more[open] > summary { margin-bottom: 4px; }
 .sceneMore { margin: 6px 0 0; }
+
+/* Cây trồng chạy tự động: chỉ còn tên cây, độ dài, một nút và thanh tiến trình %. */
+#storyPanel.autoMode .scriptPart, #storyPanel.autoMode .drafts, #storyPanel.autoMode #storyInfo { display: none !important; }
+.autoRun { margin-top: 12px; }
+.autoBar { height: 12px; border-radius: 999px; background: #1a2536; border: 1px solid var(--line); overflow: hidden; }
+.autoBar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s ease; }
+.autoText { margin: 6px 0 0; font-size: 13px; color: #cbd7e9; }
+.autoText.warn { color: #ffcf8a; }

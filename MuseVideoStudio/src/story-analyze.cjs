@@ -305,7 +305,7 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
       if (!muse) throw infra('Chưa mở được Muse tài khoản 1.');
       if (tip) {
         const result = await writeTip(muse, config, signal, label);
-        say(history ? `Muse đã viết xong bài lịch sử (${result.steps} đoạn)` : `Muse đã viết xong ${plant ? 'bài trồng cây' : 'mẹo vặt'} (${result.steps} bước)`);
+        if (!result.stopped) say(history ? `Muse đã viết xong bài lịch sử (${result.steps} đoạn)` : `Muse đã viết xong ${plant ? 'bài trồng cây' : 'mẹo vặt'} (${result.steps} bước)`);
         // Bài lịch sử không có nhãn «Bước k:» (nhãn chỉ để soát đủ mục): bỏ đi để lời đọc là bài kể liền mạch.
         return { script: history ? plan.stripStepLabels(result.script) : result.script, notes: result.notes };
       }
@@ -335,31 +335,39 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
   async function writeTip(muse, config, signal, label) {
     const tp = plan.tipPlan(config);
     const parts = plan.tipParts(tp), notes = [], missing = [], long = [];
-    let written = '';
+    let written = '', stopped = null;
     for (let index = 0; index < parts.length; index++) {
       const part = parts[index], partLabel = parts.length > 1 ? `${label} ${index + 1}/${parts.length}` : label;
       let best = null, fix = '';
-      for (let attempt = 0; attempt < 2; attempt++) {
-        check(signal);
-        const marker = randomBytes(3).toString('hex');
-        say(`${partLabel} · chuẩn bị yêu cầu…`);
-        let reply;
-        try { reply = await ask(muse, plan.buildTipScriptInstruction(config, { marker, part, parts: parts.length, number: index + 1, written, fix }), marker, signal, partLabel); }
-        catch (e) { if (!e.infra || attempt) throw e; await wait(2000, signal); continue; }
-        let text;
-        try { text = plan.tipTrim(plan.tipScriptFromReply(reply), tp, part); }
-        catch (e) { if (attempt) { if (best) break; throw e; } fix = ''; continue; }
-        const issues = plan.tipCheck(text, tp, part);
-        const score = issues.missing.length * 3 + issues.long.length + (issues.noIntro ? 2 : 0) + (issues.noEnd ? 2 : 0);
-        if (!best || score < best.score) best = { text, issues, score };
-        if (issues.ok) break;
-        fix = plan.tipFix(issues, tp);
+      try {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          check(signal);
+          const marker = randomBytes(3).toString('hex');
+          say(`${partLabel} · chuẩn bị yêu cầu…`);
+          let reply;
+          try { reply = await ask(muse, plan.buildTipScriptInstruction(config, { marker, part, parts: parts.length, number: index + 1, written, fix }), marker, signal, partLabel); }
+          catch (e) { if (!e.infra || attempt) throw e; await wait(2000, signal); continue; }
+          let text;
+          try { text = plan.tipTrim(plan.tipScriptFromReply(reply), tp, part); }
+          catch (e) { if (attempt) { if (best) break; throw e; } fix = ''; continue; }
+          const issues = plan.tipCheck(text, tp, part);
+          const score = issues.missing.length * 3 + issues.long.length + (issues.noIntro ? 2 : 0) + (issues.noEnd ? 2 : 0);
+          if (!best || score < best.score) best = { text, issues, score };
+          if (issues.ok) break;
+          fix = plan.tipFix(issues, tp);
+        }
+        if (!best) throw Error('Muse chưa viết mẹo. Bấm «Muse viết mẹo» lại.');
+        const wanted = Math.min(part[1], tp.total - 1) - Math.max(part[0], 2) + 1;
+        if (wanted > 0 && best.issues.missing.length * 2 > wanted) throw Error(`Muse viết thiếu nhiều bước (thiếu ${best.issues.missing.length}/${wanted} bước ở phần ${index + 1}). Bấm «Muse viết mẹo» lại.`);
+        missing.push(...best.issues.missing); long.push(...best.issues.long);
+        written = written ? written + '\n' + best.text : best.text;
+      } catch (error) {
+        // Bài lịch sử dài: lỗi giữa chừng (không phải bấm Dừng) thì giữ phần đã viết thay vì mất cả bài.
+        if (!tp.history || error.name === 'AbortError' || !written) throw error;
+        stopped = { number: index + 1, parts: parts.length };
+        say(`Muse dừng ở phần ${stopped.number}/${stopped.parts}, giữ phần đã viết`);
+        break;
       }
-      if (!best) throw Error('Muse chưa viết mẹo. Bấm «Muse viết mẹo» lại.');
-      const wanted = Math.min(part[1], tp.total - 1) - Math.max(part[0], 2) + 1;
-      if (wanted > 0 && best.issues.missing.length * 2 > wanted) throw Error(`Muse viết thiếu nhiều bước (thiếu ${best.issues.missing.length}/${wanted} bước ở phần ${index + 1}). Bấm «Muse viết mẹo» lại.`);
-      missing.push(...best.issues.missing); long.push(...best.issues.long);
-      written = written ? written + '\n' + best.text : best.text;
     }
     // Một ghi chú duy nhất (thiếu bước được ưu tiên hơn bước dài) để giao diện hiện gọn và dịch được.
     if (tp.history) {
@@ -367,7 +375,8 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
       else if (long.length) notes.push(`${long.length} đoạn hơi dài, có thể bị chia thành 2 cảnh.`);
     } else if (missing.length) notes.push(`Muse còn thiếu ${missing.map(k => 'bước ' + k).join(', ')}: bổ sung vào ô mẹo hoặc bấm viết lại.`);
     else if (long.length) notes.push(`${long.map(k => 'Bước ' + k).join(', ')} hơi dài, có thể bị chia thành 2 cảnh.`);
-    return { script: written, steps: tp.steps, notes };
+    if (stopped) notes.unshift(`Muse dừng ở phần ${stopped.number}/${stopped.parts} nên bài mới có phần đầu. Dán nốt phần còn lại vào cuối ô bài hoặc bấm viết lại.`);
+    return { script: written, steps: tp.steps, notes, stopped: Boolean(stopped) };
   }
 
   function cancel() { controller?.abort(); }

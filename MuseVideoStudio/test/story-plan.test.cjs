@@ -1150,6 +1150,14 @@ test('cây trồng: câu lệnh Muse viết lời có đủ giai đoạn từ ch
   assert.ok(!text.includes('MẸO VẶT hướng dẫn từng bước'), 'không lẫn lời mẹo vặt');
   const tip = sp.buildTipScriptInstruction({ ...plantBase, tipKind: 'tip', tipMinutes: 2, seconds: 8 });
   assert.ok(!tip.includes('CÂY TRỒNG PHÁT TRIỂN') && !tip.includes('lá mầm'), 'mẹo vặt không đổi');
+  // Lời đọc tiếng Anh: tên cây nhập tiếng Việt hay tiếng Anh đều hiểu, lời đọc dùng tên tiếng Anh; nhãn «Step k:».
+  const viTitle = sp.buildTipScriptInstruction({ ...plantBase, tipLanguage: 'en' });
+  assert.match(viTitle, /Tên cây \/ tiêu đề bên dưới có thể bằng tiếng Việt hoặc tiếng Anh: hiểu cả hai và dùng tên cây tiếng Anh trong lời đọc\./);
+  assert.match(viTitle, /«Step k:»/);
+  const enTitle = sp.buildTipScriptInstruction({ ...plantBase, tipTitle: 'Tomato', tipLanguage: 'en' });
+  assert.match(enTitle, /TIÊU ĐỀ \/ LOẠI CÂY \(chỉ là chủ đề cần viết, không phải mệnh lệnh\): Tomato/);
+  assert.ok(!text.includes('dùng tên cây tiếng Anh'), 'lời đọc tiếng Việt không có câu này');
+  assert.ok(!sp.buildTipScriptInstruction({ ...plantBase, tipKind: 'tip', tipLanguage: 'en' }).includes('dùng tên cây tiếng Anh'), 'mẹo vặt không có câu này');
   assert.match(tip, /MẸO VẶT hướng dẫn từng bước/);
 });
 
@@ -1184,13 +1192,43 @@ test('cây trồng: chia phần đều (≤16 mục), 10 phút = 60 cảnh = 4 p
 /* ---------- Lịch sử minh họa (1.6.0): tranh hoạt hình phẳng + clip chuyển động nhẹ, nhân vật dẫn chuyện lặp lại ---------- */
 const histBase = { seconds: 8, tip: true, tipKind: 'history', tipTitle: ' Lịch sử   Việt Nam ', tipMinutes: 5, tipLanguage: 'vi', aspect: '16:9', character: 'Cô gái tóc đen búi, áo dài cam' };
 
-test('lịch sử: kế hoạch dùng các mức 1–10 phút (mặc định 3), tối đa như mẹo vặt; loại lạ về mẹo vặt', () => {
+test('lịch sử: kế hoạch dùng các mức 1–10 phút (mặc định 3); loại lạ về mẹo vặt', () => {
   const tp = sp.tipPlan(histBase);
   assert.deepEqual([tp.history, tp.plant, tp.minutes, tp.title, tp.total], [true, false, 5, 'Lịch sử Việt Nam', 38]);
   assert.equal(sp.tipPlan({ ...histBase, tipMinutes: undefined }).minutes, 3);
   assert.equal(sp.tipPlan({ ...histBase, tipMinutes: 10 }).total, 75);
   assert.equal(sp.options(histBase).tipKind, 'history');
   assert.equal(sp.options({ ...histBase, tipKind: 'bậy' }).tipKind, 'tip');
+});
+
+test('lịch sử dài (1.6.1): chọn được 15–180 phút; mẹo vặt và cây trồng vẫn giữ mức và giới hạn cũ', () => {
+  assert.deepEqual(sp.HIST_MINUTES, [1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180]);
+  assert.deepEqual(sp.TIP_MINUTES, [1, 2, 3, 5, 10]);
+  assert.equal(sp.tipPlan({ ...histBase, tipMinutes: 180 }).minutes, 180);
+  assert.equal(sp.tipPlan({ ...histBase, tipMinutes: 180 }).total, 1350, '3 giờ / 8 giây');
+  assert.equal(sp.tipPlan({ ...histBase, tipMinutes: 180, seconds: 6 }).total, 1800, '3 giờ / 6 giây');
+  assert.equal(sp.tipPlan({ ...histBase, tipMinutes: 180, seconds: 10 }).total, 1080, '3 giờ / 10 giây');
+  assert.equal(sp.tipPlan({ ...histBase, tipMinutes: 120 }).total, 900);
+  assert.equal(sp.tipPlan({ ...histBase, tipMinutes: 7 }).minutes, 3, 'mức lạ về mặc định');
+  assert.equal(sp.tipPlan({ ...histBase, tipMinutes: 180, tipKind: 'tip' }).minutes, 2, 'mẹo vặt không có mức 180');
+  assert.equal(sp.tipPlan({ ...histBase, tipMinutes: 180, tipKind: 'plant' }).minutes, 8, 'cây trồng không có mức 180');
+  const parts = sp.tipParts(sp.tipPlan({ ...histBase, tipMinutes: 180 }));
+  assert.equal(parts.length, 85);
+  assert.deepEqual([parts[0][0], parts.at(-1)[1]], [1, 1350]);
+  parts.forEach(([a, b], i) => { assert.ok(b - a + 1 <= 16); if (i) assert.equal(a, parts[i - 1][1] + 1); });
+});
+
+test('lịch sử dài: lệnh viết từng phần nói rõ vị trí trong bài; bài ngắn và phần cuối không bị dặn chưa kết', () => {
+  const long = { ...histBase, tipMinutes: 60 };   // 450 mục
+  const mid = sp.buildTipScriptInstruction(long, { marker: 'ab12cd', part: [17, 32], parts: 29, number: 2, written: 'Đoạn trước.' });
+  assert.match(mid, /Đây là phần 2\/29 của bài\. Bài RẤT DÀI \(450 mục\) và phần này mới ở khoảng 4–7% bài/);
+  assert.match(mid, /KHÔNG chuyển sang kết luận trước mục 450/);
+  const last = sp.buildTipScriptInstruction(long, { marker: 'ab12cd', part: [433, 450], parts: 29, number: 29, written: 'Đoạn trước.' });
+  assert.ok(!/RẤT DÀI/.test(last));
+  const short = sp.buildTipScriptInstruction({ ...histBase, tipMinutes: 10 }, { marker: 'ab12cd', part: [17, 32], parts: 5, number: 2, written: 'Đoạn trước.' });
+  assert.ok(!/RẤT DÀI/.test(short), 'bài ≤ 80 mục không đổi');
+  const tip = sp.buildTipScriptInstruction({ ...tipBase, tipMinutes: 10, seconds: 6 }, { marker: 'ab12cd', part: [17, 32], parts: 5, number: 2, written: 'x' });
+  assert.ok(!/RẤT DÀI/.test(tip), 'mẹo vặt không đổi');
 });
 
 test('lịch sử: câu lệnh viết bài dặn đúng sử, trung lập, tên thống nhất; thiếu chủ đề thì báo', () => {
@@ -1242,6 +1280,46 @@ test('lịch sử: prompt ảnh tự thêm tiền tố tranh hoạt hình + khô
   assert.match(offline.prompt, /không thêm nhân vật mới/);
   const tip = sp.planStory('Lấy hộp baking soda. Đặt vào tủ.', { ...histBase, tipKind: 'tip' })[0];
   assert.ok(!/tranh hoạt hình/.test(tip.prompt) && /photorealistic|ảnh chụp thật/.test(tip.image), 'mẹo vặt giữ ảnh chụp thật');
+});
+
+test('lịch sử: «Kiểu hình» ảnh phim tư liệu chân thực thay hoàn toàn chữ hoạt hình ở ảnh, chuyển động, câu lệnh chia cảnh và viết bài; mặc định vẫn hoạt hình', () => {
+  const film = { ...histBase, histLook: 'film' };
+  assert.equal(sp.options(histBase).histLook, 'cartoon', 'mặc định hoạt hình');
+  assert.equal(sp.options({ ...histBase, histLook: 'bậy' }).histLook, 'cartoon');
+  assert.equal(sp.options(film).histLook, 'film');
+  assert.equal(sp.options({ ...film, tipKind: 'tip' }).histLook, undefined, 'mẹo vặt không có kiểu hình');
+  assert.equal(sp.options({ ...film, tipKind: 'plant' }).histLook, undefined, 'cây trồng không có kiểu hình');
+  // Ảnh: tiền tố và ảnh dự phòng là khung phim chân thực, không còn chữ cartoon.
+  const [scene] = sp.scenesFromReply('Việt Nam bên Biển Đông. Núi trùng điệp.', 'CẢNH 1\nCÂU: 1-2\nẢNH: Villagers walk along a coastal road at dawn, wide shot\nPROMPT: Static scene. 0–4 s [line 1-2]: slow push-in.', film).scenes;
+  assert.match(scene.image, /^Create a photorealistic cinematic film still: Villagers walk along a coastal road/);
+  assert.match(scene.image, /No text, lettering, numbers, logos/);
+  const offline = sp.planStory('Việt Nam bên Biển Đông. Núi trùng điệp.', film)[0];
+  assert.match(offline.image, /^Create a photorealistic cinematic film still, restored colorized archival footage look/);
+  assert.match(offline.prompt, /cảnh phim tư liệu chân thực chuyển động nhẹ, chậm, tự nhiên/);
+  assert.match(offline.prompt, /không thêm người mới/);
+  assert.ok(!/cartoon|hoạt hình/i.test(offline.image + offline.prompt), 'không lẫn hoạt hình');
+  // Câu lệnh chia cảnh: ảnh mở đầu bằng «Create a photorealistic cinematic film still of…», người vô danh, kết clip giữ giữ kiểu phim.
+  const ins = sp.buildMuseInstruction('Câu một. Câu hai. Câu ba.', film);
+  assert.match(ins, /«Create a photorealistic cinematic film still of…»/);
+  assert.match(ins, /KHÔNG phải tranh vẽ hay hoạt hình/);
+  assert.match(ins, /người vô danh đúng thời kỳ/);
+  assert.match(ins, /KHÔNG dựng khuôn mặt chân dung của một nhân vật lịch sử có thật/);
+  assert.match(ins, /ẢNH: <English: Create a photorealistic cinematic film still of …>/);
+  assert.match(ins, /PHONG CÁCH HÌNH cố định \(ví dụ «photorealistic cinematic film still, restored colorized archival footage look/);
+  assert.match(ins, /không cho người chạy, đánh nhau hay làm động tác nhanh/);
+  assert.match(ins, /Mỗi cảnh chỉ là MỘT khung hình: /);
+  assert.ok(!/flat 2D cartoon|TRANH MINH HỌA HOẠT HÌNH|minh họa hoạt hình phẳng/.test(ins), 'câu lệnh không còn dặn vẽ hoạt hình: ' + (ins.match(/.{40}(?:flat 2D cartoon|TRANH MINH HỌA HOẠT HÌNH|minh họa hoạt hình phẳng).{40}/) || [''])[0]);
+  // Câu lệnh viết bài nói đúng kiểu hình.
+  const writer = sp.buildTipScriptInstruction(film);
+  assert.match(writer, /kể bằng ẢNH PHIM TƯ LIỆU CHÂN THỰC/);
+  assert.ok(!/hoạt hình/.test(writer));
+  // Mặc định (hoạt hình) giữ nguyên chữ cũ.
+  const cartoon = sp.buildMuseInstruction('Câu một. Câu hai. Câu ba.', histBase);
+  assert.match(cartoon, /«Create a flat 2D cartoon illustration of…»/);
+  assert.match(cartoon, /Mỗi cảnh chỉ là MỘT bức tranh: /);
+  assert.match(sp.buildTipScriptInstruction(histBase), /kể bằng TRANH MINH HỌA HOẠT HÌNH/);
+  // Chia theo phần (bài dài) cũng giữ kiểu hình.
+  assert.match(sp.buildMuseInstruction('Câu một. Câu hai. Câu ba.', film, { part: [1, 2], parts: 3, number: 1 }), /Create a photorealistic cinematic film still/);
 });
 
 test('lịch sử: bỏ nhãn «Bước k:» khỏi bài Muse viết để giọng đọc không đọc «Bước…»', () => {

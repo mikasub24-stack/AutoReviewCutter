@@ -41,6 +41,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
             const units = data.script.split(/(?<=[.!?])\s+/);
             const result = { scenes: [{ title: 'Cảnh 1', source: units.slice(0, 2).join(' '), voiceover: units.slice(0, 2).join(' '), visual: '', prompt: 'Mai dắt trâu qua cánh đồng lúc bình minh, mỉm cười.\nAudio: no speech, no dialogue, no singing, no narration, no lip movement - characters stay silent with mouths closed.', durationSeconds: 10, units: [1, 2] }, { title: 'Cảnh 2', source: units.slice(2).join(' '), voiceover: units.slice(2).join(' '), visual: '', prompt: 'Chú cá vàng nhảy lên thuyền, Mai ngạc nhiên đưa tay đón.\nAudio: no speech, no dialogue, no singing, no narration, no lip movement - characters stay silent with mouths closed.', durationSeconds: 10, units: [3, 4] }].filter(sc => sc.voiceover.trim()), cast: 'Mai – theo ảnh', understanding: { summary: 'Mai dắt trâu, thả cá vàng về sông.', approach: 'Truyện kể nhẹ nhàng; dựng đúng diễn biến.', setting: 'Làng ven sông, buổi sáng.' }, notes: [] };
             if (data.tip) { result.scenes = result.scenes.map((sc, i) => ({ ...sc, prompt: 'Bếp gỗ sáng. 0–5 giây [câu ' + sc.units[0] + ']: tay đặt tỏi lên thớt. 5–10 giây [câu ' + sc.units[1] + ']: dao đập nhẹ.\nAudio: no speech, no dialogue.', image: 'Tạo ảnh chụp thật cận cảnh tay đặt tép tỏi lên thớt gỗ tròn, ánh sáng cửa sổ, bước ' + (i + 1) + '.\nTỷ lệ khung hình ảnh: 16:9 (ngang).\nKhông có chữ, chữ số, logo, hình mờ hay phụ đề trong ảnh.' })); result.understanding = null; }
+            if (window.sceneCount) result.scenes = Array.from({ length: window.sceneCount }, (_, i) => ({ ...result.scenes[i % result.scenes.length], title: 'Cảnh ' + (i + 1) }));   // bài dài: nhiều cảnh
             if (window.analyzeStop && !data.resume) { result.scenes = result.scenes.slice(0, 1); result.incomplete = { from: 3, total: units.length, message: 'Muse chưa chia đúng đoạn từ câu 3.' }; }
             return result;
           }
@@ -470,6 +471,11 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
         assert.equal(await page.locator('#tipTitleLabel').textContent(), 'What do you want to grow?');
         assert.match(await page.locator('#tipTitle').getAttribute('placeholder'), /Growing tomatoes in a pot from seed to fruit/);
         assert.match(await page.locator('#tipIntro').textContent(), /from preparing the pot and sowing seeds to fruit/);
+        // Cây trồng mặc định chạy TỰ ĐỘNG (tick sẵn) và lời đọc mặc định tiếng Anh; bỏ tick để thử từng bước như Mẹo vặt.
+        assert.equal(await page.locator('#tipAuto').isChecked(), true, 'cây trồng: tự động làm hết được tick sẵn');
+        assert.equal(await page.locator('#tipWrite').textContent(), '▶ Run automatically: write, draw, export MP4');
+        assert.equal(await page.locator('#tipLanguage').inputValue(), 'en', 'cây trồng: lời đọc mặc định tiếng Anh');
+        await page.locator('#tipAuto').uncheck();
         assert.equal(await page.locator('#tipWrite').textContent(), 'Muse writes the guide and splits scenes');
         assert.equal(await page.locator('#storyCreate').textContent(), '▶ Create images + clips');
         for (const id of ['storyRefRow', 'storyRefPaste', 'storyCharacter', 'storyForm']) assert.equal(await page.locator('#' + id).isVisible(), false, id + ' ẩn trong chế độ Cây trồng');
@@ -488,9 +494,75 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
         await page.locator('#tipWrite').click();   // ô bài đang có chữ → hộp thoại xác nhận tự đồng ý
         await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyAnalyze').length > n && !document.getElementById('storyAnalyze').disabled && document.querySelectorAll('#storyScenes .draftRow').length === 2, analyzed);
         const write = (await called('storyAdWrite')).at(-1).data;
-        assert.deepEqual([write.tip, write.tipKind, write.tipTitle, write.tipMinutes, write.seconds, write.reference], [true, 'plant', 'Trồng cà chua trong chậu', 10, 10, false]);
+        assert.deepEqual([write.tip, write.tipKind, write.tipTitle, write.tipMinutes, write.seconds, write.reference, write.tipLanguage], [true, 'plant', 'Trồng cà chua trong chậu', 10, 10, false, 'en']);
         assert.equal((await called('storyAnalyze')).at(-1).data.tipKind, 'plant', 'chia cảnh cũng biết đây là cây trồng');
         assert.deepEqual(await page.evaluate(() => { const v = JSON.parse(localStorage.getItem('museStudio.story')); return [v.mode, v.plantTipTitle, v.plantTipMinutes, v.tipTitle, v.tipMinutes, v.tipSecs]; }), ['plant', 'Trồng cà chua trong chậu', '10', '  Mẹo khử mùi tủ lạnh  ', '3', '6'], 'mỗi chế độ nhớ riêng, không ghi đè nhau');
+        // Cây trồng chạy TỰ ĐỘNG: gõ tên cây (Việt hay Anh) → một nút → viết bài, chia cảnh, vào hàng đợi, tạo ảnh + clip, xong hết thì tự xuất MP4.
+        // Chỉ hiện thanh % gọn; bài, danh sách cảnh và nút phân tích được ẩn.
+        {
+          const asked = []; const rec = d => asked.push(d.message()); page.on('dialog', rec);
+          await page.locator('#tipAuto').check();
+          await page.evaluate(() => { document.getElementById('storyPanel').open = true; document.getElementById('tipMore').open = true; window.writeDelay = 400; window.analyzeDelay = 400; });
+          assert.equal(await page.locator('#tipWrite').textContent(), '▶ Run automatically: write, draw, export MP4');
+          for (const id of ['storyScript', 'storyScenes', 'storyAnalyze', 'storyInfo', 'storyCreate', 'storyCommit']) assert.equal(await page.locator('#' + id).isVisible(), false, id + ' được ẩn khi chạy tự động');
+          assert.equal(await page.locator('#autoRun').isVisible(), false, 'chưa chạy thì chưa có thanh tiến trình');
+          assert.equal(await page.locator('#storyAspect').isVisible(), true, '«Tỉ lệ» nằm trong «Tùy chọn thêm»');
+          assert.equal(await page.locator('#tipExtra #storyAspect').count(), 1);
+          assert.equal(await page.locator('#tipExtra #storyStyle').count(), 1);
+          await page.locator('#storyAspect').selectOption('9:16');
+          await page.locator('#tipTitle').fill('Tomato');   // gõ tiếng Anh cũng được
+          const adds0 = (await called('add')).length, starts0 = (await called('start')).length, builds0 = (await called('storyBuild')).length, writes0 = (await called('storyAdWrite')).length;
+          await page.locator('#tipWrite').click();
+          await page.waitForFunction(() => !document.getElementById('autoRun').hidden);
+          assert.equal(await page.locator('#tipWrite').isDisabled(), true, 'đang chạy tự động thì không bấm lại');
+          assert.equal(await page.locator('#tipWrite').textContent(), 'Running automatically…');
+          await page.waitForFunction(n => window.calls.filter(c => c.name === 'start').length > n, starts0);
+          assert.equal((await called('storyAdWrite')).length, writes0 + 1);
+          assert.equal((await called('storyAdWrite')).at(-1).data.tipTitle, 'Tomato');
+          assert.equal((await called('add')).length, adds0 + 1, 'thêm vào hàng đợi đúng một lần');
+          assert.ok(!asked.some(m => /^Add \d+ steps/.test(m)), 'chạy tự động không hỏi xác nhận thêm vào hàng đợi: ' + asked.join(' | '));
+          const addData = (await called('add')).at(-1).data, sid = addData[0].storyId;
+          assert.deepEqual(addData.map(j => [j.phase, j.number]), [['image', 1], ['image', 2], ['clip', 1], ['clip', 2]]);
+          assert.equal(await page.locator('#storyPanel').evaluate(d => d.open), true, 'khung vẫn mở để thấy thanh tiến trình');
+          await page.waitForFunction(() => /Creating images \+ clips \(0\/4\)/.test(document.getElementById('autoLabel').textContent));
+          assert.equal(await page.locator('#autoPct').textContent(), '25%');
+          assert.equal(await page.locator('#autoText').evaluate(e => e.classList.contains('warn')), false);
+          // Ảnh xong một nửa → thanh tiến lên (25% + 65% × 2/4).
+          await page.evaluate(() => { window.s.jobs.filter(j => j.kind === 'story' && j.phase === 'image').forEach(j => { j.status = 'completed'; }); window.push(); });
+          await page.waitForFunction(() => /\(2\/4\)/.test(document.getElementById('autoLabel').textContent));
+          assert.equal(await page.locator('#autoPct').textContent(), '58%');
+          assert.equal((await called('storyBuild')).length, builds0, 'chưa xong clip thì chưa xuất');
+          // Clip xong hết → tự xuất MP4 đúng lượt, đúng tỉ lệ đã chọn, các cảnh đúng thứ tự (đồng bộ lời đọc ↔ clip).
+          await page.evaluate(() => { window.s.active = false; window.s.jobs.filter(j => j.kind === 'story' && j.phase).forEach(j => { j.status = 'completed'; j.output = 'C:\\Videos\\Cay\\' + j.number + (j.phase === 'image' ? '.png' : '.mp4'); }); window.push(); });
+          await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyBuild').length > n, builds0);
+          const prep = (await called('storyPrepare')).at(-1).data, build = (await called('storyBuild')).at(-1).data;
+          assert.equal(prep.storyId, sid, 'xuất đúng lượt vừa tạo');
+          assert.equal(build.aspect, '9:16', 'xuất theo tỉ lệ đã chọn lúc bấm');
+          assert.deepEqual(build.scenes.map(sc => sc.id), await page.evaluate(id => window.s.jobs.filter(j => j.kind === 'story' && j.storyId === id).map(j => j.id), sid), 'cảnh gửi đi đúng thứ tự đã chuẩn bị (lời đọc ↔ clip không lệch)');
+          await page.waitForFunction(() => /Done: MP4 exported/.test(document.getElementById('autoLabel').textContent));
+          assert.equal(await page.locator('#autoPct').textContent(), '100%');
+          assert.equal(await page.locator('#tipWrite').isDisabled(), false, 'xong thì bấm chạy tiếp được');
+          // Lần chạy 2: Muse chia dở dang → tự «Phân tích tiếp», không cần bấm; rồi hàng đợi dừng giữa chừng → báo rõ, không tự xuất.
+          await page.evaluate(() => { window.analyzeStop = true; });
+          await page.locator('#tipTitle').fill('Cà chua bi');   // tên tiếng Việt
+          const an0 = (await called('storyAnalyze')).length, adds1 = (await called('add')).length, builds1 = (await called('storyBuild')).length;
+          await page.locator('#tipWrite').click();
+          await page.waitForFunction(n => window.calls.filter(c => c.name === 'add').length > n, adds1);
+          await page.evaluate(() => { window.analyzeStop = false; });
+          const analyses = (await called('storyAnalyze')).slice(an0);
+          assert.equal(analyses.length, 2, 'dừng dở thì tự phân tích tiếp đúng một lần');
+          assert.equal(analyses[1].data.resume?.from, 3, 'làm tiếp từ câu Muse đã dừng');
+          assert.equal(analyses[0].data.tipKind, 'plant');
+          const sid2 = (await called('add')).at(-1).data[0].storyId;
+          assert.notEqual(sid2, sid);
+          await page.waitForFunction(() => /Creating images \+ clips/.test(document.getElementById('autoLabel').textContent));
+          await page.evaluate(id => { window.s.active = false; window.s.jobs.filter(j => j.storyId === id).forEach((j, i) => { j.status = i === 0 ? 'completed' : 'failed'; }); window.push(); }, sid2);
+          await page.waitForFunction(() => /The queue stopped with \d+ scene\(s\) unfinished\. Resume the queue, then click Export MP4\./.test(document.getElementById('autoLabel').textContent));
+          assert.equal(await page.locator('#autoText').evaluate(e => e.classList.contains('warn')), true);
+          assert.equal((await called('storyBuild')).length, builds1, 'còn clip chưa xong thì không tự xuất');
+          assert.equal(await page.locator('#tipWrite').isDisabled(), false);
+          page.off('dialog', rec);
+        }
         // Quay lại Mẹo vặt: tiêu đề, độ dài, số giây của Mẹo vặt vẫn còn nguyên.
         await page.locator('#modeTip').click();
         assert.equal(await page.locator('#tipTitleLabel').textContent(), 'What tip do you want to show?');
@@ -517,7 +589,21 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
         assert.match(await page.locator('#storyStyle').getAttribute('placeholder'), /Flat cartoon illustration by default/);
         assert.equal(await page.locator('#tipMore summary').textContent(), 'More options'); assert.equal(await page.locator('#subMore summary').textContent(), 'Subtitle style (font, size, color, position)');
         assert.equal(await page.locator('#tipMotionLabel').evaluate(l => l.hidden), true, 'lịch sử luôn chuyển động nhẹ, prompt tiếng Anh');
-        assert.deepEqual(await page.locator('#tipMinutes option').allTextContents(), ['1 minute', '2 minutes', '3 minutes', '5 minutes', '10 minutes']);
+        assert.deepEqual(await page.locator('#tipMinutes option').allTextContents(), ['1 minute', '2 minutes', '3 minutes', '5 minutes', '10 minutes', '15 minutes', '20 minutes', '30 minutes', '45 minutes', '60 minutes', '90 minutes', '120 minutes', '180 minutes']);
+        // «Kiểu hình» chỉ có ở Lịch sử: hoạt hình phẳng (mặc định) hoặc ảnh phim tư liệu chân thực màu phục chế; đổi kiểu thì ô phong cách và lời giới thiệu đổi theo.
+        assert.equal(await page.locator('#tipLookLabel').isVisible(), true, 'Kiểu hình hiện ở Lịch sử');
+        assert.deepEqual(await page.locator('#tipLook option').allTextContents(), ['Flat cartoon illustration', 'Realistic archival-film look (restored colour)']);
+        assert.equal(await page.locator('#tipLook').inputValue(), 'cartoon', 'mặc định hoạt hình');
+        assert.match(await page.locator('#tipIntro').textContent(), /gets a cartoon illustration/);
+        await page.locator('#tipLook').selectOption('film');
+        assert.match(await page.locator('#storyStyle').getAttribute('placeholder'), /^Realistic archival-film look with restored colour by default/);
+        assert.match(await page.locator('#tipIntro').textContent(), /realistic archival-film picture \(restored colour\)/);
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('museStudio.story')).histTipLook), 'film', 'kiểu hình được nhớ riêng cho Lịch sử');
+        // Lịch sử cho kênh dài: chọn 180 phút (3 giờ) → 1350 cảnh, số lượt Muse hiện đúng; chọn lại 3 phút để các bước sau không đổi.
+        await page.locator('#tipMinutes').selectOption('180');
+        assert.match(await page.locator('#tipCount').textContent(), /^≈ 1350 scenes \(1 intro \+ 1348 parts \+ 1 ending\) = 1350 pictures \+ 1350 clips, each scene narrated for about 8 seconds\. Creating the pictures and clips uses about 2700 Muse generations\.$/);
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('museStudio.story')).histTipMinutes), '180');
+        await page.locator('#tipMinutes').selectOption('3');
         assert.equal(await page.locator('#tipMinutes').inputValue(), '3'); assert.equal(await page.locator('#tipSecs').inputValue(), '8');
         assert.equal(await page.locator('#tipTitle').inputValue(), '', 'tiêu đề lịch sử lưu riêng');
         assert.match(await page.locator('#tipCount').textContent(), /^≈ 23 scenes \(1 intro \+ 21 parts \+ 1 ending\) = 23 pictures \+ 23 clips, each scene narrated for about 8 seconds\. Creating the pictures and clips uses about 46 Muse generations\.$/);
@@ -533,8 +619,10 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
         const histWrite = (await called('storyAdWrite')).at(-1).data;
         assert.deepEqual([histWrite.tip, histWrite.tipKind, histWrite.tipTitle, histWrite.tipMinutes, histWrite.seconds, histWrite.character, histWrite.reference], [true, 'history', 'Lịch sử Việt Nam', 3, 8, 'Cô gái tóc đen búi, áo dài cam', false]);
         assert.equal((await called('storyAnalyze')).at(-1).data.tipKind, 'history');
+        assert.equal(histWrite.histLook, 'film', 'kiểu hình gửi cho Muse khi viết bài');
+        assert.equal((await called('storyAnalyze')).at(-1).data.histLook, 'film', 'và khi chia cảnh');
         assert.equal((await called('storyAnalyze')).at(-1).data.character, 'Cô gái tóc đen búi, áo dài cam');
-        assert.deepEqual(await page.evaluate(() => { const v = JSON.parse(localStorage.getItem('museStudio.story')); return [v.mode, v.histTipTitle, v.plantTipTitle]; }), ['hist', 'Lịch sử Việt Nam', 'Trồng cà chua trong chậu']);
+        assert.deepEqual(await page.evaluate(() => { const v = JSON.parse(localStorage.getItem('museStudio.story')); return [v.mode, v.histTipTitle, v.plantTipTitle]; }), ['hist', 'Lịch sử Việt Nam', 'Cà chua bi']);
         // Ảnh nhân vật dẫn chuyện gắn vào các việc ẢNH (không gắn vào clip: clip làm từ chính ảnh đó).
         await page.locator('#storyRefs').click();
         await page.waitForFunction(() => /mai\.png/.test(document.getElementById('storyRefInfo').textContent));
@@ -545,9 +633,28 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
         assert.deepEqual(histAdd.map(j => [j.phase, j.number, j.dependsOn || '']), [['image', 1, ''], ['image', 2, ''], ['clip', 1, 'image'], ['clip', 2, 'image']]);
         assert.ok(histAdd.slice(0, 2).every(j => j.image === 'C:\\Refs\\mai.png' && j.references.length === 1 && j.references[0] === 'C:\\Refs\\mai.png'), 'việc ảnh mang ảnh nhân vật dẫn chuyện');
         assert.ok(histAdd.slice(2).every(j => !j.references?.length), 'clip không gắn ảnh nhân vật (ảnh do hàng đợi gắn)');
+        // Bài lịch sử dài (hơn 200 cảnh): câu hỏi xác nhận nói rõ Muse có thể chạy nhiều giờ đến nhiều ngày; bài ngắn thì không có câu này.
+        {
+          const asked = []; const rec = d => asked.push(d.message()); page.on('dialog', rec);
+          await page.evaluate(() => { window.sceneCount = 210; document.getElementById('storyPanel').open = true; });   // sau «Thêm vào hàng đợi» mục này tự thu lại
+          const before = (await called('storyAnalyze')).length;
+          await page.locator('#tipWrite').click();
+          await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyAnalyze').length > n && !document.getElementById('storyAnalyze').disabled && document.querySelectorAll('#storyScenes .draftRow').length === 210, before);
+          await page.evaluate(() => { document.getElementById('storyPanel').open = true; });
+          const adds = (await called('add')).length;
+          await page.locator('#storyCreate').click();   // «Tạo ảnh + clip» (chạy ngay) mới hỏi xác nhận
+          await page.waitForFunction(n => window.calls.filter(c => c.name === 'add').length > n, adds);
+          page.off('dialog', rec);
+          const question = asked.find(m => /^Add 210 scenes/.test(m));
+          assert.ok(question, 'có hỏi xác nhận: ' + asked.join(' | '));
+          assert.match(question, /^Add 210 scenes \(210 images \+ 210 clips\) and run now\? Each scene uses 2 Muse generations \(1 image, 1 clip\), so this may use a lot of Muse credits\. This is a long video, so Muse may run for many hours or even days; you can press Stop and continue later\. All images are created first/);
+          assert.equal((await called('add')).at(-1).data.length, 420, '210 ảnh + 210 clip vào hàng đợi');
+          await page.evaluate(() => { window.sceneCount = 0; });
+        }
         await page.evaluate(() => { document.getElementById('storyPanel').open = true; });
         // Về Mẹo vặt: nhân vật, ảnh và tiêu đề của Lịch sử không mang sang.
         await page.locator('#modeTip').click();
+        assert.equal(await page.locator('#tipLookLabel').isVisible(), false, 'Kiểu hình chỉ có ở Lịch sử');
         assert.equal(await page.locator('#storyCharacter').isVisible(), false);
         assert.equal(await page.locator('#tipTitle').inputValue(), '  Mẹo khử mùi tủ lạnh  ');
         assert.equal(await page.locator('#modeHist').getAttribute('aria-pressed'), 'false');
@@ -556,6 +663,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
         await page.locator('#tipWrite').click();
         await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyAnalyze').length > n && !document.getElementById('storyAnalyze').disabled && document.querySelectorAll('#storyScenes .draftRow').length === 2, again);
         assert.equal((await called('storyAdWrite')).at(-1).data.tipKind, 'tip');
+        assert.equal((await called('storyAdWrite')).at(-1).data.histLook, undefined, 'mẹo vặt không gửi kiểu hình');
       }
       // Các tab độc lập: chữ, cảnh, tỉ lệ/nhân vật/phong cách riêng từng tab; Muse chạy ở tab nào thì chỉ tab đó thấy tiến độ và nút Dừng.
       {
