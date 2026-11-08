@@ -45,9 +45,11 @@ class App(tk.Tk):
         self.temp = tempfile.TemporaryDirectory(prefix='CinecodeStudio-'); self.folder = Path(self.temp.name)
         DATA.mkdir(parents=True, exist_ok=True)
         self.model = tk.StringVar(value='gemini-2.5-flash')
+        self.tts_model = tk.StringVar(value='gemini-3.8-flash-tts')
         try:
             settings = json.loads((DATA / 'settings.json').read_text(encoding='utf-8'))
             self.model.set(settings.get('model', self.model.get()))
+            self.tts_model.set(settings.get('ttsModel', self.tts_model.get()))
             if settings.get('key'): self.key = protected_key(settings['key'], True)
         except (OSError, ValueError): pass
         style = ttk.Style(self); style.theme_use('clam')
@@ -183,15 +185,16 @@ class App(tk.Tk):
         if p:self.data[kind]=p;self.refresh()
 
     def settings(self):
-        w=tk.Toplevel(self);w.title('Cài đặt AI');w.geometry('540x260');w.transient(self);w.grab_set()
+        w=tk.Toplevel(self);w.title('Cài đặt AI');w.geometry('540x340');w.transient(self);w.grab_set()
         f=ttk.Frame(w,padding=20);f.pack(fill='both',expand=True)
         ttk.Label(f,text='Khóa Gemini API · chỉ nhập tại đây').pack(anchor='w')
         entry=ttk.Entry(f,show='•');entry.insert(0,self.key);entry.pack(fill='x',pady=8)
         ttk.Label(f,text='Mô hình viết kịch bản').pack(anchor='w');ttk.Entry(f,textvariable=self.model).pack(fill='x',pady=8)
+        ttk.Label(f,text='Mô hình đọc (TTS)').pack(anchor='w');ttk.Entry(f,textvariable=self.tts_model).pack(fill='x',pady=8)
         ttk.Label(f,text='AI gửi nội dung tới Google và dùng hạn mức tài khoản của bạn.\nKhóa được mã hóa theo tài khoản Windows, không ghi vào dự án.',wraplength=480).pack(anchor='w')
         def apply():
             try:
-                self.key=entry.get().strip();settings={'model':self.model.get(),'key':protected_key(self.key) if self.key else ''}
+                self.key=entry.get().strip();settings={'model':self.model.get(),'ttsModel':self.tts_model.get(),'key':protected_key(self.key) if self.key else ''}
                 target=DATA/'settings.json';temp=target.with_suffix('.tmp');temp.write_text(json.dumps(settings),encoding='utf-8');temp.replace(target);w.destroy()
             except OSError as e:messagebox.showerror('Chưa lưu được',str(e),parent=w)
         ttk.Button(f,text='Lưu cài đặt',command=apply).pack(anchor='e',pady=10)
@@ -240,7 +243,7 @@ class App(tk.Tk):
         if not any(s['narration'].strip() for s in self.data['scenes']):messagebox.showinfo('Chưa có lời đọc','Điền lời đọc cho các cảnh trước.');return
         path=filedialog.asksaveasfilename(defaultextension='.wav',initialfile='Loi-doc.wav',filetypes=[('WAV','*.wav')])
         if not path:return
-        snapshot=core.validate(self.data);key=self.key
+        snapshot=core.validate(self.data);key=self.key;tts_model=self.tts_model.get()
         def task():
             # One recording per scene; extend its timing if the spoken line is longer.
             chunks=[]
@@ -248,7 +251,7 @@ class App(tk.Tk):
                 if self.cancel.is_set():raise RuntimeError('Đã hủy tạo lời đọc.')
                 self.events.put(('status',f'Đang tạo lời đọc cảnh {i+1}/{len(snapshot["scenes"])}…'))
                 if s['narration'].strip():
-                    part=self.folder/f'voice-{i}.wav';length=core.synthesize(key,s['narration'],part,language=snapshot['narrationLanguage'])
+                    part=self.folder/f'voice-{i}.wav';length=core.synthesize(key,s['narration'],part,language=snapshot['narrationLanguage'],model=tts_model)
                     import wave
                     with wave.open(str(part),'rb') as w:pcm=w.readframes(w.getnframes())
                     s['duration']=max(s['duration'],length+.3)

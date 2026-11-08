@@ -16,6 +16,10 @@ VERSION = '0.1.0'
 STYLES = {'Điện ảnh': ['#091321', '#67e8d2'], 'Ấm áp': ['#261b22', '#ffc58e'],
           'Giải thích': ['#101832', '#a0b5ff']}
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
 def validate(data):
     if not isinstance(data, dict) or not isinstance(data.get('scenes'), list):
         raise ValueError('Kịch bản phải có danh sách scenes.')
@@ -44,16 +48,17 @@ def parse_ai(text):
         text = text.split('\n', 1)[1].rsplit('```', 1)[0]
     return validate(json.loads(text))
 
-def request_ai(key, model, body):
+def request_ai(key, model, body, interactions=False):
     # The key never appears in a URL, a project file, or diagnostic logs.
     if not key.strip():
         raise ValueError('Nhập khóa Gemini trong Cài đặt AI trước.')
     if not model or any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._' for c in model):
         raise ValueError('Tên mô hình không hợp lệ.')
-    req = urllib.request.Request('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent',
+    endpoint = 'interactions' if interactions else 'models/' + model + ':generateContent'
+    req = urllib.request.Request('https://generativelanguage.googleapis.com/v1beta/' + endpoint,
           data=json.dumps(body).encode(), headers={'Content-Type': 'application/json', 'x-goog-api-key': key.strip()})
     try:
-        with urllib.request.urlopen(req, timeout=180) as r:
+        with urllib.request.build_opener(NoRedirect).open(req, timeout=180) as r:
             return json.load(r)
     except urllib.error.HTTPError as e:
         # Provider response bodies can echo request data; keep the error message bounded and private.
@@ -74,8 +79,24 @@ def generate(key, model, brief, duration, style, ratio, language='Tiếng Việt
     data.update(style=style, ratio=ratio, narrationLanguage=language)
     return data
 
-def synthesize(key, text, path, voice='Kore', language='Tiếng Việt'):
-    r = request_ai(key, 'gemini-2.5-flash-preview-tts', {
+def synthesize(key, text, path, voice='Kore', language='Tiếng Việt', model='gemini-3.8-flash-tts'):
+    instruction = 'Read naturally and clearly in English.' if language == 'English' else 'Đọc tiếng Việt tự nhiên, rõ ràng.'
+    if not model.startswith('gemini-2.5-'):
+        r = request_ai(key, model, {'model': model, 'input': [{'type': 'user_input', 'content': [
+            {'type': 'text', 'text': text, 'annotations': [{'type': 'speech_metadata', 'style': instruction}]}]}],
+            'response_format': {'type': 'audio'}, 'generation_config': {'speech_config': [{'voice': voice}]}}, interactions=True)
+        blocks = [c for step in r.get('steps', []) if step.get('type') == 'model_output'
+                  for c in step.get('content', []) if c.get('type') == 'audio']
+        if not blocks: raise ValueError('Gemini chưa trả âm thanh. Kiểm tra mô hình TTS và quyền truy cập.')
+        audio = base64.b64decode(blocks[-1]['data'], validate=True)
+        ffmpeg = executable('ffmpeg')
+        if not ffmpeg: raise RuntimeError('Thiếu FFmpeg để xử lý lời đọc.')
+        p = subprocess.run([ffmpeg, '-hide_banner', '-loglevel', 'error', '-y', '-i', 'pipe:0',
+                            '-ac', '1', '-ar', '24000', '-c:a', 'pcm_s16le', str(path)],
+                           input=audio, capture_output=True, creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        if p.returncode: raise ValueError('Không giải mã được lời đọc từ Gemini.')
+        with wave.open(str(path),'rb') as w: return w.getnframes()/w.getframerate()
+    r = request_ai(key, model, {
         'contents': [{'parts': [{'text': ('Read naturally and clearly in English:\n' if language == 'English'
                                         else 'Đọc tiếng Việt tự nhiên, rõ ràng:\n') + text}]}],
         'generationConfig': {'responseModalities': ['AUDIO'], 'speechConfig': {

@@ -1,8 +1,11 @@
 import json
+import base64
+import io
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+import wave
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import core
@@ -42,5 +45,20 @@ class CoreTests(unittest.TestCase):
             data=core.generate('secret','gemini-2.5-flash','A calm morning',30,'Điện ảnh','16:9','English')
             self.assertEqual(core.validate(data)['narrationLanguage'],'English')
             self.assertIn('narration bằng English',request.call_args.args[2]['contents'][0]['parts'][0]['text'])
+
+    def test_tts_audio_and_english_instruction(self):
+        buffer=io.BytesIO()
+        with wave.open(buffer,'wb') as w:
+            w.setnchannels(1);w.setsampwidth(2);w.setframerate(24000);w.writeframes(b'\0'*4800)
+        reply={'steps':[{'type':'model_output','content':[{'type':'audio','data':base64.b64encode(buffer.getvalue()).decode()}]}]}
+        with tempfile.TemporaryDirectory() as td,patch.object(core,'request_ai',return_value=reply) as request:
+            duration=core.synthesize('secret','Hello',Path(td)/'voice.wav',language='English')
+            self.assertAlmostEqual(duration,.1)
+            self.assertTrue(request.call_args.kwargs['interactions'])
+            self.assertIn('English',request.call_args.args[2]['input'][0]['content'][0]['annotations'][0]['style'])
+        reply={'candidates':[{'content':{'parts':[{'inlineData':{'mimeType':'audio/L16;codec=pcm;rate=24000','data':base64.b64encode(b'\0'*4800).decode()}}]}}]}
+        with tempfile.TemporaryDirectory() as td,patch.object(core,'request_ai',return_value=reply) as request:
+            self.assertAlmostEqual(core.synthesize('secret','Hello',Path(td)/'voice.wav',language='English',model='gemini-2.5-flash-preview-tts'),.1)
+            self.assertIn('English',request.call_args.args[2]['contents'][0]['parts'][0]['text'])
 
 if __name__=='__main__':unittest.main()
