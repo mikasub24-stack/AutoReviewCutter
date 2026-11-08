@@ -142,6 +142,10 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.6.10
+
+- **Âm gốc của clip mặc định TẮT.** Ô «Tiếng động gốc của clip» giờ mặc định là «Tắt»: video xuất ra chỉ có giọng kể, không còn tiếng động / nhạc / giọng lẫn trong clip Muse. Lựa chọn «Nhỏ» đã lưu từ bản cũ không còn được giữ (đổi sang khóa lưu mới) nên mọi máy đều về «Tắt»; muốn có lại âm gốc thì chọn «Nhỏ» (thấp hơn giọng kể 20 dB) hoặc «Trung bình» (12 dB). Cảnh không có giọng kể cũng im theo «Tắt».
+
 ## Update 1.6.9
 
 - **Âm thanh gốc của clip giờ thật sự nhỏ hơn giọng kể.** Trước 1.6.8: «Nhỏ» chỉ nhân âm gốc với 0,25 so với CHÍNH clip đó; clip Muse to hơn giọng đọc thì vẫn át/ngang lời kể. Giờ khi xuất, app đo độ to (LUFS) của giọng đọc và của âm gốc từng cảnh rồi hạ âm gốc xuống THẤP HƠN giọng kể một mức cố định: **Nhỏ = 20 dB** (gần như chỉ còn nền), **Trung bình = 12 dB**, **Tắt** = không có âm gốc. Không bao giờ khuếch đại clip (clip vốn đã nhỏ hơn mức này thì giữ nguyên). Cảnh không có giọng kể vẫn giữ âm gốc như cũ; không đo được thì dùng tỉ lệ cũ (0,25 / 0,5).

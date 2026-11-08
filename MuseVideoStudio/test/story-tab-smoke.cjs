@@ -259,6 +259,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.locator('#storyExport').isDisabled(), true);
     assert.match(await page.locator('#storyStatus').textContent(), /Còn 1 cảnh chưa có clip/);
     await page.evaluate(() => { window.s.jobs.find(j => j.id === 'story2').status = 'completed'; window.push(); });
+    assert.equal(await page.locator('#storySfx').inputValue(), 'off', 'âm gốc của clip mặc định TẮT (kể cả máy từng lưu «Nhỏ»: khóa lưu mới)');
     await page.locator('#subSrt').check(); await page.locator('#storySfx').selectOption('mid'); await page.locator('#storyName').fill('Cô bé Mai');
     await page.locator('#storyExport').click();
     await page.waitForFunction(() => window.calls.some(c => c.name === 'storyBuild'));

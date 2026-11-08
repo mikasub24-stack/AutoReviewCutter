@@ -67,7 +67,7 @@ function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async
   }
 
   // Bước 2: nhận ảnh phụ đề từ giao diện rồi ghép MP4.
-  function build({ runId, name, aspect = '16:9', subtitles = true, srt = false, sfx = 'low', scenes = [] }) {
+  function build({ runId, name, aspect = '16:9', subtitles = true, srt = false, sfx = 'off', scenes = [] }) {
     return guard(async signal => {
       await ensureAllowed();
       if (!prepared || prepared.runId !== runId) throw Error('Phiên chuẩn bị đã hết hạn. Bấm Xuất MP4 lại.');

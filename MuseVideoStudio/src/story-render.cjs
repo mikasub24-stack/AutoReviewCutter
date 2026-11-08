@@ -73,7 +73,7 @@ async function loudness(ffmpeg, file, signal) {
 
 // Hệ số âm lượng (tuyến tính, 0..1) cho tiếng động gốc dưới giọng kể. Không bao giờ khuếch đại clip.
 function sfxGain(level, voiceLufs, clipLufs) {
-  const fixed = SFX[level] ?? SFX.low;
+  const fixed = SFX[level] ?? 0;
   if (!(fixed > 0)) return 0;
   const below = SFX_BELOW[level];
   if (!below || !Number.isFinite(voiceLufs) || !Number.isFinite(clipLufs)) return fixed;
@@ -193,14 +193,14 @@ async function freeName(dir, base, extension) {
 }
 
 // scenes: [{ clip, voice|null, chunks:[{text,start,end,png|null}] }]
-async function assembleStory({ scenes, dir, name = 'Ke-chuyen', ffmpeg = 'ffmpeg', aspect = '16:9', subtitles = true, srt = false, sfx = 'low', onProgress = () => {}, signal, cores }) {
+async function assembleStory({ scenes, dir, name = 'Ke-chuyen', ffmpeg = 'ffmpeg', aspect = '16:9', subtitles = true, srt = false, sfx = 'off', onProgress = () => {}, signal, cores }) {
   if (!Array.isArray(scenes) || !scenes.length) throw Error('Chưa có cảnh nào để ghép.');
   const { width, height } = dimensions(aspect);
   const t = await checkTools(ffmpeg);
   await fs.mkdir(dir, { recursive: true });
   const temp = await fs.mkdtemp(path.join(dir, '.story-'));
   try {
-    const sfxVolume = SFX[sfx] ?? SFX.low;
+    const sfxVolume = SFX[sfx] ?? 0;
     const { workers, threads } = parallelism(cores);
     onProgress('Đang đọc thông tin các cảnh…');
     // 1. Đo từng cảnh để biết độ dài chính xác (song song).
