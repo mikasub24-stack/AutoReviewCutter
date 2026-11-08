@@ -34,6 +34,7 @@ def validate(data):
               'style': data.get('style') if data.get('style') in STYLES else 'Điện ảnh',
               'ratio': data.get('ratio') if data.get('ratio') in ('16:9', '9:16', '1:1') else '16:9',
               'narrationLanguage': 'English' if data.get('narrationLanguage') == 'English' else 'Tiếng Việt',
+              'videoLanguage': 'English' if data.get('videoLanguage',data.get('narrationLanguage')) == 'English' else 'Tiếng Việt',
               'music': str(data.get('music', '')), 'voice': str(data.get('voice', '')), 'scenes': []}
     for scene in data['scenes']:
         if not isinstance(scene, dict):
@@ -158,13 +159,15 @@ def generate(key, model, brief, duration, style, ratio, language='Tiếng Việt
         budget = min(8, max(3, math.ceil(seconds / 15)))
         if status: status(f'Đang viết phần {part+1}/{parts} · {seconds} giây…')
         context = json.dumps(scenes[-2:], ensure_ascii=False)
-        prompt = ('Bạn là biên kịch video tiếng Việt. Chỉ trả JSON với title và scenes. '
+        prompt = ('Bạn là biên kịch video. Chỉ trả JSON với title và scenes. '
                   'Mỗi scene có title (ngắn), text (tối đa 20 từ), narration (lời đọc theo ngôn ngữ yêu cầu), duration (1-60 giây). '
                   f'Đây là phần {part+1}/{parts} của video tổng {duration} giây. Phần này dài {seconds} giây, '
                   f'viết từ 3 đến {budget} cảnh. Đây là phim chữ/ảnh với chuyển động đồ họa, '
                   'không tự tạo footage người thật. Không bịa nguồn hay sự kiện. '
                   'Chỉ mở đầu ở phần đầu, chỉ kết luận ở phần cuối; các phần giữa nối tiếp nội dung, không nhắc lại. '
-                  'Viết narration bằng ' + language + '. Độ dài lời đọc phù hợp từng cảnh. Nội dung yêu cầu:\n' + brief +
+                  'Viết title, text và narration bằng ' + language + ', kể cả tiêu đề toàn video. '
+                  'Không trộn hai ngôn ngữ, dù ý tưởng đầu vào dùng ngôn ngữ khác. '
+                  'Độ dài lời đọc phù hợp từng cảnh. Nội dung yêu cầu:\n' + brief +
                   '\nHai cảnh cuối phần trước (nếu có):\n' + context)
         r = request_ai(key, model, {'contents': [{'parts': [{'text': prompt}]}],
                       'generationConfig': {'responseMimeType': 'application/json'}}, cancelled=cancelled, status=status)
@@ -176,7 +179,7 @@ def generate(key, model, brief, duration, style, ratio, language='Tiếng Việt
         fit_duration(data['scenes'], seconds)
         if part == 0: title = data['title']
         scenes.extend(data['scenes'])
-    return validate(dict(title=title, scenes=scenes, style=style, ratio=ratio, narrationLanguage=language))
+    return validate(dict(title=title, scenes=scenes, style=style, ratio=ratio, narrationLanguage=language,videoLanguage=language))
 
 def synthesize(key, text, path, voice='Kore', language='Tiếng Việt', model='gemini-3.8-flash-tts', cancelled=None, status=None):
     instruction = 'Read naturally and clearly in English.' if language == 'English' else 'Đọc tiếng Việt tự nhiên, rõ ràng.'

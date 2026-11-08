@@ -54,7 +54,12 @@ class CoreTests(unittest.TestCase):
         with patch.object(core,'request_ai',return_value={'candidates':[{'content':{'parts':[{'text':json.dumps(core.demo())}]}}]}) as request:
             data=core.generate('secret','gemini-2.5-flash','A calm morning',30,'Điện ảnh','16:9','English')
             self.assertEqual(core.validate(data)['narrationLanguage'],'English')
+            self.assertEqual(core.validate(data)['videoLanguage'],'English')
             self.assertIn('narration bằng English',request.call_args.args[2]['contents'][0]['parts'][0]['text'])
+            self.assertIn('Viết title, text và narration',request.call_args.args[2]['contents'][0]['parts'][0]['text'])
+            with tempfile.TemporaryDirectory() as td:
+                p=Path(td)/'English.cinecode.json';core.save_project(p,data)
+                self.assertEqual(core.load_project(p)['videoLanguage'],'English')
 
     def test_tts_audio_and_english_instruction(self):
         buffer=io.BytesIO()

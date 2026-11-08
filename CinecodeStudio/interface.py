@@ -32,7 +32,11 @@ def build(a):
     page=ctk.CTkScrollableFrame(a,fg_color=BG,corner_radius=0,scrollbar_button_color='#2b415d')
     page.grid(row=1,column=0,sticky='nsew',padx=16);page.grid_columnconfigure(0,weight=1)
     ideas=frame(page);ideas.grid(row=0,column=0,sticky='ew',padx=4,pady=(0,12))
-    label(ideas,'01   Ý TƯỞNG VIDEO',text_color=ACCENT,font=('Segoe UI',13,'bold')).pack(anchor='w',padx=18,pady=(12,4))
+    idea_header=ctk.CTkFrame(ideas,fg_color='transparent');idea_header.pack(fill='x',padx=18,pady=(12,6))
+    label(idea_header,'01   Ý TƯỞNG VIDEO',text_color=ACCENT,font=('Segoe UI',13,'bold')).pack(side='left')
+    a.language=tk.StringVar(value=a.data['videoLanguage'])
+    combo(idea_header,a.language,['Tiếng Việt','English'],125).pack(side='right')
+    label(idea_header,'Ngôn ngữ video').pack(side='right',padx=(0,10))
     a.brief=a.text(ideas,height=68);a.brief.pack(fill='x',padx=16,pady=(0,10))
     a.brief.insert('1.0','Làm video về việc sống chậm lại, nhẹ nhàng và tích cực.')
     opts=ctk.CTkFrame(ideas,fg_color='transparent');opts.pack(fill='x',padx=18,pady=(0,14))
@@ -81,8 +85,7 @@ def build(a):
     audio=ctk.CTkFrame(sound,fg_color='transparent');audio.pack(fill='x',padx=18)
     for text,fn in [('Thêm nhạc',lambda:a.audio('music')),('Thêm lời đọc',lambda:a.audio('voice')),('AI tạo lời đọc',a.tts),('Bỏ âm thanh',a.clear_audio)]:
         a.button(audio,text,fn,width=122).pack(side='left',padx=(0,8))
-    a.language=tk.StringVar(value=a.data['narrationLanguage'])
-    label(audio,'Ngôn ngữ').pack(side='left',padx=(12,8));combo(audio,a.language,['Tiếng Việt','English'],125).pack(side='left')
+    label(audio,'Lời đọc theo ngôn ngữ video đã chọn',font=('Segoe UI',12)).pack(side='left',padx=(12,0))
     a.audio_label=tk.StringVar();label(sound,textvariable=a.audio_label,font=('Segoe UI',12)).pack(anchor='w',padx=18,pady=(6,12))
 
     footer=frame(a);footer.grid(row=2,column=0,sticky='ew',padx=24,pady=(10,18))

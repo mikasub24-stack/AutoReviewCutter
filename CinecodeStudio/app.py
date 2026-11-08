@@ -75,7 +75,7 @@ class App(ctk.CTk):
         s = self.data['scenes'][self.current]
         candidate = dict(s, title=self.title_var.get(), text=self.caption.get('1.0','end').strip(),
                          narration=self.narration.get('1.0','end').strip(), duration=float(self.seconds.get()))
-        data = dict(self.data, scenes=list(self.data['scenes']), style=self.style.get(), ratio=self.ratio.get(), narrationLanguage=self.language.get())
+        data = dict(self.data, scenes=list(self.data['scenes']), style=self.style.get(), ratio=self.ratio.get(), narrationLanguage=self.language.get(),videoLanguage=self.language.get())
         data['scenes'][self.current] = candidate
         self.data = core.validate(data)
 
@@ -101,14 +101,14 @@ class App(ctk.CTk):
 
     def new(self):
         if not messagebox.askyesno('Dự án mới','Tạo dự án mẫu mới? Hãy lưu dự án đang chỉnh trước.'):return
-        self.reset_output(); self.data=core.demo(); self.path=None; self.current=0; self.style.set(self.data['style']); self.ratio.set(self.data['ratio']); self.language.set(self.data['narrationLanguage']); self.refresh(); self.load_scene()
+        self.reset_output(); self.data=core.demo(); self.path=None; self.current=0; self.style.set(self.data['style']); self.ratio.set(self.data['ratio']); self.language.set(self.data['videoLanguage']); self.refresh(); self.load_scene()
 
     def open(self):
         p=filedialog.askopenfilename(filetypes=[('Dự án Cinecode','*.cinecode.json'),('JSON','*.json')])
         if not p:return
         try:
             loaded=core.load_project(p); self.reset_output(); self.data=loaded; self.path=Path(p); self.current=0
-            self.style.set(self.data['style']); self.ratio.set(self.data['ratio']); self.language.set(self.data['narrationLanguage']); self.refresh(); self.load_scene()
+            self.style.set(self.data['style']); self.ratio.set(self.data['ratio']); self.language.set(self.data['videoLanguage']); self.refresh(); self.load_scene()
         except (OSError,ValueError) as e:messagebox.showerror('Không mở được',str(e))
 
     def save(self):
