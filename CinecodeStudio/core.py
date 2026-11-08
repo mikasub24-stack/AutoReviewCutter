@@ -61,7 +61,7 @@ def request_ai(key, model, body):
 
 def generate(key, model, brief, duration, style, ratio, language='Tiếng Việt'):
     prompt = ('Bạn là biên kịch video tiếng Việt. Chỉ trả JSON với title và scenes. '
-              'Mỗi scene có title (ngắn), text (tối đa 20 từ), narration (lời đọc tiếng Việt), duration (1-60 giây). '
+              'Mỗi scene có title (ngắn), text (tối đa 20 từ), narration (lời đọc theo ngôn ngữ yêu cầu), duration (1-60 giây). '
               'Tổng duration đúng ' + str(duration) + ' giây, 3-12 cảnh. Đây là phim chữ/ảnh với chuyển động đồ họa, '
               'không tự tạo footage người thật. Không bịa nguồn hay sự kiện. '
               'Viết narration bằng ' + language + '. Nội dung yêu cầu:\n' + brief)
@@ -165,7 +165,7 @@ def render(data, folder, output, cancelled, status=lambda s: None):
     picture = folder / 'picture.mp4'
     status('Đang dựng khung hình… Có thể mất vài phút.')
     command = [node, str(ROOT / 'vendor/capture.mjs'), '--url', str(html), '--video', str(picture),
-               '--status', str(folder / 'progress.json'), '--workers', '1']
+               '--status', str(folder / 'progress.json'), '--workers', '1', '--format', 'jpeg']
     if os.environ.get('CINECODE_CAPTURE_FLAGS'): command += ['--flags', os.environ['CINECODE_CAPTURE_FLAGS']]
     run_command(command, folder / 'render.log', cancelled)
     status('Đang ghép âm thanh và hoàn thiện…')

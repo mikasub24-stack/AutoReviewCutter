@@ -7,9 +7,16 @@ import subprocess
 import sys
 import tempfile
 import threading
+import traceback
 import wave
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import core
+
+def report_error(kind, value, tb):
+    detail=''.join(traceback.format_exception(kind,value,tb))
+    print('::error title=Cinecode real render::'+detail.replace('%','%25').replace('\r','%0D').replace('\n','%0A'),flush=True)
+    sys.__excepthook__(kind,value,tb)
+sys.excepthook=report_error
 
 with tempfile.TemporaryDirectory(prefix='cinecode-tiếng-Việt-') as td:
     folder=Path(td);data=core.demo();data['scenes']=data['scenes'][:1];data['scenes'][0]['duration']=1
