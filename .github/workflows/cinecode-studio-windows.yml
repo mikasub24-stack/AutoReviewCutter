@@ -13,6 +13,9 @@ jobs:
   windows:
     runs-on: windows-latest
     timeout-minutes: 25
+    env:
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: utf-8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -50,8 +53,12 @@ jobs:
           if ($LASTEXITCODE) { throw 'Core tests failed' }
           python CinecodeStudio/app.py --smoke-test
           if ($LASTEXITCODE) { throw 'GUI test failed' }
-          python CinecodeStudio/tests/render_smoke.py
-          if ($LASTEXITCODE) { throw 'Real render test failed' }
+          python CinecodeStudio/tests/render_smoke.py 2>&1 | Tee-Object -Variable renderOutput
+          if ($LASTEXITCODE) {
+            $detail = ($renderOutput | Out-String).Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Host "::error title=Cinecode render output::$detail"
+            throw 'Real render test failed'
+          }
           python -m PyInstaller --noconfirm --windowed --name CinecodeStudio --icon CinecodeStudio/icon.ico --distpath CinecodeStudio/build --workpath CinecodeStudio/pybuild --specpath . --add-data 'CinecodeStudio/icon.ico;.' --add-data 'CinecodeStudio/film.html;.' --add-data 'CinecodeStudio/vendor;vendor' --add-data 'CinecodeStudio/runtime;runtime' CinecodeStudio/app.py
           if ($LASTEXITCODE) { throw 'Packaging failed' }
           Copy-Item CinecodeStudio/README.vi.md,CinecodeStudio/THIRD-PARTY.md CinecodeStudio/build/CinecodeStudio/
