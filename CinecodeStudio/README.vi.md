@@ -1,13 +1,20 @@
-# Cinecode Studio 0.1.2
+# Cinecode Studio 0.1.3
 
 Ứng dụng Windows 10/11 x64 có giao diện tiếng Việt, dùng bộ xuất khung hình Cinecode của sarpstar. Bản đầu dựng phim ngắn chữ/ảnh và motion graphics với ba bảng màu, chưa có trình dựng nhân vật 3D hoặc toàn bộ quy trình agent của Cinecode.
 
-## 0.1.2 · Video 10 phút, chọn model và lỗi Gemini
+## 0.1.3 · Video 10 phút, chọn model và lỗi Gemini
 
 - Chọn nhanh 600 giây; AI viết theo từng phần tối đa 120 giây, nối ngữ cảnh, tối đa 40 cảnh. Tổng thời lượng được căn theo khung hình về đúng lựa chọn. Tạo lời đọc có thể kéo dài cảnh: nếu tổng vượt 10 phút, app yêu cầu rút gọn thay vì cắt mất nội dung.
 - Cài đặt AI có hộp chọn model viết/model đọc (vẫn gõ tên được) và nút lấy danh sách từ Google. Danh sách không bảo đảm tài khoản có hạn mức dùng từng model.
 - HTTP 503/500/502/504 hoặc giới hạn tạm thời 429 được thử tối đa 3 lần; hiện thời gian chờ, tôn trọng Retry-After ngắn và cho hủy trong lúc chờ. Không thử lại lỗi khóa/quyền/model hoặc hết hạn mức ngày. Không đổi model âm thầm.
 - Hiện thông báo cụ thể từ Google (đã ẩn khóa), giữ nguyên kịch bản khi yêu cầu thất bại. Không cam kết retry sẽ xử lý được gián đoạn dịch vụ kéo dài.
+
+## 0.1.3 · Hủy yêu cầu đang chờ, thử model và làm video tự động
+
+- **Hủy** dừng cả tiến trình đang chờ phản hồi HTTP, không phải đợi timeout. App giữ nguyên dự án đang mở và không áp dụng kết quả đến sau khi hủy. Yêu cầu Google đã nhận có thể vẫn được dịch vụ xử lý/tính hạn mức; hủy ở app không thu hồi được yêu cầu đã tới máy chủ.
+- **Cài đặt AI → Kiểm tra model viết / Kiểm tra model đọc** gửi một yêu cầu nhỏ thật theo đúng chế độ app dùng. Chỉ báo dùng được sau khi nhận JSON hợp lệ/âm thanh giải mã được; 503/429/quyền/model không tồn tại có trạng thái riêng. Model chưa thử ghi rõ chưa kiểm tra. Kết quả ghi giờ thử và gắn với khóa đang nhập, chỉ lưu trong phiên vì quyền/hạn mức có thể thay đổi.
+- **Tạo video tự động**: dán tiêu đề hoặc kịch bản, chọn Việt/Anh và thời lượng, chọn nơi lưu MP4 một lần. App viết cảnh, tạo lời đọc, dựng Canvas 2D rồi ghép MP4. Nhạc đã chọn được dùng lại nếu có. Ảnh/nền chuyển động vẫn là engine tích hợp; không tự tạo footage người thật.
+- Dự án, lời đọc và nội dung đầu vào được lưu trong thư mục dự án cạnh MP4. Nếu Google từ chối hoặc model không hoạt động, quy trình dừng với lỗi cụ thể; không hứa hoàn tất khi dịch vụ AI gián đoạn.
 
 ## Video tiếng Anh
 

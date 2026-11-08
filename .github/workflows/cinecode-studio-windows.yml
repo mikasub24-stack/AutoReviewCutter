@@ -30,6 +30,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
           Start-Transcript -Path "$env:RUNNER_TEMP/cinecode-build.log" | Out-Null
           trap {
+            if ($env:CINECODE_SMOKE_REPORT -and (Test-Path $env:CINECODE_SMOKE_REPORT)) {
+              $smoke = (Get-Content $env:CINECODE_SMOKE_REPORT -Raw).Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+              Write-Host "::error title=Cinecode app smoke report::$smoke"
+            }
             $exception = ($_ | Out-String) + $_.ScriptStackTrace
             $exception = $exception.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
             Write-Host "::error title=Cinecode exception::$exception"
@@ -53,6 +57,7 @@ jobs:
           python -m unittest discover -s CinecodeStudio/tests -v
           if ($LASTEXITCODE) { throw 'Core tests failed' }
           $env:CINECODE_SCREENSHOT = Join-Path (Get-Location) 'dist-cinecode/UI-Preview.png'
+          $env:CINECODE_SMOKE_REPORT = Join-Path (Get-Location) 'dist-cinecode/SmokeTest.json'
           python CinecodeStudio/app.py --smoke-test
           if ($LASTEXITCODE) { throw 'GUI test failed' }
           python CinecodeStudio/tests/render_smoke.py 2>&1 | Tee-Object -Variable renderOutput
@@ -69,7 +74,7 @@ jobs:
           & 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe' CinecodeStudio/installer.iss
           if ($LASTEXITCODE) { throw 'Installer failed' }
           $install = Join-Path $env:RUNNER_TEMP 'Cinecode-installed'
-          $p = Start-Process dist-cinecode/CinecodeStudio-0.1.2-Setup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
+          $p = Start-Process dist-cinecode/CinecodeStudio-0.1.3-Setup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
           if ($p.ExitCode) { throw 'Installation failed' }
           $p = Start-Process "$install/CinecodeStudio.exe" -ArgumentList '--smoke-test' -Wait -PassThru
           if ($p.ExitCode) { throw 'Installed GUI failed' }
@@ -78,6 +83,6 @@ jobs:
           'Core, GUI, real Chromium/FFmpeg render, deterministic frame, packaged GUI and installed GUI checks passed.' | Out-File $env:GITHUB_STEP_SUMMARY -Append
       - uses: actions/upload-artifact@v4
         with:
-          name: CinecodeStudio-0.1.2-Installer
+          name: CinecodeStudio-0.1.3-Installer
           path: dist-cinecode/*
           if-no-files-found: error

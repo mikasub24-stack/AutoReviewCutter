@@ -15,15 +15,19 @@ from email.utils import parsedate_to_datetime
 from datetime import datetime, timezone
 import urllib.request
 import wave
+import network
+
+TaskCancelled = network.Cancelled
+_perform_request = network.perform
+
+class ApiError(RuntimeError):
+    def __init__(self, message, code=None):
+        super().__init__(message);self.code=code
 
 ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).parent))
-VERSION = '0.1.2'
+VERSION = '0.1.3'
 STYLES = {'Điện ảnh': ['#091321', '#67e8d2'], 'Ấm áp': ['#261b22', '#ffc58e'],
           'Giải thích': ['#101832', '#a0b5ff']}
-
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *args, **kwargs):
-        return None
 
 def validate(data):
     if not isinstance(data, dict) or not isinstance(data.get('scenes'), list):
@@ -90,7 +94,7 @@ def service_error(error, key):
     if message: detail += '\nGoogle: ' + message
     return detail, delay, daily
 
-def request_ai(key, model, body, interactions=False, cancelled=None, status=None, catalog=False):
+def request_ai(key, model, body, interactions=False, cancelled=None, status=None, catalog=False, attempts=3):
     # The key never appears in a URL, a project file, or diagnostic logs.
     if not key.strip():
         raise ValueError('Nhập khóa Gemini trong Cài đặt AI trước.')
@@ -99,29 +103,27 @@ def request_ai(key, model, body, interactions=False, cancelled=None, status=None
     endpoint = 'models?pageSize=1000' if catalog else 'interactions' if interactions else 'models/' + model + ':generateContent'
     req = urllib.request.Request('https://generativelanguage.googleapis.com/v1beta/' + endpoint,
           data=None if catalog else json.dumps(body).encode(), headers={'Content-Type': 'application/json', 'x-goog-api-key': key.strip()})
-    opener = urllib.request.build_opener(NoRedirect)
-    for attempt in range(3):
-        if cancelled is not None and cancelled.is_set(): raise RuntimeError('Đã hủy tác vụ AI.')
+    for attempt in range(attempts):
+        if cancelled is not None and cancelled.is_set(): raise TaskCancelled('Đã hủy tác vụ AI.')
         try:
-            with opener.open(req, timeout=180) as r:
-                return json.load(r)
+            return _perform_request(req,cancelled)
         except urllib.error.HTTPError as e:
             detail, retry_after, daily = service_error(e, key)
             e.close()
             retryable = e.code in (429, 500, 502, 503, 504) and not daily
             delay = max((2, 5, 10)[attempt], retry_after)
-            if retryable and attempt < 2 and delay <= 25:
+            if retryable and attempt < attempts-1 and delay <= 25:
                 if status: status(f'Gemini HTTP {e.code} · chờ {math.ceil(delay)} giây, thử lại lần {attempt+2}/3…')
                 if cancelled is not None:
-                    if cancelled.wait(delay): raise RuntimeError('Đã hủy tác vụ AI.') from None
+                    if cancelled.wait(delay): raise TaskCancelled('Đã hủy tác vụ AI.') from None
                 else: time.sleep(delay)
                 continue
-            if retryable:
+            if retryable and attempts>1:
                 detail += ('\nĐã thử tối đa 3 lần. Hãy thử lại sau; app giữ nguyên kịch bản hiện tại.'
                            if attempt == 2 else f'\nGoogle yêu cầu chờ {math.ceil(delay)} giây. Hãy thử lại sau thời gian này.')
-            raise RuntimeError(detail + '\nMô hình: ' + model) from None
+            raise ApiError(detail + '\nMô hình: ' + model,e.code) from None
         except urllib.error.URLError:
-            raise RuntimeError('Không kết nối được Gemini. Kiểm tra mạng, proxy hoặc chứng chỉ. App không tự gửi lại yêu cầu khi chưa rõ kết quả.') from None
+            raise ApiError('Không kết nối được Gemini hoặc yêu cầu đã quá thời gian chờ. Kiểm tra mạng, proxy hoặc chứng chỉ. App không tự gửi lại khi chưa rõ kết quả.') from None
 
 def list_models(key, cancelled=None, status=None):
     result = request_ai(key, 'models', {}, catalog=True, cancelled=cancelled, status=status)
@@ -133,6 +135,33 @@ def list_models(key, cancelled=None, status=None):
         elif 'generateContent' in item.get('supportedGenerationMethods', []): text.append(name)
     if not text and not tts: raise ValueError('Google chưa trả model phù hợp. Bạn vẫn có thể nhập tên model thủ công.')
     return sorted(set(text)), sorted(set(tts))
+
+def check_model(key, model, kind, cancelled=None):
+    """A real, small request. A catalog listing alone never marks a model ready."""
+    try:
+        if kind=='text':
+            result=request_ai(key,model,{'contents':[{'parts':[{'text':'Return only this JSON: {"ok":true}'}]}],
+                'generationConfig':{'responseMimeType':'application/json','maxOutputTokens':1024}},
+                cancelled=cancelled,attempts=1)
+            text=''.join(p.get('text','') for c in result.get('candidates',[]) for p in c.get('content',{}).get('parts',[]) if not p.get('thought'))
+            parsed=json.loads(text)
+            if not isinstance(parsed,dict) or parsed.get('ok') is not True:raise ValueError('Model chưa trả đúng nội dung JSON thử.')
+        elif kind=='tts':
+            with tempfile.TemporaryDirectory(prefix='cinecode-model-test-') as td:
+                duration=synthesize(key,'Xin chào.',Path(td)/'test.wav',model=model,cancelled=cancelled,attempts=1)
+                if duration<=0:raise ValueError('Model chưa trả âm thanh có thể phát.')
+        else:raise ValueError('Loại model không hợp lệ.')
+        state,label,detail='ready','Dùng được · đã thử thành công','Đã nhận JSON hợp lệ.' if kind=='text' else 'Đã nhận và giải mã được âm thanh.'
+    except ApiError as e:
+        state,label={401:('denied','Khóa không hợp lệ'),403:('denied','Không có quyền / API chưa bật'),
+            404:('missing','Không tìm thấy model'),429:('quota','Đang bị giới hạn / hết hạn mức'),
+            500:('busy','Máy chủ lỗi tạm thời · chưa xác nhận'),502:('busy','Dịch vụ bận · chưa xác nhận'),
+            503:('busy','Dịch vụ bận 503 · chưa xác nhận'),504:('busy','Dịch vụ quá thời gian chờ')}.get(e.code,('unverified','Chưa dùng được trong lần thử này'))
+        detail=str(e)
+    except (ValueError,KeyError,TypeError) as e:
+        state,label,detail='unverified','Phản hồi chưa tương thích với app',str(e)
+    if cancelled is not None and cancelled.is_set():raise TaskCancelled('Đã hủy kiểm tra model.')
+    return {'model':model,'kind':kind,'state':state,'label':label,'detail':detail,'checked_at':time.strftime('%H:%M:%S')}
 
 def fit_duration(scenes, duration):
     """Allocate whole 30fps frames, with no silent truncation of a long script."""
@@ -154,7 +183,7 @@ def generate(key, model, brief, duration, style, ratio, language='Tiếng Việt
     parts = math.ceil(duration / 120)
     scenes, title = [], 'Video của tôi'
     for part in range(parts):
-        if cancelled is not None and cancelled.is_set(): raise RuntimeError('Đã hủy viết kịch bản.')
+        if cancelled is not None and cancelled.is_set(): raise TaskCancelled('Đã hủy viết kịch bản.')
         seconds = round((part+1)*duration/parts) - round(part*duration/parts)
         budget = min(8, max(3, math.ceil(seconds / 15)))
         if status: status(f'Đang viết phần {part+1}/{parts} · {seconds} giây…')
@@ -167,7 +196,8 @@ def generate(key, model, brief, duration, style, ratio, language='Tiếng Việt
                   'Chỉ mở đầu ở phần đầu, chỉ kết luận ở phần cuối; các phần giữa nối tiếp nội dung, không nhắc lại. '
                   'Viết title, text và narration bằng ' + language + ', kể cả tiêu đề toàn video. '
                   'Không trộn hai ngôn ngữ, dù ý tưởng đầu vào dùng ngôn ngữ khác. '
-                  'Độ dài lời đọc phù hợp từng cảnh. Nội dung yêu cầu:\n' + brief +
+                  'Lời đọc tối đa khoảng 2 từ mỗi giây, ngắn hơn thời lượng cảnh để còn khoảng nghỉ. '
+                  'Đầu vào có thể là tiêu đề hoặc kịch bản đầy đủ; nếu đã có kịch bản hãy giữ ý và thứ tự, chia thành cảnh, không bịa thêm. Nội dung yêu cầu:\n' + brief +
                   '\nHai cảnh cuối phần trước (nếu có):\n' + context)
         r = request_ai(key, model, {'contents': [{'parts': [{'text': prompt}]}],
                       'generationConfig': {'responseMimeType': 'application/json'}}, cancelled=cancelled, status=status)
@@ -181,12 +211,12 @@ def generate(key, model, brief, duration, style, ratio, language='Tiếng Việt
         scenes.extend(data['scenes'])
     return validate(dict(title=title, scenes=scenes, style=style, ratio=ratio, narrationLanguage=language,videoLanguage=language))
 
-def synthesize(key, text, path, voice='Kore', language='Tiếng Việt', model='gemini-3.8-flash-tts', cancelled=None, status=None):
+def synthesize(key, text, path, voice='Kore', language='Tiếng Việt', model='gemini-3.8-flash-tts', cancelled=None, status=None, attempts=3):
     instruction = 'Read naturally and clearly in English.' if language == 'English' else 'Đọc tiếng Việt tự nhiên, rõ ràng.'
     if not model.startswith('gemini-2.5-'):
         r = request_ai(key, model, {'model': model, 'input': [{'type': 'user_input', 'content': [
             {'type': 'text', 'text': text, 'annotations': [{'type': 'speech_metadata', 'style': instruction}]}]}],
-            'response_format': {'type': 'audio'}, 'generation_config': {'speech_config': [{'voice': voice}]}}, interactions=True, cancelled=cancelled, status=status)
+            'response_format': {'type': 'audio'}, 'generation_config': {'speech_config': [{'voice': voice}]}}, interactions=True, cancelled=cancelled, status=status,attempts=attempts)
         blocks = [c for step in r.get('steps', []) if step.get('type') == 'model_output'
                   for c in step.get('content', []) if c.get('type') == 'audio']
         if not blocks: raise ValueError('Gemini chưa trả âm thanh. Kiểm tra mô hình TTS và quyền truy cập.')
@@ -202,7 +232,7 @@ def synthesize(key, text, path, voice='Kore', language='Tiếng Việt', model='
         'contents': [{'parts': [{'text': ('Read naturally and clearly in English:\n' if language == 'English'
                                         else 'Đọc tiếng Việt tự nhiên, rõ ràng:\n') + text}]}],
         'generationConfig': {'responseModalities': ['AUDIO'], 'speechConfig': {
-            'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': voice}}}}}, cancelled=cancelled, status=status)
+            'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': voice}}}}}, cancelled=cancelled, status=status,attempts=attempts)
     try:
         audio = next(p['inlineData'] for p in r['candidates'][0]['content']['parts'] if 'inlineData' in p)
         if not audio.get('mimeType', '').startswith('audio/L16'):
@@ -250,6 +280,73 @@ def copy_video(source, destination):
         temporary.replace(destination)
     finally: temporary.unlink(missing_ok=True)
     return destination
+
+def create_narration(data,key,path,folder,model,cancelled,status=None,strict_duration=False,writing_model=None):
+    data=copy.deepcopy(validate(data));folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
+    if not any(s['narration'].strip() for s in data['scenes']):raise ValueError('Kịch bản chưa có lời đọc.')
+    temporary=Path(path).with_name(Path(path).stem+'.working.wav')
+    try:
+        with wave.open(str(temporary),'wb') as out:
+            out.setnchannels(1);out.setsampwidth(2);out.setframerate(24000)
+            for i,scene in enumerate(data['scenes']):
+                if cancelled.is_set():raise TaskCancelled('Đã hủy tạo lời đọc.')
+                if status:status(f'Đang tạo lời đọc cảnh {i+1}/{len(data["scenes"])}…')
+                pcm=b''
+                if scene['narration'].strip():
+                    part=folder/f'voice-{i}.wav'
+                    length=synthesize(key,scene['narration'],part,model=model,language=data['narrationLanguage'],cancelled=cancelled,status=status)
+                    if strict_duration and length>scene['duration']*1.22 and writing_model:
+                        if status:status(f'Đang rút gọn lời đọc cảnh {i+1} cho vừa thời lượng…')
+                        response=request_ai(key,writing_model,{'contents':[{'parts':[{'text':
+                            f'Shorten this narration to at most {max(2,int(scene["duration"]*1.5))} words. Keep its meaning and language. Return JSON {{"narration":"..."}} only.\n'+scene['narration']}]}],
+                            'generationConfig':{'responseMimeType':'application/json'}},cancelled=cancelled,status=status)
+                        text=''.join(p.get('text','') for p in response['candidates'][0]['content']['parts'])
+                        shorter=json.loads(text).get('narration','').strip()
+                        if not shorter:raise ValueError('AI chưa rút gọn được lời đọc.')
+                        scene['narration']=shorter
+                        length=synthesize(key,shorter,part,model=model,language=data['narrationLanguage'],cancelled=cancelled,status=status)
+                    if strict_duration and length>scene['duration']-.1:
+                        factor=length/max(.5,scene['duration']-.1)
+                        if factor>1.25:raise ValueError(f'Lời đọc cảnh {i+1} còn quá dài cho thời lượng. Dự án đã được giữ để chỉnh tiếp.')
+                        if factor>1:
+                            adjusted=folder/f'voice-{i}-fit.wav'
+                            run_command([executable('ffmpeg'),'-hide_banner','-nostdin','-y','-i',str(part),'-af',f'atempo={factor}',
+                                '-ac','1','-ar','24000','-c:a','pcm_s16le',str(adjusted)],folder/f'voice-{i}-fit.log',cancelled)
+                            part=adjusted
+                    with wave.open(str(part),'rb') as w:
+                        pcm=w.readframes(w.getnframes())
+                    if not strict_duration:scene['duration']=max(scene['duration'],len(pcm)/48000+.3)
+                if scene['duration']>60:raise ValueError('Lời đọc quá dài. Hãy chia thành nhiều cảnh.')
+                frames=round(scene['duration']*24000)
+                if len(pcm)>frames*2:raise ValueError('Lời đọc còn dài hơn cảnh; hãy rút gọn trước khi xuất.')
+                out.writeframes(pcm+b'\0'*(frames*2-len(pcm)))
+        data=validate(data)
+        if cancelled.is_set():raise TaskCancelled('Đã hủy tạo lời đọc.')
+        temporary.replace(path);data['voice']=str(path)
+        return data
+    finally:temporary.unlink(missing_ok=True)
+
+def automatic_video(key,writing_model,tts_model,brief,duration,style,ratio,language,output,cancelled,status=None,music=''):
+    if cancelled.is_set():raise TaskCancelled('Đã hủy tác vụ tự động.')
+    output=Path(output)
+    folder=Path(tempfile.mkdtemp(prefix=output.stem+'-project-',dir=output.parent))
+    try:
+        (folder/'brief.txt').write_text(brief,encoding='utf-8')
+        project=folder/'project.cinecode.json'
+        if status:status('Bước 1/3 · Viết kịch bản và chia cảnh…')
+        data=generate(key,writing_model,brief,duration,style,ratio,language,cancelled,status)
+        data['music']=music;save_project(project,data)
+        if status:status('Bước 2/3 · Tạo lời đọc…')
+        data=create_narration(data,key,folder/'narration.wav',folder,tts_model,cancelled,status,
+                              strict_duration=True,writing_model=writing_model)
+        save_project(project,data)
+        if status:status('Bước 3/3 · Dựng hình và xuất MP4…')
+        render(data,folder,output,cancelled,status or (lambda s:None))
+        if cancelled.is_set():raise TaskCancelled('Đã hủy tác vụ tự động.')
+        return {'data':data,'project':str(project),'output':str(output)}
+    except TaskCancelled:raise
+    except Exception as e:
+        raise RuntimeError(str(e)+'\nDự án/nội dung đã lưu tại: '+str(folder)) from None
 
 def build_html(data, folder, preview=False):
     data = copy.deepcopy(validate(data))

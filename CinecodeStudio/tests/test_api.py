@@ -18,42 +18,52 @@ def error(code, message='Service unavailable', retry=None):
 
 class ApiTests(unittest.TestCase):
     def test_503_retry_recovers_with_status_and_redacts_key(self):
-        opener=Mock();opener.open.side_effect=[error(503,'Busy secret'),io.StringIO('{"ok":true}')]
+        opener=Mock(side_effect=[error(503,'Busy secret'),{'ok':True}])
         updates=[]
-        with patch.object(core.urllib.request,'build_opener',return_value=opener),patch.object(core.time,'sleep') as sleep:
+        with patch.object(core,'_perform_request',opener),patch.object(core.time,'sleep') as sleep:
             self.assertEqual(core.request_ai('secret','test-model',{},status=updates.append),{'ok':True})
-            self.assertEqual(opener.open.call_count,2);sleep.assert_called_once_with(2)
+            self.assertEqual(opener.call_count,2);sleep.assert_called_once_with(2)
             self.assertIn('503',updates[0]);self.assertNotIn('secret',' '.join(updates))
 
     def test_exhausted_503_reports_google_without_key(self):
-        opener=Mock();opener.open.side_effect=[error(503,'Busy secret') for _ in range(3)]
-        with patch.object(core.urllib.request,'build_opener',return_value=opener),patch.object(core.time,'sleep'):
+        opener=Mock(side_effect=[error(503,'Busy secret') for _ in range(3)])
+        with patch.object(core,'_perform_request',opener),patch.object(core.time,'sleep'):
             with self.assertRaises(RuntimeError) as caught:core.request_ai('secret','test-model',{})
         self.assertNotIn('secret',str(caught.exception));self.assertIn('503',str(caught.exception))
         self.assertIn('3 lần',str(caught.exception));self.assertIn('Google:',str(caught.exception))
 
     def test_auth_daily_quota_and_long_retry_are_not_retried(self):
         for response in [error(403,'API disabled'),error(429,'GenerateRequestsPerDayPerProject'),error(503,'Busy',30)]:
-            opener=Mock();opener.open.side_effect=response
-            with patch.object(core.urllib.request,'build_opener',return_value=opener),patch.object(core.time,'sleep') as sleep:
+            opener=Mock(side_effect=response)
+            with patch.object(core,'_perform_request',opener),patch.object(core.time,'sleep') as sleep:
                 with self.assertRaises(RuntimeError):core.request_ai('secret','test-model',{})
-                self.assertEqual(opener.open.call_count,1);sleep.assert_not_called()
+                self.assertEqual(opener.call_count,1);sleep.assert_not_called()
 
     def test_cancel_interrupts_retry_wait(self):
-        opener=Mock();opener.open.side_effect=error(503)
+        opener=Mock(side_effect=error(503))
         cancel=Mock();cancel.is_set.return_value=False;cancel.wait.return_value=True
-        with patch.object(core.urllib.request,'build_opener',return_value=opener):
+        with patch.object(core,'_perform_request',opener):
             with self.assertRaisesRegex(RuntimeError,'Đã hủy'):core.request_ai('secret','test-model',{},cancelled=cancel)
-        self.assertEqual(opener.open.call_count,1)
+        self.assertEqual(opener.call_count,1)
 
     def test_model_catalog_uses_get_and_separates_tts(self):
         response={'models':[{'name':'models/my-text','supportedGenerationMethods':['generateContent']},
                             {'name':'models/my-tts'},{'name':'models/embedding','supportedGenerationMethods':['embedContent']} ]}
-        opener=Mock();opener.open.return_value=io.StringIO(json.dumps(response))
-        with patch.object(core.urllib.request,'build_opener',return_value=opener):
+        opener=Mock(return_value=response)
+        with patch.object(core,'_perform_request',opener):
             self.assertEqual(core.list_models('secret'),(['my-text'],['my-tts']))
-        req=opener.open.call_args.args[0];self.assertEqual(req.get_method(),'GET')
+        req=opener.call_args.args[0];self.assertEqual(req.get_method(),'GET')
         self.assertNotIn('secret',req.full_url)
+
+    def test_model_probe_reports_real_success_and_transient_failure(self):
+        with patch.object(core,'request_ai',return_value={'candidates':[{'content':{'parts':[{'text':'{"ok":true}'}]}}]}) as request:
+            result=core.check_model('secret','model-text','text')
+            self.assertEqual(result['state'],'ready');self.assertEqual(request.call_args.kwargs['attempts'],1)
+        for code,state in [(503,'busy'),(429,'quota'),(403,'denied'),(404,'missing')]:
+            with patch.object(core,'request_ai',side_effect=core.ApiError('Google failure',code)):
+                self.assertEqual(core.check_model('secret','model','text')['state'],state)
+        with patch.object(core,'request_ai',return_value={'candidates':[]}):
+            self.assertEqual(core.check_model('secret','model','text')['state'],'unverified')
 
     def test_ten_minute_script_is_chunked_and_frame_exact(self):
         result={'title':'Video dài','scenes':[{'title':f'Cảnh {i}','text':'Nội dung','duration':14} for i in range(8)]}

@@ -9,6 +9,7 @@ import tempfile
 import threading
 import traceback
 import wave
+from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import core
 
@@ -53,3 +54,13 @@ with tempfile.TemporaryDirectory(prefix='cinecode-tiếng-Việt-') as td:
     subprocess.run(cmd,check=True)
     assert len(list(frames.glob('*.jpg')))==3
     print('LONG TIMELINE PASS: 600 seconds, 18000 frames, first/middle/last frames captured')
+    automatic=core.demo();automatic['scenes']=automatic['scenes'][:1]
+    automatic['scenes'][0].update(duration=1,narration='Hello.')
+    def speech(key,text,path,**kwargs):
+        with wave.open(str(path),'wb') as w:w.setnchannels(1);w.setsampwidth(2);w.setframerate(24000);w.writeframes(b'\0'*4800)
+        return .1
+    with patch.object(core,'generate',return_value=automatic),patch.object(core,'synthesize',side_effect=speech):
+        result=core.automatic_video('test-key','test-writing','test-tts','Title',15,'Điện ảnh','16:9','English',folder/'auto.mp4',threading.Event(),print)
+    assert Path(result['output']).is_file() and Path(result['project']).is_file()
+    assert Path(core.load_project(result['project'])['voice']).is_file()
+    print('AUTOMATIC PASS: fixture AI, real audio assembly, real Chromium render and MP4 export')
