@@ -150,6 +150,8 @@ def check_model(key, model, kind, cancelled=None):
             with tempfile.TemporaryDirectory(prefix='cinecode-model-test-') as td:
                 duration=synthesize(key,'Xin chào.',Path(td)/'test.wav',model=model,cancelled=cancelled,attempts=1)
                 if duration<=0:raise ValueError('Model chưa trả âm thanh có thể phát.')
+                with wave.open(str(Path(td)/'test.wav'),'rb') as w:
+                    if not any(w.readframes(w.getnframes())):raise ValueError('Model trả âm thanh im lặng; chưa xác nhận dùng được.')
         else:raise ValueError('Loại model không hợp lệ.')
         state,label,detail='ready','Dùng được · đã thử thành công','Đã nhận JSON hợp lệ.' if kind=='text' else 'Đã nhận và giải mã được âm thanh.'
     except ApiError as e:
@@ -415,7 +417,9 @@ def render(data, folder, output, cancelled, status=lambda s: None):
             gain = .22 if kind == 'music' and 'voice' in inputs else 1
             filters.append(f'[{i}:a]aresample=48000,volume={gain},apad,atrim=0:{duration}[a{i}]')
         tracks = ''.join(f'[a{i}]' for i in range(1, len(inputs) + 1))
-        filters.append(tracks + f'amix=inputs={len(inputs)}:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=9[a]')
+        # Some FFmpeg builds emit non-finite samples when normalizing complete silence.
+        finite="aeval=exprs='if(isnan(val(ch))+isinf(val(ch)),0,val(ch))'"
+        filters.append(tracks + f'amix=inputs={len(inputs)}:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=9,'+finite+',aresample=48000[a]')
         args += ['-filter_complex', ';'.join(filters), '-map', '0:v', '-map', '[a]', '-c:a', 'aac', '-b:a', '192k']
     else: args += ['-an']
     # Write a temporary output so an interrupted job cannot replace a finished video.
