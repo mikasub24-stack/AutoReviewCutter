@@ -341,7 +341,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.evaluate(() => window.studioI18n.t('Chưa tải được danh sách giọng Microsoft (mạng lỗi). Đang dùng danh sách có sẵn.')), 'Could not load the Microsoft voice list (mạng lỗi). Using the built-in list.');
     await page.locator('#storyEngine').selectOption('clone');
     assert.equal(await page.locator('#subOn').locator('xpath=..').textContent().then(t => t.trim()), 'Show subtitles in the video');
-    assert.equal(await page.locator('#storySfx option[value=low]').textContent(), 'Low (background under narration)');
+    assert.equal(await page.locator('#storySfx option[value=low]').textContent(), 'Low (20 dB below the narration)');
     // Phần kiểm tra kịch bản cũng được dịch sang tiếng Anh.
     await page.evaluate(() => { document.getElementById('storyPanel').open = true; document.getElementById('storyMuse').open = true; });
     await page.locator('#storyScript').fill('Mai ra bến sông lúc bình minh. Cá vàng nhảy lên thuyền.');
