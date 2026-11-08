@@ -25,6 +25,13 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          Start-Transcript -Path "$env:RUNNER_TEMP/cinecode-build.log" | Out-Null
+          trap {
+            $detail = (Get-Content "$env:RUNNER_TEMP/cinecode-build.log" -Tail 75) -join "`n"
+            $detail = $detail.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Host "::error title=Cinecode Windows build::$detail"
+            exit 1
+          }
           python -m pip install pyinstaller==6.16.0 imageio-ffmpeg==0.6.0
           if ($LASTEXITCODE) { throw 'pip failed' }
           New-Item -ItemType Directory -Force CinecodeStudio/runtime | Out-Null
@@ -41,7 +48,7 @@ jobs:
           if ($LASTEXITCODE) { throw 'GUI test failed' }
           python CinecodeStudio/tests/render_smoke.py
           if ($LASTEXITCODE) { throw 'Real render test failed' }
-          python -m PyInstaller --noconfirm --windowed --name CinecodeStudio --icon CinecodeStudio/icon.ico --distpath CinecodeStudio/build --workpath CinecodeStudio/pybuild --specpath CinecodeStudio --add-data 'CinecodeStudio/icon.ico;.' --add-data 'CinecodeStudio/film.html;.' --add-data 'CinecodeStudio/vendor;vendor' --add-data 'CinecodeStudio/runtime;runtime' CinecodeStudio/app.py
+          python -m PyInstaller --noconfirm --windowed --name CinecodeStudio --icon CinecodeStudio/icon.ico --distpath CinecodeStudio/build --workpath CinecodeStudio/pybuild --specpath . --add-data 'CinecodeStudio/icon.ico;.' --add-data 'CinecodeStudio/film.html;.' --add-data 'CinecodeStudio/vendor;vendor' --add-data 'CinecodeStudio/runtime;runtime' CinecodeStudio/app.py
           if ($LASTEXITCODE) { throw 'Packaging failed' }
           Copy-Item CinecodeStudio/README.vi.md,CinecodeStudio/THIRD-PARTY.md CinecodeStudio/build/CinecodeStudio/
           $p = Start-Process CinecodeStudio/build/CinecodeStudio/CinecodeStudio.exe -ArgumentList '--smoke-test' -Wait -PassThru
