@@ -1,13 +1,17 @@
-# Cinecode Studio 0.1.1
+# Cinecode Studio 0.1.2
 
 Ứng dụng Windows 10/11 x64 có giao diện tiếng Việt, dùng bộ xuất khung hình Cinecode của sarpstar. Bản đầu dựng phim ngắn chữ/ảnh và motion graphics với ba bảng màu, chưa có trình dựng nhân vật 3D hoặc toàn bộ quy trình agent của Cinecode.
 
-## 0.1.1 · Video 10 phút, chọn model và lỗi Gemini
+## 0.1.2 · Video 10 phút, chọn model và lỗi Gemini
 
 - Chọn nhanh 600 giây; AI viết theo từng phần tối đa 120 giây, nối ngữ cảnh, tối đa 40 cảnh. Tổng thời lượng được căn theo khung hình về đúng lựa chọn. Tạo lời đọc có thể kéo dài cảnh: nếu tổng vượt 10 phút, app yêu cầu rút gọn thay vì cắt mất nội dung.
 - Cài đặt AI có hộp chọn model viết/model đọc (vẫn gõ tên được) và nút lấy danh sách từ Google. Danh sách không bảo đảm tài khoản có hạn mức dùng từng model.
 - HTTP 503/500/502/504 hoặc giới hạn tạm thời 429 được thử tối đa 3 lần; hiện thời gian chờ, tôn trọng Retry-After ngắn và cho hủy trong lúc chờ. Không thử lại lỗi khóa/quyền/model hoặc hết hạn mức ngày. Không đổi model âm thầm.
 - Hiện thông báo cụ thể từ Google (đã ẩn khóa), giữ nguyên kịch bản khi yêu cầu thất bại. Không cam kết retry sẽ xử lý được gián đoạn dịch vụ kéo dài.
+
+## Giao diện và video hoàn tất
+
+Giao diện mới dùng các vùng ý tưởng/kịch bản/âm thanh, chữ lớn hơn, cuộn nội dung và giữ nút xuất video ở cuối cửa sổ. Sau khi xuất, dùng **Mở video**, **Tải video** (lưu thêm một bản MP4, không dựng lại) hoặc **Mở thư mục**. Bản gốc đã xuất được giữ nguyên.
 
 ## Dùng nhanh
 
@@ -22,6 +26,6 @@ Node 22 và FFmpeg được kèm bộ cài; không cần cài Python/Node riêng
 
 ## Phát triển
 
-Python 3.12, Tkinter, Node 22+, Chrome/Edge, FFmpeg/ffprobe trên PATH. `python CinecodeStudio/app.py`; kiểm tra `python -m unittest discover -s CinecodeStudio/tests`; thử render thật `python CinecodeStudio/tests/render_smoke.py`. AI được kiểm thử parser và xử lý lỗi; tích hợp Google cần khóa/hạn mức thật để xác nhận.
+Python 3.12, CustomTkinter 5.2.2, Pillow 12, Tkinter, Node 22+, Chrome/Edge, FFmpeg/ffprobe trên PATH. `python CinecodeStudio/app.py`; kiểm tra `python -m unittest discover -s CinecodeStudio/tests`; thử render thật `python CinecodeStudio/tests/render_smoke.py`. AI được kiểm thử parser và xử lý lỗi; tích hợp Google cần khóa/hạn mức thật để xác nhận.
 
 Workflow `.github/workflows/cinecode-studio-windows.yml` dựng và thử bộ cài trên Windows. Giữ nguyên mã Vocal Studio. Backend Cinecode được ghim tại commit 67f9807112b97ae253d4a5f0eccaccc46c3b2633.

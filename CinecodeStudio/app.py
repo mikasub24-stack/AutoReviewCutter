@@ -8,7 +8,9 @@ import sys
 import tempfile
 import threading
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import filedialog, messagebox
+import customtkinter as ctk
+import interface
 import webbrowser
 
 import core
@@ -33,13 +35,15 @@ def protected_key(value, decrypt=False):
     finally:
         ctypes.windll.kernel32.LocalFree(target.data)
 
-class App(tk.Tk):
+ctk.set_appearance_mode("dark")
+
+class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title('Cinecode Studio · Làm video bằng tiếng Việt')
         if os.name == 'nt': self.iconbitmap(str(core.ROOT/'icon.ico'))
-        self.geometry('1120x820'); self.minsize(960, 740)
-        self.configure(bg='#101927')
+        self.geometry('1220x900'); self.minsize(1100, 720)
+        self.last_output = None
         self.data = core.demo(); self.path = None; self.dirty = False; self.current = 0
         self.events = queue.Queue(); self.cancel = threading.Event(); self.busy = False; self.key = ''
         self.temp = tempfile.TemporaryDirectory(prefix='CinecodeStudio-'); self.folder = Path(self.temp.name)
@@ -52,71 +56,20 @@ class App(tk.Tk):
             self.tts_model.set(settings.get('ttsModel', self.tts_model.get()))
             if settings.get('key'): self.key = protected_key(settings['key'], True)
         except (OSError, ValueError): pass
-        style = ttk.Style(self); style.theme_use('clam')
-        style.configure('.', font=('Segoe UI', 10), background='#101927', foreground='#e9f0f8')
-        style.configure('TButton', padding=(12, 7), background='#234355')
-        style.configure('TEntry', fieldbackground='#1d2b3e', foreground='#edf4fa')
-        style.configure('TCombobox', fieldbackground='#1d2b3e', foreground='#edf4fa')
-        style.map('TCombobox', fieldbackground=[('readonly', '#1d2b3e')], foreground=[('readonly', '#edf4fa')])
-        body = ttk.Frame(self, padding=22); body.pack(fill='both', expand=True)
-        ttk.Label(body, text='CINECODE STUDIO', font=('Segoe UI', 22, 'bold'), foreground='#67e8d2').pack(anchor='w')
-        ttk.Label(body, text='Viết ý tưởng → sửa từng cảnh → thêm âm thanh → xuất video', foreground='#a6b6c9').pack(anchor='w', pady=(0,12))
-        bar = ttk.Frame(body); bar.pack(fill='x')
         self.buttons = []
-        for label, fn in [('Dự án mới', self.new), ('Mở dự án', self.open), ('Lưu dự án', self.save), ('Cài đặt AI', self.settings)]:
-            self.button(bar, label, fn).pack(side='left', padx=(0,8))
-        self.brief = self.text(body, height=3); self.brief.pack(fill='x', pady=(12,8))
-        self.brief.insert('1.0', 'Làm video ngắn về việc sống chậm lại, nhẹ nhàng và tích cực.')
-        opts = ttk.Frame(body); opts.pack(fill='x', pady=(0,12))
-        self.duration = tk.StringVar(value='30'); self.ratio = tk.StringVar(value='16:9'); self.style = tk.StringVar(value='Điện ảnh')
-        for label, variable, values in [('Thời lượng (giây)', self.duration, ['15','30','60','120','180','300','600']), ('Khung hình', self.ratio, ['16:9','9:16','1:1']), ('Phong cách', self.style, list(core.STYLES))]:
-            ttk.Label(opts, text=label).pack(side='left', padx=(0,6))
-            ttk.Combobox(opts, textvariable=variable, values=values, state='readonly', width=13).pack(side='left', padx=(0,14))
-        self.button(opts, 'AI viết kịch bản', self.generate).pack(side='right')
-        panes = ttk.Frame(body); panes.pack(fill='both', expand=True)
-        left = ttk.Frame(panes); left.pack(side='left', fill='y', padx=(0,16))
-        ttk.Label(left, text='CÁC CẢNH').pack(anchor='w', pady=(0,8))
-        self.scenes = tk.Listbox(left, width=27, bg='#19273a', fg='#e9f0f8', selectbackground='#246559',
-                                 font=('Segoe UI',11), borderwidth=0, exportselection=False)
-        self.scenes.pack(fill='both', expand=True); self.scenes.bind('<<ListboxSelect>>', self.select_scene)
-        controls = ttk.Frame(left); controls.pack(fill='x', pady=8)
-        self.button(controls, '+ Cảnh', self.add_scene).pack(side='left')
-        self.button(controls, 'Xóa cảnh', self.delete_scene).pack(side='right')
-        right = ttk.Frame(panes); right.pack(side='left', fill='both', expand=True)
-        self.title_var = tk.StringVar(); self.seconds = tk.StringVar(); self.image_var = tk.StringVar()
-        ttk.Label(right, text='Tiêu đề cảnh').pack(anchor='w'); ttk.Entry(right, textvariable=self.title_var).pack(fill='x', pady=(4,8))
-        row = ttk.Frame(right); row.pack(fill='x')
-        ttk.Label(row, text='Số giây').pack(side='left'); ttk.Spinbox(row, from_=1, to=60, textvariable=self.seconds, width=6).pack(side='left', padx=8)
-        self.button(row, 'Chọn ảnh cho cảnh', self.image).pack(side='left')
-        self.button(row, 'Bỏ ảnh', self.clear_image).pack(side='left', padx=8)
-        ttk.Label(right, textvariable=self.image_var, foreground='#9aabbd', wraplength=680).pack(anchor='w', pady=4)
-        ttk.Label(right, text='Chữ trên màn hình (nên ngắn, dễ đọc)').pack(anchor='w')
-        self.caption = self.text(right, height=3); self.caption.pack(fill='both', expand=True, pady=(4,8))
-        ttk.Label(right, text='Lời đọc của cảnh').pack(anchor='w')
-        self.narration = self.text(right, height=3); self.narration.pack(fill='both', expand=True, pady=(4,8))
-        audio = ttk.Frame(body); audio.pack(fill='x', pady=8)
-        self.button(audio, 'Thêm nhạc', lambda:self.audio('music')).pack(side='left')
-        self.button(audio, 'Thêm lời đọc', lambda:self.audio('voice')).pack(side='left', padx=8)
-        self.button(audio, 'AI tạo lời đọc', self.tts).pack(side='left')
-        self.button(audio, 'Bỏ âm thanh', self.clear_audio).pack(side='left', padx=8)
-        self.language = tk.StringVar(value=self.data['narrationLanguage'])
-        ttk.Label(audio, text='Ngôn ngữ đọc').pack(side='left', padx=(8,4))
-        ttk.Combobox(audio, textvariable=self.language, values=['Tiếng Việt','English'], state='readonly', width=12).pack(side='left')
-        self.audio_label = tk.StringVar(); ttk.Label(body, textvariable=self.audio_label, wraplength=1050, foreground='#a6b6c9').pack(anchor='w')
-        bottom = ttk.Frame(body); bottom.pack(fill='x', pady=(10,6))
-        self.button(bottom, 'Xem trước hình', self.preview).pack(side='left')
-        self.button(bottom, 'Xuất MP4', self.export).pack(side='left', padx=8)
-        self.cancel_button = ttk.Button(bottom, text='Hủy tác vụ', command=self.cancel.set, state='disabled'); self.cancel_button.pack(side='right')
-        self.status = tk.StringVar(value='Sẵn sàng · Dự án mẫu không cần khóa AI. Xem trước hình chưa phát nhạc/lời đọc.')
-        ttk.Label(body, textvariable=self.status, wraplength=1050, foreground='#67e8d2').pack(anchor='w')
+        interface.build(self)
         self.refresh(); self.load_scene(); self.protocol('WM_DELETE_WINDOW', self.close); self.after(100, self.poll)
 
-    def button(self, parent, text, command):
-        b = ttk.Button(parent, text=text, command=command); self.buttons.append(b); return b
+    def button(self, parent, text, command, primary=False, width=112):
+        b = ctk.CTkButton(parent, text=text, command=command, width=width, height=36,
+            font=('Segoe UI',14,'bold' if primary else 'normal'), corner_radius=9,
+            fg_color='#5de0c1' if primary else '#24364d', hover_color='#89f1d8' if primary else '#354e6b',
+            text_color='#09241e' if primary else '#e4edf8')
+        self.buttons.append(b); return b
 
     def text(self, parent, **kwargs):
-        return tk.Text(parent, bg='#19273a', fg='#edf4fa', insertbackground='white', wrap='word',
-                       font=('Segoe UI',11), relief='flat', padx=10, pady=8, undo=True, **kwargs)
+        return ctk.CTkTextbox(parent, fg_color='#0d1829', text_color='#edf4fa', wrap='word',
+            font=('Segoe UI',14), corner_radius=10, border_width=1, border_color='#263b54', undo=True, **kwargs)
 
     def commit(self):
         s = self.data['scenes'][self.current]
@@ -130,6 +83,8 @@ class App(tk.Tk):
         self.scenes.delete(0,'end')
         for i,s in enumerate(self.data['scenes']): self.scenes.insert('end', f'{i+1:02} · {s["title"] or "Cảnh mới"}')
         self.scenes.selection_set(self.current)
+        total=sum(s['duration'] for s in self.data['scenes'])
+        self.summary.set(f"{len(self.data['scenes'])} cảnh · {int(total)//60}:{int(total)%60:02d} · {self.data['ratio']}")
         self.audio_label.set('Nhạc: '+(Path(self.data['music']).name or 'chưa chọn')+'   |   Lời đọc: '+(Path(self.data['voice']).name or 'chưa chọn'))
 
     def load_scene(self):
@@ -146,13 +101,13 @@ class App(tk.Tk):
 
     def new(self):
         if not messagebox.askyesno('Dự án mới','Tạo dự án mẫu mới? Hãy lưu dự án đang chỉnh trước.'):return
-        self.data=core.demo(); self.path=None; self.current=0; self.style.set(self.data['style']); self.ratio.set(self.data['ratio']); self.language.set(self.data['narrationLanguage']); self.refresh(); self.load_scene()
+        self.reset_output(); self.data=core.demo(); self.path=None; self.current=0; self.style.set(self.data['style']); self.ratio.set(self.data['ratio']); self.language.set(self.data['narrationLanguage']); self.refresh(); self.load_scene()
 
     def open(self):
         p=filedialog.askopenfilename(filetypes=[('Dự án Cinecode','*.cinecode.json'),('JSON','*.json')])
         if not p:return
         try:
-            self.data=core.load_project(p); self.path=Path(p); self.current=0
+            loaded=core.load_project(p); self.reset_output(); self.data=loaded; self.path=Path(p); self.current=0
             self.style.set(self.data['style']); self.ratio.set(self.data['ratio']); self.language.set(self.data['narrationLanguage']); self.refresh(); self.load_scene()
         except (OSError,ValueError) as e:messagebox.showerror('Không mở được',str(e))
 
@@ -185,14 +140,14 @@ class App(tk.Tk):
         if p:self.data[kind]=p;self.refresh()
 
     def settings(self):
-        w=tk.Toplevel(self);w.title('Cài đặt AI');w.geometry('600x400');w.transient(self);w.grab_set()
-        f=ttk.Frame(w,padding=20);f.pack(fill='both',expand=True)
-        ttk.Label(f,text='Khóa Gemini API · chỉ nhập tại đây').pack(anchor='w')
-        entry=ttk.Entry(f,show='•');entry.insert(0,self.key);entry.pack(fill='x',pady=8)
-        ttk.Label(f,text='Model viết kịch bản · chọn hoặc nhập tên').pack(anchor='w')
-        text_models=ttk.Combobox(f,textvariable=self.model,values=[self.model.get(),'gemini-2.5-flash','gemini-2.5-pro']);text_models.pack(fill='x',pady=8)
-        ttk.Label(f,text='Model đọc (TTS) · chọn hoặc nhập tên').pack(anchor='w')
-        tts_models=ttk.Combobox(f,textvariable=self.tts_model,values=[self.tts_model.get(),'gemini-2.5-flash-preview-tts']);tts_models.pack(fill='x',pady=8)
+        w=ctk.CTkToplevel(self);w.title('Cài đặt AI');w.geometry('640x490');w.transient(self);w.grab_set()
+        f=ctk.CTkFrame(w,fg_color='#131f31',corner_radius=14);f.pack(fill='both',expand=True,padx=18,pady=18)
+        ctk.CTkLabel(f,font=('Segoe UI',14),text='Khóa Gemini API · chỉ nhập tại đây').pack(anchor='w')
+        entry=ctk.CTkEntry(f,show='•',height=36,font=('Segoe UI',14));entry.insert(0,self.key);entry.pack(fill='x',pady=8)
+        ctk.CTkLabel(f,font=('Segoe UI',14),text='Model viết kịch bản · chọn hoặc nhập tên').pack(anchor='w')
+        text_models=interface.combo(f,self.model,[self.model.get(),'gemini-2.5-flash','gemini-2.5-pro'],state='normal');text_models.pack(fill='x',pady=8)
+        ctk.CTkLabel(f,font=('Segoe UI',14),text='Model đọc (TTS) · chọn hoặc nhập tên').pack(anchor='w')
+        tts_models=interface.combo(f,self.tts_model,[self.tts_model.get(),'gemini-2.5-flash-preview-tts'],state='normal');tts_models.pack(fill='x',pady=8)
         def fetch_models():
             key=entry.get().strip()
             def done(result):
@@ -202,18 +157,18 @@ class App(tk.Tk):
                 messagebox.showinfo('Đã kết nối Google',f'Có {len(text)} model viết, {len(tts)} model đọc trong danh sách. Quyền và hạn mức được kiểm tra khi dùng model.',parent=w)
             self.status.set('Đang lấy danh sách model từ Google…')
             self.start(lambda:core.list_models(key,self.cancel,lambda s:self.events.put(('status',s))),done)
-        ttk.Button(f,text='Lấy danh sách model từ Google',command=fetch_models).pack(anchor='w',pady=(0,8))
-        ttk.Label(f,text='AI gửi nội dung tới Google và dùng hạn mức tài khoản của bạn.\nKhóa được mã hóa theo tài khoản Windows, không ghi vào dự án.',wraplength=480).pack(anchor='w')
+        ctk.CTkButton(f,height=36,font=('Segoe UI',14),text='Lấy danh sách model từ Google',command=fetch_models).pack(anchor='w',pady=(0,8))
+        ctk.CTkLabel(f,font=('Segoe UI',14),text='AI gửi nội dung tới Google và dùng hạn mức tài khoản của bạn.\nKhóa được mã hóa theo tài khoản Windows, không ghi vào dự án.',wraplength=580).pack(anchor='w')
         def apply():
             try:
                 self.key=entry.get().strip();settings={'model':self.model.get(),'ttsModel':self.tts_model.get(),'key':protected_key(self.key) if self.key else ''}
                 target=DATA/'settings.json';temp=target.with_suffix('.tmp');temp.write_text(json.dumps(settings),encoding='utf-8');temp.replace(target);w.destroy()
             except OSError as e:messagebox.showerror('Chưa lưu được',str(e),parent=w)
-        ttk.Button(f,text='Lưu cài đặt',command=apply).pack(anchor='e',pady=10)
+        ctk.CTkButton(f,height=36,font=('Segoe UI',14),text='Lưu cài đặt',command=apply).pack(anchor='e',pady=10)
 
     def start(self,fn,done):
         if self.busy:return
-        self.busy=True;self.cancel.clear()
+        self.busy=True;self.cancel.clear();self.progress.configure(mode='indeterminate');self.progress.start()
         for b in self.buttons:b.configure(state='disabled')
         self.cancel_button.configure(state='normal')
         def worker():
@@ -226,7 +181,7 @@ class App(tk.Tk):
             while True:
                 event=self.events.get_nowait()
                 if event[0]=='status':self.status.set(event[1]);continue
-                self.busy=False
+                self.busy=False;self.progress.stop();self.progress.configure(mode='determinate');self.progress.set(0)
                 for b in self.buttons:b.configure(state='normal')
                 self.cancel_button.configure(state='disabled')
                 if event[0]=='error':self.status.set(event[1]);messagebox.showerror('Chưa hoàn tất',event[1])
@@ -247,6 +202,38 @@ class App(tk.Tk):
     def preview(self):
         try:self.commit();webbrowser.open(core.build_html(self.data,self.folder,True).as_uri());self.refresh()
         except (ValueError,OSError) as e:messagebox.showerror('Chưa xem được',str(e))
+
+    def reset_output(self):
+        self.last_output=None;self.output_label.set('Video đã xuất sẽ hiện ở đây')
+        for b in self.result_buttons:b.configure(state='disabled')
+
+    def complete_export(self,path):
+        self.last_output=Path(path);self.output_label.set('Đã xuất: '+Path(path).name)
+        for b in self.result_buttons:b.configure(state='normal')
+        self.status.set('Video đã sẵn sàng · Mở xem hoặc bấm Tải video để lưu thêm một bản.')
+
+    def download(self):
+        if not self.last_output:return
+        p=filedialog.asksaveasfilename(title='Tải video · Chọn nơi lưu bản sao',defaultextension='.mp4',
+                initialfile=self.last_output.name,filetypes=[('Video MP4','*.mp4')])
+        if not p:return
+        try:core.copy_video(self.last_output,p);self.status.set('Đã lưu video: '+str(p))
+        except (ValueError,OSError) as e:messagebox.showerror('Chưa lưu được video',str(e))
+
+    def open_video(self):
+        if not self.last_output:return
+        try:
+            if not self.last_output.is_file():raise OSError('Không tìm thấy video ở vị trí đã xuất.')
+            if os.name=='nt':os.startfile(str(self.last_output))
+            else:webbrowser.open(self.last_output.as_uri())
+        except OSError as e:messagebox.showerror('Chưa mở được video',str(e))
+
+    def open_folder(self):
+        if not self.last_output:return
+        try:
+            if os.name=='nt':os.startfile(str(self.last_output.parent))
+            else:webbrowser.open(self.last_output.parent.as_uri())
+        except OSError as e:messagebox.showerror('Chưa mở được thư mục',str(e))
 
     def tts(self):
         if not self.key:self.settings();return
@@ -283,7 +270,7 @@ class App(tk.Tk):
         except ValueError as e:messagebox.showerror('Kiểm tra cảnh',str(e));return
         p=filedialog.asksaveasfilename(defaultextension='.mp4',initialfile='Video-cua-toi.mp4',filetypes=[('MP4','*.mp4')])
         if not p:return
-        def done(path):self.status.set('Đã xuất: '+str(path));messagebox.showinfo('Hoàn tất','Video đã lưu tại:\n'+str(path))
+        def done(path):self.complete_export(path)
         self.start(lambda:core.render(data,self.folder,p,self.cancel,lambda s:self.events.put(('status',s))),done)
 
     def close(self):
@@ -293,5 +280,25 @@ class App(tk.Tk):
 
 if __name__=='__main__':
     if '--smoke-test' in sys.argv:
-        app=App();app.update();assert app.scenes.size()==3;app.commit();app.destroy();sys.exit(0)
+        from unittest.mock import patch
+        app=App();app.update();assert app.scenes.size()==3;app.commit()
+        assert all(b.cget('state')=='disabled' for b in app.result_buttons)
+        source=app.folder/'exported.mp4';source.write_bytes(b'smoke-video')
+        target=app.folder/'downloaded.mp4';app.complete_export(source)
+        with patch('tkinter.filedialog.asksaveasfilename',return_value=str(target)):app.download()
+        assert target.read_bytes()==source.read_bytes()
+        assert all(b.cget('state')=='normal' for b in app.result_buttons)
+        app.geometry('1100x720');app.update()
+        for b in app.result_buttons:
+            assert b.winfo_height()>10 and b.winfo_width()>40
+            assert b.winfo_rooty()+b.winfo_height()<=app.winfo_rooty()+app.winfo_height()+2
+        app.settings();app.update()
+        for child in app.winfo_children():
+            if isinstance(child,ctk.CTkToplevel):child.grab_release();child.destroy()
+        if os.environ.get('CINECODE_SCREENSHOT'):
+            from PIL import ImageGrab
+            app.geometry('1220x900');app.reset_output();app.status.set('Sẵn sàng · Có thể thử dự án mẫu không cần AI.');app.update()
+            path=Path(os.environ['CINECODE_SCREENSHOT']);path.parent.mkdir(parents=True,exist_ok=True)
+            ImageGrab.grab(bbox=(app.winfo_rootx(),app.winfo_rooty(),app.winfo_rootx()+app.winfo_width(),app.winfo_rooty()+app.winfo_height())).save(path)
+        app.destroy();sys.exit(0)
     App().mainloop()

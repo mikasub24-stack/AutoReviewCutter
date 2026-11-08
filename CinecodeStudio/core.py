@@ -10,13 +10,14 @@ import subprocess
 import sys
 import re
 import time
+import tempfile
 from email.utils import parsedate_to_datetime
 from datetime import datetime, timezone
 import urllib.request
 import wave
 
 ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).parent))
-VERSION = '0.1.1'
+VERSION = '0.1.2'
 STYLES = {'Điện ảnh': ['#091321', '#67e8d2'], 'Ấm áp': ['#261b22', '#ffc58e'],
           'Giải thích': ['#101832', '#a0b5ff']}
 
@@ -234,6 +235,18 @@ def save_project(path, data):
     tmp = path.with_suffix('.tmp')
     tmp.write_text(json.dumps(validate(data), ensure_ascii=False, indent=2), encoding='utf-8')
     tmp.replace(path)
+
+def copy_video(source, destination):
+    source, destination = Path(source), Path(destination)
+    if not source.is_file(): raise ValueError('Video không còn ở vị trí đã xuất. Hãy xuất lại hoặc tìm file bạn đã chuyển.')
+    if source.resolve() == destination.resolve(): return destination
+    with tempfile.NamedTemporaryFile(dir=destination.parent, prefix='.cinecode-copy-', delete=False) as f:
+        temporary=Path(f.name)
+    try:
+        shutil.copy2(source,temporary)
+        temporary.replace(destination)
+    finally: temporary.unlink(missing_ok=True)
+    return destination
 
 def build_html(data, folder, preview=False):
     data = copy.deepcopy(validate(data))

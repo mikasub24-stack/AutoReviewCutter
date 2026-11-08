@@ -40,6 +40,16 @@ class CoreTests(unittest.TestCase):
             d=core.demo();d['scenes'][0]['image']=str(Path(td)/'missing.png')
             with self.assertRaisesRegex(ValueError,'Không tìm thấy ảnh'):core.build_html(d,td)
 
+    def test_download_copy_keeps_original_and_supports_same_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            source=Path(td)/'đã xuất.mp4';source.write_bytes(b'video-content')
+            target=Path(td)/'tải video.mp4';target.write_bytes(b'older-copy')
+            core.copy_video(source,target)
+            self.assertEqual(source.read_bytes(),target.read_bytes())
+            self.assertEqual(core.copy_video(source,source),source)
+            self.assertEqual(source.read_bytes(),b'video-content')
+            self.assertFalse(list(Path(td).glob('.cinecode-copy-*')))
+
     def test_english_narration_request_and_project(self):
         with patch.object(core,'request_ai',return_value={'candidates':[{'content':{'parts':[{'text':json.dumps(core.demo())}]}}]}) as request:
             data=core.generate('secret','gemini-2.5-flash','A calm morning',30,'Điện ảnh','16:9','English')

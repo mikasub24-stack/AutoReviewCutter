@@ -6,3 +6,5 @@
 - Python 3.12 và Tcl/Tk: các giấy phép trong _internal của bản đóng gói PyInstaller.
 
 Mã giao diện và engine Canvas riêng của CinecodeStudio trong repo này được cấp phép MIT. Tài sản ảnh/nhạc/lời đọc người dùng chọn chịu giấy phép riêng.
+
+- CustomTkinter 5.2.2: https://github.com/TomSchimansky/CustomTkinter (MIT); darkdetect (BSD-3-Clause); Pillow 12 (MIT-CMU/HPND). Giấy phép được kèm cùng bản đóng gói.
