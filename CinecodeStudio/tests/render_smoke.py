@@ -40,3 +40,16 @@ with tempfile.TemporaryDirectory(prefix='cinecode-tiếng-Việt-') as td:
     if os.environ.get('CINECODE_CAPTURE_FLAGS'):cmd+=['--flags',os.environ['CINECODE_CAPTURE_FLAGS']]
     subprocess.run(cmd,check=True)
     print('RENDER PASS: Unicode path, portrait MP4, audio mix, deterministic frames')
+    long=core.demo();long['scenes']=[dict(long['scenes'][i%3],duration=15) for i in range(40)]
+    html=core.build_html(long,folder/'long')
+    cmd=[core.executable('node'),str(core.ROOT/'vendor/capture.mjs'),'--url',str(html),'--probe']
+    if os.environ.get('CINECODE_CAPTURE_FLAGS'):cmd+=['--flags',os.environ['CINECODE_CAPTURE_FLAGS']]
+    probe=subprocess.run(cmd,check=True,capture_output=True,text=True,encoding='utf-8')
+    assert '18000 frames' in probe.stdout,probe.stdout
+    frames=folder/'long-frames'
+    cmd=[core.executable('node'),str(core.ROOT/'vendor/capture.mjs'),'--url',str(html),
+         '--frames','0,9000,17999','--out',str(frames),'--format','jpeg']
+    if os.environ.get('CINECODE_CAPTURE_FLAGS'):cmd+=['--flags',os.environ['CINECODE_CAPTURE_FLAGS']]
+    subprocess.run(cmd,check=True)
+    assert len(list(frames.glob('*.jpg')))==3
+    print('LONG TIMELINE PASS: 600 seconds, 18000 frames, first/middle/last frames captured')

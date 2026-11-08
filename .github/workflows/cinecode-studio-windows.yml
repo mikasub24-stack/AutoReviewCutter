@@ -67,7 +67,7 @@ jobs:
           & 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe' CinecodeStudio/installer.iss
           if ($LASTEXITCODE) { throw 'Installer failed' }
           $install = Join-Path $env:RUNNER_TEMP 'Cinecode-installed'
-          $p = Start-Process dist-cinecode/CinecodeStudio-0.1.0-Setup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
+          $p = Start-Process dist-cinecode/CinecodeStudio-0.1.1-Setup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
           if ($p.ExitCode) { throw 'Installation failed' }
           $p = Start-Process "$install/CinecodeStudio.exe" -ArgumentList '--smoke-test' -Wait -PassThru
           if ($p.ExitCode) { throw 'Installed GUI failed' }
@@ -76,6 +76,6 @@ jobs:
           'Core, GUI, real Chromium/FFmpeg render, deterministic frame, packaged GUI and installed GUI checks passed.' | Out-File $env:GITHUB_STEP_SUMMARY -Append
       - uses: actions/upload-artifact@v4
         with:
-          name: CinecodeStudio-0.1.0-Installer
+          name: CinecodeStudio-0.1.1-Installer
           path: dist-cinecode/*
           if-no-files-found: error

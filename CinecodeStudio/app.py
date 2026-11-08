@@ -69,7 +69,7 @@ class App(tk.Tk):
         self.brief.insert('1.0', 'Làm video ngắn về việc sống chậm lại, nhẹ nhàng và tích cực.')
         opts = ttk.Frame(body); opts.pack(fill='x', pady=(0,12))
         self.duration = tk.StringVar(value='30'); self.ratio = tk.StringVar(value='16:9'); self.style = tk.StringVar(value='Điện ảnh')
-        for label, variable, values in [('Thời lượng (giây)', self.duration, ['15','30','60','120']), ('Khung hình', self.ratio, ['16:9','9:16','1:1']), ('Phong cách', self.style, list(core.STYLES))]:
+        for label, variable, values in [('Thời lượng (giây)', self.duration, ['15','30','60','120','180','300','600']), ('Khung hình', self.ratio, ['16:9','9:16','1:1']), ('Phong cách', self.style, list(core.STYLES))]:
             ttk.Label(opts, text=label).pack(side='left', padx=(0,6))
             ttk.Combobox(opts, textvariable=variable, values=values, state='readonly', width=13).pack(side='left', padx=(0,14))
         self.button(opts, 'AI viết kịch bản', self.generate).pack(side='right')
@@ -185,12 +185,24 @@ class App(tk.Tk):
         if p:self.data[kind]=p;self.refresh()
 
     def settings(self):
-        w=tk.Toplevel(self);w.title('Cài đặt AI');w.geometry('540x340');w.transient(self);w.grab_set()
+        w=tk.Toplevel(self);w.title('Cài đặt AI');w.geometry('600x400');w.transient(self);w.grab_set()
         f=ttk.Frame(w,padding=20);f.pack(fill='both',expand=True)
         ttk.Label(f,text='Khóa Gemini API · chỉ nhập tại đây').pack(anchor='w')
         entry=ttk.Entry(f,show='•');entry.insert(0,self.key);entry.pack(fill='x',pady=8)
-        ttk.Label(f,text='Mô hình viết kịch bản').pack(anchor='w');ttk.Entry(f,textvariable=self.model).pack(fill='x',pady=8)
-        ttk.Label(f,text='Mô hình đọc (TTS)').pack(anchor='w');ttk.Entry(f,textvariable=self.tts_model).pack(fill='x',pady=8)
+        ttk.Label(f,text='Model viết kịch bản · chọn hoặc nhập tên').pack(anchor='w')
+        text_models=ttk.Combobox(f,textvariable=self.model,values=[self.model.get(),'gemini-2.5-flash','gemini-2.5-pro']);text_models.pack(fill='x',pady=8)
+        ttk.Label(f,text='Model đọc (TTS) · chọn hoặc nhập tên').pack(anchor='w')
+        tts_models=ttk.Combobox(f,textvariable=self.tts_model,values=[self.tts_model.get(),'gemini-2.5-flash-preview-tts']);tts_models.pack(fill='x',pady=8)
+        def fetch_models():
+            key=entry.get().strip()
+            def done(result):
+                if not w.winfo_exists():return
+                text,tts=result;text_models.configure(values=sorted(set(text+[self.model.get()])));tts_models.configure(values=sorted(set(tts+[self.tts_model.get()])))
+                self.status.set(f'Đã lấy danh sách: {len(text)} model viết, {len(tts)} model đọc. Chọn model rồi Lưu cài đặt.')
+                messagebox.showinfo('Đã kết nối Google',f'Có {len(text)} model viết, {len(tts)} model đọc trong danh sách. Quyền và hạn mức được kiểm tra khi dùng model.',parent=w)
+            self.status.set('Đang lấy danh sách model từ Google…')
+            self.start(lambda:core.list_models(key,self.cancel,lambda s:self.events.put(('status',s))),done)
+        ttk.Button(f,text='Lấy danh sách model từ Google',command=fetch_models).pack(anchor='w',pady=(0,8))
         ttk.Label(f,text='AI gửi nội dung tới Google và dùng hạn mức tài khoản của bạn.\nKhóa được mã hóa theo tài khoản Windows, không ghi vào dự án.',wraplength=480).pack(anchor='w')
         def apply():
             try:
@@ -230,7 +242,7 @@ class App(tk.Tk):
         def done(data):
             if self.cancel.is_set():self.status.set('Đã hủy nhận kịch bản.');return
             self.data=data;self.current=0;self.refresh();self.load_scene();self.status.set('Đã có kịch bản · xem và sửa từng cảnh trước khi xuất.')
-        self.start(lambda:core.generate(*args),done)
+        self.start(lambda:core.generate(*args,cancelled=self.cancel,status=lambda s:self.events.put(('status',s))),done)
 
     def preview(self):
         try:self.commit();webbrowser.open(core.build_html(self.data,self.folder,True).as_uri());self.refresh()
@@ -251,7 +263,7 @@ class App(tk.Tk):
                 if self.cancel.is_set():raise RuntimeError('Đã hủy tạo lời đọc.')
                 self.events.put(('status',f'Đang tạo lời đọc cảnh {i+1}/{len(snapshot["scenes"])}…'))
                 if s['narration'].strip():
-                    part=self.folder/f'voice-{i}.wav';length=core.synthesize(key,s['narration'],part,language=snapshot['narrationLanguage'],model=tts_model)
+                    part=self.folder/f'voice-{i}.wav';length=core.synthesize(key,s['narration'],part,language=snapshot['narrationLanguage'],model=tts_model,cancelled=self.cancel,status=lambda s:self.events.put(('status',s)))
                     import wave
                     with wave.open(str(part),'rb') as w:pcm=w.readframes(w.getnframes())
                     s['duration']=max(s['duration'],length+.3)

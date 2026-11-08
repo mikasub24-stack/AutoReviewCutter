@@ -1,6 +1,13 @@
-# Cinecode Studio 0.1.0
+# Cinecode Studio 0.1.1
 
 Ứng dụng Windows 10/11 x64 có giao diện tiếng Việt, dùng bộ xuất khung hình Cinecode của sarpstar. Bản đầu dựng phim ngắn chữ/ảnh và motion graphics với ba bảng màu, chưa có trình dựng nhân vật 3D hoặc toàn bộ quy trình agent của Cinecode.
+
+## 0.1.1 · Video 10 phút, chọn model và lỗi Gemini
+
+- Chọn nhanh 600 giây; AI viết theo từng phần tối đa 120 giây, nối ngữ cảnh, tối đa 40 cảnh. Tổng thời lượng được căn theo khung hình về đúng lựa chọn. Tạo lời đọc có thể kéo dài cảnh: nếu tổng vượt 10 phút, app yêu cầu rút gọn thay vì cắt mất nội dung.
+- Cài đặt AI có hộp chọn model viết/model đọc (vẫn gõ tên được) và nút lấy danh sách từ Google. Danh sách không bảo đảm tài khoản có hạn mức dùng từng model.
+- HTTP 503/500/502/504 hoặc giới hạn tạm thời 429 được thử tối đa 3 lần; hiện thời gian chờ, tôn trọng Retry-After ngắn và cho hủy trong lúc chờ. Không thử lại lỗi khóa/quyền/model hoặc hết hạn mức ngày. Không đổi model âm thầm.
+- Hiện thông báo cụ thể từ Google (đã ẩn khóa), giữ nguyên kịch bản khi yêu cầu thất bại. Không cam kết retry sẽ xử lý được gián đoạn dịch vụ kéo dài.
 
 ## Dùng nhanh
 

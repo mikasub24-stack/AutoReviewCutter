@@ -21,6 +21,6 @@ let y=textBlock(s.title,H*.46+rise,Math.min(W*.065,72),true,'#ffffff',H*.22);tex
 x.font=`${Math.max(14,W*.014)}px "Segoe UI",Arial,sans-serif`;x.fillStyle=accent;x.fillText(String(idx+1).padStart(2,'0')+' / '+String(project.scenes.length).padStart(2,'0'),W*.1,H*.91);x.globalAlpha=1;
 };
 window.captureFrame=function(i,mime='image/png',quality=.94){renderFrame(i);return c.toDataURL(mime,quality)};
-window.READY=Promise.all(project.scenes.filter(s=>s.image).map(s=>new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{images.set(s.image,img);resolve()};img.onerror=()=>reject(Error('Không đọc được ảnh'));img.src=s.image}))).then(()=>({frames:Math.ceil(total*fps),fps,width:W,height:H,renderer:'Cinecode Studio Canvas 2D'}));
+window.READY=Promise.all(project.scenes.filter(s=>s.image).map(s=>new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{images.set(s.image,img);resolve()};img.onerror=()=>reject(Error('Không đọc được ảnh'));img.src=s.image}))).then(()=>({frames:Math.round(total*fps),fps,width:W,height:H,renderer:'Cinecode Studio Canvas 2D'}));
 READY.then(()=>{if(new URLSearchParams(location.search).get('capture')!=='1'){const begin=performance.now();function tick(now){renderFrame(Math.floor(((now-begin)/1000%total)*fps));requestAnimationFrame(tick)}requestAnimationFrame(tick)}else renderFrame(0)});
 </script></html>

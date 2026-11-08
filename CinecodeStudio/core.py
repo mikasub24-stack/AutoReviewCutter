@@ -8,11 +8,15 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import re
+import time
+from email.utils import parsedate_to_datetime
+from datetime import datetime, timezone
 import urllib.request
 import wave
 
 ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).parent))
-VERSION = '0.1.0'
+VERSION = '0.1.1'
 STYLES = {'Điện ảnh': ['#091321', '#67e8d2'], 'Ấm áp': ['#261b22', '#ffc58e'],
           'Giải thích': ['#101832', '#a0b5ff']}
 
@@ -38,7 +42,7 @@ def validate(data):
             raise ValueError('Thời lượng mỗi cảnh phải từ 1 đến 60 giây.')
         result['scenes'].append({k: str(scene.get(k, ''))[:5000] for k in ('title', 'text', 'narration', 'image')}
                                | {'duration': duration})
-    if sum(s['duration'] for s in result['scenes']) > 600:
+    if sum(s['duration'] for s in result['scenes']) > 600 + 1e-6:
         raise ValueError('Bản đầu hỗ trợ video tối đa 10 phút.')
     return result
 
@@ -48,43 +52,137 @@ def parse_ai(text):
         text = text.split('\n', 1)[1].rsplit('```', 1)[0]
     return validate(json.loads(text))
 
-def request_ai(key, model, body, interactions=False):
+def service_error(error, key):
+    """Keep Google's useful explanation, redact credentials, and classify retry hints."""
+    raw = error.read(65536).decode('utf-8', errors='replace')
+    try:
+        data = json.loads(raw).get('error', {})
+        if not isinstance(data, dict): data = {}
+    except (ValueError, AttributeError): data = {}
+    message = str(data.get('message', '')).replace(key.strip(), '[khóa đã ẩn]')
+    message = re.sub(r'AIza[\w-]+', '[khóa đã ẩn]', message)
+    message = ' '.join(message.split())[:500]
+    daily = any(w in raw.lower() for w in ('perday', 'per_day', 'per day', 'daily'))
+    delay = 0.0
+    for info in data.get('details', []) if isinstance(data.get('details'), list) else []:
+        if isinstance(info, dict):
+            match = re.fullmatch(r'(\d+(?:\.\d+)?)s', str(info.get('retryDelay', '')))
+            if match: delay = max(delay, float(match[1]))
+    retry_after = error.headers.get('Retry-After', '') if error.headers else ''
+    try: delay = max(delay, float(retry_after))
+    except ValueError:
+        try: delay = max(delay, (parsedate_to_datetime(retry_after) - datetime.now(timezone.utc)).total_seconds())
+        except (TypeError, ValueError, OverflowError): pass
+    if not math.isfinite(delay): delay = 0
+    explanations = {
+        400: 'Yêu cầu không được Google chấp nhận; xem chi tiết bên dưới.',
+        401: 'Google không chấp nhận khóa API. Kiểm tra khóa trong Cài đặt AI.',
+        403: 'Tài khoản/dự án chưa được phép dùng API hoặc mô hình này. Kiểm tra quyền và thanh toán trong Google AI Studio.',
+        404: 'Google không tìm thấy mô hình hoặc API này. Kiểm tra tên mô hình trong Cài đặt AI.',
+        429: 'Đã hết hạn mức trong ngày.' if daily else 'Google đang giới hạn số yêu cầu hoặc hạn mức của dự án.',
+        500: 'Gemini gặp lỗi máy chủ tạm thời.',
+        502: 'Cổng dịch vụ Gemini tạm thời bị lỗi.',
+        503: 'Gemini tạm thời không phục vụ được (máy chủ bận hoặc dịch vụ gián đoạn).',
+        504: 'Dịch vụ Gemini chưa phản hồi kịp.'}
+    detail = f'Gemini HTTP {error.code} · ' + explanations.get(error.code, 'Google từ chối yêu cầu.')
+    if message: detail += '\nGoogle: ' + message
+    return detail, delay, daily
+
+def request_ai(key, model, body, interactions=False, cancelled=None, status=None, catalog=False):
     # The key never appears in a URL, a project file, or diagnostic logs.
     if not key.strip():
         raise ValueError('Nhập khóa Gemini trong Cài đặt AI trước.')
     if not model or any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._' for c in model):
         raise ValueError('Tên mô hình không hợp lệ.')
-    endpoint = 'interactions' if interactions else 'models/' + model + ':generateContent'
+    endpoint = 'models?pageSize=1000' if catalog else 'interactions' if interactions else 'models/' + model + ':generateContent'
     req = urllib.request.Request('https://generativelanguage.googleapis.com/v1beta/' + endpoint,
-          data=json.dumps(body).encode(), headers={'Content-Type': 'application/json', 'x-goog-api-key': key.strip()})
-    try:
-        with urllib.request.build_opener(NoRedirect).open(req, timeout=180) as r:
-            return json.load(r)
-    except urllib.error.HTTPError as e:
-        # Provider response bodies can echo request data; keep the error message bounded and private.
-        raise RuntimeError(f'Gemini trả lỗi HTTP {e.code}. Kiểm tra khóa, mô hình, hạn mức và kết nối.') from None
+          data=None if catalog else json.dumps(body).encode(), headers={'Content-Type': 'application/json', 'x-goog-api-key': key.strip()})
+    opener = urllib.request.build_opener(NoRedirect)
+    for attempt in range(3):
+        if cancelled is not None and cancelled.is_set(): raise RuntimeError('Đã hủy tác vụ AI.')
+        try:
+            with opener.open(req, timeout=180) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            detail, retry_after, daily = service_error(e, key)
+            e.close()
+            retryable = e.code in (429, 500, 502, 503, 504) and not daily
+            delay = max((2, 5, 10)[attempt], retry_after)
+            if retryable and attempt < 2 and delay <= 25:
+                if status: status(f'Gemini HTTP {e.code} · chờ {math.ceil(delay)} giây, thử lại lần {attempt+2}/3…')
+                if cancelled is not None:
+                    if cancelled.wait(delay): raise RuntimeError('Đã hủy tác vụ AI.') from None
+                else: time.sleep(delay)
+                continue
+            if retryable:
+                detail += ('\nĐã thử tối đa 3 lần. Hãy thử lại sau; app giữ nguyên kịch bản hiện tại.'
+                           if attempt == 2 else f'\nGoogle yêu cầu chờ {math.ceil(delay)} giây. Hãy thử lại sau thời gian này.')
+            raise RuntimeError(detail + '\nMô hình: ' + model) from None
+        except urllib.error.URLError:
+            raise RuntimeError('Không kết nối được Gemini. Kiểm tra mạng, proxy hoặc chứng chỉ. App không tự gửi lại yêu cầu khi chưa rõ kết quả.') from None
 
-def generate(key, model, brief, duration, style, ratio, language='Tiếng Việt'):
-    prompt = ('Bạn là biên kịch video tiếng Việt. Chỉ trả JSON với title và scenes. '
-              'Mỗi scene có title (ngắn), text (tối đa 20 từ), narration (lời đọc theo ngôn ngữ yêu cầu), duration (1-60 giây). '
-              'Tổng duration đúng ' + str(duration) + ' giây, 3-12 cảnh. Đây là phim chữ/ảnh với chuyển động đồ họa, '
-              'không tự tạo footage người thật. Không bịa nguồn hay sự kiện. '
-              'Viết narration bằng ' + language + '. Nội dung yêu cầu:\n' + brief)
-    r = request_ai(key, model, {'contents': [{'parts': [{'text': prompt}]}],
-                  'generationConfig': {'responseMimeType': 'application/json'}})
-    try:
-        data = parse_ai(''.join(p.get('text', '') for p in r['candidates'][0]['content']['parts']))
-    except (KeyError, IndexError):
-        raise ValueError('AI chưa trả kịch bản. Hãy thử nội dung khác.') from None
-    data.update(style=style, ratio=ratio, narrationLanguage=language)
-    return data
+def list_models(key, cancelled=None, status=None):
+    result = request_ai(key, 'models', {}, catalog=True, cancelled=cancelled, status=status)
+    text, tts = [], []
+    for item in result.get('models', []):
+        name = str(item.get('name', '')).removeprefix('models/')
+        if not re.fullmatch(r'[a-zA-Z0-9._-]+', name): continue
+        if 'tts' in name.lower(): tts.append(name)
+        elif 'generateContent' in item.get('supportedGenerationMethods', []): text.append(name)
+    if not text and not tts: raise ValueError('Google chưa trả model phù hợp. Bạn vẫn có thể nhập tên model thủ công.')
+    return sorted(set(text)), sorted(set(tts))
 
-def synthesize(key, text, path, voice='Kore', language='Tiếng Việt', model='gemini-3.8-flash-tts'):
+def fit_duration(scenes, duration):
+    """Allocate whole 30fps frames, with no silent truncation of a long script."""
+    target = round(duration * 30)
+    if not len(scenes) * 30 <= target <= len(scenes) * 1800:
+        raise ValueError('AI trả thiếu/thừa cảnh cho thời lượng yêu cầu. Hãy thử viết lại kịch bản.')
+    weight = sum(s['duration'] for s in scenes)
+    ticks = [max(30, min(1800, round(s['duration'] / weight * target))) for s in scenes]
+    delta = target - sum(ticks)
+    while delta:
+        for i in range(len(ticks)):
+            if delta > 0 and ticks[i] < 1800: ticks[i] += 1; delta -= 1
+            elif delta < 0 and ticks[i] > 30: ticks[i] -= 1; delta += 1
+            if not delta: break
+    for s, frames in zip(scenes, ticks): s['duration'] = frames / 30
+
+def generate(key, model, brief, duration, style, ratio, language='Tiếng Việt', cancelled=None, status=None):
+    if not 3 <= duration <= 600: raise ValueError('Chọn thời lượng từ 3 đến 600 giây.')
+    parts = math.ceil(duration / 120)
+    scenes, title = [], 'Video của tôi'
+    for part in range(parts):
+        if cancelled is not None and cancelled.is_set(): raise RuntimeError('Đã hủy viết kịch bản.')
+        seconds = round((part+1)*duration/parts) - round(part*duration/parts)
+        budget = min(8, max(3, math.ceil(seconds / 15)))
+        if status: status(f'Đang viết phần {part+1}/{parts} · {seconds} giây…')
+        context = json.dumps(scenes[-2:], ensure_ascii=False)
+        prompt = ('Bạn là biên kịch video tiếng Việt. Chỉ trả JSON với title và scenes. '
+                  'Mỗi scene có title (ngắn), text (tối đa 20 từ), narration (lời đọc theo ngôn ngữ yêu cầu), duration (1-60 giây). '
+                  f'Đây là phần {part+1}/{parts} của video tổng {duration} giây. Phần này dài {seconds} giây, '
+                  f'viết từ 3 đến {budget} cảnh. Đây là phim chữ/ảnh với chuyển động đồ họa, '
+                  'không tự tạo footage người thật. Không bịa nguồn hay sự kiện. '
+                  'Chỉ mở đầu ở phần đầu, chỉ kết luận ở phần cuối; các phần giữa nối tiếp nội dung, không nhắc lại. '
+                  'Viết narration bằng ' + language + '. Độ dài lời đọc phù hợp từng cảnh. Nội dung yêu cầu:\n' + brief +
+                  '\nHai cảnh cuối phần trước (nếu có):\n' + context)
+        r = request_ai(key, model, {'contents': [{'parts': [{'text': prompt}]}],
+                      'generationConfig': {'responseMimeType': 'application/json'}}, cancelled=cancelled, status=status)
+        try:
+            data = parse_ai(''.join(p.get('text', '') for p in r['candidates'][0]['content']['parts']))
+        except (KeyError, IndexError, json.JSONDecodeError):
+            raise ValueError(f'AI trả thiếu nội dung ở phần {part+1}/{parts}. Kịch bản đang mở vẫn được giữ.') from None
+        if len(data['scenes']) > budget: raise ValueError('AI trả quá nhiều cảnh. Hãy thử viết lại kịch bản.')
+        fit_duration(data['scenes'], seconds)
+        if part == 0: title = data['title']
+        scenes.extend(data['scenes'])
+    return validate(dict(title=title, scenes=scenes, style=style, ratio=ratio, narrationLanguage=language))
+
+def synthesize(key, text, path, voice='Kore', language='Tiếng Việt', model='gemini-3.8-flash-tts', cancelled=None, status=None):
     instruction = 'Read naturally and clearly in English.' if language == 'English' else 'Đọc tiếng Việt tự nhiên, rõ ràng.'
     if not model.startswith('gemini-2.5-'):
         r = request_ai(key, model, {'model': model, 'input': [{'type': 'user_input', 'content': [
             {'type': 'text', 'text': text, 'annotations': [{'type': 'speech_metadata', 'style': instruction}]}]}],
-            'response_format': {'type': 'audio'}, 'generation_config': {'speech_config': [{'voice': voice}]}}, interactions=True)
+            'response_format': {'type': 'audio'}, 'generation_config': {'speech_config': [{'voice': voice}]}}, interactions=True, cancelled=cancelled, status=status)
         blocks = [c for step in r.get('steps', []) if step.get('type') == 'model_output'
                   for c in step.get('content', []) if c.get('type') == 'audio']
         if not blocks: raise ValueError('Gemini chưa trả âm thanh. Kiểm tra mô hình TTS và quyền truy cập.')
@@ -100,7 +198,7 @@ def synthesize(key, text, path, voice='Kore', language='Tiếng Việt', model='
         'contents': [{'parts': [{'text': ('Read naturally and clearly in English:\n' if language == 'English'
                                         else 'Đọc tiếng Việt tự nhiên, rõ ràng:\n') + text}]}],
         'generationConfig': {'responseModalities': ['AUDIO'], 'speechConfig': {
-            'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': voice}}}}})
+            'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': voice}}}}}, cancelled=cancelled, status=status)
     try:
         audio = next(p['inlineData'] for p in r['candidates'][0]['content']['parts'] if 'inlineData' in p)
         if not audio.get('mimeType', '').startswith('audio/L16'):
