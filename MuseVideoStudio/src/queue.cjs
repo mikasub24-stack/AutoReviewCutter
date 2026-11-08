@@ -20,7 +20,7 @@ function resetRunFields(job, stage='pending') {
 class Queue {
   constructor({jobs=[],save,run,notify=()=>{},concurrency=1}){
     this.jobs=jobs.map((j,index)=>({...j,kind:kindOf(j.kind),order:Number.isSafeInteger(j.order)&&j.order>0?j.order:index+1,status:j.status==='running'?'interrupted':j.status}));
-    this.save=save;this.run=run;this.notify=notify;this.active=false;this.paused=true;this.kind=null;this.concurrency=concurrency;this.writes=Promise.resolve();this.controllers=new Map();this.runningPromise=null;
+    this.save=save;this.run=run;this.notify=notify;this.active=false;this.paused=true;this.kind=null;this.concurrency=concurrency;this.writes=Promise.resolve();this.controllers=new Map();this.cancels=new Map();this.runningPromise=null;
   }
   async publish(){const p=this.writes.then(()=>this.save(this.jobs));this.writes=p.catch(()=>{});await p;this.notify(this.jobs);}
   async add(items){
@@ -55,6 +55,18 @@ class Queue {
     job.references=[image.output];job.image=image.output;
     if(!job.mayHaveSubmitted)delete job.lockedInput;
   }
+  // Dừng RIÊNG một cảnh đang chạy mà không dừng cả hàng đợi.
+  //   mode 'again': bỏ lượt chờ này và đưa cảnh về «đang chờ» để gửi lại ngay (worker rảnh sẽ nhặt lại đúng cảnh này, vì cảnh đứng đầu hàng).
+  //   mode 'skip' : bỏ lượt chờ, cảnh thành «bị gián đoạn» (vẫn lấy lại video đã tạo được / gửi lại sau); các cảnh khác chạy tiếp.
+  // hold: Promise (vd lệnh bấm Dừng trong Muse) phải xong trước khi trả chỗ cho cảnh kế tiếp. Xong khi cảnh đã rời trạng thái «đang chạy».
+  async cancelJob(id,mode='skip',hold=null){
+    const job=this.jobs.find(j=>j.id===id),controller=this.controllers.get(id);
+    if(!job||job.status!=='running'||!controller)throw Error('Cảnh này không còn đang chạy.');
+    if(this.cancels.has(id))return;
+    this.cancels.set(id,{mode:mode==='again'?'again':'skip',hold:hold||Promise.resolve()});
+    controller.abort();
+    while(this.controllers.has(id))await new Promise(r=>setTimeout(r,20));
+  }
   pause(){this.paused=true;}
   async stop(){this.paused=true;for(const c of this.controllers.values())c.abort();if(this.runningPromise)await this.runningPromise;}
   async executeJob(job, runner, fresh) {
@@ -71,9 +83,19 @@ class Queue {
       if(typeof output!=='string'||!output.trim())throw Error(photo?'Chưa xác nhận được tệp ảnh đã lưu.':'Chưa xác nhận được tệp video tải xuống.');
       job.output=output;job.status='completed';job.stage='completed';job.stageMessage=photo?'Đã lưu ảnh về máy':'Đã tải và lưu video về máy';job.progress=100;
     } catch(error) {
-      job.status=controller.signal.aborted||error?.name==='AbortError'?'interrupted':'failed';
-      job.stage=job.status;job.error=error?.message||(isPhoto(job)?'Không xử lý được tác vụ ảnh.':'Không xử lý được tác vụ video.');job.stageMessage=job.error;this.paused=true;
-    } finally {job.finishedAt=new Date().toISOString();this.controllers.delete(job.id);}
+      const cancel=this.cancels.get(job.id);
+      if(cancel){
+        // Dừng RIÊNG cảnh này (nút trên thẻ): hàng đợi KHÔNG tạm dừng, tab / tài khoản còn lại chạy tiếp.
+        // Đợi lệnh bấm Dừng trong Muse xong rồi mới trả chỗ, để lượt gửi kế tiếp không bấm nhầm vào cảnh mới.
+        try{await cancel.hold;}catch{}
+        this.cancels.delete(job.id);
+        if(cancel.mode==='again'){delete job.resumeMode;delete job.late;resetRunFields(job);job.status='pending';}
+        else{job.status='interrupted';job.stage='interrupted';job.error='Đã dừng cảnh này. Bấm «Tìm / tải video đã tạo» để lấy kết quả nếu Muse đã làm xong, hoặc «Gửi lại prompt».';job.stageMessage=job.error;}
+      }else{
+        job.status=controller.signal.aborted||error?.name==='AbortError'?'interrupted':'failed';
+        job.stage=job.status;job.error=error?.message||(isPhoto(job)?'Không xử lý được tác vụ ảnh.':'Không xử lý được tác vụ video.');job.stageMessage=job.error;this.paused=true;
+      }
+    } finally {job.finishedAt=job.status==='pending'?null:new Date().toISOString();this.controllers.delete(job.id);this.cancels.delete(job.id);}
     await this.publish();
   }
   prepareResume(kind){

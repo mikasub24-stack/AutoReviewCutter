@@ -426,6 +426,12 @@ Gửi lại prompt|Resubmit prompt
 Video trước|Previous video
 Tạo lại|Regenerate
 Tạo lại cảnh này; giữ video cũ.|Regenerate this scene; keep the previous video.
+Dừng cảnh này|Stop this scene
+Tạo lại ngay|Restart now
+Không chờ cảnh này nữa; tab khác vẫn chạy tiếp.|Stop waiting for this scene; other tabs keep running.
+Dừng chờ và gửi lại prompt của cảnh này ngay.|Stop waiting and resend this scene's prompt now.
+Dừng chờ cảnh này? Các cảnh khác vẫn chạy tiếp. Cảnh này thành «Bị gián đoạn»: sau đó có thể «Tìm / tải video đã tạo» hoặc «Gửi lại prompt».|Stop waiting for this scene? Other scenes keep running. It becomes “Interrupted”: you can then use “Find / download generated video” or “Resubmit prompt”.
+Bấm dừng cảnh này trong Muse rồi gửi lại prompt ngay? Nếu Muse đang tạo dở thì phần đó bị bỏ.|Stop this scene in Muse and resend its prompt now? Anything Muse is still generating for it is discarded.
 Xóa|Remove
 Đưa về sửa|Edit scene
 Video đã tải|Saved video

@@ -263,3 +263,89 @@ test('Mẹo vặt: việc ảnh/clip giữ nguyên phase và dependsOn khi lưu 
   const again = new Queue({ ...base, jobs: saved.at(-1), run: async () => 'x' });
   assert.deepEqual(again.jobs.map(j => [j.phase, j.dependsOn, j.number]), [['image', '', 1], ['clip', 'image', 1]]);
 });
+// ---- Nút riêng trên thẻ cảnh: «Dừng cảnh này» / «Tạo lại ngay» (1.6.8) ----
+test('Dừng cảnh này: chỉ cảnh đó bị gián đoạn, hàng đợi KHÔNG tạm dừng, tab còn lại chạy tiếp các cảnh sau', async () => {
+  const hung = []; const done = [];
+  const q = new Queue({ ...base, concurrency: 2, run: async (j, slot, signal) => {
+    if (j.prompt === 'stuck') return new Promise((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(Error('x'), { name: 'AbortError' }))));
+    hung.push(slot); await new Promise(r => setTimeout(r, 5)); done.push(j.prompt); return j.prompt + '.mp4';
+  } });
+  await q.add(['stuck', 'b', 'c', 'd'].map(prompt => ({ prompt })));
+  const running = q.start();
+  await new Promise(r => setTimeout(r, 30));
+  const stuck = q.jobs[0]; assert.equal(stuck.status, 'running');
+  await q.cancelJob(stuck.id, 'skip');
+  await running;
+  assert.equal(stuck.status, 'interrupted'); assert.match(stuck.error, /Đã dừng cảnh này/);
+  assert.deepEqual(q.jobs.slice(1).map(j => j.status), ['completed', 'completed', 'completed']);
+  assert.equal(q.active, false);
+});
+test('Dừng cảnh này: chỉ một worker chạy cảnh còn lại, nó dừng thì tab kia vẫn tiếp tục (không bị paused)', async () => {
+  const q = new Queue({ ...base, concurrency: 2, run: async (j, slot, signal) => {
+    if (j.prompt === 'stuck') return new Promise((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(Error('x'), { name: 'AbortError' }))));
+    await new Promise(r => setTimeout(r, 40)); return j.prompt + '.mp4';
+  } });
+  await q.add(['stuck', 'b', 'c'].map(prompt => ({ prompt })));
+  const running = q.start(); await new Promise(r => setTimeout(r, 15));
+  await q.cancelJob(q.jobs[0].id, 'skip');
+  assert.equal(q.paused, false);
+  await running;
+  assert.deepEqual(q.jobs.map(j => j.status), ['interrupted', 'completed', 'completed']);
+});
+test('Tạo lại ngay: cảnh về hàng đợi và được gửi lại ngay (đúng 1 lần nữa), các cảnh khác không bị đụng', async () => {
+  const calls = []; let first = true;
+  const q = new Queue({ ...base, concurrency: 2, run: async (j, slot, signal) => {
+    calls.push(j.prompt);
+    if (j.prompt === 'stuck' && first) { first = false; return new Promise((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(Error('x'), { name: 'AbortError' })))); }
+    await new Promise(r => setTimeout(r, 5)); return j.prompt + '.mp4';
+  } });
+  await q.add(['stuck', 'b', 'c'].map(prompt => ({ prompt })));
+  const running = q.start(); await new Promise(r => setTimeout(r, 20));
+  const id = q.jobs[0].id; q.jobs[0].mayHaveSubmitted = true; q.jobs[0].late = true;
+  await q.cancelJob(id, 'again');
+  await running;
+  assert.deepEqual(q.jobs.map(j => j.status), ['completed', 'completed', 'completed']);
+  assert.equal(calls.filter(p => p === 'stuck').length, 2);
+  assert.equal(calls.filter(p => p === 'b').length, 1); assert.equal(calls.filter(p => p === 'c').length, 1);
+  assert.equal(q.jobs[0].late, undefined); assert.equal(q.jobs[0].error, '');
+});
+test('Dừng / Tạo lại riêng cảnh: đợi lệnh dừng trong Muse xong rồi mới trả chỗ cho lượt gửi sau', async () => {
+  const order = []; let first = true;
+  const q = new Queue({ ...base, concurrency: 1, run: async (j, slot, signal) => {
+    order.push('run:' + j.prompt);
+    if (first) { first = false; return new Promise((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(Error('x'), { name: 'AbortError' })))); }
+    return 'ok.mp4';
+  } });
+  await q.add([{ prompt: 'one' }]);
+  const running = q.start(); await new Promise(r => setTimeout(r, 15));
+  const hold = new Promise(r => setTimeout(() => { order.push('muse-stopped'); r(); }, 60));
+  await q.cancelJob(q.jobs[0].id, 'again', hold);
+  await running;
+  assert.deepEqual(order, ['run:one', 'muse-stopped', 'run:one']);
+  assert.equal(q.jobs[0].status, 'completed');
+});
+test('cancelJob từ chối cảnh không đang chạy; «Dừng» toàn hàng đợi vẫn tạm dừng như cũ', async () => {
+  const q = new Queue({ ...base, run: (j, s, signal) => new Promise((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(Error('x'), { name: 'AbortError' })))) });
+  await q.add([{ prompt: 'a' }, { prompt: 'b' }]);
+  await assert.rejects(q.cancelJob(q.jobs[0].id, 'skip'), /không còn đang chạy/);
+  const running = q.start(); await new Promise(r => setTimeout(r, 15));
+  await q.stop(); await running;
+  assert.equal(q.paused, true); assert.deepEqual(q.jobs.map(j => j.status), ['interrupted', 'pending']);
+});
+test('10 trình duyệt chạy song song: dừng / tạo lại MỘT cảnh kẹt không ảnh hưởng 9 tab còn lại', async () => {
+  const slotsSeen = new Set(); let stuckSlot = -1;
+  const q = new Queue({ ...base, concurrency: 10, run: async (j, slot, signal) => {
+    slotsSeen.add(slot);
+    if (j.prompt === 'stuck') { stuckSlot = slot; return new Promise((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(Error('x'), { name: 'AbortError' })))); }
+    await new Promise(r => setTimeout(r, 25)); return j.prompt + '.mp4';
+  } });
+  await q.add(['a', 'b', 'stuck', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's'].map(prompt => ({ prompt })));
+  const running = q.start(); await new Promise(r => setTimeout(r, 12));
+  assert.equal(q.jobs.filter(j => j.status === 'running').length, 10);
+  await q.cancelJob(q.jobs[2].id, 'skip');
+  await running;
+  assert.equal(slotsSeen.size, 10);
+  assert.equal(q.jobs[2].status, 'interrupted');
+  assert.equal(q.jobs.filter(j => j.status === 'completed').length, 19);
+  assert.equal(q.paused, false);
+});

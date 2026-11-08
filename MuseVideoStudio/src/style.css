@@ -191,6 +191,10 @@ main { margin-left: var(--sidebar); width: calc(100% - var(--sidebar)); max-widt
 .cardActions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
 .cardActions button { padding: 6px 8px; background: #20314a; border-color: #334864; font-size: 10px; color: #b7c9e1; }
 .cardActions:not(:has(button:not([hidden]))) { display: none; }
+/* Thẻ đang chạy có thêm «Dừng cảnh này» / «Tạo lại ngay»: hàng nút gọn để 4 thẻ vẫn vừa một màn hình. */
+.card[data-status=running] .cardActions { margin-top: 6px; }
+.card[data-status=running] .cardActions button { padding: 4px 8px; }
+.cardActions button.danger { border-color: #6b3a3f; background: #3a2025; color: #f0b9bf; }
 .empty { text-align: center; padding: 48px 20px 60px; border: 1px dashed #2c405e; border-radius: 12px; background: #101b2a; }
 .emptyIcon { display: block; font-size: 40px; line-height: 1.2; color: #9b845f; margin-bottom: 16px; }
 .empty h3 { color: #b7c9e3; font-size: 16px; }

@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.6.8
+
+- **Nút «Dừng cảnh này» và «Tạo lại ngay» trên thẻ cảnh ĐANG CHẠY.** Trước đây thẻ đang chờ Muse không có nút nào; một tab kẹt (vd «Đã thấy tin nhắn · chờ Muse phản hồi» hàng chục phút) thì tab đó đứng im, các tab còn lại chạy xong hết rồi vẫn phải chờ. Nay: **Dừng cảnh này** bỏ lượt chờ của riêng cảnh đó (có bấm Dừng trong Muse), cảnh thành «Bị gián đoạn» — sau đó vẫn có «Tìm / tải video đã tạo» (nếu Muse đã làm xong) hoặc «Gửi lại prompt»; **Tạo lại ngay** dừng rồi gửi lại prompt của cảnh đó ngay trên tab rảnh. Chỉ ảnh hưởng đúng cảnh được bấm: hàng đợi KHÔNG tạm dừng, các tab khác (đến 10 trình duyệt) chạy tiếp bình thường. Đợi lệnh dừng trong Muse xong mới nhả chỗ để lượt gửi sau không bấm nhầm vào cảnh mới.
+- **Chờ này kéo dài tới khi nào?** Trước 1.6.8: không có giới hạn. Sau «Báo Muse chậm sau (phút)» (mặc định 15) app chỉ ghi «Muse chậm hơn thời gian dự kiến · vẫn giữ cảnh này» rồi chờ tiếp cho tới khi Muse trả kết quả hoặc bạn bấm Dừng (cố ý để không gửi trùng prompt). Từ 1.6.8 dòng đó có thêm gợi ý bấm hai nút trên. **Chưa** tự động dừng / gửi lại khi quá hạn (sẽ tốn thêm lượt tạo nếu Muse thật ra vẫn đang làm).
+- Test: 6 test hàng đợi mới (dừng riêng một cảnh không tạm dừng hàng đợi; tạo lại gửi đúng 1 lần nữa; đợi lệnh dừng trong Muse xong mới trả chỗ; 10 trình duyệt song song; «Dừng» cả hàng đợi vẫn tạm dừng như cũ) + smoke giao diện với IPC giả. **Chưa thử với Muse thật** (không bấm nút Dừng thật của Muse được trong môi trường dựng).
+
 ## Update 1.6.7
 
 - **Thanh tiến trình % cho mọi lượt tạo (không chỉ «Làm tự động»).** Trong khung «Âm thanh & xuất video» có thanh % và nhãn bước: tạo clip (0–85%), đọc giọng (85–92%), edit khớp + dựng (92–98%), nối MP4 (98–100%), rồi «Xong: tên-file.mp4». Ở khung Hàng đợi, cạnh thanh «N / M clip đã lưu» có thêm số % tổng.

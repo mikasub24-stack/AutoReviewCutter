@@ -412,7 +412,7 @@ async function runJob(job,worker,signal,{recover=false}={}) {
         }catch(e){check();stage('downloading',(image?'Chưa lưu được ảnh · giữ đúng kết quả và thử lại: ':'Chưa lưu được video · giữ đúng kết quả và thử tải lại: ')+e.message);await step(delay(5000));continue;}
       }
       if(!warned&&Date.now()>warnAt){warned=true;job.late=true;}
-      stage(!result.echoMatched?'confirming':'waiting',(job.late?'Muse chậm hơn thời gian dự kiến · vẫn giữ cảnh này. ':'')+(!result.echoMatched?'Chưa thấy đúng prompt trong chat Muse':!result.responseMatched?'Đã thấy tin nhắn · chờ Muse phản hồi'+(result.hint?' ('+result.hint+')':''):holding?'Ảnh đã hiện · chờ Muse tạo xong rồi mới lưu':result.stage||(image?'Chờ đúng ảnh của prompt':'Chờ đúng video của prompt')));
+      stage(!result.echoMatched?'confirming':'waiting',(job.late?'Muse chậm hơn thời gian dự kiến · vẫn giữ cảnh này; bấm «Dừng cảnh này» hoặc «Tạo lại ngay» nếu không muốn chờ nữa. ':'')+(!result.echoMatched?'Chưa thấy đúng prompt trong chat Muse':!result.responseMatched?'Đã thấy tin nhắn · chờ Muse phản hồi'+(result.hint?' ('+result.hint+')':''):holding?'Ảnh đã hiện · chờ Muse tạo xong rồi mới lưu':result.stage||(image?'Chờ đúng ảnh của prompt':'Chờ đúng video của prompt')));
       await step(delay(1500));
     }
   }finally{
@@ -447,30 +447,32 @@ async function testBrowsers(){
   }finally{testing=false;probeController=null;finishProbe();if(!starting&&!queue.active&&!flushingQuit){main?.show();main?.focus();}notify();}
   return snapshot();
 }
+// Bấm nút Dừng của chính Muse cho một cảnh đã gửi (tối đa ~6,5 giây); kết quả ghi vào job.remoteStop. Dùng cho «Dừng» cả hàng đợi và cho nút «Dừng / Tạo lại» riêng từng cảnh.
+async function remoteStopJob(job){
+  if(!job.mayHaveSubmitted){job.remoteStop={state:'not-sent'};return;}
+  const muse=browsers.get(Number(job.account)-1),args={composerSelector:settings.composer,selector:settings.stopSelector||'',trackerId:job.trackerId||job.id,requestId:(job.stopRequestId=randomUUID())};
+  try{
+    const end=Date.now()+6500;
+    let request=true,clicked=false;
+    while(Date.now()<end){
+      const observed=await dom(muse,browserStop,{...args,request},2000);job.remoteStop=observed;notify();
+      if(['confirmed','ui-stopped','completed','ambiguous','chat-changed'].includes(observed.state))break;
+      if(observed.clicked)clicked=true;
+      if(observed.state==='unavailable'&&clicked)break;
+      request=!clicked;
+      await delay(400);
+    }
+
+  }catch{job.remoteStop={state:'unavailable',clicked:false};}
+  job.stageMessage=['confirmed','ui-stopped'].includes(job.remoteStop.state)?'Đã bấm dừng trong Muse · Tiếp tục sẽ gửi lại cảnh đã khóa':job.remoteStop.state==='completed'?'Video đã có · Tiếp tục sẽ tải về':'Chưa xác nhận dừng trên Muse · Tiếp tục sẽ chờ/lấy kết quả, không gửi trùng';
+}
 async function stopAll(){
   if(stopping){while(stopping)await delay(50);return snapshot();}
   storyAnalyzer?.cancel();
   stopping=true;runEpoch++;starting=false;probeController?.abort();queue.pause();
   const probes=[...browserTests.values()].filter(t=>testing&&t.mayHaveSubmitted&&t.status!=='ready').map(t=>({id:t.id,trackerId:t.id,account:t.index+1,mayHaveSubmitted:true}));
   const jobs=[...queue.jobs.filter(j=>!probes.some(t=>t.account===j.account)&&(j.status==='running'||(['failed','interrupted'].includes(j.status)&&j.mayHaveSubmitted&&!['confirmed','ui-stopped'].includes(j.remoteStop?.state)))),...probes];notify();
-  const requests=jobs.map(async job=>{
-    if(!job.mayHaveSubmitted){job.remoteStop={state:'not-sent'};return;}
-    const muse=browsers.get(Number(job.account)-1),args={composerSelector:settings.composer,selector:settings.stopSelector||'',trackerId:job.trackerId||job.id,requestId:(job.stopRequestId=randomUUID())};
-    try{
-      const end=Date.now()+6500;
-      let request=true,clicked=false;
-      while(Date.now()<end){
-        const observed=await dom(muse,browserStop,{...args,request},2000);job.remoteStop=observed;notify();
-        if(['confirmed','ui-stopped','completed','ambiguous','chat-changed'].includes(observed.state))break;
-        if(observed.clicked)clicked=true;
-        if(observed.state==='unavailable'&&clicked)break;
-        request=!clicked;
-        await delay(400);
-      }
-
-    }catch{job.remoteStop={state:'unavailable',clicked:false};}
-    job.stageMessage=['confirmed','ui-stopped'].includes(job.remoteStop.state)?'Đã bấm dừng trong Muse · Tiếp tục sẽ gửi lại cảnh đã khóa':job.remoteStop.state==='completed'?'Video đã có · Tiếp tục sẽ tải về':'Chưa xác nhận dừng trên Muse · Tiếp tục sẽ chờ/lấy kết quả, không gửi trùng';
-  });
+  const requests=jobs.map(remoteStopJob);
   try{await queue.stop();await Promise.allSettled(requests);for(const job of jobs){job.error='';job.stageMessage=['confirmed','ui-stopped'].includes(job.remoteStop?.state)?'Đã dừng trong Muse · Tiếp tục sẽ gửi lại cảnh đã khóa':job.remoteStop?.state==='completed'?'Clip đã có · Tiếp tục sẽ tải về':'Chưa xác nhận dừng trên Muse · Tiếp tục sẽ chờ đúng kết quả, không gửi trùng';}await save();}
   finally{stopping=false;notify();}
   return snapshot();
@@ -581,6 +583,18 @@ app.whenReady().then(async () => {
         if(job.kind==='video')invalidateOutputs();queue.regenerate(id).catch(e=>dialog.showErrorBox(ui('Tạo lại','Regenerate'),e.message)).finally(notify);
       }finally{starting=false;notify();}
       return snapshot();
+    },
+    // Nút riêng trên thẻ cảnh đang chạy: 'skip' = dừng cảnh này (các cảnh khác chạy tiếp), 'again' = dừng rồi gửi lại ngay.
+    cancelJob: async data => {
+      const id=String(data?.id||''),mode=data?.mode==='again'?'again':'skip';
+      if(stopping||merging||packaging)throw Error('Chờ xử lý hiện tại hoàn tất.');
+      const job=queue.jobs.find(j=>j.id===id);
+      if(!job||job.status!=='running')throw Error('Cảnh này không còn đang chạy.');
+      if(job.kind==='video')invalidateOutputs();
+      const hold=remoteStopJob(job);
+      await queue.cancelJob(id,mode,hold);
+      browsers.get(Number(job.account)-1)?.releasePage?.(id);
+      notify();return snapshot();
     },
     retry: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); const target=queue.jobs.find(j=>j.id===id),browser=browsers.get(Number(target?.account)-1);if(target?.kind==='video')invalidateOutputs(); await queue.retry(id);browser?.releasePage?.(id); return snapshot(); },
     remove: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); const removed=queue.jobs.find(j=>j.id===id);if(removed?.kind==='video')invalidateOutputs(); await queue.remove(id);browsers.get(Number(removed?.account)-1)?.releasePage?.(id);if(removed?.trackerId)void dom(browsers.get(Number(removed.account)-1),endTracking,{id:removed.trackerId}).catch(()=>{}); return snapshot(); },
