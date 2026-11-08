@@ -95,8 +95,11 @@ class App(tk.Tk):
         audio = ttk.Frame(body); audio.pack(fill='x', pady=8)
         self.button(audio, 'Thêm nhạc', lambda:self.audio('music')).pack(side='left')
         self.button(audio, 'Thêm lời đọc', lambda:self.audio('voice')).pack(side='left', padx=8)
-        self.button(audio, 'AI đọc tiếng Việt', self.tts).pack(side='left')
+        self.button(audio, 'AI tạo lời đọc', self.tts).pack(side='left')
         self.button(audio, 'Bỏ âm thanh', self.clear_audio).pack(side='left', padx=8)
+        self.language = tk.StringVar(value=self.data['narrationLanguage'])
+        ttk.Label(audio, text='Ngôn ngữ đọc').pack(side='left', padx=(8,4))
+        ttk.Combobox(audio, textvariable=self.language, values=['Tiếng Việt','English'], state='readonly', width=12).pack(side='left')
         self.audio_label = tk.StringVar(); ttk.Label(body, textvariable=self.audio_label, wraplength=1050, foreground='#a6b6c9').pack(anchor='w')
         bottom = ttk.Frame(body); bottom.pack(fill='x', pady=(10,6))
         self.button(bottom, 'Xem trước hình', self.preview).pack(side='left')
@@ -117,7 +120,7 @@ class App(tk.Tk):
         s = self.data['scenes'][self.current]
         candidate = dict(s, title=self.title_var.get(), text=self.caption.get('1.0','end').strip(),
                          narration=self.narration.get('1.0','end').strip(), duration=float(self.seconds.get()))
-        data = dict(self.data, scenes=list(self.data['scenes']), style=self.style.get(), ratio=self.ratio.get())
+        data = dict(self.data, scenes=list(self.data['scenes']), style=self.style.get(), ratio=self.ratio.get(), narrationLanguage=self.language.get())
         data['scenes'][self.current] = candidate
         self.data = core.validate(data)
 
@@ -141,14 +144,14 @@ class App(tk.Tk):
 
     def new(self):
         if not messagebox.askyesno('Dự án mới','Tạo dự án mẫu mới? Hãy lưu dự án đang chỉnh trước.'):return
-        self.data=core.demo(); self.path=None; self.current=0; self.style.set(self.data['style']); self.ratio.set(self.data['ratio']); self.refresh(); self.load_scene()
+        self.data=core.demo(); self.path=None; self.current=0; self.style.set(self.data['style']); self.ratio.set(self.data['ratio']); self.language.set(self.data['narrationLanguage']); self.refresh(); self.load_scene()
 
     def open(self):
         p=filedialog.askopenfilename(filetypes=[('Dự án Cinecode','*.cinecode.json'),('JSON','*.json')])
         if not p:return
         try:
             self.data=core.load_project(p); self.path=Path(p); self.current=0
-            self.style.set(self.data['style']); self.ratio.set(self.data['ratio']); self.refresh(); self.load_scene()
+            self.style.set(self.data['style']); self.ratio.set(self.data['ratio']); self.language.set(self.data['narrationLanguage']); self.refresh(); self.load_scene()
         except (OSError,ValueError) as e:messagebox.showerror('Không mở được',str(e))
 
     def save(self):
@@ -219,7 +222,7 @@ class App(tk.Tk):
     def generate(self):
         if not self.key:self.settings();return
         if not messagebox.askyesno('Viết kịch bản mới','AI sẽ thay các cảnh hiện tại. Tiếp tục?'):return
-        brief=self.brief.get('1.0','end').strip();args=(self.key,self.model.get(),brief,int(self.duration.get()),self.style.get(),self.ratio.get())
+        brief=self.brief.get('1.0','end').strip();args=(self.key,self.model.get(),brief,int(self.duration.get()),self.style.get(),self.ratio.get(),self.language.get())
         self.status.set('AI đang viết kịch bản tiếng Việt…')
         def done(data):
             if self.cancel.is_set():self.status.set('Đã hủy nhận kịch bản.');return
@@ -245,7 +248,7 @@ class App(tk.Tk):
                 if self.cancel.is_set():raise RuntimeError('Đã hủy tạo lời đọc.')
                 self.events.put(('status',f'Đang tạo lời đọc cảnh {i+1}/{len(snapshot["scenes"])}…'))
                 if s['narration'].strip():
-                    part=self.folder/f'voice-{i}.wav';length=core.synthesize(key,s['narration'],part)
+                    part=self.folder/f'voice-{i}.wav';length=core.synthesize(key,s['narration'],part,language=snapshot['narrationLanguage'])
                     import wave
                     with wave.open(str(part),'rb') as w:pcm=w.readframes(w.getnframes())
                     s['duration']=max(s['duration'],length+.3)

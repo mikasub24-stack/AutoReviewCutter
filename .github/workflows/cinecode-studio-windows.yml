@@ -27,6 +27,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
           Start-Transcript -Path "$env:RUNNER_TEMP/cinecode-build.log" | Out-Null
           trap {
+            $exception = ($_ | Out-String) + $_.ScriptStackTrace
+            $exception = $exception.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Host "::error title=Cinecode exception::$exception"
+            Stop-Transcript | Out-Null
             $detail = (Get-Content "$env:RUNNER_TEMP/cinecode-build.log" -Tail 75) -join "`n"
             $detail = $detail.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
             Write-Host "::error title=Cinecode Windows build::$detail"

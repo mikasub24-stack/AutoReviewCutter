@@ -24,6 +24,7 @@ def validate(data):
     result = {'title': str(data.get('title', 'Video của tôi'))[:200],
               'style': data.get('style') if data.get('style') in STYLES else 'Điện ảnh',
               'ratio': data.get('ratio') if data.get('ratio') in ('16:9', '9:16', '1:1') else '16:9',
+              'narrationLanguage': 'English' if data.get('narrationLanguage') == 'English' else 'Tiếng Việt',
               'music': str(data.get('music', '')), 'voice': str(data.get('voice', '')), 'scenes': []}
     for scene in data['scenes']:
         if not isinstance(scene, dict):
@@ -58,23 +59,25 @@ def request_ai(key, model, body):
         # Provider response bodies can echo request data; keep the error message bounded and private.
         raise RuntimeError(f'Gemini trả lỗi HTTP {e.code}. Kiểm tra khóa, mô hình, hạn mức và kết nối.') from None
 
-def generate(key, model, brief, duration, style, ratio):
+def generate(key, model, brief, duration, style, ratio, language='Tiếng Việt'):
     prompt = ('Bạn là biên kịch video tiếng Việt. Chỉ trả JSON với title và scenes. '
               'Mỗi scene có title (ngắn), text (tối đa 20 từ), narration (lời đọc tiếng Việt), duration (1-60 giây). '
               'Tổng duration đúng ' + str(duration) + ' giây, 3-12 cảnh. Đây là phim chữ/ảnh với chuyển động đồ họa, '
-              'không tự tạo footage người thật. Không bịa nguồn hay sự kiện. Nội dung yêu cầu:\n' + brief)
+              'không tự tạo footage người thật. Không bịa nguồn hay sự kiện. '
+              'Viết narration bằng ' + language + '. Nội dung yêu cầu:\n' + brief)
     r = request_ai(key, model, {'contents': [{'parts': [{'text': prompt}]}],
                   'generationConfig': {'responseMimeType': 'application/json'}})
     try:
         data = parse_ai(''.join(p.get('text', '') for p in r['candidates'][0]['content']['parts']))
     except (KeyError, IndexError):
         raise ValueError('AI chưa trả kịch bản. Hãy thử nội dung khác.') from None
-    data.update(style=style, ratio=ratio)
+    data.update(style=style, ratio=ratio, narrationLanguage=language)
     return data
 
-def synthesize(key, text, path, voice='Kore'):
+def synthesize(key, text, path, voice='Kore', language='Tiếng Việt'):
     r = request_ai(key, 'gemini-2.5-flash-preview-tts', {
-        'contents': [{'parts': [{'text': 'Đọc tiếng Việt tự nhiên, rõ ràng:\n' + text}]}],
+        'contents': [{'parts': [{'text': ('Read naturally and clearly in English:\n' if language == 'English'
+                                        else 'Đọc tiếng Việt tự nhiên, rõ ràng:\n') + text}]}],
         'generationConfig': {'responseModalities': ['AUDIO'], 'speechConfig': {
             'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': voice}}}}})
     try:

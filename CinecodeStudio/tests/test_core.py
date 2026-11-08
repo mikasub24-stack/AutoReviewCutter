@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import core
 
@@ -35,5 +36,11 @@ class CoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             d=core.demo();d['scenes'][0]['image']=str(Path(td)/'missing.png')
             with self.assertRaisesRegex(ValueError,'Không tìm thấy ảnh'):core.build_html(d,td)
+
+    def test_english_narration_request_and_project(self):
+        with patch.object(core,'request_ai',return_value={'candidates':[{'content':{'parts':[{'text':json.dumps(core.demo())}]}}]}) as request:
+            data=core.generate('secret','gemini-2.5-flash','A calm morning',30,'Điện ảnh','16:9','English')
+            self.assertEqual(core.validate(data)['narrationLanguage'],'English')
+            self.assertIn('narration bằng English',request.call_args.args[2]['contents'][0]['parts'][0]['text'])
 
 if __name__=='__main__':unittest.main()
