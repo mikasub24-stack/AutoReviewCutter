@@ -5,8 +5,11 @@ const sp = require('../src/story-plan.js');
 
 const story = 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng Mai dậy sớm ra bến đón đò.\n\nMột hôm có chú cá vàng nhảy lên thuyền. Mai thả cá về sông và cá hứa sẽ giúp cô một điều ước.\n\nHết.';
 
+// Tiếng Việt đọc ~20 ký tự/giây nên một clip 10 giây chứa ~180 ký tự: dùng bài dài hơn để vẫn thấy chia thành vài cảnh.
+const storyLong = story.replace('Hết.', 'Sáng hôm sau Mai lại ra bến sông, nhưng chú cá vàng đã không còn ở đó nữa. Cô ngồi lặng bên bờ nước, nhìn những con sóng nhỏ lăn tăn dưới nắng sớm và mỉm cười thật khẽ.\n\nHết.');
+
 test('chia nhanh gộp câu theo thời lượng, giữ đủ chữ, mỗi cảnh có lời đọc và prompt', () => {
-  const scenes = sp.planStory(story, { seconds: 10, aspect: '16:9', style: 'hoạt hình màu nước', character: 'Mai, bé gái tóc đen' });
+  const scenes = sp.planStory(storyLong, { seconds: 10, aspect: '16:9', style: 'hoạt hình màu nước', character: 'Mai, bé gái tóc đen' });
   assert.ok(scenes.length >= 2 && scenes.length <= 4, 'số cảnh ' + scenes.length);
   for (const [index, scene] of scenes.entries()) {
     assert.equal(scene.title, 'Cảnh ' + (index + 1));
@@ -24,7 +27,7 @@ test('chia nhanh gộp câu theo thời lượng, giữ đủ chữ, mỗi cản
     assert.ok(scene.prompt.includes(`Tạo video dài ${scene.durationSeconds} giây`), 'prompt mẫu ghi đúng số giây của cảnh');
   }
   const joined = scenes.map(s => s.voiceover).join(' ').replace(/\s/g, '');
-  assert.equal(joined, story.replace(/\s/g, ''));
+  assert.equal(joined, storyLong.replace(/\s/g, ''));
 });
 
 test('báo lỗi tiếng Việt khi thiếu kịch bản hoặc cấu hình sai', () => {
@@ -180,7 +183,7 @@ test('sửa theo kịch bản: lời đúng nguyên văn, câu bị bỏ thành 
 
 test('soát cảnh trước khi tạo: lời quá dài, thoại, nhảy thời gian, prompt ngắn hoặc thiếu no speech', () => {
   const ok = sceneOf('Mai ra bến sông lúc bình minh.');
-  const long = sceneOf('Ngày xưa có một cô bé tên Mai sống ở làng ven sông, mỗi sáng cô dậy sớm ra bến đón đò, mang theo giỏ bánh nhỏ để đổi cá tươi cho bữa sáng của cả nhà mình.');
+  const long = sceneOf('Ngày xưa có một cô bé tên Mai sống ở làng ven sông, mỗi sáng cô dậy sớm ra bến đón đò, mang theo giỏ bánh nhỏ để đổi cá tươi cho bữa sáng của cả nhà mình, rồi ngồi chờ rất lâu bên bờ nước lạnh buốt cho tới khi mặt trời lên cao và sương tan hết.');
   const talk = sceneOf('Mai nói: "Cá vàng ơi, hãy ở lại với tôi".');
   const skip = sceneOf('Hôm sau Mai lại ra bến sông.');
   const short = { voiceover: 'Mai ra bến.', prompt: 'Mai ra bến sông.' };
@@ -377,10 +380,11 @@ test('giây mỗi cảnh tự tính theo lời kể: ngắn thì ngắn, tối t
     assert.equal(got, Math.min(10, Math.max(3, need)), text);
     assert.ok(got >= 3 && got <= 10);
   }
-  // Đúng 4,5 giây đọc (63 ký tự, 14 ký tự/giây) thì cần 5 giây chứ không phải 6 (không để sai số số thực đẩy lên).
-  const text63 = 'a'.repeat(63);
-  assert.equal(sp.estimateSeconds(text63, 'vi'), 4.5);
-  assert.equal(sp.sceneSeconds(text63, 10), 5);
+  // Đúng 4,5 giây đọc (90 ký tự, 20 ký tự/giây) thì cần 5 giây chứ không phải 6 (không để sai số số thực đẩy lên).
+  const text90 = 'ạ'.repeat(90);   // có dấu tiếng Việt để nhận ra là tiếng Việt
+  assert.equal(sp.estimateSeconds(text90, 'vi'), 4.5);
+  assert.equal(sp.sceneSeconds(text90, 10), 5);
+  assert.equal(sp.sceneSeconds('ạ'.repeat(91), 10), 6, 'chỉ cần dư 1 ký tự là sang 6 giây');
   assert.equal(sp.sceneSeconds('a '.repeat(2000), 10), 10, 'không bao giờ vượt mức tối đa của Muse');
   assert.equal(sp.sceneSeconds('a '.repeat(2000), 6), 6, 'mức tối đa tùy chọn vẫn được giữ');
 });
@@ -957,7 +961,7 @@ test('Mẹo vặt: tách trả lời của Muse thành ảnh + prompt chuyển �
   assert.equal(sp.finalImagePrompt(a.image, tipCfg), a.image);
   assert.equal(again.scenes.length, 2);
   // Mốc chuyển động vẫn được soát như truyện thường: mốc đảo thứ tự câu thì báo lỗi cứng.
-  assert.equal(sp.motionIssues(a, tipCfg).length, 0);
+  assert.equal(sp.motionIssues({ ...a, durationSeconds: 8 }, tipCfg).length, 0);
   assert.ok(sp.motionIssues({ ...a, prompt: '0–4 giây [câu 2]: x. 4–10 giây [câu 1]: y.' }, tipCfg).some(x => x.hard));
 });
 test('Mẹo vặt: Muse quên dòng ẢNH thì bước đó là cảnh mẫu (để hỏi lại), có ảnh mẫu dùng tạm', () => {
@@ -997,7 +1001,7 @@ test('mẹo vặt từ tiêu đề: số cảnh = độ dài video chia số gi�
   assert.equal(sp.tipPlan({ ...tipBase, tipMinutes: 10, seconds: 6 }).total, 80, 'tối đa 80 cảnh');
   assert.equal(sp.tipPlan({ ...tipBase, tipMinutes: 7 }).minutes, 2, 'độ dài lạ về mặc định 2 phút');
   assert.equal(sp.tipPlan({ ...tipBase, tipLanguage: 'fr' }).language, 'vi');
-  assert.ok(sp.tipPlan({ ...tipBase, tipLanguage: 'en' }).hi > sp.tipPlan(tipBase).hi, 'tiếng Anh đọc nhanh hơn nên mỗi mục dài hơn');
+  assert.deepEqual([sp.tipPlan(tipBase).hi, sp.tipPlan({ ...tipBase, tipLanguage: 'en' }).hi], [144, 108], 'mỗi ngôn ngữ một tốc độ đọc riêng (tiếng Việt 20, tiếng Anh 15 ký tự/giây)');
   assert.equal(sp.options({ ...tipBase, tip: false }).tipTitle, undefined, 'chế độ khác không có trường mẹo');
   assert.deepEqual(sp.TIP_MINUTES, [1, 2, 3, 5, 10]);
   assert.deepEqual(sp.TIP_SECS, [6, 8, 10]);
@@ -1017,7 +1021,7 @@ test('mẹo vặt từ tiêu đề: câu lệnh gửi Muse có tiêu đề, đ�
   const text = sp.buildTipScriptInstruction(tipBase, { marker: 'ab12cd' });
   assert.match(text, /Video gồm 15 cảnh/);
   assert.match(text, /13 BƯỚC/);
-  assert.match(text, /khoảng 57–100 ký tự \(đọc khoảng 8 giây\)/);
+  assert.match(text, /khoảng 81–144 ký tự \(đọc khoảng 8 giây\)/);
   assert.match(text, /bắt đầu bằng «Bước k:» \(k là số bước từ 1 đến 13\)/);
   assert.match(text, /KHÔNG bịa số liệu/);
   assert.match(text, /không hướng dẫn trộn các chất tẩy rửa/);
@@ -1080,7 +1084,7 @@ test('mẹo vặt: Muse trả prompt tiếng Anh thì mọi câu app tự thêm 
   for (const s of got.scenes) {
     assert.ok(s.prompt.includes(sp.tipStartLine('en')) && !s.prompt.includes(sp.tipStartLine('vi')) && s.prompt.endsWith(sp.NO_SPEECH));
     assert.ok(s.prompt.includes('Video aspect ratio: 9:16') && !/Tỷ lệ khung hình/.test(s.prompt));
-    assert.equal(sp.motionIssues(s, cfg).length, 0, 'mốc «0–4 s [line 1]» đi đúng thứ tự câu');
+    assert.equal(sp.motionIssues({ ...s, durationSeconds: 8 }, cfg).length, 0, 'mốc «0–4 s [line 1]» đi đúng thứ tự câu');
   }
   assert.ok(sp.motionIssues({ ...a, prompt: '0–4 s [line 2]: x. 4–10 s [line 1]: y.' }, cfg).some(x => x.hard), 'đảo thứ tự câu vẫn bị bắt');
   assert.equal(sp.stripBeatTags(a.prompt).includes('[line'), false, 'thẻ số câu bị bỏ khi gửi Muse');
@@ -1125,7 +1129,7 @@ test('mẹo vặt từ tiêu đề: soát thiếu bước, bước quá dài, th
   const tp = { ...sp.tipPlan({ ...tipBase, tipMinutes: 1, seconds: 10 }) };   // 6 mục = mở đầu + 4 bước + kết
   const good = 'Mở đầu.\nBước 1: Một.\nBước 2: Hai.\nBước 3: Ba.\nBước 4: Bốn.\nKết thúc.';
   assert.deepEqual(sp.tipCheck(good, tp, [1, 6]), { missing: [], long: [], noIntro: false, noEnd: false, ok: true });
-  const bad = sp.tipCheck('Bước 1: Một.\nBước 2: ' + 'dài '.repeat(60) + '.\nBước 4: Bốn.', tp, [1, 6]);
+  const bad = sp.tipCheck('Bước 1: Một.\nBước 2: ' + 'dài '.repeat(90) + '.\nBước 4: Bốn.', tp, [1, 6]);
   assert.deepEqual([bad.missing, bad.long, bad.noIntro, bad.noEnd, bad.ok], [[3], [2], true, true, false]);
   assert.equal(sp.tipFix(bad, tp), ['- Thiếu Bước 3: (mỗi bước một dòng bắt đầu bằng nhãn).', `- Bước 2: quá dài: rút còn tối đa ${tp.hi} ký tự.`, '- Thiếu dòng MỞ ĐẦU (không nhãn) trước Bước 1.', '- Thiếu dòng KẾT (không nhãn) sau bước cuối.'].join('\n'));
   // phần giữa: chỉ cần các bước của mình, không cần mở đầu/kết
@@ -1389,7 +1393,7 @@ test('shortRuns: tìm dải cảnh liền nhau quá ngắn mà gộp vẫn vừa
   assert.deepEqual(sp.shortRuns([mk(1, 1, w(4)), mk(2, 2, long), mk(3, 3, w(4))], cfg), []);
   assert.deepEqual(sp.shortRuns([mk(1, 1, long), mk(2, 2, long)], cfg), []);
   // Gộp lại vượt 90% clip thì thôi: chỉ gộp phần vừa.
-  const many = Array.from({ length: 10 }, (_, i) => mk(i + 1, i + 1, w(4)));
+  const many = Array.from({ length: 10 }, (_, i) => mk(i + 1, i + 1, w(8)));
   const manyRuns = sp.shortRuns(many, cfg);
   assert.ok(manyRuns.length >= 2 && manyRuns.every(r => r.seconds <= 9 && r.count >= 2), JSON.stringify(manyRuns));
   assert.equal(manyRuns.reduce((n, r) => n + r.count, 0), 10, 'phủ hết các cảnh ngắn, không chồng nhau');
@@ -1407,4 +1411,20 @@ test('shortRuns: tìm dải cảnh liền nhau quá ngắn mà gộp vẫn vừa
   assert.match(fix, /chỉ giữ tách khi thật sự đổi địa điểm hoặc nhảy thời gian/);
   // Câu lệnh chia cảnh mang lời dặn ở phần SỬA LỖI.
   assert.match(sp.buildMuseInstruction('Câu một. Câu hai. Câu ba.', cfg, { fix }), /SỬA LỖI[^\n]*\n- Lần trước các câu này bị chia thành 3 cảnh/);
+});
+
+test('tốc độ đọc tiếng Việt ~20 ký tự/giây: bài mẫu 10 phút ra ít cảnh, ngang AnimStudio (~82), không phải ~140 như khi tính 14', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const txt = fs.readFileSync(path.join(__dirname, '../examples/kich-ban-meo-song-gon-10-phut.txt'), 'utf8');
+  assert.equal(sp.detectLanguage(txt), 'vi');
+  const minutes = sp.estimateSeconds(txt, 'vi') / 60;
+  assert.ok(minutes > 9 && minutes < 11, 'kịch bản «10 phút» ước lượng ' + minutes.toFixed(1) + ' phút');
+  const n = sp.planStory(txt, { seconds: 10 }).length;
+  assert.ok(n >= 66 && n <= 100, 'số cảnh ' + n);
+  const keep = sp.estimateSeconds('a'.repeat(100), 'vi');
+  sp.setRate('vi', 14);
+  try {
+    assert.ok(sp.planStory(txt, { seconds: 10 }).length > 120, 'tốc độ cũ chia thừa cảnh');
+  } finally { sp.setRate('vi', 20); }
+  assert.equal(sp.estimateSeconds('a'.repeat(100), 'vi'), keep, 'trả lại tốc độ mặc định');
 });

@@ -866,6 +866,21 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       // Lượt đã xong sẵn từ trước (chưa từng thấy chạy dở) không tự xuất.
       await addGroup('Truyen-OLD', 'completed'); await nap(1200);
       assert.equal(await builds(), b0, 'lượt xong sẵn từ trước không tự xuất');
+      // Cây trồng + Lịch sử (ảnh rồi clip, cùng một lượt): xong ảnh chưa xuất, xong hết clip mới tự đọc + edit + xuất, không cần «Làm tự động».
+      for (const [btn, sid] of [['#modePlant', 'Cay-TAY'], ['#modeHist', 'Su-TAY']]) {
+        await page.locator(btn).click(); await setAuto(true);
+        const bb = await builds();
+        await page.evaluate(sid => { for (const [phase, ext] of [['image', '.png'], ['clip', '.mp4']]) for (const n of [1, 2]) window.s.jobs.push({ id: sid + phase + n, kind: 'story', storyId: sid, phase, status: 'pending', stage: 'pending', order: n, number: n, prompt: 'p' + n, title: 'Cảnh ' + n, references: [], voiceover: 'Lời ' + n + '.', output: '' }); window.push(); }, sid);
+        await nap(300);
+        await page.evaluate(sid => { window.s.jobs.filter(j => j.storyId === sid && j.phase === 'image').forEach(j => { j.status = 'completed'; j.stage = 'completed'; j.output = 'C:\\Videos\\' + sid + '\\' + j.number + '.png'; }); window.push(); }, sid);
+        await nap(900);
+        assert.equal(await builds(), bb, btn + ': mới xong ảnh thì chưa xuất');
+        await page.evaluate(sid => { window.s.jobs.filter(j => j.storyId === sid && j.phase === 'clip').forEach(j => { j.status = 'completed'; j.stage = 'completed'; j.output = 'C:\\Videos\\' + sid + '\\' + j.number + '.mp4'; }); window.push(); }, sid);
+        await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyBuild').length > n, bb);
+        assert.equal((await called('storyPrepare')).at(-1).data.storyId, sid, btn + ': tự xuất đúng lượt');
+        await nap(900);
+        assert.equal(await builds(), bb + 1, btn + ': xuất đúng một lần');
+      }
     }
     assert.deepEqual(errors, []);
     console.log('PASS: story tab — own jobs/counts/folder, Muse analysis + pasted Muse reply parsing (no-speech rule kept), no quick split, character image on every scene, free voice setup/listen/clone with consent, subtitles on/off + .srt + PNG captions, auto-edit report, export errors, persistence, English labels.');

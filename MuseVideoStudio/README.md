@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.6.6
+
+- **Chia ÍT cảnh hơn thật sự (sửa nguyên nhân gốc).** Muse Studio tính tiếng Việt đọc **14 ký tự/giây** (~2,9 từ/giây), còn AnimStudio tính **4,6 từ/giây** (~22 ký tự/giây) — chậm hơn ~1,5 lần so với giọng đọc thật. Vì tưởng lời đọc dài hơn thật nên app và Muse chia mỗi cảnh quá ít chữ (clip 10 giây chỉ chứa ~126 ký tự), ra nhiều cảnh thừa. Nay tiếng Việt tính **20 ký tự/giây** (hơi chậm hơn AnimStudio một chút để chừa lề): một clip 10 giây chứa ~180 ký tự. Kịch bản mẫu «10 phút» (`examples/`): trước **140 cảnh**, nay **~88 cảnh** (AnimStudio chia offline ra 82).
+- Tốc độ này cũng dùng cho Mẹo vặt / Cây trồng / Lịch sử (độ dài lời đọc mỗi bước tính theo cùng tốc độ), nên lời mỗi bước dài hơn trước ~40% và video ra gần đúng số phút đã chọn thay vì ngắn hơn.
+- **Tự đọc giọng, edit khớp và xuất MP4 áp dụng cho cả Cây trồng và Lịch sử** (không cần bật «Làm tự động»): xong hết clip của lượt là tự xuất (ảnh xong mà clip chưa xong thì chưa xuất). Có test riêng cho hai tab này.
+- Lưu ý thật: số cảnh vẫn không thể thấp hơn tổng thời lượng lời đọc chia cho ~9 giây vì Muse chỉ tạo clip tối đa 10 giây. Tốc độ 20 ký tự/giây là **ước lượng**, chưa đo với giọng thật của bạn: nếu giọng bạn đọc chậm hơn, cảnh nào lời dài hơn clip sẽ giữ khung cuối (app báo trong ghi chú sau khi xuất) — khi đó báo mình để chỉnh lại tốc độ. Chưa thử với Muse thật.
+
 ## Update 1.6.5
 
 - **Tạo xong hết clip là tự đọc giọng, edit khớp và xuất MP4 — giống tab «Vẽ» bên AnimStudio.** Trước đây chỉ chế độ «Làm tự động» (Cây trồng / Mẹo vặt / Lịch sử) mới tự xuất; tab «Kể chuyện» (và quảng cáo) tạo xong clip rồi dừng, phải bấm «Xuất MP4». Nay mọi chế độ: lượt nào đang chạy dở mà **xong hết clip** (kể cả khi bạn tự bấm «Chạy hàng đợi» hoặc «Chạy tiếp») thì app tự đọc giọng bằng giọng/tốc độ đang chọn, vẽ phụ đề, edit khớp (cắt phần thừa, giữ khung cuối khi lời dài hơn clip, âm thanh, tên, .srt) và xuất MP4, đúng tỉ lệ đã chọn lúc bấm tạo.

@@ -8,7 +8,7 @@
   const ASPECTS = ['16:9', '9:16', '1:1'];
   // Muse chỉ tạo clip tối đa 10 giây, nên mỗi cảnh không được dài hơn.
   const MAX_SECONDS = 10;
-  // Tiếng Việt đọc bình thường khoảng 14–15 ký tự mỗi giây.
+  // Tốc độ mặc định cho ngôn ngữ chưa có số riêng (RATES); tiếng Việt xem RATES.vi.
   const CHARS_PER_SECOND = 14;
   const count = value => Array.from(String(value || '')).length;
   // Viết bằng tiếng Anh vì Muse hiểu ràng buộc âm thanh bằng tiếng Anh chắc hơn.
@@ -31,7 +31,8 @@
     it: 'il lo la gli le di che e in un una per con non si da è sono del della ma'.split(' ')
   };
   // Số ký tự (kể cả khoảng trắng) đọc được trong một giây — chỉ để ước lượng độ dài lời đọc.
-  const RATES = { vi: 14, en: 15, es: 16, fr: 15, de: 14, pt: 15, it: 15, id: 14, ru: 14, th: 11, ar: 13, hi: 14, zh: 4.5, ja: 7.5, ko: 8 };
+  // Tiếng Việt: ~4,4 âm tiết/giây × ~4,8 ký tự (tính cả dấu cách) ≈ 20 ký tự/giây (hơi chậm hơn 21 mà AnimStudio dùng, chừa lề), cùng tốc độ AnimStudio dùng (4,6 từ/giây); trước 1.6.5 để 14 nên tưởng lời đọc dài hơn ~1,5 lần thật và chia thừa cảnh.
+  const RATES = { vi: 20, en: 15, es: 16, fr: 15, de: 14, pt: 15, it: 15, id: 14, ru: 14, th: 11, ar: 13, hi: 14, zh: 4.5, ja: 7.5, ko: 8 };
 
   function detectLanguage(text) {
     const value = String(text || '').normalize('NFC');
@@ -60,6 +61,8 @@
     return words.filter(w => common.has(w)).length >= 3 ? 'en' : 'vi';
   }
   const charsPerSecond = language => RATES[language] || CHARS_PER_SECOND;
+  // Đổi tốc độ đọc của một ngôn ngữ (dùng khi đã đo được giọng thật, và trong test để cố định tình huống).
+  const setRate = (language, perSecond) => { if (Number(perSecond) > 0) RATES[language] = Number(perSecond); };
   const isCjk = language => language === 'zh' || language === 'ja';
   // Số ký tự tối đa của lời đọc để vừa trong một clip (chừa 10% cho nhịp nghỉ).
   const budgetChars = (seconds, language) => Math.max(8, Math.floor(seconds * charsPerSecond(language) * 0.9));
@@ -1321,5 +1324,5 @@
     return entries.map((entry, index) => `${index + 1}\n${srtTime(entry.start)} --> ${srtTime(entry.end)}\n${entry.text}\n`).join('\n');
   }
 
-  return { ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, stripStepLabels, TIP_MINUTES, PLANT_MINUTES, HIST_MINUTES, TIP_SECS, tipPlan, tipParts, buildTipScriptInstruction, tipScriptFromReply, tipTrim, tipCheck, tipFix, MAX_SECONDS, MIN_SECONDS, sceneSeconds, sceneFloor, shortRuns, shortFix, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, lockLine, buildMuseInstruction, buildUnderstandInstruction, parseUnderstanding, understandRanges, understandingText, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, motionIssues, stripBeatTags, tipImagePrompt, finalImagePrompt, tipStartLine, subtitleChunks, srtTime, toSrt };
+  return { setRate, ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, stripStepLabels, TIP_MINUTES, PLANT_MINUTES, HIST_MINUTES, TIP_SECS, tipPlan, tipParts, buildTipScriptInstruction, tipScriptFromReply, tipTrim, tipCheck, tipFix, MAX_SECONDS, MIN_SECONDS, sceneSeconds, sceneFloor, shortRuns, shortFix, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, lockLine, buildMuseInstruction, buildUnderstandInstruction, parseUnderstanding, understandRanges, understandingText, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, motionIssues, stripBeatTags, tipImagePrompt, finalImagePrompt, tipStartLine, subtitleChunks, srtTime, toSrt };
 });

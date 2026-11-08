@@ -3,6 +3,7 @@
 const { chromium } = require('playwright-core');
 const assert = require('node:assert/strict');
 const plan = require('../src/story-plan.js');
+plan.setRate('vi', 14);   // bài này kiểm tra luồng hỏi–đáp với trang Muse giả: giữ tốc độ đọc cũ (14 ký tự/giây) để các tình huống chia cảnh cố định. Tốc độ mới (20) có bài riêng trong story-plan.test.cjs.
 const { createStoryAnalyzer } = require('../src/story-analyze.cjs');
 
 const PAGE = `<!doctype html><meta charset="utf-8"><style>#log{white-space:pre-wrap}[data-role]{margin:6px;padding:4px;border:1px solid #ccc}</style>
