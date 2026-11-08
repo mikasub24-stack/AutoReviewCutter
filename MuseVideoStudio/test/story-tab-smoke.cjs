@@ -275,6 +275,8 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.match(await page.locator('#storyStatus').textContent(), /Tự edit: cắt 5\.6 giây thừa; 1 cảnh lời dài hơn clip nên giữ khung cuối \(cảnh 2\)/);
     assert.equal(await page.locator('#storyOpen').isVisible(), true);
     await page.locator('#storyOpen').click(); assert.equal((await called('storyReveal')).length, 1);
+    assert.equal(await page.locator('#storySave').isVisible(), true, 'có nút «Tải video» khi đã xuất xong');
+    await page.locator('#storySave').click(); assert.equal((await called('storySave')).length, 1);
 
     // The exported video plays right here in the tab (no need to open the folder).
     const player = page.locator('#storyVideo');

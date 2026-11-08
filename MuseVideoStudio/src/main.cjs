@@ -563,6 +563,17 @@ app.whenReady().then(async () => {
     },
     storyAnalyzeCancel:async()=>{storyAnalyzer.cancel();return snapshot();},
     storyReveal:async()=>{const out=storyService.status().output;if(out)shell.showItemInFolder(out);return true;},
+    // «Tải video»: hộp «Lưu như…» để chọn nơi lưu một bản sao MP4 (kèm .srt cùng tên nếu có và chưa có file trùng).
+    storySave:async()=>{
+      const st=storyService.status(),out=st.output;if(!out)return false;
+      const picked=await dialog.showSaveDialog(main,{title:ui('Tải video về','Save video'),defaultPath:path.join(app.getPath('downloads'),path.basename(out)),filters:[{name:'MP4',extensions:['mp4']}]});
+      if(picked.canceled||!picked.filePath)return false;
+      const dest=/\.mp4$/i.test(picked.filePath)?picked.filePath:picked.filePath+'.mp4';
+      if(path.resolve(dest).toLowerCase()!==path.resolve(out).toLowerCase())await fs.copyFile(out,dest);
+      let srt='';
+      if(st.srt){const to=dest.replace(/\.mp4$/i,'.srt');try{await fs.copyFile(st.srt,to,fs.constants.COPYFILE_EXCL);srt=to;}catch{/* đã có file .srt trùng tên hoặc không đọc được: bỏ qua, không ghi đè */}}
+      shell.showItemInFolder(dest);return{file:dest,srt};
+    },
     language:async value=>{if(!['vi','en'].includes(value))throw Error('Unsupported language');settings.language=value;await save();notify();return snapshot();},
     testBrowsers,
     openOutput:async data=>{if(!settings.output)throw Error('Chọn thư mục lưu video trước.');const folder=data?.kind==='image'?imageDirectory():data?.kind==='story'?path.join(settings.output,'KeChuyen'):settings.output;await fs.mkdir(folder,{recursive:true});const error=await shell.openPath(folder);if(error)throw Error(error);},

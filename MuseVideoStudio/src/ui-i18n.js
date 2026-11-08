@@ -178,6 +178,7 @@ Truyện|Story
 Tự edit: cảnh nào lời đọc ngắn hơn clip thì cắt phần thừa; lời dài hơn clip thì giữ khung cuối cho đọc hết. Prompt đã dặn Muse tạo video im lặng, không âm thanh (nhân vật vẫn há miệng, cười, mấp máy trên hình); giọng đọc do app thêm.|Auto edit: if a scene's narration is shorter than its clip, the extra footage is cut; if it is longer, the last frame is held so it can finish. Prompts tell Muse to make the video silent with no audio (characters still open their mouths, laugh and mouth words on screen); the narration is added by the app.
 Xuất MP4|Export MP4
 Mở video|Open video
+Tải video|Save video
 Video đã xuất|Exported video
 Không mở được video này ở đây. Bấm «Mở video» để mở thư mục chứa file.|This video cannot be opened here. Click “Open video” to show its folder.
 Đang xuất…|Exporting…
@@ -639,6 +640,7 @@ Bước nào cũng cần prompt ảnh.|Every step needs an image prompt.
       [/^Hàng đợi đã dừng, còn (\d+) cảnh chưa xong\. Chạy tiếp hàng đợi rồi bấm Xuất MP4\.$/,m=>'The queue stopped with '+m[1]+' scene(s) unfinished. Resume the queue, then click Export MP4.'],
       [/^Hàng đợi đã dừng, còn (\d+) cảnh chưa xong nên chưa tự xuất MP4\. .*$/,m=>'The queue stopped with '+m[1]+' scene(s) unfinished, so the MP4 was not exported automatically. Click “Continue” to carry on.'],
       [/^Tài khoản (\d+)$/,m=>'Account '+m[1]],
+      [/^Đã lưu video: (.+)$/,m=>'Video saved: '+m[1]],
       [/^Đã thấy tin nhắn · chờ Muse phản hồi \((.+)\)$/,m=>'Message found · Waiting for Muse response ('+t(m[1])+')'],
       [/^Đang bấm chuột phải → Tải xuống \(ảnh (\d+)\/(\d+)\)$/,m=>'Right-clicking the image → Download (image '+m[1]+'/'+m[2]+')'],
       [/^thấy (\d+) tin nhắn giống prompt, lúc gửi có (\d+|\?)$/,m=>'found '+m[1]+' message(s) matching the prompt, '+m[2]+' when it was sent'],

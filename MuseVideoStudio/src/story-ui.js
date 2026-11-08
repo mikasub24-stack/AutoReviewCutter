@@ -937,6 +937,7 @@
     $('storyExport').textContent = busy ? 'Đang xuất…' : 'Xuất MP4';
     $('storyStop').hidden = !s.busy;
     $('storyOpen').hidden = !s.output;
+    $('storySave').hidden = !s.output;
     let line = '';
     if (s.error && !busy) line = s.error;
     else if (busy) line = s.progress || 'Đang xử lý…';
@@ -972,6 +973,7 @@
   $('storyExport').onclick = () => exportVideo();
   $('storyStop').onclick = async () => { const r = await call('storyCancel'); if (r) render(r); };
   $('storyOpen').onclick = () => call('storyReveal');
+  $('storySave').onclick = async () => { const r = await call('storySave'); if (r && r.file) toast('Đã lưu video: ' + r.file); };
   $('storyVideo').addEventListener('error', () => { if ($('storyVideo').getAttribute('src')) $('storyVideoError').hidden = false; });
   $('storyVideo').addEventListener('loadeddata', () => { $('storyVideoError').hidden = true; });
   $('storyAspect').addEventListener('change', drawPreview);

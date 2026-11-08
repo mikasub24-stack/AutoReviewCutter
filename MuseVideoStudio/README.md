@@ -142,6 +142,10 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.6.11
+
+- **Nút «Tải video»** cạnh «Xuất MP4» / «Mở video» (hiện khi đã xuất xong): mở hộp «Lưu như…» (mặc định thư mục Downloads) để lưu một BẢN SAO video vào nơi bạn chọn, kèm file phụ đề .srt cùng tên nếu có (không ghi đè .srt đã tồn tại). Xong thì mở thư mục chứa bản vừa lưu. File gốc trong thư mục xuất giữ nguyên. «Mở video» vẫn mở thư mục chứa file gốc.
+
 ## Update 1.6.10
 
 - **Âm gốc của clip mặc định TẮT.** Ô «Tiếng động gốc của clip» giờ mặc định là «Tắt»: video xuất ra chỉ có giọng kể, không còn tiếng động / nhạc / giọng lẫn trong clip Muse. Lựa chọn «Nhỏ» đã lưu từ bản cũ không còn được giữ (đổi sang khóa lưu mới) nên mọi máy đều về «Tắt»; muốn có lại âm gốc thì chọn «Nhỏ» (thấp hơn giọng kể 20 dB) hoặc «Trung bình» (12 dB). Cảnh không có giọng kể cũng im theo «Tắt».
