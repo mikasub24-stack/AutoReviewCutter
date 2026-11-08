@@ -533,6 +533,10 @@ Tự động dừng vì bạn đã đổi tab. Quay lại «Cây trồng phát t
 Xong hết clip. Đang tự xuất MP4…|All clips are done. Exporting the MP4 automatically…
 Xong hết clip. Đang tự đọc giọng, edit khớp và xuất MP4…|All clips are done. Narrating, editing and exporting the MP4 automatically…
 Tự đọc giọng, edit khớp và xuất MP4 khi tạo xong hết clip|Auto narrate, edit to match and export MP4 when all clips are done
+Đang đọc giọng…|Narrating…
+Đang đo độ dài lời đọc|Measuring narration length
+Đang edit khớp lời đọc với clip…|Editing narration to match the clips…
+Đang nối thành MP4|Joining into the MP4
 Giọng Việt có sẵn VieNeu (miễn phí, offline)|Built-in Vietnamese voices (VieNeu, free, offline)
 ↻ Tải lại danh sách giọng|↻ Reload voice list
 Đang tải danh sách…|Loading the list…
@@ -635,6 +639,12 @@ Bước nào cũng cần prompt ảnh.|Every step needs an image prompt.
       [/^thấy (\d+) video mới nhưng chưa gắn được vào đúng prompt$/,m=>'found '+m[1]+' new video(s) not yet bound to this prompt'],
       [/^Tài khoản này chỉ chạy khi chọn «Chạy song song» từ (\d+) trình duyệt\.$/,m=>'This account only runs when "Parallel browsers" is set to '+m[1]+' or more.'],
       [/^Đăng xuất TK (\d+) · (.+)$/,m=>'Sign out · Account '+m[1]+' · '+t(m[2])],
+      [/^Đang tạo clip (\d+)\/(\d+)$/,m=>'Creating clips '+m[1]+'/'+m[2]],
+      [/^Hàng đợi đang dừng · (\d+)\/(\d+) clip\. Bấm «Tiếp tục» ở Hàng đợi để làm tiếp$/,m=>'Queue stopped · '+m[1]+'/'+m[2]+' clips. Press “Continue” in the queue to resume'],
+      [/^Đang đọc giọng (\d+)\/(\d+) cảnh$/,m=>'Narrating '+m[1]+'/'+m[2]+' scenes'],
+      [/^Đang edit khớp & dựng (\d+)\/(\d+) cảnh$/,m=>'Editing to match and building '+m[1]+'/'+m[2]+' scenes'],
+      [/^Xong: (.+\.mp4)$/i,m=>'Done: '+m[1]],
+      [/^Còn (\d+) cảnh chưa có clip\. Xong hết clip app sẽ tự đọc giọng, edit khớp và xuất MP4\.$/,m=>m[1]+' scene(s) have no clip yet. When all clips are done the app narrates, edits to match and exports the MP4 by itself.'],
       [/^(\d+) \/ (\d+) video đã lưu$/,m=>m[1]+' / '+m[2]+' videos saved'],
       [/^(\d+) \/ (\d+) ảnh đã lưu$/,m=>m[1]+' / '+m[2]+' images saved'],
       [/^thấy (\d+) ảnh mới nhưng chưa gắn được vào đúng prompt$/,m=>'found '+m[1]+' new image(s) not yet bound to this prompt'],

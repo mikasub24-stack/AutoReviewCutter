@@ -337,3 +337,8 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .autoBar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s ease; }
 .autoText { margin: 6px 0 0; font-size: 13px; color: #cbd7e9; }
 .autoText.warn { color: #ffcf8a; }
+
+.overallPct { font-size: 13px; color: #cbd7e9; margin-left: 4px; }
+#runProgress { margin: 10px 0 4px; }
+#runText { font-size: 14px; }
+#runText b { font-size: 16px; }

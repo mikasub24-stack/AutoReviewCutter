@@ -241,7 +241,7 @@ function render(next){
   const done=jobs.filter(j=>j.status==='completed'),running=jobs.filter(j=>j.status==='running'),pending=jobs.filter(j=>j.status==='pending'),interrupted=jobs.filter(j=>['failed','interrupted'].includes(j.status));
   $('summary').textContent=`${done.length} / ${jobs.length} ${isImage()?'ảnh':isStory()?'clip':'video'} đã lưu`;
   $('runningCount').textContent=`${running.length} đang làm`;$('pendingCount').textContent=`${pending.length} đang chờ`;$('attentionCount').textContent=`${interrupted.length} cảnh dở / lỗi`;
-  $('overallProgress').setAttribute('aria-label',isImage()?'Số ảnh đã lưu':'Số video đã lưu');$('overallProgress').max=Math.max(1,jobs.length);$('overallProgress').value=done.length;
+  $('overallProgress').setAttribute('aria-label',isImage()?'Số ảnh đã lưu':'Số video đã lưu');$('overallProgress').max=Math.max(1,jobs.length);$('overallProgress').value=done.length;$('overallPct').textContent=Math.round(100*done.length/Math.max(1,jobs.length))+'%';
   $('testBrowsers').disabled=Boolean(busy);$('testBrowsers').textContent=state.testing?'Đang gửi câu bắt đầu…':'Gửi câu bắt đầu';
   $('browserTests').replaceChildren(...Array.from({length:state.settings.accountCount},(_,index)=>{const t=state.browserTests?.find(t=>t.index===index);return el('span','browserTest '+(t?.status||''),'Trình duyệt '+(index+1)+': '+(t?.message||'Chưa gửi câu bắt đầu'));}));
   if(state.testing&&!state.active){$('queueState').textContent=state.starting?'Chuẩn bị gửi cảnh…':'Đang gửi câu bắt đầu · bạn có thể bấm Chạy';$('pause').disabled=Boolean(state.stopping);}

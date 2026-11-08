@@ -700,6 +700,7 @@
     if (!story) return toast('Chưa có clip kể chuyện nào trong hàng đợi.');
     if (story.done < story.total) return toast(`Còn ${story.total - story.done} cảnh chưa xong. Chạy hàng đợi cho xong rồi xuất.`);
     exportDone.add(story.id); exportWatch.delete(story.id);   // đã xuất (tay hoặc tự) thì không tự xuất lại lần nữa
+    runMax = { id: story.id, v: 0 };
     exportOk = false; exporting = true; renderStatus();
     try {
       const subtitles = $('subOn').checked, srt = $('subSrt').checked, aspect = opts.aspect || $('storyAspect').value;
@@ -863,6 +864,63 @@
       if (autoRun?.id === g.id) setAuto({ phase: 'stopped', msg: `Hàng đợi đã dừng, còn ${g.total - g.done} cảnh chưa xong. Bấm «Chạy tiếp» để chạy tiếp, xong sẽ tự xuất MP4.`, why: whyFailed(g.id) });
     }
   }
+  /* ---------- Thanh tiến trình % cho MỌI lượt (không chỉ «Làm tự động») ----------
+     Tạo clip 0–85%, đọc giọng 85–92%, edit khớp + dựng 92–98%, nối MP4 98–100%.
+     Khi ô «Tự đọc giọng…» bật: ẩn nút «Xuất MP4» và dòng hướng dẫn thủ công lúc đang chạy; chỉ hiện lại khi xong hoặc khi kẹt (lỗi / hàng đợi dừng) để làm tay. */
+  let runMax = { id: '', v: 0 };
+  // Lượt để hiện tiến trình: đang xuất → lượt đang chọn; đang chạy → lượt chạy dở mới nhất (ưu tiên lượt có clip đang làm); không thì lượt mới nhất
+  // trong {chạy dở, vừa xuất xong}; không có gì thì lượt đang chọn. Lượt cũ bị bỏ dở lâu rồi không chen vào lượt mới.
+  function focusGroup() {
+    const list = groups();
+    if (exporting) return currentStory();
+    const inc = list.filter(x => x.done < x.total && exportWatch.has(x.id));
+    if (state?.active || state?.starting) {
+      const run = inc.filter(x => (state.jobs || []).some(j => j.storyId === x.id && j.status === 'running'));
+      if (run.length || inc.length) return (run.length ? run : inc).at(-1);
+    }
+    const done = runMax.id && list.find(x => x.id === runMax.id && x.done >= x.total);
+    const pool = [inc.at(-1), done].filter(Boolean).sort((a, b) => list.indexOf(a) - list.indexOf(b));
+    return pool.at(-1) || currentStory();
+  }
+  function runInfo() {
+    const g = focusGroup(), s = state?.story || {};
+    if (!g || !state) return null;
+    if (runMax.id !== g.id) runMax = { id: g.id, v: 0 };
+    if (exporting || s.busy) {
+      const p = String(s.progress || ''), m = /(\d+)\/(\d+)/.exec(p), f = m ? Number(m[1]) / Math.max(1, Number(m[2])) : 0;
+      let pct = 85, label = 'Đang đọc giọng…';
+      if (/giọng đọc|nạp mô hình/i.test(p)) { pct = 85; label = 'Đang đọc giọng…'; }
+      else if (/^Đã đọc/.test(p) && m) { pct = 85 + Math.round(7 * f); label = `Đang đọc giọng ${m[1]}/${m[2]} cảnh`; }
+      else if (/đo độ dài|chuẩn bị/i.test(p)) { pct = 92; label = 'Đang đo độ dài lời đọc'; }
+      else if (/thông tin các cảnh/i.test(p)) { pct = 93; label = 'Đang edit khớp lời đọc với clip…'; }
+      else if (/dựng/i.test(p) && m) { pct = 93 + Math.round(5 * f); label = `Đang edit khớp & dựng ${m[1]}/${m[2]} cảnh`; }
+      else if (/nối/i.test(p)) { pct = 98; label = 'Đang nối thành MP4'; }
+      else if (p) label = p;
+      runMax.v = Math.max(runMax.v, pct);
+      return { pct: runMax.v, label, phase: 'export' };
+    }
+    if (g.done < g.total) {
+      const live = Boolean(state.active || state.starting), watching = exportWatch.has(g.id) || pendingExport?.id === g.id;
+      if (!live && !watching) return null;
+      runMax.v = Math.round(85 * g.done / g.total);
+      return live ? { pct: runMax.v, label: `Đang tạo clip ${g.done}/${g.total}`, phase: 'clips' }
+        : { pct: runMax.v, label: `Hàng đợi đang dừng · ${g.done}/${g.total} clip. Bấm «Tiếp tục» ở Hàng đợi để làm tiếp`, phase: 'clips', stuck: true };
+    }
+    if (s.error) return { pct: Math.max(85, runMax.v), label: s.error, phase: 'error', stuck: true };
+    if (s.output && (!s.storyId || s.storyId === g.id) && exportDone.has(g.id)) { runMax.v = 100; return { pct: 100, label: 'Xong: ' + baseName(s.output), phase: 'done', done: true }; }
+    return null;
+  }
+  function renderRun() {
+    const info = $('autoExport').checked ? runInfo() : null, box = $('runProgress');
+    box.hidden = !info;
+    const running = Boolean(info && !info.stuck && !info.done);
+    $('storyExport').hidden = running; $('storyStatus').hidden = running;
+    if (!info) return;
+    $('runFill').style.width = info.pct + '%'; $('runBar').setAttribute('aria-valuenow', String(info.pct));
+    $('runPct').textContent = info.pct + '%'; $('runLabel').textContent = info.label;
+    $('runText').classList.toggle('warn', Boolean(info.stuck));
+  }
+  $('autoExport').addEventListener('change', () => { if (state) renderStatus(); });
   function notesText(notes) {
     if (!Array.isArray(notes) || !notes.length) return '';
     const cut = notes.reduce((sum, n) => sum + (n.cut || 0), 0), held = notes.filter(n => n.hold > 0.05);
@@ -883,7 +941,7 @@
     if (s.error && !busy) line = s.error;
     else if (busy) line = s.progress || 'Đang xử lý…';
     else if (s.output) line = `✓ ${baseName(s.output)}${s.srt ? ' + ' + baseName(s.srt) : ''}. ${notesText(s.notes)}`;
-    else if (story && story.done < story.total) line = `Còn ${story.total - story.done} cảnh chưa có clip. Chạy hàng đợi cho xong rồi xuất MP4.`;
+    else if (story && story.done < story.total) line = $('autoExport').checked ? `Còn ${story.total - story.done} cảnh chưa có clip. Xong hết clip app sẽ tự đọc giọng, edit khớp và xuất MP4.` : `Còn ${story.total - story.done} cảnh chưa có clip. Chạy hàng đợi cho xong rồi xuất MP4.`;
     else if (story) line = `${story.total} cảnh đã sẵn sàng. Chọn giọng, phụ đề rồi bấm Xuất MP4.`;
     else line = 'Chưa có clip kể chuyện. Chia cảnh và bấm Tạo clip trước.';
     $('storyStatus').textContent = line;
@@ -896,6 +954,7 @@
     }
     if (story && story.id !== lastStory) { lastStory = story.id; }
     checkAutoExport();
+    renderRun();
     if (isPlant()) renderAnalyze();   // nhãn «Chạy tiếp (còn N cảnh)» theo hàng đợi
   }
 

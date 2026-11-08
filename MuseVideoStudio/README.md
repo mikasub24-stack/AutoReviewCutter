@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.6.7
+
+- **Thanh tiến trình % cho mọi lượt tạo (không chỉ «Làm tự động»).** Trong khung «Âm thanh & xuất video» có thanh % và nhãn bước: tạo clip (0–85%), đọc giọng (85–92%), edit khớp + dựng (92–98%), nối MP4 (98–100%), rồi «Xong: tên-file.mp4». Ở khung Hàng đợi, cạnh thanh «N / M clip đã lưu» có thêm số % tổng.
+- **Ẩn thao tác thủ công khi chạy tự động.** Khi ô «Tự đọc giọng, edit khớp và xuất MP4…» bật, lúc đang chạy nút «Xuất MP4» và dòng «Chạy hàng đợi cho xong rồi xuất» được ẩn; chỉ hiện lại khi xong (để xuất lại nếu muốn), khi kẹt (lỗi xuất / hàng đợi dừng) hoặc khi bạn bỏ chọn ô tự động. Truyện cũ đã xong từ trước vẫn có nút «Xuất MP4».
+- Chưa làm: gộp luôn bước «Muse chia cảnh» và «Tạo clip» thành một nút cho tab Kể chuyện / Lịch sử / Mẹo vặt (hiện còn 2 lần bấm: chia cảnh → Tạo clip; từ lúc bấm «Tạo clip» trở đi mọi thứ tự chạy). Cây trồng đã có «Làm tự động» chạy từ viết bài đến MP4.
+- Test: giao diện với IPC giả (thanh %, ẩn/hiện nút, % khớp số clip). **Chưa thử với Muse / giọng đọc thật.**
+
 ## Update 1.6.6
 
 - **Chia ÍT cảnh hơn thật sự (sửa nguyên nhân gốc).** Muse Studio tính tiếng Việt đọc **14 ký tự/giây** (~2,9 từ/giây), còn AnimStudio tính **4,6 từ/giây** (~22 ký tự/giây) — chậm hơn ~1,5 lần so với giọng đọc thật. Vì tưởng lời đọc dài hơn thật nên app và Muse chia mỗi cảnh quá ít chữ (clip 10 giây chỉ chứa ~126 ký tự), ra nhiều cảnh thừa. Nay tiếng Việt tính **20 ký tự/giây** (hơi chậm hơn AnimStudio một chút để chừa lề): một clip 10 giây chứa ~180 ký tự. Kịch bản mẫu «10 phút» (`examples/`): trước **140 cảnh**, nay **~88 cảnh** (AnimStudio chia offline ra 82).

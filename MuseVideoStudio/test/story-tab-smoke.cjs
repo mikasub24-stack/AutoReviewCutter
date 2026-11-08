@@ -866,6 +866,27 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       // Lượt đã xong sẵn từ trước (chưa từng thấy chạy dở) không tự xuất.
       await addGroup('Truyen-OLD', 'completed'); await nap(1200);
       assert.equal(await builds(), b0, 'lượt xong sẵn từ trước không tự xuất');
+      // Thanh tiến trình %: tạo clip 0–85%, rồi đọc giọng / edit / nối; ẩn nút «Xuất MP4» và dòng hướng dẫn thủ công lúc đang chạy, hiện lại khi xong.
+      await page.locator('#modeStory').click(); await setAuto(true);
+      await page.evaluate(() => { window.s.active = true; window.push(); });
+      await addGroup('Truyen-BAR', 'pending'); await nap(300);
+      assert.equal(await page.locator('#runProgress').isVisible(), true, 'có thanh % khi đang tạo clip');
+      assert.equal(await page.locator('#runPct').textContent(), '0%');
+      assert.match(await page.locator('#runLabel').textContent(), /Creating clips 0\/2/);
+      assert.equal(await page.locator('#storyExport').isVisible(), false, 'ẩn nút xuất tay khi tự động đang chạy');
+      assert.equal(await page.locator('#storyStatus').isVisible(), false, 'ẩn dòng hướng dẫn thủ công');
+      await page.evaluate(() => { const j = window.s.jobs.find(x => x.id === 'Truyen-BAR1'); j.status = 'completed'; j.output = 'C:\\Videos\\1.mp4'; window.push(); }); await nap(300);
+      assert.equal(await page.locator('#runPct').textContent(), '43%', '1/2 clip → 42,5% làm tròn 43%');
+      assert.equal(await page.locator('#overallPct').textContent(), (await page.evaluate(() => { const l = window.s.jobs.filter(j => j.kind === 'story'); return Math.round(100 * l.filter(j => j.status === 'completed').length / l.length) + '%'; })), '% cạnh thanh hàng đợi');
+      // Tắt ô tự xuất: thanh % ẩn, nút xuất tay hiện lại.
+      await setAuto(false); await nap(200);
+      assert.equal(await page.locator('#runProgress').isVisible(), false);
+      assert.equal(await page.locator('#storyExport').isVisible(), true, 'tắt tự động thì có nút xuất tay');
+      await setAuto(true); await page.evaluate(() => { window.s.active = false; window.push(); });
+      await finish('Truyen-BAR');
+      await page.waitForFunction(() => /Done: Truyen-1\.mp4/.test(document.getElementById('runLabel').textContent));
+      assert.equal(await page.locator('#runPct').textContent(), '100%');
+      assert.equal(await page.locator('#storyExport').isVisible(), true, 'xong thì hiện lại nút (xuất lại nếu muốn)');
       // Cây trồng + Lịch sử (ảnh rồi clip, cùng một lượt): xong ảnh chưa xuất, xong hết clip mới tự đọc + edit + xuất, không cần «Làm tự động».
       for (const [btn, sid] of [['#modePlant', 'Cay-TAY'], ['#modeHist', 'Su-TAY']]) {
         await page.locator(btn).click(); await setAuto(true);
