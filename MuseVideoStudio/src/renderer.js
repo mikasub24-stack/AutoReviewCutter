@@ -120,6 +120,7 @@ function makeCard(id){
   row.cancelBtn.title='Không chờ cảnh này nữa; tab khác vẫn chạy tiếp.';row.cancelBtn.classList.add('danger');
   row.restartBtn=action('Tạo lại ngay',async()=>{if(confirm('Bấm dừng cảnh này trong Muse rồi gửi lại prompt ngay? Nếu Muse đang tạo dở thì phần đó bị bỏ.'))render(await call('cancelJob',{id:row.job.id,mode:'again'}));});
   row.restartBtn.title='Dừng chờ và gửi lại prompt của cảnh này ngay.';
+  const previewActions=el('div','previewActions');previewActions.append(row.cancelBtn,row.restartBtn);preview.append(previewActions);
   row.edit=action('Đưa về sửa',async()=>{const result=await call('remove',row.job.id);if(result){drafts.push({...row.job});$('editorPanel').open=true;renderDrafts();render(result);$('editorPanel').scrollIntoView({block:'nearest'});}});
   body.append(badge,title,meta,steps,stage,fileLine,disclosure,source,error,actions);card.append(preview,body);return row;
 }

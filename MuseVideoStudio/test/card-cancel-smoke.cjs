@@ -23,7 +23,7 @@ const root=path.resolve(__dirname,'../src');
     });
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
     await page.waitForSelector('[data-job-id="stuck"]');
-    const btn=(id,label)=>page.locator(`[data-job-id=${id}] .cardActions button`).filter({hasText:label});
+    const btn=(id,label)=>page.locator(`[data-job-id=${id}] .previewActions button`).filter({hasText:label});
     // chỉ cảnh ĐANG CHẠY có 2 nút; cảnh xong / đang chờ thì không
     for(const id of ['stuck','busy']){assert.equal(await btn(id,/^Dừng cảnh này$/).isVisible(),true,id);assert.equal(await btn(id,/^Tạo lại ngay$/).isVisible(),true,id);}
     for(const id of ['done','next']){assert.equal(await btn(id,/^Dừng cảnh này$/).isVisible(),false,id);assert.equal(await btn(id,/^Tạo lại ngay$/).isVisible(),false,id);}
@@ -42,7 +42,7 @@ const root=path.resolve(__dirname,'../src');
     assert.equal(await btn('stuck',/^Dừng cảnh này$/).isDisabled(),true);assert.equal(await btn('busy',/^Tạo lại ngay$/).isDisabled(),true);
     // cảnh đã bị dừng (interrupted) -> hai nút biến mất, hiện «Gửi lại prompt»
     await page.evaluate(()=>{window.s.stopping=false;window.s.active=false;Object.assign(window.s.jobs[0],{status:'interrupted',stage:'interrupted',error:'Đã dừng cảnh này.'});window.push();});
-    assert.equal(await btn('stuck',/^Dừng cảnh này$/).isVisible(),false);assert.equal(await btn('stuck',/^Gửi lại prompt$/).isVisible(),true);
+    assert.equal(await btn('stuck',/^Dừng cảnh này$/).isVisible(),false);assert.equal(await page.locator('[data-job-id=stuck] .cardActions button').filter({hasText:/^Gửi lại prompt$/}).isVisible(),true);
     assert.deepEqual(errors,[]);
     await page.screenshot({path:process.env.MUSE_UI_SCREENSHOT||path.join(require('node:os').tmpdir(),'muse-card-cancel.png')});
     console.log('PASS: card-cancel smoke (Dừng cảnh này / Tạo lại ngay chỉ hiện trên cảnh đang chạy, đúng IPC, khóa khi đang dừng cả hàng đợi)');
