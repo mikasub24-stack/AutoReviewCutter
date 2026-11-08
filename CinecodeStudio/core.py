@@ -418,7 +418,7 @@ def render(data, folder, output, cancelled, status=lambda s: None):
             filters.append(f'[{i}:a]aresample=48000,volume={gain},apad,atrim=0:{duration}[a{i}]')
         tracks = ''.join(f'[a{i}]' for i in range(1, len(inputs) + 1))
         # Some FFmpeg builds emit non-finite samples when normalizing complete silence.
-        finite="aeval=exprs='if(isnan(val(ch))+isinf(val(ch)),0,val(ch))'"
+        finite="aeval=exprs='if(isnan(val(ch))+isinf(val(ch)),0,val(ch))':c=same"
         filters.append(tracks + f'amix=inputs={len(inputs)}:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=9,'+finite+',aresample=48000[a]')
         args += ['-filter_complex', ';'.join(filters), '-map', '0:v', '-map', '[a]', '-c:a', 'aac', '-b:a', '192k']
     else: args += ['-an']
