@@ -1,0 +1,62 @@
+name: Cinecode Studio Vietnamese Windows
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/vst3-discovery]
+    paths: ['CinecodeStudio/**', '.github/workflows/cinecode-studio-windows.yml']
+permissions:
+  contents: read
+concurrency:
+  group: cinecode-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+      - name: Test and package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m pip install pyinstaller==6.16.0 imageio-ffmpeg==0.6.0
+          if ($LASTEXITCODE) { throw 'pip failed' }
+          New-Item -ItemType Directory -Force CinecodeStudio/runtime | Out-Null
+          Copy-Item (Get-Command node).Source CinecodeStudio/runtime/node.exe
+          $encoder = python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
+          Copy-Item $encoder CinecodeStudio/runtime/ffmpeg.exe
+          Invoke-WebRequest 'https://raw.githubusercontent.com/nodejs/node/v22.14.0/LICENSE' -OutFile CinecodeStudio/runtime/NODE-LICENSE.txt
+          python -c "import importlib.metadata,pathlib; d=importlib.metadata.distribution('imageio-ffmpeg'); dest=pathlib.Path('CinecodeStudio/runtime'); [(dest / ('FFMPEG-'+pathlib.Path(str(p)).name)).write_bytes(d.locate_file(p).read_bytes()) for p in d.files if 'license' in str(p).lower() or 'readme' in str(p).lower()]"
+          & CinecodeStudio/runtime/ffmpeg.exe -version 2>&1 | Out-File CinecodeStudio/runtime/FFMPEG-BUILD.txt -Encoding utf8
+          'Binary distributor and corresponding source/build information: https://github.com/imageio/imageio-binaries/tree/master/ffmpeg . FFmpeg source: https://ffmpeg.org/download.html#get-sources . Exact build/version in FFMPEG-BUILD.txt.' | Set-Content CinecodeStudio/runtime/FFMPEG-README.txt -Encoding utf8
+          python -m unittest discover -s CinecodeStudio/tests -v
+          if ($LASTEXITCODE) { throw 'Core tests failed' }
+          python CinecodeStudio/app.py --smoke-test
+          if ($LASTEXITCODE) { throw 'GUI test failed' }
+          python CinecodeStudio/tests/render_smoke.py
+          if ($LASTEXITCODE) { throw 'Real render test failed' }
+          python -m PyInstaller --noconfirm --windowed --name CinecodeStudio --icon CinecodeStudio/icon.ico --distpath CinecodeStudio/build --workpath CinecodeStudio/pybuild --specpath CinecodeStudio --add-data 'CinecodeStudio/icon.ico;.' --add-data 'CinecodeStudio/film.html;.' --add-data 'CinecodeStudio/vendor;vendor' --add-data 'CinecodeStudio/runtime;runtime' CinecodeStudio/app.py
+          if ($LASTEXITCODE) { throw 'Packaging failed' }
+          Copy-Item CinecodeStudio/README.vi.md,CinecodeStudio/THIRD-PARTY.md CinecodeStudio/build/CinecodeStudio/
+          $p = Start-Process CinecodeStudio/build/CinecodeStudio/CinecodeStudio.exe -ArgumentList '--smoke-test' -Wait -PassThru
+          if ($p.ExitCode) { throw 'Packaged GUI failed' }
+          & 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe' CinecodeStudio/installer.iss
+          if ($LASTEXITCODE) { throw 'Installer failed' }
+          $install = Join-Path $env:RUNNER_TEMP 'Cinecode-installed'
+          $p = Start-Process dist-cinecode/CinecodeStudio-0.1.0-Setup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
+          if ($p.ExitCode) { throw 'Installation failed' }
+          $p = Start-Process "$install/CinecodeStudio.exe" -ArgumentList '--smoke-test' -Wait -PassThru
+          if ($p.ExitCode) { throw 'Installed GUI failed' }
+          Get-FileHash dist-cinecode/* -Algorithm SHA256 | Format-List | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          'Core, GUI, real Chromium/FFmpeg render, deterministic frame, packaged GUI and installed GUI checks passed.' | Out-File $env:GITHUB_STEP_SUMMARY -Append
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CinecodeStudio-0.1.0-Installer
+          path: dist-cinecode/*
+          if-no-files-found: error

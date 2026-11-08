@@ -1,0 +1,26 @@
+<!doctype html><html lang="vi"><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:;">
+<title>Cinecode Studio · Xem trước</title>
+<style>body{margin:0;background:#080e18;display:grid;place-items:center;min-height:100vh}canvas{max-width:100vw;max-height:100vh;object-fit:contain}</style>
+<canvas id="film"></canvas><script>
+'use strict';
+const project=__PROJECT_JSON__;
+const sizes={'16:9':[1280,720],'9:16':[720,1280],'1:1':[960,960]};
+const [W,H]=sizes[project.ratio];const c=document.getElementById('film');c.width=W;c.height=H;
+const x=c.getContext('2d'),fps=30,total=project.scenes.reduce((a,s)=>a+s.duration,0);
+const palettes={'Điện ảnh':['#091321','#67e8d2'],'Ấm áp':['#261b22','#ffc58e'],'Giải thích':['#101832','#a0b5ff']};
+const [bg,accent]=palettes[project.style];const images=new Map();
+function wrap(text,width,size){x.font=`${size}px "Segoe UI",Arial,sans-serif`;let rows=[],line='';for(const word of text.split(/\s+/)){const next=line?line+' '+word:word;if(x.measureText(next).width>width&&line){rows.push(line);line=word}else line=next}if(line)rows.push(line);return rows;}
+function fit(text,maxSize,width,maxHeight){let size=maxSize,rows;do{rows=wrap(text,width,size);if(rows.length*size*1.35<=maxHeight)break;size-=2}while(size>14);return {size,rows};}
+function textBlock(text,y,maxSize,bold,color,maxHeight){const r=fit(text,maxSize,W*.80,maxHeight);x.font=`${bold?700:400} ${r.size}px "Segoe UI",Arial,sans-serif`;x.fillStyle=color;x.textAlign='left';for(const line of r.rows){x.fillText(line,W*.10,y);y+=r.size*1.35}return y;}
+window.renderFrame=function(frame){let t=Math.min(frame/fps,total-.001),start=0,idx=0;for(let i=0;i<project.scenes.length;i++){if(t<start+project.scenes[i].duration){idx=i;break}start+=project.scenes[i].duration}const s=project.scenes[idx],local=t-start,p=local/s.duration;
+x.globalAlpha=1;x.fillStyle=bg;x.fillRect(0,0,W,H);const img=images.get(s.image);
+if(img){const scale=Math.max(W/img.width,H/img.height)*(1.02+p*.08);x.drawImage(img,(W-img.width*scale)/2,(H-img.height*scale)/2,img.width*scale,img.height*scale);const g=x.createLinearGradient(0,0,0,H);g.addColorStop(0,'#07101b44');g.addColorStop(1,'#07101bf2');x.fillStyle=g;x.fillRect(0,0,W,H)}else{const g=x.createRadialGradient(W*(.7+.08*Math.sin(t*.3)),H*.3,0,W*.6,H*.4,W*.85);g.addColorStop(0,accent+'40');g.addColorStop(1,bg);x.fillStyle=g;x.fillRect(0,0,W,H);for(let i=0;i<14;i++){x.beginPath();x.strokeStyle=accent+'16';x.lineWidth=2;x.arc(W*.75,H*.34,50+i*W*.035+Math.sin(t*.4+i)*12,0,Math.PI*2);x.stroke()}}
+x.globalAlpha=Math.min(1,local/.45,(s.duration-local)/.35);const rise=24*(1-Math.min(1,local/.6));x.fillStyle=accent;x.fillRect(W*.1,H*.37+rise,56,4);
+let y=textBlock(s.title,H*.46+rise,Math.min(W*.065,72),true,'#ffffff',H*.22);textBlock(s.text,y+26,Math.min(W*.033,36),false,'#d7e4ed',H*.25);
+x.font=`${Math.max(14,W*.014)}px "Segoe UI",Arial,sans-serif`;x.fillStyle=accent;x.fillText(String(idx+1).padStart(2,'0')+' / '+String(project.scenes.length).padStart(2,'0'),W*.1,H*.91);x.globalAlpha=1;
+};
+window.captureFrame=function(i){renderFrame(i);return c.toDataURL('image/jpeg',.94)};
+window.READY=Promise.all(project.scenes.filter(s=>s.image).map(s=>new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{images.set(s.image,img);resolve()};img.onerror=()=>reject(Error('Không đọc được ảnh'));img.src=s.image}))).then(()=>({frames:Math.ceil(total*fps),fps,width:W,height:H,renderer:'Cinecode Studio Canvas 2D'}));
+READY.then(()=>{if(new URLSearchParams(location.search).get('capture')!=='1'){const begin=performance.now();function tick(now){renderFrame(Math.floor(((now-begin)/1000%total)*fps));requestAnimationFrame(tick)}requestAnimationFrame(tick)}else renderFrame(0)});
+</script></html>
