@@ -142,6 +142,11 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.6.9
+
+- **Âm thanh gốc của clip giờ thật sự nhỏ hơn giọng kể.** Trước 1.6.8: «Nhỏ» chỉ nhân âm gốc với 0,25 so với CHÍNH clip đó; clip Muse to hơn giọng đọc thì vẫn át/ngang lời kể. Giờ khi xuất, app đo độ to (LUFS) của giọng đọc và của âm gốc từng cảnh rồi hạ âm gốc xuống THẤP HƠN giọng kể một mức cố định: **Nhỏ = 20 dB** (gần như chỉ còn nền), **Trung bình = 12 dB**, **Tắt** = không có âm gốc. Không bao giờ khuếch đại clip (clip vốn đã nhỏ hơn mức này thì giữ nguyên). Cảnh không có giọng kể vẫn giữ âm gốc như cũ; không đo được thì dùng tỉ lệ cũ (0,25 / 0,5).
+- Đã đo bằng ffmpeg thật trên clip thử: Nhỏ → âm gốc thấp hơn giọng ≈ 19,4 dB, Trung bình ≈ 11,3 dB, Tắt → im (trước đó Nhỏ chỉ thấp hơn 6 dB khi clip to gấp đôi giọng).
+
 ## Update 1.6.8
 
 - **Nút «Dừng cảnh này» và «Tạo lại ngay» trên thẻ cảnh ĐANG CHẠY.** Trước đây thẻ đang chờ Muse không có nút nào; một tab kẹt (vd «Đã thấy tin nhắn · chờ Muse phản hồi» hàng chục phút) thì tab đó đứng im, các tab còn lại chạy xong hết rồi vẫn phải chờ. Nay: **Dừng cảnh này** bỏ lượt chờ của riêng cảnh đó (có bấm Dừng trong Muse), cảnh thành «Bị gián đoạn» — sau đó vẫn có «Tìm / tải video đã tạo» (nếu Muse đã làm xong) hoặc «Gửi lại prompt»; **Tạo lại ngay** dừng rồi gửi lại prompt của cảnh đó ngay trên tab rảnh. Chỉ ảnh hưởng đúng cảnh được bấm: hàng đợi KHÔNG tạm dừng, các tab khác (đến 10 trình duyệt) chạy tiếp bình thường. Đợi lệnh dừng trong Muse xong mới nhả chỗ để lượt gửi sau không bấm nhầm vào cảnh mới.

@@ -170,8 +170,8 @@ Xem trước phụ đề|Subtitle preview
 Âm thanh & xuất video|Audio & video export
 Tiếng động gốc của clip|Original clip sound effects
 Tắt|Off
-Nhỏ (nền dưới giọng kể)|Low (background under narration)
-Trung bình|Medium
+Nhỏ (thấp hơn giọng kể 20 dB)|Low (20 dB below the narration)
+Trung bình (thấp hơn giọng kể 12 dB)|Medium (12 dB below the narration)
 Tên video|Video name
 Tên truyện|Story name
 Truyện|Story

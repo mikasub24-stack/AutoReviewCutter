@@ -57,6 +57,18 @@ test('lệnh tiếng một cảnh: giữ tiếng động nhỏ dưới giọng k
   assert.ok(silent.includes('anullsrc=r=48000:cl=stereo'));
 });
 
+test('tiếng động gốc hạ xuống thấp hơn giọng kể đúng số dB, không bao giờ khuếch đại clip', () => {
+  const db = g => Math.round(20 * Math.log10(g) * 10) / 10;
+  assert.equal(db(r.sfxGain('low', -20, -26)), -14, 'Nhỏ: clip -26 LUFS, giọng -20 → đưa về -40 LUFS = thấp hơn 20 dB');
+  assert.equal(db(r.sfxGain('mid', -20, -20)), -12, 'Trung bình: thấp hơn giọng 12 dB');
+  assert.equal(r.sfxGain('low', -20, -50), 1, 'clip vốn đã nhỏ hơn mức cần thì giữ nguyên, không tăng');
+  assert.ok(r.sfxGain('low', -20, -10) < 0.04, 'clip rất to thì hạ mạnh');
+  assert.equal(r.sfxGain('off', -20, -20), 0);
+  assert.equal(r.sfxGain('low', null, -20), r.SFX.low, 'không đo được giọng thì dùng tỉ lệ cũ');
+  assert.equal(r.sfxGain('mid', -20, null), r.SFX.mid);
+  assert.ok(r.SFX_BELOW.low > r.SFX_BELOW.mid, 'Nhỏ phải nhỏ hơn Trung bình');
+});
+
 test('chia việc dựng theo số nhân CPU: nhiều cảnh cùng lúc, mỗi cảnh vài luồng, không vượt tổng', () => {
   assert.deepEqual(r.parallelism(1), { workers: 1, threads: 1 });
   assert.deepEqual(r.parallelism(2), { workers: 1, threads: 2 });

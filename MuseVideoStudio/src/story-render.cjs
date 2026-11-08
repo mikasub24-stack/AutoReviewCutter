@@ -17,7 +17,10 @@ const SIZES = { '16:9': [1920, 1080], '9:16': [1080, 1920], '1:1': [1080, 1080] 
 const FPS = 30;
 const TAIL = 0.4; // giây lặng sau mỗi lời đọc
 const MIN_SCENE = 1.5;
-const SFX = { off: 0, low: 0.25, mid: 0.5 }; // âm lượng tiếng động gốc của clip khi đang có giọng kể
+const SFX = { off: 0, low: 0.25, mid: 0.5 }; // âm lượng tiếng động gốc (tỉ lệ so với chính clip) khi chưa đo được độ to
+// Đo được độ to thì không dùng tỉ lệ cố định nữa: hạ tiếng động gốc xuống thấp hơn GIỌNG KỂ đúng bấy nhiêu dB,
+// clip Muse to cỡ nào cũng không át lời kể (hạ 25% so với chính clip vẫn to hơn giọng nếu clip to).
+const SFX_BELOW = { low: 20, mid: 12 };
 
 function dimensions(aspect) {
   const size = SIZES[aspect];
@@ -56,6 +59,26 @@ function run(file, args, { signal, timeout = 900000 } = {}) {
       else resolve({ out, err });
     });
   });
+}
+
+// Độ to trung bình (LUFS, bỏ quãng lặng) của phần tiếng trong file; null nếu không có tiếng / quá ngắn để đo.
+async function loudness(ffmpeg, file, signal) {
+  try {
+    const { err } = await run(ffmpeg, ['-hide_banner', '-nostats', '-nostdin', '-i', file, '-vn', '-af', 'ebur128=peak=none', '-f', 'null', '-'], { signal });
+    const hit = [...String(err).matchAll(/^\s+I:\s+(-?\d+(?:\.\d+)?|-inf)\s+LUFS/gm)].pop();
+    const value = hit ? Number(hit[1]) : NaN;
+    return Number.isFinite(value) && value > -69 ? value : null;
+  } catch (e) { if (signal?.aborted) throw e; return null; }
+}
+
+// Hệ số âm lượng (tuyến tính, 0..1) cho tiếng động gốc dưới giọng kể. Không bao giờ khuếch đại clip.
+function sfxGain(level, voiceLufs, clipLufs) {
+  const fixed = SFX[level] ?? SFX.low;
+  if (!(fixed > 0)) return 0;
+  const below = SFX_BELOW[level];
+  if (!below || !Number.isFinite(voiceLufs) || !Number.isFinite(clipLufs)) return fixed;
+  const db = Math.max(-60, Math.min(0, (voiceLufs - below) - clipLufs));
+  return Math.pow(10, db / 20);
 }
 
 // Chạy `task` cho từng phần tử, tối đa `limit` việc cùng lúc; một việc lỗi thì dừng các việc còn lại.
@@ -186,12 +209,17 @@ async function assembleStory({ scenes, dir, name = 'Ke-chuyen', ffmpeg = 'ffmpeg
       const clipInfo = await probe(t.ffprobe, scene.clip);
       if (!clipInfo.hasVideo) throw Error(`Cảnh ${i + 1} không có luồng video.`);
       const voiceInfo = scene.voice ? await probe(t.ffprobe, scene.voice) : null;
-      return { clipInfo, voiceInfo, total: sceneLength(clipInfo.duration, voiceInfo?.duration) };
+      let gain = sfxVolume;
+      if (scene.voice && clipInfo.hasAudio && sfxVolume > 0) {
+        const [voiceLufs, clipLufs] = await Promise.all([loudness(t.ffmpeg, scene.voice, signal), loudness(t.ffmpeg, scene.clip, signal)]);
+        gain = sfxGain(sfx, voiceLufs, clipLufs);
+      }
+      return { clipInfo, voiceInfo, gain, total: sceneLength(clipInfo.duration, voiceInfo?.duration) };
     }, signal);
     const timeline = [], notes = [];
     let offset = 0;
     const jobs = scenes.map((scene, i) => {
-      const { clipInfo, total } = plan[i];
+      const { clipInfo, total, gain } = plan[i];
       const chunks = Array.isArray(scene.chunks) ? scene.chunks : [];
       const burn = subtitles ? chunks.filter(c => c.png).map(c => ({ png: c.png, x: c.x || 0, y: c.y || 0, start: Math.max(0, c.start), end: Math.min(total, c.end) })) : [];
       const cut = clipInfo.duration - total, hold = total - clipInfo.duration;
@@ -199,7 +227,7 @@ async function assembleStory({ scenes, dir, name = 'Ke-chuyen', ffmpeg = 'ffmpeg
       for (const c of chunks) timeline.push({ text: c.text, start: offset + c.start, end: offset + Math.min(total, c.end) });
       offset += total;
       // Có giọng kể: tiếng động gốc chỉ làm nền nhỏ. Không có giọng: giữ tiếng động gốc đủ to (trừ khi tắt).
-      const volume = scene.voice ? sfxVolume : (sfx === 'off' ? 0 : 1);
+      const volume = scene.voice ? gain : (sfx === 'off' ? 0 : 1);
       return { i, scene, clipInfo, total, burn, volume };
     });
     // 2. Dựng hình + tiếng từng cảnh, nhiều cảnh cùng lúc.
@@ -248,4 +276,4 @@ async function measureScenes({ scenes, ffmpeg = 'ffmpeg' }) {
   });
 }
 
-module.exports = { SIZES, SFX, TAIL, MIN_SCENE, FPS, dimensions, sceneLength, videoArgs, audioArgs, parallelism, voicePauses, assembleStory, measureScenes, probe };
+module.exports = { SIZES, SFX, SFX_BELOW, loudness, sfxGain, TAIL, MIN_SCENE, FPS, dimensions, sceneLength, videoArgs, audioArgs, parallelism, voicePauses, assembleStory, measureScenes, probe };
