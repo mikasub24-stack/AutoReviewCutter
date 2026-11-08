@@ -1,0 +1,59 @@
+name: Recheck exact Cinecode 0.1.3 installer with Defender
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/vst3-discovery]
+    paths: ['.github/workflows/cinecode-security-check.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  scan:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download original installer without rebuilding or executing it
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '13625629122'
+          run-id: '42501709835'
+          github-token: ${{ github.token }}
+          path: original
+          merge-multiple: true
+      - name: Verify exact bytes and scan original package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force reports | Out-Null
+          $report = [ordered]@{ status='not-scanned'; sourceRun='42501709835'; sourceArtifact='13625629122'; file='CinecodeStudio-0.1.3-Setup.exe'; sha256=$null; signature=$null; engine=$null; signatures=$null; threats=@(); error=$null; executed=$false; checkedUtc=(Get-Date).ToUniversalTime().ToString('o') }
+          try {
+            $root = (Resolve-Path original).Path
+            $file = Join-Path $root $report.file
+            $report.sha256 = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($report.sha256 -ne 'faa5a640d007671eba446a32bb77358a3afdede8f8492178ea6fd7d3576ae479') { throw 'Hash differs from the installer delivered to the user. No scan verdict.' }
+            $report.signature = (Get-AuthenticodeSignature $file).Status.ToString()
+            $state = Get-MpComputerStatus
+            if (!$state.AMServiceEnabled) { Start-Service WinDefend; $state = Get-MpComputerStatus }
+            if (!$state.AntivirusEnabled -or !$state.AMServiceEnabled) { throw 'Defender unavailable' }
+            try { Update-MpSignature } catch { $report['updateWarning'] = $_.Exception.Message }
+            $state = Get-MpComputerStatus
+            if ($state.AntivirusSignatureAge -gt 2) { throw 'Signatures stale; no accepted verdict' }
+            $report.engine = $state.AMEngineVersion; $report.signatures = $state.AntivirusSignatureVersion
+            Start-MpScan -ScanType CustomScan -ScanPath $root
+            $found = @(Get-MpThreatDetection | Where-Object { @($_.Resources | Where-Object { $_ -like "*$root*" }).Count -gt 0 })
+            $report.threats = @($found | ForEach-Object { [ordered]@{ id=$_.ThreatID; resources=@($_.Resources) } })
+            if ($found.Count) { $report.status='detected'; throw 'Threat detected. Do not distribute or install.' }
+            $report.status='no-detections'
+          } catch { $report.error=$_.Exception.Message; if ($report.status -ne 'detected') { $report.status='scan-failed' } }
+          $json = $report | ConvertTo-Json -Depth 8
+          $json | Set-Content reports/DefenderRecheck.json -Encoding utf8
+          $json | Out-File $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          $detail = $json.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+          if ($report.status -ne 'no-detections') { Write-Host "::error title=Exact installer recheck::$detail"; exit 1 }
+          Write-Host "::notice title=Exact installer recheck::$detail"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Cinecode-0.1.3-Exact-Installer-Defender-Recheck
+          path: reports/
+          if-no-files-found: warn
