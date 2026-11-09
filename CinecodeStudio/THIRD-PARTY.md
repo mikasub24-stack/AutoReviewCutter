@@ -8,3 +8,6 @@
 Mã giao diện và engine Canvas riêng của CinecodeStudio trong repo này được cấp phép MIT. Tài sản ảnh/nhạc/lời đọc người dùng chọn chịu giấy phép riêng.
 
 - CustomTkinter 5.2.2: https://github.com/TomSchimansky/CustomTkinter (MIT); darkdetect (BSD-3-Clause); Pillow 13 (MIT-CMU/HPND). Giấy phép được kèm cùng bản đóng gói.
+
+- Cinecode gốc được phân phối đầy đủ dưới vendor/cinecode, giữ nguyên 168 file của commit đã ghim và giấy phép upstream.
+- Bản 0.2 có Python chuẩn từ toolchain CPython Windows (PSF licence), cùng bộ FFmpeg/ffprobe GPL shared do BtbN/FFmpeg-Builds phát hành; URL và SHA-256 archive được ghim trong scripts/prepare_upstream_runtime.ps1.

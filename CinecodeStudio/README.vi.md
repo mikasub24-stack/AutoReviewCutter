@@ -1,6 +1,16 @@
-# Cinecode Studio 0.1.4
+# Cinecode Studio 0.2.0
 
-Ứng dụng Windows 10/11 x64 có giao diện tiếng Việt, dùng bộ xuất khung hình Cinecode của sarpstar. Bản đầu dựng phim ngắn chữ/ảnh và motion graphics với ba bảng màu, chưa có trình dựng nhân vật 3D hoặc toàn bộ quy trình agent của Cinecode.
+Giao diện Windows tiếng Việt cho bộ Cinecode gốc, kết nối với Claude Code hoặc Cursor đã cài trên máy. Mặc định mở quy trình gốc, không dùng engine nền mẫu 0.1.x. Agent chính thức viết mã cảnh, sử dụng các starter/camera/ánh sáng/style/âm thanh và công cụ kiểm tra của toolkit gốc.
+
+## 0.2.0 · Cinecode gốc qua Claude Code/Cursor
+
+1. Cài Claude Code chính thức, đăng nhập cùng tài khoản Claude Pro/Max. Pro là quyền dùng agent theo hạn mức gói, không bao gồm phí Anthropic API hay các dịch vụ TTS/tạo ảnh/video ngoài. App không cần Gemini API cho việc chạy agent gốc. Cursor cũng dùng quyền tài khoản của chính Cursor.
+2. Nhập brief/kịch bản, chọn Quick hoặc Film, loại phim, thời lượng, ngôn ngữ, tiến độ và nguồn nhạc. Đính kèm ảnh/nhạc/video nếu có.
+3. **Tạo dự án gốc** tạo đúng cấu trúc upstream và cài skill nguyên bản trong dự án. App mở Claude Code với yêu cầu đó; tiếp tục trao đổi/cho phép công cụ trong cửa sổ agent chính thức. Với Cursor, app mở dự án và chép yêu cầu để dán vào Agent chat. Không bỏ qua permission của agent.
+4. Agent thực hiện quy trình gốc. Các nút ảnh xem trước/bản nháp/bản cuối gọi nguyên make.py; khi cần thông tin hoặc phê duyệt thật, tương tác với agent. Video đã hoàn tất hiện để mở hoặc lưu bản sao. Không tự coi file trong renders/ là video đã đạt QC.
+5. Node, Python chuẩn và bộ FFmpeg/ffprobe đầy đủ được kèm app. Whisper, dịch vụ giọng đọc hoặc tài sản bên ngoài có điều kiện cài đặt/tài khoản riêng như toolkit gốc; không bị xóa để giảm tính năng.
+
+Toàn bộ 168 file upstream được giữ nguyên và có manifest checksum. Bản cũ 0.1.x chỉ được giữ cho tương thích qua tham số --legacy-project, không còn là quy trình Cinecode mặc định. Kết nối tài khoản Pro/Cursor và chất lượng phim thực tế cần được thử trên tài khoản của người dùng; build được EXE không chứng minh chất lượng tác phẩm.
 
 ## 0.1.4 · Đóng gói và đối chiếu nguồn gốc
 
@@ -15,7 +25,7 @@ Các thay đổi này không chứng minh nguyên nhân trình duyệt đã ch�
 - HTTP 503/500/502/504 hoặc giới hạn tạm thời 429 được thử tối đa 3 lần; hiện thời gian chờ, tôn trọng Retry-After ngắn và cho hủy trong lúc chờ. Không thử lại lỗi khóa/quyền/model hoặc hết hạn mức ngày. Không đổi model âm thầm.
 - Hiện thông báo cụ thể từ Google (đã ẩn khóa), giữ nguyên kịch bản khi yêu cầu thất bại. Không cam kết retry sẽ xử lý được gián đoạn dịch vụ kéo dài.
 
-## 0.1.4 · Hủy yêu cầu đang chờ, thử model và làm video tự động
+## 0.2.0 · Hủy yêu cầu đang chờ, thử model và làm video tự động
 
 - **Hủy** dừng cả tiến trình đang chờ phản hồi HTTP, không phải đợi timeout. App giữ nguyên dự án đang mở và không áp dụng kết quả đến sau khi hủy. Yêu cầu Google đã nhận có thể vẫn được dịch vụ xử lý/tính hạn mức; hủy ở app không thu hồi được yêu cầu đã tới máy chủ.
 - **Cài đặt AI → Kiểm tra model viết / Kiểm tra model đọc** gửi một yêu cầu nhỏ thật theo đúng chế độ app dùng. Chỉ báo dùng được sau khi nhận JSON hợp lệ/âm thanh giải mã được; 503/429/quyền/model không tồn tại có trạng thái riêng. Model chưa thử ghi rõ chưa kiểm tra. Kết quả ghi giờ thử và gắn với khóa đang nhập, chỉ lưu trong phiên vì quyền/hạn mức có thể thay đổi.

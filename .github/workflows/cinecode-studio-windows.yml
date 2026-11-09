@@ -58,6 +58,8 @@ jobs:
           python -c "import importlib.metadata,pathlib; d=importlib.metadata.distribution('imageio-ffmpeg'); dest=pathlib.Path('CinecodeStudio/runtime'); [(dest / ('FFMPEG-'+pathlib.Path(str(p)).name)).write_bytes(d.locate_file(p).read_bytes()) for p in d.files if 'license' in str(p).lower() or 'readme' in str(p).lower()]"
           & CinecodeStudio/runtime/ffmpeg.exe -version 2>&1 | Out-File CinecodeStudio/runtime/FFMPEG-BUILD.txt -Encoding utf8
           'Binary distributor and corresponding source/build information: https://github.com/imageio/imageio-binaries/tree/master/ffmpeg . FFmpeg source: https://ffmpeg.org/download.html#get-sources . Exact build/version in FFMPEG-BUILD.txt.' | Set-Content CinecodeStudio/runtime/FFMPEG-README.txt -Encoding utf8
+          & ./CinecodeStudio/scripts/prepare_upstream_runtime.ps1
+          if ($LASTEXITCODE) { throw 'Original-tool runtime preparation failed' }
           python -m unittest discover -s CinecodeStudio/tests -v
           if ($LASTEXITCODE) { throw 'Core tests failed' }
           $env:CINECODE_SCREENSHOT = Join-Path (Get-Location) 'dist-cinecode/UI-Preview.png'
@@ -70,6 +72,8 @@ jobs:
             Write-Host "::error title=Cinecode render output::$detail"
             throw 'Real render test failed'
           }
+          python CinecodeStudio/tests/upstream_render_smoke.py
+          if ($LASTEXITCODE) { throw 'Original Three.js engine test failed' }
           python -m PyInstaller --noconfirm --windowed --clean --noupx --version-file CinecodeStudio/version-info.txt --collect-all customtkinter --collect-all darkdetect --name CinecodeStudio --icon CinecodeStudio/icon.ico --distpath CinecodeStudio/build --workpath CinecodeStudio/pybuild --specpath . --add-data 'CinecodeStudio/icon.ico;.' --add-data 'CinecodeStudio/film.html;.' --add-data 'CinecodeStudio/vendor;vendor' --add-data 'CinecodeStudio/runtime;runtime' CinecodeStudio/app.py
           if ($LASTEXITCODE) { throw 'Packaging failed' }
           Copy-Item CinecodeStudio/README.vi.md,CinecodeStudio/THIRD-PARTY.md CinecodeStudio/build/CinecodeStudio/
@@ -81,17 +85,17 @@ jobs:
           & 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe' CinecodeStudio/installer.iss
           if ($LASTEXITCODE) { throw 'Installer failed' }
           $install = Join-Path $env:RUNNER_TEMP 'Cinecode-installed'
-          $p = Start-Process dist-cinecode/CinecodeStudio-0.1.4-Setup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
+          $p = Start-Process dist-cinecode/CinecodeStudio-0.2.0-Setup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
           if ($p.ExitCode) { throw 'Installation failed' }
           $p = Start-Process "$install/CinecodeStudio.exe" -ArgumentList '--smoke-test' -Wait -PassThru
           if ($p.ExitCode) { throw 'Installed GUI failed' }
           & ./VocalStudio/scripts/scan-windows.ps1 -RuntimeDirectory CinecodeStudio/build/CinecodeStudio -PackageDirectory dist-cinecode
-          & git archive '--format=zip' '--output=dist-cinecode/CinecodeStudio-0.1.4-Source.zip' HEAD CinecodeStudio .github/workflows/cinecode-studio-windows.yml VocalStudio/scripts/scan-windows.ps1
+          & git archive '--format=zip' '--output=dist-cinecode/CinecodeStudio-0.2.0-Source.zip' HEAD CinecodeStudio .github/workflows/cinecode-studio-windows.yml VocalStudio/scripts/scan-windows.ps1
           if ($LASTEXITCODE) { throw 'Source archive failed' }
           Get-FileHash dist-cinecode/* -Algorithm SHA256 | Format-List | Out-File $env:GITHUB_STEP_SUMMARY -Append
           'Core, GUI, real Chromium/FFmpeg render, deterministic frame, packaged GUI and installed GUI checks passed.' | Out-File $env:GITHUB_STEP_SUMMARY -Append
       - uses: actions/upload-artifact@v4
         with:
-          name: CinecodeStudio-0.1.4-Installer
+          name: CinecodeStudio-0.2.0-Installer
           path: dist-cinecode/*
           if-no-files-found: error

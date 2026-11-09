@@ -364,7 +364,7 @@ def smoke_test():
     if os.environ.get('CINECODE_SCREENSHOT'):
         from PIL import ImageGrab
         app.geometry('1220x900');app.reset_output();app.status.set('Sẵn sàng · Có thể thử dự án mẫu không cần AI.');app.update()
-        path=Path(os.environ['CINECODE_SCREENSHOT']);path.parent.mkdir(parents=True,exist_ok=True)
+        path=Path(os.environ['CINECODE_SCREENSHOT']).with_name('Legacy-Preview.png');path.parent.mkdir(parents=True,exist_ok=True)
         ImageGrab.grab(bbox=(app.winfo_rootx(),app.winfo_rooty(),app.winfo_rootx()+app.winfo_width(),app.winfo_rooty()+app.winfo_height())).save(path)
     app.destroy()
 
@@ -372,11 +372,18 @@ if __name__=='__main__':
     if '--smoke-test' in sys.argv:
         import traceback
         report={'passed':False}
-        try:smoke_test();report['passed']=True
+        try:
+            smoke_test()
+            from full_studio import smoke_test as full_smoke_test
+            full_smoke_test()
+            report['passed']=True;report['defaultInterface']='Original Cinecode / native agent';report['liveAgentAccountTested']=False
         except Exception as e:report.update(error=str(e),traceback=traceback.format_exc())
         if os.environ.get('CINECODE_SMOKE_REPORT'):
             path=Path(os.environ['CINECODE_SMOKE_REPORT']);path.parent.mkdir(parents=True,exist_ok=True)
             path.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
         if not report['passed'] and sys.stderr:print(report.get('traceback'),file=sys.stderr)
         sys.exit(0 if report['passed'] else 1)
-    App().mainloop()
+    if '--legacy-project' in sys.argv:App().mainloop()
+    else:
+        from full_studio import FullStudio
+        FullStudio().mainloop()
