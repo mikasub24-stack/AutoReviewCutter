@@ -19,6 +19,9 @@ class FullAdapterTests(unittest.TestCase):
             self.assertIn('English',brief);self.assertIn('10 phút',brief)
             command=upstream.tool_command(project,'make.py',['draft'])
             self.assertEqual(command[-1],'draft')
+            helper=project/'tools/fonts.py';original=helper.read_bytes();helper.write_text('modified helper',encoding='utf-8')
+            with self.assertRaises(ValueError):upstream.tool_command(project,'make.py',['draft'])
+            helper.write_bytes(original)
             (project/'tools/make.py').write_text('modified',encoding='utf-8')
             with self.assertRaises(ValueError):upstream.tool_command(project,'make.py',['final'])
 

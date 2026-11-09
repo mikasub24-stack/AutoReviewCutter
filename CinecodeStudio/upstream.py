@@ -128,8 +128,14 @@ def tool_command(project,name,args):
         raise ValueError('Công cụ không được gọi từ nút giao diện này.')
     script=project/'tools'/name;original=KIT/'scripts'/name
     if not script.is_file():raise ValueError('Dự án chưa có tools/'+name)
-    if hashlib.sha256(script.read_bytes()).digest()!=hashlib.sha256(original.read_bytes()).digest():
-        raise ValueError('Công cụ trong dự án đã được chỉnh khác bản gốc. Hãy mở agent để kiểm tra trước khi chạy.')
+    # make.py imports sibling helpers and launches capture.mjs; check that chain too.
+    for local in (project/'tools').rglob('*'):
+        if local.is_file() and local.suffix.lower() in ('.py','.mjs','.js','.cjs'):
+            relative=local.relative_to(project/'tools')
+            expected=KIT/'scripts'/relative
+            if relative.as_posix()=='type.mjs':expected=KIT/'starter/type.mjs'
+            if not expected.is_file() or local.is_symlink() or hashlib.sha256(local.read_bytes()).digest()!=hashlib.sha256(expected.read_bytes()).digest():
+                raise ValueError('Công cụ trong dự án đã được chỉnh khác bản gốc: '+str(relative)+'. Hãy mở agent để kiểm tra trước khi chạy.')
     return [python_runtime(),str(script),*args]
 
 def run_step(project,step,cancelled,status):
