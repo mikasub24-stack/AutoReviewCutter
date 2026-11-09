@@ -11,6 +11,106 @@ import time
 import core
 
 KIT=core.ROOT/'vendor/cinecode'
+_agent_version_cache={}
+CLAUDE_DESKTOP='Claude Desktop (Code)'
+
+def agent_settings_path():
+    return Path(os.environ.get('LOCALAPPDATA',Path.home()))/'CinecodeStudio/agents.json'
+
+def saved_claude_path():
+    try:return str(json.loads(agent_settings_path().read_text(encoding='utf-8')).get('claudeCode',''))
+    except (OSError,ValueError,AttributeError):return ''
+
+def saved_agent_settings():
+    try:
+        data=json.loads(agent_settings_path().read_text(encoding='utf-8'))
+        return data if isinstance(data,dict) else {}
+    except (OSError,ValueError):return {}
+
+def _save_agent_path(field,path,preferred):
+    target=agent_settings_path();target.parent.mkdir(parents=True,exist_ok=True)
+    data=saved_agent_settings();data[field]=os.path.abspath(os.fspath(path));data['preferredAgent']=preferred
+    temporary=target.with_suffix('.tmp');temporary.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf-8');temporary.replace(target)
+    return data[field]
+
+def _claude_prefix(path):
+    path=Path(path)
+    if not path.is_file():return None
+    parts=[part.lower() for part in path.parts]
+    if 'anthropicclaude' in parts and not any(part in ('claude-code','native-binary') for part in parts):return None
+    if path.parent.name.lower()=='windowsapps' and path.name.lower()=='claude.exe':return None
+    if path.parent.name.lower()=='claude' and path.parent.parent.name.lower()=='programs':return None
+    if any(word in path.name.lower() for word in ('setup','installer')):return None
+    if path.name.lower()=='cli.js':return [core.executable('node') or 'node',str(path)]
+    if path.suffix.lower() in ('.exe',''):return [str(path)]
+    if path.suffix.lower() in ('.cmd','.bat'):
+        package=path.parent/'node_modules/@anthropic-ai/claude-code'
+        for native in (package/'bin/claude.exe',package/'cli.exe'):
+            if native.is_file():return [str(native)]
+        script=package/'cli.js'
+        if script.is_file():return [core.executable('node') or 'node',str(script)]
+    return None
+
+def claude_version(command):
+    signature=tuple((str(p),Path(p).stat().st_mtime_ns,Path(p).stat().st_size) for p in command if Path(p).is_file())
+    cache=(tuple(command),signature)
+    if cache in _agent_version_cache:return _agent_version_cache[cache]
+    try:
+        result=subprocess.run([*command,'--version'],capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=6,
+                              creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    except (OSError,subprocess.TimeoutExpired):return None
+    text=(result.stdout+'\n'+result.stderr).strip()
+    if result.returncode or 'claude code' not in text.lower():return None
+    version=' '.join(text.split())[:180];_agent_version_cache[cache]=version
+    return version
+
+def claude_candidates():
+    home=Path.home();roaming=Path(os.environ.get('APPDATA',home/'AppData/Roaming'));local=Path(os.environ.get('LOCALAPPDATA',home/'AppData/Local'))
+    candidates=[saved_claude_path(),shutil.which('claude.exe'),shutil.which('claude'),
+                home/'.local/bin/claude.exe',roaming/'npm/claude.cmd',
+                local/'Microsoft/WinGet/Links/claude.exe',local/'Programs/ClaudeCode/claude.exe',
+                Path(os.environ.get('ProgramFiles',r'C:\Program Files'))/'ClaudeCode/claude.exe']
+    for root in (home/'.vscode/extensions',home/'.cursor/extensions',home/'.vscode-insiders/extensions'):
+        if root.is_dir():
+            for extension in sorted(root.glob('anthropic.claude-code-*'),reverse=True)[:6]:
+                candidates.extend([extension/'resources/native-binary/claude.exe',extension/'resources/claude-code/cli.js'])
+    winget=local/'Microsoft/WinGet/Packages'
+    if winget.is_dir():
+        for package in winget.glob('Anthropic.ClaudeCode*'):
+            candidates.extend([package/'claude.exe',package/'bin/claude.exe'])
+    desktop=local/'AnthropicClaude'
+    if desktop.is_dir():
+        for version in sorted(desktop.glob('app-*'),reverse=True)[:4]:
+            candidates.extend([version/'resources/claude-code/cli.js',version/'resources/claude-code/bin/claude.exe',
+                               version/'resources/app.asar.unpacked/node_modules/@anthropic-ai/claude-code/bin/claude.exe'])
+    seen=set()
+    for candidate in filter(None,candidates):
+        value=str(candidate)
+        if value.lower() not in seen:seen.add(value.lower());yield Path(value)
+
+def choose_claude(path):
+    prefix=_claude_prefix(path)
+    if prefix is None:raise ValueError('Chọn file Claude Code đã cài (claude.exe hoặc claude.cmd). File Claude Desktop hoặc bộ cài không phải CLI cần dùng.')
+    version=claude_version(prefix)
+    if not version:raise ValueError('File này chưa được xác nhận là Claude Code qua --version. Đường dẫn chưa được lưu. Hãy chọn đúng CLI, không chọn app chat Desktop hoặc bộ cài.')
+    selected=_save_agent_path('claudeCode',path,'Claude Code')
+    return {'path':selected,'version':version}
+
+def choose_desktop(path):
+    path=Path(path)
+    if not path.is_file() or path.suffix.lower()!='.exe' or 'claude' not in path.name.lower() or any(w in path.name.lower() for w in ('setup','installer')):
+        raise ValueError('Chọn file Claude Desktop đã cài (Claude.exe), không chọn bộ cài.')
+    return {'path':_save_agent_path('claudeDesktop',path,CLAUDE_DESKTOP),'version':'Claude Desktop; mở chế độ Code trong ứng dụng'}
+
+def desktop_command():
+    local=Path(os.environ.get('LOCALAPPDATA',Path.home()/'AppData/Local'))
+    candidates=[saved_agent_settings().get('claudeDesktop'),local/'AnthropicClaude/claude.exe',local/'Programs/Claude/Claude.exe']
+    root=local/'AnthropicClaude'
+    if root.is_dir():candidates.extend(path/'claude.exe' for path in sorted(root.glob('app-*'),reverse=True))
+    for candidate in filter(None,candidates):
+        path=Path(candidate)
+        if path.is_file():return [str(path)]
+    raise RuntimeError('Chưa dò được Claude Desktop trong thư mục cài đặt phổ biến. Nếu dùng Claude Code CLI, chọn file claude.exe/claude.cmd đã cài.')
 
 def python_runtime():
     bundled=core.ROOT/'runtime/python/python.exe'
@@ -28,19 +128,12 @@ def environment(pro=False):
     return env
 
 def agent_command(agent='Claude Code'):
+    if agent==CLAUDE_DESKTOP:return desktop_command()
     if agent=='Claude Code':
-        candidates=[shutil.which('claude.exe'),shutil.which('claude'),str(Path.home()/'.local/bin/claude.exe')]
-        for candidate in filter(None,candidates):
-            path=Path(candidate)
-            if not path.is_file():continue
-            if path.suffix.lower() in ('.exe',''):return [str(path)]
-            if path.suffix.lower() in ('.cmd','.bat'):
-                package=path.parent/'node_modules/@anthropic-ai/claude-code'
-                for native in (package/'bin/claude.exe',package/'cli.exe'):
-                    if native.is_file():return [str(native)]
-                script=package/'cli.js'
-                if script.is_file():return [core.executable('node') or 'node',str(script)]
-        raise RuntimeError('Chưa tìm thấy Claude Code. Cài Claude Code chính thức và đăng nhập tài khoản Pro/Max, rồi mở lại app.')
+        for path in claude_candidates():
+            prefix=_claude_prefix(path)
+            if prefix and claude_version(prefix):return prefix
+        raise RuntimeError('Chưa dò được Claude Code CLI. Nếu đã cài, bấm Chọn Claude Code đã cài để trỏ tới file, không cần cài lại. Vị trí thường gặp: %USERPROFILE%\\.local\\bin\\claude.exe hoặc %APPDATA%\\npm\\claude.cmd; bản extension nằm trong .vscode/extensions hoặc .cursor/extensions.')
     candidates=[shutil.which('cursor.exe'),str(Path(os.environ.get('LOCALAPPDATA',Path.home()))/'Programs/cursor/Cursor.exe')]
     shim=shutil.which('cursor')
     if shim:
@@ -56,8 +149,8 @@ def launch_agent(project,agent='Claude Code',login=False):
     command=agent_command(agent)
     if agent=='Claude Code':
         command+=['auth','login'] if login else ['/cinecode Read STATE.md first and resume existing work. Read .cinecode-ui/START-HERE.md and follow the user brief. Do not restart an existing film unless requested. Respond in Vietnamese. Use the original Cinecode workflow and tools.']
-    else:command += [str(project),'--goto',str(project/'.cinecode-ui/START-HERE.md')]
-    return subprocess.Popen(command,cwd=project,env=environment(pro=agent=='Claude Code'),
+    elif agent=='Cursor':command += [str(project),'--goto',str(project/'.cinecode-ui/START-HERE.md')]
+    return subprocess.Popen(command,cwd=project,env=environment(pro=agent.startswith('Claude')),
         creationflags=getattr(subprocess,'CREATE_NEW_CONSOLE',0))
 
 def stop_agent(process):
@@ -75,7 +168,7 @@ def slug(text):
 def connect_existing_project(project,agent):
     project=Path(project)
     if not (project/'STATE.md').is_file():raise ValueError('Dự án gốc cần có STATE.md.')
-    skill=project/('.claude' if agent=='Claude Code' else '.cursor')/'skills/cinecode'
+    skill=project/('.cursor' if agent=='Cursor' else '.claude')/'skills/cinecode'
     if not skill.exists():shutil.copytree(KIT,skill)
     control=project/'.cinecode-ui';control.mkdir(exist_ok=True)
     task=control/'START-HERE.md'
@@ -90,7 +183,7 @@ def create_project(parent,brief,mode,route,duration,language,agent,pace,music,at
     if mode=='Quick':args.append('--quick')
     run=subprocess.run(args,env=environment(),capture_output=True,text=True,encoding='utf-8',errors='replace',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     if run.returncode:raise RuntimeError('Không khởi tạo được dự án gốc:\n'+(run.stderr+run.stdout)[-2000:])
-    skill=project/('.claude' if agent=='Claude Code' else '.cursor')/'skills/cinecode'
+    skill=project/('.cursor' if agent=='Cursor' else '.claude')/'skills/cinecode'
     shutil.copytree(KIT,skill)
     media=[]
     destination=project/'assets/user-media';destination.mkdir(parents=True,exist_ok=True)
@@ -172,7 +265,12 @@ def diagnostics():
         path=core.executable(name);lines.append(name+': '+(path or 'THIẾU'))
     try:lines.append('Python: '+python_runtime())
     except RuntimeError as e:lines.append(str(e))
-    for agent in ('Claude Code','Cursor'):
-        try:lines.append(agent+': '+agent_command(agent)[0])
+    for agent in ('Claude Code',CLAUDE_DESKTOP,'Cursor'):
+        try:
+            command=agent_command(agent);lines.append(agent+': '+' | '.join(command))
+            if agent=='Claude Code':lines.append('Phiên bản CLI: '+str(claude_version(command)))
         except RuntimeError:lines.append(agent+': chưa tìm thấy')
+    selected=saved_claude_path()
+    if selected:lines.append('Đường dẫn CLI đã lưu: '+selected)
+    lines.append('Vị trí CLI phổ biến: %USERPROFILE%\\.local\\bin hoặc %APPDATA%\\npm; extension: .vscode/extensions, .cursor/extensions.')
     return '\n'.join(lines)

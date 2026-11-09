@@ -1,6 +1,12 @@
-# Cinecode Studio 0.2.0
+# Cinecode Studio 0.2.1
 
 Giao diện Windows tiếng Việt cho bộ Cinecode gốc, kết nối với Claude Code hoặc Cursor đã cài trên máy. Mặc định mở quy trình gốc, không dùng engine nền mẫu 0.1.x. Agent chính thức viết mã cảnh, sử dụng các starter/camera/ánh sáng/style/âm thanh và công cụ kiểm tra của toolkit gốc.
+
+## 0.2.1 · Nhận Claude đã cài
+
+Không cần cài lại Claude khi app chưa nhận đường dẫn. Chọn đúng Agent, rồi **Chọn Claude đã cài** để lưu file trên máy. Claude Code CLI được kiểm tra bằng `--version`; đường dẫn được ghi nhớ trong `%LOCALAPPDATA%/CinecodeStudio/agents.json`. App dò thêm npm, WinGet và extension VS Code/Cursor khi CLI không có trong PATH.
+
+Claude Desktop là ứng dụng riêng: chọn **Claude Desktop (Code)** và chọn `Claude.exe` đã cài. App mở Desktop và chép yêu cầu vào clipboard; nếu phiên bản/tài khoản hỗ trợ Code, chọn tab Code, chọn thư mục dự án rồi dán yêu cầu. Không dùng app chat Desktop như CLI, không tự điều khiển cửa sổ hoặc tự xác nhận đăng nhập. Nếu Desktop không có Code, dùng Claude Code CLI hoặc Cursor.
 
 ## 0.2.0 · Cinecode gốc qua Claude Code/Cursor
 

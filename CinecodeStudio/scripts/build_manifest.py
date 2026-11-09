@@ -14,7 +14,7 @@ for p in sorted(root.rglob('*')):
         with p.open('rb') as file: digest=hashlib.file_digest(file,'sha256').hexdigest()
         files.append({'path':p.relative_to(root).as_posix(),'bytes':p.stat().st_size,
                       'sha256':digest})
-manifest={'version':'0.2.0','sourceCommit':os.environ.get('GITHUB_SHA','local'),
+manifest={'version':'0.2.1','sourceCommit':os.environ.get('GITHUB_SHA','local'),
           'sourceRepository':'https://github.com/mikasub24-stack/AutoReviewCutter',
           'python':sys.version,'packager':'PyInstaller '+importlib.metadata.version('pyinstaller'),
           'upx':False,'onefile':False,'authenticode':'NotSigned; no publisher certificate configured',

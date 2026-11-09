@@ -25,7 +25,7 @@ class ApiError(RuntimeError):
         super().__init__(message);self.code=code
 
 ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).parent))
-VERSION = '0.2.0'
+VERSION = '0.2.1'
 STYLES = {'Điện ảnh': ['#091321', '#67e8d2'], 'Ấm áp': ['#261b22', '#ffc58e'],
           'Giải thích': ['#101832', '#a0b5ff']}
 

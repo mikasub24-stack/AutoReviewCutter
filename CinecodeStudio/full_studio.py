@@ -18,20 +18,26 @@ class FullStudio(ctk.CTk):
         self.geometry('1180x880');self.minsize(1000,720);self.configure(fg_color='#0b1220')
         if os.name=='nt':self.iconbitmap(str(core.ROOT/'icon.ico'))
         self.project=None;self.attachments=[];self.agent_process=None;self.cancel=threading.Event();self.busy=False;self.events=queue.Queue()
+        self.buttons=[]
         body=ctk.CTkScrollableFrame(self,fg_color='transparent');body.pack(fill='both',expand=True,padx=20,pady=16)
         ctk.CTkLabel(body,text='Cinecode Studio · BỘ GỐC',font=('Segoe UI',25,'bold'),text_color='#5de0c1').pack(anchor='w')
         ctk.CTkLabel(body,text='Giao diện quản lý dự án · Agent viết mã cảnh và dùng toàn bộ công cụ Cinecode gốc',font=('Segoe UI',14)).pack(anchor='w',pady=(0,12))
         options=ctk.CTkFrame(body);options.pack(fill='x',pady=8)
-        self.agent=tk.StringVar(value='Claude Code');self.mode=tk.StringVar(value='Film');self.route=tk.StringVar(value='Phim / hoạt hình')
+        preferred=upstream.saved_agent_settings().get('preferredAgent','Claude Code')
+        self.agent=tk.StringVar(value=preferred if preferred in ('Claude Code',upstream.CLAUDE_DESKTOP,'Cursor') else 'Claude Code');self.mode=tk.StringVar(value='Film');self.route=tk.StringVar(value='Phim / hoạt hình')
         self.duration=tk.StringVar(value='1 phút');self.language=tk.StringVar(value='Tiếng Việt');self.pace=tk.StringVar(value='Tự làm đến MP4')
         self.music=tk.StringVar(value='Không nhạc / hiệu ứng âm thanh');self.project_label=tk.StringVar(value='Chưa chọn dự án')
         for row,items in enumerate([
-            [('Agent',self.agent,['Claude Code','Cursor']),('Chế độ gốc',self.mode,['Quick','Film']),('Ngôn ngữ phim',self.language,['Tiếng Việt','English'])],
+            [('Agent',self.agent,['Claude Code',upstream.CLAUDE_DESKTOP,'Cursor']),('Chế độ gốc',self.mode,['Quick','Film']),('Ngôn ngữ phim',self.language,['Tiếng Việt','English'])],
             [('Loại video',self.route,['Phim / hoạt hình','Quảng cáo / sản phẩm','MV theo nhạc','Theo video tham chiếu','Dựng từ video có sẵn']),('Thời lượng',self.duration,['30 giây','1 phút','3 phút','5 phút','10 phút','15 phút']),('Tiến độ',self.pace,['Tự làm đến MP4','Duyệt từng giai đoạn'])]]):
             line=ctk.CTkFrame(options,fg_color='transparent');line.pack(fill='x',padx=12,pady=8)
             for text,var,values in items:
                 ctk.CTkLabel(line,text=text,font=('Segoe UI',13)).pack(side='left',padx=(0,6))
                 ctk.CTkComboBox(line,variable=var,values=values,width=220 if text=='Loại video' else 160,state='normal' if text=='Thời lượng' else 'readonly').pack(side='left',padx=(0,14))
+        install=ctk.CTkFrame(body,fg_color='transparent');install.pack(fill='x',pady=(4,8))
+        choose=ctk.CTkButton(install,text='Chọn Claude đã cài',command=self.choose_claude,width=180);choose.pack(side='left',padx=(0,10));self.buttons.append(choose)
+        self.installation=tk.StringVar(value='Đã cài nhưng app chưa tìm thấy? Chọn file và app sẽ ghi nhớ đường dẫn.')
+        ctk.CTkLabel(install,textvariable=self.installation,font=('Segoe UI',12),wraplength=750,anchor='w',justify='left').pack(side='left',fill='x',expand=True)
         self.brief=ctk.CTkTextbox(body,height=160,font=('Segoe UI',15),wrap='word');self.brief.pack(fill='x',pady=8)
         self.brief.insert('1.0','Dán tiêu đề hoặc kịch bản đầy đủ ở đây. Có thể yêu cầu cảnh 2D/3D, nhân vật, ánh sáng, camera và phong cách cụ thể.')
         media=ctk.CTkFrame(body,fg_color='transparent');media.pack(fill='x',pady=6)
@@ -39,7 +45,6 @@ class FullStudio(ctk.CTk):
         ctk.CTkComboBox(media,variable=self.music,values=['Không nhạc / hiệu ứng âm thanh','Dùng nhạc của tôi','Tìm nhạc mở, cho tôi chọn','Nhạc viết bằng code'],width=265,state='readonly').pack(side='left',padx=12)
         self.media_label=tk.StringVar(value='Chưa đính kèm file');ctk.CTkLabel(body,textvariable=self.media_label,wraplength=1050).pack(anchor='w')
         actions=ctk.CTkFrame(body);actions.pack(fill='x',pady=12)
-        self.buttons=[]
         for number,(text,fn) in enumerate([('Tạo dự án gốc',self.create),('Mở dự án gốc',self.open_project),('Mở agent / tiếp tục',self.launch),('Đăng nhập Claude Pro',self.login),('Kiểm tra thành phần',self.doctor),('Dừng Claude Code',self.stop_agent)]):
             b=ctk.CTkButton(actions,text=text,command=fn,width=180);b.grid(row=number//3,column=number%3,padx=10,pady=8,sticky='ew');self.buttons.append(b)
         for column in range(3):actions.grid_columnconfigure(column,weight=1)
@@ -57,6 +62,23 @@ class FullStudio(ctk.CTk):
         ctk.CTkLabel(body,textvariable=self.status,wraplength=1050,font=('Segoe UI',13),text_color='#a7b9d0').pack(anchor='w',pady=12)
         self.log=ctk.CTkTextbox(body,height=90,font=('Consolas',12));self.log.pack(fill='x',pady=4)
         self.after(300,self.poll);self.after(1500,self.refresh_outputs);self.protocol('WM_DELETE_WINDOW',self.close)
+        self.agent.trace_add('write',self.show_selected_agent);self.show_selected_agent()
+
+    def show_selected_agent(self,*_):
+        settings=upstream.saved_agent_settings()
+        selected=settings.get('claudeDesktop' if self.agent.get()==upstream.CLAUDE_DESKTOP else 'claudeCode','')
+        self.installation.set(('Đã lưu: '+selected) if selected else ('Claude Desktop: chọn chế độ Code trong ứng dụng.' if self.agent.get()==upstream.CLAUDE_DESKTOP else 'Chưa có đường dẫn lưu; app sẽ dò CLI, npm, WinGet và extension VS Code/Cursor.'))
+
+    def choose_claude(self):
+        desktop=self.agent.get()==upstream.CLAUDE_DESKTOP
+        path=filedialog.askopenfilename(title='Chọn Claude Desktop đã cài' if desktop else 'Chọn Claude Code CLI đã cài',
+             filetypes=[('Claude đã cài','*.exe *.cmd *.bat *.js'),('Tất cả file','*.*')])
+        if not path:return
+        self.status.set('Đang kiểm tra file Claude đã chọn…')
+        def done(result):
+            self.agent.set(upstream.CLAUDE_DESKTOP if desktop else 'Claude Code');self.show_selected_agent()
+            self.status.set('Đã ghi nhớ: '+result['version'])
+        self.start(lambda:upstream.choose_desktop(path) if desktop else upstream.choose_claude(path),done)
 
     def add_media(self):
         files=filedialog.askopenfilenames(title='Ảnh, lời đọc, nhạc hoặc video của bạn')
@@ -109,14 +131,18 @@ class FullStudio(ctk.CTk):
             if self.agent.get()=='Cursor':
                 self.clipboard_clear();self.clipboard_append('Read .cinecode-ui/START-HERE.md and run the cinecode skill. Respond in Vietnamese.')
                 self.status.set('Đã mở Cursor và chép yêu cầu vào clipboard. Dán vào Agent chat để bắt đầu quy trình gốc.')
+            elif self.agent.get()==upstream.CLAUDE_DESKTOP:
+                self.clipboard_clear();self.clipboard_append('Read STATE.md and .cinecode-ui/START-HERE.md in this project and use the cinecode skill. Respond in Vietnamese.')
+                messagebox.showinfo('Claude Desktop đã mở','Trong Claude Desktop, chọn Code rồi chọn thư mục dự án này:\n'+str(self.project)+'\n\nYêu cầu đã được chép vào clipboard; dán vào chat Code để tiếp tục. App không tự điều khiển cửa sổ Desktop.',parent=self)
+                self.status.set('Claude Desktop đã mở · Chọn Code và thư mục dự án, rồi dán yêu cầu trong clipboard.')
         except Exception as e:messagebox.showerror('Chưa mở được agent',str(e))
 
     def login(self):
-        try:upstream.launch_agent(self.project or Path.home(),'Claude Code',login=True)
+        try:upstream.launch_agent(self.project or Path.home(),upstream.CLAUDE_DESKTOP if self.agent.get()==upstream.CLAUDE_DESKTOP else 'Claude Code',login=True)
         except Exception as e:messagebox.showerror('Đăng nhập Claude Code',str(e))
 
     def stop_agent(self):
-        if self.agent.get()!='Claude Code':messagebox.showinfo('Cursor','Dừng tác vụ trong Agent chat của Cursor để không đóng các dự án khác.');return
+        if self.agent.get()!='Claude Code':messagebox.showinfo('Dừng agent','Dừng tác vụ trong chat của '+self.agent.get()+' để không đóng các dự án khác.');return
         self.start(lambda:upstream.stop_agent(self.agent_process),lambda _:self.status.set('Đã dừng tiến trình Claude Code do app mở. Dự án đã lưu vẫn giữ để tiếp tục.'))
 
     def close(self):
@@ -124,7 +150,9 @@ class FullStudio(ctk.CTk):
         self.destroy()
 
     def doctor(self):
-        self.log.delete('1.0','end');self.log.insert('1.0',upstream.diagnostics())
+        self.status.set('Đang tìm các thành phần đã cài…')
+        def done(text):self.log.delete('1.0','end');self.log.insert('1.0',text);self.show_selected_agent();self.status.set('Đã kiểm tra. Nếu đã cài mà chưa dò được, dùng Chọn Claude đã cài để lưu vị trí.')
+        self.start(upstream.diagnostics,done)
 
     def render(self,step):
         if not self.project:return
@@ -183,6 +211,10 @@ def smoke_test():
         probe=subprocess_runtime_check()
         assert probe.returncode==0,probe.stderr
         app=FullStudio();app.set_project(project);app.update();app.doctor()
+        import time
+        deadline=time.monotonic()+12
+        while app.busy and time.monotonic()<deadline:app.update();time.sleep(.01)
+        assert not app.busy
         assert app.project==project and app.mode.get()=='Film'
         assert 'ffprobe' in app.log.get('1.0','end')
         if os.environ.get('CINECODE_SCREENSHOT'):
