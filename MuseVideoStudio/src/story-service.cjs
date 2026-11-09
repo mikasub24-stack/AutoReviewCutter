@@ -42,7 +42,7 @@ function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async
   }
 
   // Bước 1: làm giọng đọc cho mọi cảnh, đo thời lượng để chia phụ đề.
-  function prepare({ storyId, engine = 'none', voice: voiceId = '', tempo = 1 }) {
+  function prepare({ storyId, engine = 'none', voice: voiceId = '', tempo = 1, volume = 1 }) {
     return guard(async signal => {
       await ensureAllowed();
       const jobs = pick(storyId);
@@ -54,7 +54,7 @@ function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async
       let voices = [];
       if (engine !== 'none') {
         say('Đang làm giọng đọc…');
-        voices = await voice.synth({ engine, voice: voiceId, tempo, dir, signal, onProgress: say, items: jobs.filter(j => String(j.voiceover || '').trim()).map(j => ({ id: j.id, text: j.voiceover })) });
+        voices = await voice.synth({ engine, voice: voiceId, tempo, volume, dir, signal, onProgress: say, items: jobs.filter(j => String(j.voiceover || '').trim()).map(j => ({ id: j.id, text: j.voiceover })) });
       }
       const byId = new Map(voices.map(v => [v.id, v.file]));
       const scenes = jobs.map(j => ({ id: j.id, number: j.number || j.order, clip: j.output, voice: byId.get(j.id) || null, text: j.voiceover || '' }));

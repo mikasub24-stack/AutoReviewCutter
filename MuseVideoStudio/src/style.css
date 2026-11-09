@@ -273,6 +273,9 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .storyOptions { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 14px; margin: 12px 0; align-items: end; }
 .storyOptions label { margin: 0; font-size: 11px; color: #a9bad1; }
 .storyOptions input[type=color] { height: 38px; padding: 3px 4px; cursor: pointer; }
+.storyOptions .sliderLabel { display: block; }
+.storyOptions .sliderLabel output { float: right; color: #d6e0ef; font-variant-numeric: tabular-nums; }
+.storyOptions input[type=range] { display: block; width: 100%; padding: 0; margin: 10px 0 0; height: 20px; accent-color: #6ea8ff; cursor: pointer; }
 .storyRow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
 .storyRow .cloneName { flex: 1; min-width: 140px; color: #d6e0ef; font-size: 12px; }
 .storyBlock { padding: 14px 16px; border: 1px solid #2e3b52; border-radius: 10px; background: #162233; margin-top: 8px; }

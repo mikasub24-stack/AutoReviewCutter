@@ -138,6 +138,8 @@ Giọng clone của bạn (miễn phí)|Your cloned voice (free)
 Giọng có sẵn trong Windows|Built-in Windows voice
 Chọn giọng|Choose voice
 Tốc độ đọc|Reading speed
+Âm lượng giọng đọc|Narration volume
+Đặt lại 1× / 100%|Reset to 1× / 100%
 Chậm|Slow
 Bình thường|Normal
 Nhanh|Fast

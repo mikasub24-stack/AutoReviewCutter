@@ -243,10 +243,22 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await page.waitForFunction(() => document.querySelectorAll('#storyClones .cloneName').length === 1);
     assert.deepEqual((await called('storyAddVoice')).at(-1).data, { name: 'Giọng của tôi', consent: true });
     assert.equal(await page.locator('#storyVoice').inputValue(), 'Giong-cua-toi');
-    await page.locator('#storyTempo').selectOption('1.15');
+    const setRange = (id, v) => page.evaluate(([id, v]) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); }, [id, v]);
+    // Tốc độ đọc (0.5–2×, chỉnh mịn) + âm lượng giọng đọc (0–200%): có nhãn giá trị, lưu lại, nút đặt lại.
+    assert.equal(await page.locator('#storyTempo').getAttribute('type'), 'range'); assert.equal(await page.locator('#storyVol').getAttribute('type'), 'range');
+    assert.equal(await page.locator('#storyTempo').inputValue(), '1'); assert.equal(await page.locator('#storyVol').inputValue(), '100', 'mặc định 1× và 100% (giữ nguyên như trước)');
+    assert.equal(await page.locator('#storyTempoOut').textContent(), '1.00×'); assert.equal(await page.locator('#storyVolOut').textContent(), '100%');
+    assert.deepEqual(await page.evaluate(() => ['storyTempo', 'storyVol'].map(id => { const e = document.getElementById(id); return [e.min, e.max, e.step]; })), [['0.5', '2', '0.05'], ['0', '200', '5']]);
+    await setRange('storyTempo', '0.7'); await setRange('storyVol', '40');
+    assert.equal(await page.locator('#storyTempoOut').textContent(), '0.70×'); assert.equal(await page.locator('#storyVolOut').textContent(), '40%');
+    assert.deepEqual(await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('museStudio.story')); return [s.tempo, s.voiceVol]; }), ['0.7', '40'], 'lưu lại cho lần mở sau');
+    await page.locator('#storyVoiceReset').click();
+    assert.equal(await page.locator('#storyTempo').inputValue(), '1'); assert.equal(await page.locator('#storyVol').inputValue(), '100'); assert.equal(await page.locator('#storyVolOut').textContent(), '100%');
+    await setRange('storyTempo', '1.15'); await setRange('storyVol', '150');
+    assert.equal(await page.locator('#storyTempoOut').textContent(), '1.15×'); assert.equal(await page.locator('#storyVolOut').textContent(), '150%');
     await page.locator('#storyListen').click();
     await page.waitForFunction(() => !document.querySelector('#storyAudio').hidden);
-    assert.deepEqual((await called('storyListen')).at(-1).data, { engine: 'clone', voice: 'Giong-cua-toi', tempo: '1.15', text: 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng Mai dậy sớm ra bến đón đò.' });
+    assert.deepEqual((await called('storyListen')).at(-1).data, { engine: 'clone', voice: 'Giong-cua-toi', tempo: '1.15', volume: 1.5, text: 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng Mai dậy sớm ra bến đón đò.' });
     assert.match(await page.locator('#storyAudio').getAttribute('src'), /^file:\/\/\/C:\/Data\/preview\/nghe\.mp3$/);
 
     // Subtitles: preview is drawn; export sends PNG captions only when on; .srt and sound-effect level pass through.
@@ -264,7 +276,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await page.locator('#storyExport').click();
     await page.waitForFunction(() => window.calls.some(c => c.name === 'storyBuild'));
     const prep = (await called('storyPrepare')).at(-1).data;
-    assert.deepEqual(prep, { storyId: 'Truyen-1', engine: 'clone', voice: 'Giong-cua-toi', tempo: '1.15' });
+    assert.deepEqual(prep, { storyId: 'Truyen-1', engine: 'clone', voice: 'Giong-cua-toi', tempo: '1.15', volume: 1.5 });
     let build = (await called('storyBuild')).at(-1).data;
     assert.equal(build.runId, 'r1'); assert.equal(build.subtitles, true); assert.equal(build.srt, true); assert.equal(build.sfx, 'mid'); assert.equal(build.name, 'Cô bé Mai'); assert.equal(build.aspect, '16:9');
     assert.equal(build.scenes.length, 3);
@@ -328,6 +340,8 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.match(await page.locator('#storyPanel summary').first().textContent(), /Story & character/);
     assert.equal(await page.locator('#navStory').textContent().then(t => t.replace(/\s+/g, '')), '✎Story3');
     assert.equal(await page.locator('#storyListen').textContent(), '▶ Listen to voice');
+    assert.match(await page.locator('label:has(#storyVol)').textContent(), /^Narration volume/); assert.match(await page.locator('label:has(#storyTempo)').textContent(), /^Reading speed/);
+    assert.equal(await page.locator('#storyVoiceReset').textContent(), 'Reset to 1× / 100%');
     // Giọng mới (VieNeu có sẵn, danh sách Microsoft) cũng có bản tiếng Anh.
     assert.equal(await page.locator('#storyEngine option[value=preset]').textContent(), 'Built-in Vietnamese voices (VieNeu, free, offline)');
     await page.locator('#storyEngine').selectOption('preset');

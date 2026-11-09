@@ -549,8 +549,8 @@ app.whenReady().then(async () => {
       await voiceService.addClone({name:data?.name,source:picked.filePaths[0],consent:data?.consent===true});return snapshot();
     },
     storyRemoveVoice:async key=>{await voiceService.removeClone(String(key||''));return snapshot();},
-    storyListen:async data=>voiceService.preview({engine:String(data?.engine||''),voice:String(data?.voice||''),text:String(data?.text||''),tempo:Number(data?.tempo)||1}),
-    storyPrepare:async data=>storyService.prepare({storyId:String(data?.storyId||''),engine:String(data?.engine||'none'),voice:String(data?.voice||''),tempo:Number(data?.tempo)||1}),
+    storyListen:async data=>voiceService.preview({engine:String(data?.engine||''),voice:String(data?.voice||''),text:String(data?.text||''),tempo:Number(data?.tempo)||1,volume:data?.volume===undefined?1:Number(data.volume)}),
+    storyPrepare:async data=>storyService.prepare({storyId:String(data?.storyId||''),engine:String(data?.engine||'none'),voice:String(data?.voice||''),tempo:Number(data?.tempo)||1,volume:data?.volume===undefined?1:Number(data.volume)}),
     storyBuild:async data=>{await storyService.build({runId:String(data?.runId||''),name:String(data?.name||''),aspect:String(data?.aspect||'16:9'),subtitles:data?.subtitles!==false,srt:data?.srt===true,sfx:String(data?.sfx||'off'),scenes:Array.isArray(data?.scenes)?data.scenes:[]});return snapshot();},
     storyCancel:async()=>{storyService.cancel();return snapshot();},
     storyAnalyze:async data=>{

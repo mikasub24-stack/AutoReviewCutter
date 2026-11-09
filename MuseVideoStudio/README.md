@@ -142,6 +142,14 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.7.0
+- **Chỉnh tốc độ đọc và âm lượng giọng đọc** (khung «Giọng, phụ đề & xuất MP4» → «Giọng kể»):
+  - **Tốc độ đọc**: thanh trượt 0.5×–2× (mỗi nấc 0.05×), thay cho 4 mức cố định cũ; đổi tốc độ không đổi cao độ giọng. Giá trị đã lưu trước đây (0.9 / 1 / 1.15 / 1.3) vẫn dùng được.
+  - **Âm lượng giọng đọc** (mới): 0–200% (mỗi nấc 5%), 100% = giữ nguyên như trước. Trên 100% có chặn đỉnh nên không vỡ tiếng; 0% là im lặng.
+  - Nút **Đặt lại 1× / 100%**. Cả hai áp dụng cho **Nghe thử** và cho **xuất MP4** (kể cả tự xuất khi xong clip), được lưu lại cho lần mở sau.
+  - Tiếng động gốc của clip (Nhỏ / Trung bình) tính theo độ to của giọng **sau khi đã chỉnh**, nên kéo âm lượng giọng lên/xuống thì tiếng gốc đi theo đúng mức «dưới giọng bao nhiêu dB».
+- Chưa thử trên Windows thật / giọng thật: đã kiểm bằng FFmpeg thật (đo thời lượng và mức âm lượng sau khi chỉnh) và giao diện Chromium thật.
+
 ## Update 1.6.11
 
 - **Nút «Tải video»** cạnh «Xuất MP4» / «Mở video» (hiện khi đã xuất xong): mở hộp «Lưu như…» (mặc định thư mục Downloads) để lưu một BẢN SAO video vào nơi bạn chọn, kèm file phụ đề .srt cùng tên nếu có (không ghi đè .srt đã tồn tại). Xong thì mở thư mục chứa bản vừa lưu. File gốc trong thư mục xuất giữ nguyên. «Mở video» vẫn mở thư mục chứa file gốc.
@@ -336,7 +344,7 @@ Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang 
 - **Soát từng cảnh trước khi tạo** (để khỏi tốn lượt tạo): lời quá dài so với 10 giây, có thoại trong ngoặc kép, chuyển mốc thời gian, quá nhiều câu, prompt thiếu/ngắn hoặc thiếu câu «no speech». Chỉ cảnh báo, không chặn.
 - Chia nhanh (không dùng Muse) gộp câu theo thời lượng với prompt mẫu (đánh nhãn «prompt mẫu» để bạn biết chưa qua Muse). Nhân vật không nói: mọi prompt cảnh đều có câu tiếng Anh `no speech` (không thoại, không hát, không lời bình), chỉ cho phép tiếng động; cũng dặn không chèn chữ/phụ đề/logo vào hình. «Áp ảnh cho hàng chờ» ở tab Tạo video không còn ghi đè ảnh của cảnh kể chuyện.
 - Đúng thứ tự khi chạy nhiều luồng: mỗi cảnh có số riêng, clip lưu `001.mp4`, `002.mp4`… theo số cảnh dù cảnh nào xong trước; khi xuất chỉ ghép theo số cảnh và báo «Còn N cảnh chưa có clip» nếu thiếu. Clip nằm trong `KeChuyen/<mã truyện>/`.
-- Giọng đọc miễn phí, có **Nghe thử**: giọng Windows có sẵn (offline, không cần Python); giọng Microsoft Edge (`edge-tts`, cần mạng, đọc tối đa 4 cảnh cùng lúc); **clone giọng miễn phí** (VieNeu, chạy trên máy, mẫu 3–15 giây, phải tick xác nhận có quyền dùng giọng đó). Edge và clone cần Python 3.10–3.13; «Cài giọng» tạo môi trường riêng trong dữ liệu app. Lần clone đầu tải mô hình từ Hugging Face. Tốc độ đọc 0,9 / 1 / 1,15 / 1,3.
+- Giọng đọc miễn phí, có **Nghe thử**: giọng Windows có sẵn (offline, không cần Python); giọng Microsoft Edge (`edge-tts`, cần mạng, đọc tối đa 4 cảnh cùng lúc); **clone giọng miễn phí** (VieNeu, chạy trên máy, mẫu 3–15 giây, phải tick xác nhận có quyền dùng giọng đó). Edge và clone cần Python 3.10–3.13; «Cài giọng» tạo môi trường riêng trong dữ liệu app. Lần clone đầu tải mô hình từ Hugging Face. Tốc độ đọc chỉnh mịn 0,5×–2× và âm lượng giọng 0–200%.
 - Phụ đề bật/tắt, chọn font/cỡ/màu/viền/vị trí/nền, xem trước, tùy chọn `.srt`. Phụ đề chia theo câu, thời gian tính theo **độ dài giọng đọc thật** rồi dịch ranh giới về đúng chỗ người đọc nghỉ (phát hiện khoảng lặng trong file giọng); đoạn cuối giữ đến hết cảnh.
 - **Dựng nhanh và khớp**: độ dài mỗi cảnh làm tròn đúng số khung hình (1/30 giây); hình và tiếng của từng cảnh dựng riêng, nhiều cảnh chạy song song theo số nhân CPU; tiếng của mọi cảnh nối liền thành một luồng rồi mã hóa AAC đúng một lần (không lệch dần ở chỗ nối); hình giữ nguyên khi nối; chữ phụ đề chỉ phủ vùng chứa chữ. Đo trên máy thử 2 nhân: 6 cảnh 1080p có phụ đề (video 28,8 giây) từ 71 giây còn khoảng 17 giây; hình và tiếng cùng 28,800 giây, lệch 0. Máy nhiều nhân sẽ nhanh hơn nữa.
 - Tự dựng: có giọng thì mỗi cảnh dài bằng lời đọc + 0,4 giây (tối thiểu 1,5 giây) và **cắt phần clip thừa**; lời dài hơn clip thì giữ khung cuối (có báo). Không có giọng thì giữ nguyên clip. Âm thanh gốc của clip (tiếng động) hạ nhỏ dưới giọng: Tắt / Nhỏ / Trung bình.

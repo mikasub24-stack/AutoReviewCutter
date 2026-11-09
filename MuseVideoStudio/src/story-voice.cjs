@@ -55,7 +55,13 @@ function buildEdgeVoices(rows) {
 const CATALOG_TTL = 3 * 86400000;
 // Giọng Việt có sẵn của VieNeu (25 giọng, chạy offline, không cần file mẫu).
 const PRESETS = VIENEU_PRESETS.map(([name, desc, gender, region]) => ({ name, desc, gender, region }));
-const TEMPOS = [0.9, 1, 1.15, 1.3];
+const TEMPOS = [0.9, 1, 1.15, 1.3];   // mức gợi ý cũ (giữ để tương thích); giờ chỉnh mịn trong TEMPO_MIN…TEMPO_MAX
+const TEMPO_MIN = 0.5, TEMPO_MAX = 2, VOLUME_MAX = 2;
+const round2 = n => Math.round(n * 100) / 100;
+// Tốc độ đọc: 0.5×–2× (atempo chỉ nhận 0.5–2 trong một bước). Giá trị lạ → 1.
+const normTempo = v => { const n = Number(v); return Number.isFinite(n) && n > 0 ? round2(Math.min(TEMPO_MAX, Math.max(TEMPO_MIN, n))) : 1; };
+// Âm lượng giọng đọc: 0 (câm) – 2 (200%), 1 = giữ nguyên. Giá trị lạ → 1.
+const normVolume = v => { const n = v === '' || v === null || v === undefined ? NaN : Number(v); return Number.isFinite(n) ? round2(Math.min(VOLUME_MAX, Math.max(0, n))) : 1; };
 const CLONE_SECONDS = { min: 3, max: 15 };
 const PY_MIN = [3, 10], PY_MAX = [3, 13];
 
@@ -299,18 +305,23 @@ function createVoiceService({ dataDir, getFfmpeg = () => 'ffmpeg', platform = pr
     notify();
   }
 
-  async function slow(file, tempo) {
-    if (!tempo || Math.abs(tempo - 1) < 0.01) return file;
+  // Chỉnh tốc độ (atempo, không đổi cao độ) và âm lượng của lời đọc ngay khi làm giọng: các bước sau (đo độ dài cảnh, phụ đề,
+  // chỉnh tiếng động gốc theo độ to của giọng) đều dùng đúng file đã chỉnh. Âm lượng > 100% có chặn đỉnh để không vỡ tiếng.
+  async function finish(file, tempo, volume) {
+    const filters = [];
+    if (Math.abs(tempo - 1) >= 0.005) filters.push(`atempo=${tempo}`);
+    if (Math.abs(volume - 1) >= 0.005) { filters.push(`volume=${volume}`); if (volume > 1) filters.push('alimiter=limit=0.95'); }
+    if (!filters.length) return file;
     const out = file.replace(/\.[^.]+$/, '') + '-t.wav';
-    await command(getFfmpeg(), ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y', '-i', file, '-filter:a', `atempo=${tempo}`, '-ar', '48000', out], 120000);
+    await command(getFfmpeg(), ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y', '-i', file, '-filter:a', filters.join(','), '-ar', '48000', out], 120000);
     return out;
   }
 
   // items: [{id, text}] → [{id, file, seconds}]
-  async function synth({ engine, voice, items, tempo = 1, dir, signal, onProgress = () => {} }) {
+  async function synth({ engine, voice, items, tempo = 1, volume = 1, dir, signal, onProgress = () => {} }) {
     if (!ENGINES.includes(engine) || engine === 'none') throw Error('Chưa chọn giọng đọc.');
     if (!Array.isArray(items) || !items.length) return [];
-    if (!TEMPOS.includes(Number(tempo))) tempo = 1;
+    tempo = normTempo(tempo); volume = normVolume(volume);
     await fs.mkdir(dir, { recursive: true });
     const extension = engine === 'edge' ? '.mp3' : '.wav';
     const jobs = items.map(item => ({ id: String(item.id), text: String(item.text || '').trim(), out: path.join(dir, `${String(item.id).replace(/[^\w-]/g, '')}-${randomUUID().slice(0, 6)}${extension}`) })).filter(j => j.text);
@@ -355,22 +366,22 @@ function createVoiceService({ dataDir, getFfmpeg = () => 'ffmpeg', platform = pr
     const out = [];
     for (const job of jobs) {
       if (!done.has(job.id)) throw Error(`Giọng đọc chưa tạo xong cảnh ${job.id}.`);
-      const file = await slow(job.out, Number(tempo));
+      const file = await finish(job.out, tempo, volume);
       out.push({ id: job.id, file, seconds: await durationOf(file) });
     }
     return out;
   }
 
   // Nghe thử: đọc một câu, trả về đường dẫn file để phát.
-  async function preview({ engine, voice, text, tempo, signal }) {
+  async function preview({ engine, voice, text, tempo, volume, signal }) {
     const dir = path.join(dataDir, 'preview');
     await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
     const clean = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Xin chào, đây là giọng kể chuyện của bạn.';
-    const [first] = await synth({ engine, voice, items: [{ id: 'nghe', text: clean }], tempo, dir, signal });
+    const [first] = await synth({ engine, voice, items: [{ id: 'nghe', text: clean }], tempo, volume, dir, signal });
     return first.file;
   }
 
   return { load, status, setup, cancelSetup, refreshCatalog, findPython, listWindowsVoices, addClone, removeClone, synth, preview, venvPython, helperFile };
 }
 
-module.exports = { createVoiceService, exec, parseVersion, inRange, slug, ENGINES, EDGE_VOICES, PRESETS, buildEdgeVoices, localeCode, TEMPOS, CLONE_SECONDS, MISSING_PYTHON };
+module.exports = { createVoiceService, exec, parseVersion, inRange, slug, ENGINES, EDGE_VOICES, PRESETS, buildEdgeVoices, localeCode, TEMPOS, TEMPO_MIN, TEMPO_MAX, VOLUME_MAX, normTempo, normVolume, CLONE_SECONDS, MISSING_PYTHON };

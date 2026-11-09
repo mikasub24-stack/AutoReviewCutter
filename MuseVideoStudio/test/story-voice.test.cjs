@@ -235,6 +235,31 @@ test('tốc độ đọc: tempo 0.9 làm lời dài hơn đúng tỉ lệ', { sk
   assert.ok(Math.abs(slowed.seconds / normal.seconds - 1 / 0.9) < 0.05, `${normal.seconds} → ${slowed.seconds}`);
 });
 
+test('tốc độ đọc chỉnh mịn 0.5×–2× (ngoài khoảng thì kẹp lại) và âm lượng giọng 0–200%', { skip: !(hasFfmpeg && hasNumpy) && 'cần ffmpeg + python3 + numpy' }, async t => {
+  const dir = await temp(t);
+  const svc = await readyService(dir, await fakeLibs(dir));
+  const text = 'Một hai ba bốn năm sáu bảy tám chín mười';
+  const make = async (name, extra) => (await svc.synth({ engine: 'edge', voice: 'vi-VN-NamMinhNeural', items: [{ id: 'a', text }], dir: path.join(dir, name), ...extra }))[0];
+  const level = async file => { const m = /mean_volume:\s*(-?[\d.]+|-inf) dB/.exec(spawnSync('ffmpeg', ['-hide_banner', '-nostdin', '-i', file, '-af', 'volumedetect', '-f', 'null', '-'], { encoding: 'utf8' }).stderr); return m[1] === '-inf' ? -200 : Number(m[1]); };
+  const normal = await make('n', {});
+  const fast = await make('f', { tempo: 1.5 }), slow = await make('s', { tempo: 0.6 });
+  assert.ok(Math.abs(normal.seconds / fast.seconds - 1.5) < 0.06, `1.5×: ${normal.seconds} → ${fast.seconds}`);
+  assert.ok(Math.abs(slow.seconds / normal.seconds - 1 / 0.6) < 0.06, `0.6×: ${normal.seconds} → ${slow.seconds}`);
+  const fastest = await make('x', { tempo: 9 }), slowest = await make('y', { tempo: 0.1 }), junk = await make('j', { tempo: 'abc' });
+  assert.ok(Math.abs(normal.seconds / fastest.seconds - 2) < 0.08, 'tempo quá lớn bị kẹp ở 2×');
+  assert.ok(Math.abs(slowest.seconds / normal.seconds - 2) < 0.08, 'tempo quá nhỏ bị kẹp ở 0.5×');
+  assert.ok(Math.abs(junk.seconds - normal.seconds) < 0.05, 'giá trị lạ → 1×');
+  const base = await level(normal.file), half = await level((await make('h', { volume: 0.5 })).file), twice = await level((await make('d', { volume: 2 })).file);
+  assert.ok(Math.abs(base - half - 6.02) < 0.6, `50% phải nhỏ hơn ~6 dB: ${base} → ${half}`);
+  assert.ok(twice - base > 3 && twice - base < 6.5, `200% phải to hơn tới ~6 dB (có chặn đỉnh): ${base} → ${twice}`);
+  const mute = await level((await make('m', { volume: 0 })).file);
+  assert.ok(mute < -80 || Number.isNaN(mute), `0% là im lặng: ${mute}`);
+  const same = await make('k', { volume: 1, tempo: 1 });
+  assert.equal(same.file.endsWith('-t.wav'), false, '1× và 100% không đụng tới file gốc');
+  assert.deepEqual([v.normTempo(0.3), v.normTempo(1.234), v.normTempo(5), v.normTempo('x'), v.normTempo(0)], [0.5, 1.23, 2, 1, 1]);
+  assert.deepEqual([v.normVolume(-3), v.normVolume(0), v.normVolume(1.254), v.normVolume(9), v.normVolume(undefined), v.normVolume('')], [0, 0, 1.25, 2, 1, 1]);
+});
+
 test('clone miễn phí: thêm giọng mẫu (có tick đồng ý), nghe thử, đọc câu dài chia đoạn ≤200 ký tự, xóa giọng', { skip: !(hasFfmpeg && hasNumpy) && 'cần ffmpeg + python3 + numpy' }, async t => {
   const dir = await temp(t);
   const svc = await readyService(dir, await fakeLibs(dir));

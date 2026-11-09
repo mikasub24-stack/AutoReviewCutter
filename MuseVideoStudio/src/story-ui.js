@@ -14,7 +14,7 @@
     tipMotion: ['tipMotion', 'gentle'], tipPrompt: ['tipPrompt', 'en'],
     adProduct: ['adProduct', ''], adPoints: ['adPoints', ''], adAudience: ['adAudience', ''], adOffer: ['adOffer', ''], adCta: ['adCta', ''],
     adTone: ['adTone', AD.AD_TONE[0].id], adLength: ['adLength', '30'],
-    storyEngine: ['engine', 'none'], storyTempo: ['tempo', '1'], subFont: ['subFont', 'Arial'], subSize: ['subSize', '54'], subColor: ['subColor', '#ffffff'],
+    storyEngine: ['engine', 'none'], storyTempo: ['tempo', '1'], storyVol: ['voiceVol', '100'], subFont: ['subFont', 'Arial'], subSize: ['subSize', '54'], subColor: ['subColor', '#ffffff'],
     subOutline: ['subOutline', '#000000'], subPos: ['subPos', 'bottom'], storySfx: ['sfxMode', 'off'], storyName: ['name', '']
   };
   const CHECKS = { subOn: ['subOn', true], subSrt: ['subSrt', false], subBox: ['subBox', false], autoExport: ['autoExport', true] };
@@ -616,10 +616,19 @@
     const first = latest && jobs.find(j => j.storyId === latest.storyId);
     return first ? first.voiceover : '';
   }
+  // Tốc độ 0.5–2× và âm lượng 0–200% của giọng đọc (1 và 100% = giữ nguyên). Áp dụng khi làm giọng: nghe thử và xuất MP4 đều theo đúng mức này.
+  const tempoValue = () => { const n = Number($('storyTempo').value); return Number.isFinite(n) && n > 0 ? Math.min(2, Math.max(0.5, n)) : 1; };
+  const volumeValue = () => { const n = Number($('storyVol').value); return Number.isFinite(n) ? Math.min(200, Math.max(0, n)) / 100 : 1; };
+  const showVoiceLevels = () => { $('storyTempoOut').textContent = tempoValue().toFixed(2) + '×'; $('storyVolOut').textContent = Math.round(volumeValue() * 100) + '%'; };
+  for (const id of ['storyTempo', 'storyVol']) $(id).addEventListener('input', showVoiceLevels);
+  $('storyVoiceReset').onclick = () => {
+    for (const [id, v] of [['storyTempo', '1'], ['storyVol', '100']]) { $(id).value = v; $(id).dispatchEvent(new Event('input')); $(id).dispatchEvent(new Event('change')); }
+  };
+  showVoiceLevels();
   $('storyListen').onclick = async () => {
     listening = true; renderVoice();
     try {
-      const file = await call('storyListen', { engine: engine(), voice: $('storyVoice').value, tempo: $('storyTempo').value, text: sampleText() });
+      const file = await call('storyListen', { engine: engine(), voice: $('storyVoice').value, tempo: $('storyTempo').value, volume: volumeValue(), text: sampleText() });
       if (file) { const audio = $('storyAudio'); audio.src = localFileUrl(file); audio.hidden = false; audio.play().catch(() => {}); }
     } finally { listening = false; renderVoice(); }
   };
@@ -704,7 +713,7 @@
     exportOk = false; exporting = true; renderStatus();
     try {
       const subtitles = $('subOn').checked, srt = $('subSrt').checked, aspect = opts.aspect || $('storyAspect').value;
-      const prep = await call('storyPrepare', { storyId: story.id, engine: engine(), voice: $('storyVoice').value, tempo: $('storyTempo').value });
+      const prep = await call('storyPrepare', { storyId: story.id, engine: engine(), voice: $('storyVoice').value, tempo: $('storyTempo').value, volume: volumeValue() });
       if (!prep) return;
       const [w, h] = dims(aspect), canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
