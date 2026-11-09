@@ -1,5 +1,6 @@
 """Vietnamese project controls for upstream Cinecode; AI stays in the native agent."""
 import os
+import json
 from pathlib import Path
 import queue
 import shutil
@@ -82,7 +83,17 @@ class FullStudio(ctk.CTk):
         self.start(lambda:upstream.create_project(*args),done)
 
     def set_project(self,path):
-        self.project=Path(path);self.project_label.set(str(self.project));self.status.set('Đã mở dự án Cinecode gốc. Mở agent để tiếp tục.')
+        self.project=Path(path)
+        config=self.project/'.cinecode-ui/project.json'
+        if config.is_file():
+            try:
+                data=json.loads(config.read_text(encoding='utf-8'))
+                for name in ('mode','route','duration','language','agent','pace','music'):
+                    if name in data:getattr(self,name).set(str(data[name]))
+                if data.get('brief'):self.brief.delete('1.0','end');self.brief.insert('1.0',str(data['brief']))
+            except (OSError,ValueError):pass
+        upstream.connect_existing_project(self.project,self.agent.get())
+        self.project_label.set(str(self.project));self.status.set('Đã mở dự án Cinecode gốc. Mở agent để tiếp tục từ STATE.md.')
 
     def open_project(self):
         path=filedialog.askdirectory(title='Mở thư mục dự án Cinecode có STATE.md')

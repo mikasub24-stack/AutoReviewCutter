@@ -55,7 +55,7 @@ def launch_agent(project,agent='Claude Code',login=False):
     project=Path(project).resolve()
     command=agent_command(agent)
     if agent=='Claude Code':
-        command+=['auth','login'] if login else ['/cinecode Read .cinecode-ui/START-HERE.md and follow the user brief. Respond in Vietnamese. Use the original Cinecode workflow and tools.']
+        command+=['auth','login'] if login else ['/cinecode Read STATE.md first and resume existing work. Read .cinecode-ui/START-HERE.md and follow the user brief. Do not restart an existing film unless requested. Respond in Vietnamese. Use the original Cinecode workflow and tools.']
     else:command += [str(project),'--goto',str(project/'.cinecode-ui/START-HERE.md')]
     return subprocess.Popen(command,cwd=project,env=environment(pro=agent=='Claude Code'),
         creationflags=getattr(subprocess,'CREATE_NEW_CONSOLE',0))
@@ -71,6 +71,15 @@ def slug(text):
     text=re.sub(r'[<>:"/\\|?*\x00-\x1f]','-',text.splitlines()[0] if text.strip() else 'Film').strip(' .')[:75]
     if not text or text.upper().split('.')[0] in ('CON','PRN','AUX','NUL') or re.fullmatch(r'(COM|LPT)[1-9]',text,re.I):text='Film-'+text
     return text
+
+def connect_existing_project(project,agent):
+    project=Path(project)
+    if not (project/'STATE.md').is_file():raise ValueError('Dự án gốc cần có STATE.md.')
+    skill=project/('.claude' if agent=='Claude Code' else '.cursor')/'skills/cinecode'
+    if not skill.exists():shutil.copytree(KIT,skill)
+    control=project/'.cinecode-ui';control.mkdir(exist_ok=True)
+    task=control/'START-HERE.md'
+    if not task.exists():task.write_text('Tiếp tục dự án Cinecode gốc này từ STATE.md. Giữ nguyên kịch bản, cảnh, style và các phần đã được người dùng duyệt. Dùng skill cinecode đầy đủ. Hỏi người dùng bằng tiếng Việt nếu thiếu thông tin bắt buộc. Không tự khởi tạo lại phim.',encoding='utf-8')
 
 def create_project(parent,brief,mode,route,duration,language,agent,pace,music,attachments=()):
     parent=Path(parent);parent.mkdir(parents=True,exist_ok=True)
@@ -91,7 +100,7 @@ def create_project(parent,brief,mode,route,duration,language,agent,pace,music,at
         target=destination/f'{number:02}-{source.name}';shutil.copy2(source,target)
         media.append(target.relative_to(project).as_posix())
     control=project/'.cinecode-ui';control.mkdir(exist_ok=True)
-    settings={'mode':mode,'route':route,'duration':duration,'language':language,'agent':agent,'pace':pace,'music':music,'attachments':media,
+    settings={'mode':mode,'route':route,'duration':duration,'language':language,'agent':agent,'pace':pace,'music':music,'attachments':media,'brief':brief,
               'upstreamCommit':'67f9807112b97ae253d4a5f0eccaccc46c3b2633'}
     (control/'project.json').write_text(json.dumps(settings,ensure_ascii=False,indent=2),encoding='utf-8')
     task=f'''# Yêu cầu làm phim của người dùng
