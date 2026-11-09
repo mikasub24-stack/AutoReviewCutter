@@ -60,8 +60,14 @@ jobs:
           'Binary distributor and corresponding source/build information: https://github.com/imageio/imageio-binaries/tree/master/ffmpeg . FFmpeg source: https://ffmpeg.org/download.html#get-sources . Exact build/version in FFMPEG-BUILD.txt.' | Set-Content CinecodeStudio/runtime/FFMPEG-README.txt -Encoding utf8
           & ./CinecodeStudio/scripts/prepare_upstream_runtime.ps1
           if ($LASTEXITCODE) { throw 'Original-tool runtime preparation failed' }
-          python -m unittest discover -s CinecodeStudio/tests -v
-          if ($LASTEXITCODE) { throw 'Core tests failed' }
+          python -m unittest discover -s CinecodeStudio/tests -v 2>&1 | Tee-Object -Variable coreOutput
+          if ($LASTEXITCODE) {
+            $detail = ($coreOutput | Out-String)
+            if ($detail.Length -gt 14000) { $detail = $detail.Substring($detail.Length - 14000) }
+            $detail = $detail.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Host "::error title=Cinecode core tests::$detail"
+            throw 'Core tests failed'
+          }
           $env:CINECODE_SCREENSHOT = Join-Path (Get-Location) 'dist-cinecode/UI-Preview.png'
           $env:CINECODE_SMOKE_REPORT = Join-Path (Get-Location) 'dist-cinecode/SmokeTest.json'
           python CinecodeStudio/app.py --smoke-test

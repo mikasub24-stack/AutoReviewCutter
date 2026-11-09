@@ -1,0 +1,2 @@
+# Preserve the exact pinned upstream bytes on Windows as well as Linux.
+CinecodeStudio/vendor/cinecode/** -text
