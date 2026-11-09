@@ -1,4 +1,4 @@
-#define Version "0.1.3"
+#define Version "0.1.4"
 [Setup]
 AppId={{285EA01D-73D3-4249-B8DC-7F7C89CC2860}
 AppName=Cinecode Studio

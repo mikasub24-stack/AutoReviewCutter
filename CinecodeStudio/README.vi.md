@@ -1,6 +1,12 @@
-# Cinecode Studio 0.1.3
+# Cinecode Studio 0.1.4
 
 Ứng dụng Windows 10/11 x64 có giao diện tiếng Việt, dùng bộ xuất khung hình Cinecode của sarpstar. Bản đầu dựng phim ngắn chữ/ảnh và motion graphics với ba bảng màu, chưa có trình dựng nhân vật 3D hoặc toàn bộ quy trình agent của Cinecode.
+
+## 0.1.4 · Đóng gói và đối chiếu nguồn gốc
+
+Cập nhật Python 3.13, Node 22.23.4, PyInstaller 6.22.3, imageio-ffmpeg 0.8.1, Pillow 13.0.0. Phụ thuộc Windows có phiên bản và SHA-256 khóa trong requirements-windows.lock; Node được đối chiếu với checksum bản phát hành chính thức. EXE có thông tin phiên bản, không dùng UPX; bộ cài có BuildManifest.json liệt kê checksum runtime và mã nguồn tương ứng.
+
+Các thay đổi này không chứng minh nguyên nhân trình duyệt đã chặn bản cũ. Chưa có chứng thư ký mã của nhà phát hành; kết quả quét Defender không phải xác nhận của Chrome/Cốc Cốc. Không hướng dẫn bỏ qua cảnh báo hoặc tắt bảo vệ.
 
 ## 0.1.3 · Video 10 phút, chọn model và lỗi Gemini
 
@@ -9,7 +15,7 @@
 - HTTP 503/500/502/504 hoặc giới hạn tạm thời 429 được thử tối đa 3 lần; hiện thời gian chờ, tôn trọng Retry-After ngắn và cho hủy trong lúc chờ. Không thử lại lỗi khóa/quyền/model hoặc hết hạn mức ngày. Không đổi model âm thầm.
 - Hiện thông báo cụ thể từ Google (đã ẩn khóa), giữ nguyên kịch bản khi yêu cầu thất bại. Không cam kết retry sẽ xử lý được gián đoạn dịch vụ kéo dài.
 
-## 0.1.3 · Hủy yêu cầu đang chờ, thử model và làm video tự động
+## 0.1.4 · Hủy yêu cầu đang chờ, thử model và làm video tự động
 
 - **Hủy** dừng cả tiến trình đang chờ phản hồi HTTP, không phải đợi timeout. App giữ nguyên dự án đang mở và không áp dụng kết quả đến sau khi hủy. Yêu cầu Google đã nhận có thể vẫn được dịch vụ xử lý/tính hạn mức; hủy ở app không thu hồi được yêu cầu đã tới máy chủ.
 - **Cài đặt AI → Kiểm tra model viết / Kiểm tra model đọc** gửi một yêu cầu nhỏ thật theo đúng chế độ app dùng. Chỉ báo dùng được sau khi nhận JSON hợp lệ/âm thanh giải mã được; 503/429/quyền/model không tồn tại có trạng thái riêng. Model chưa thử ghi rõ chưa kiểm tra. Kết quả ghi giờ thử và gắn với khóa đang nhập, chỉ lưu trong phiên vì quyền/hạn mức có thể thay đổi.
@@ -37,6 +43,6 @@ Node 22 và FFmpeg được kèm bộ cài; không cần cài Python/Node riêng
 
 ## Phát triển
 
-Python 3.12, CustomTkinter 5.2.2, Pillow 12, Tkinter, Node 22+, Chrome/Edge, FFmpeg/ffprobe trên PATH. `python CinecodeStudio/app.py`; kiểm tra `python -m unittest discover -s CinecodeStudio/tests`; thử render thật `python CinecodeStudio/tests/render_smoke.py`. AI được kiểm thử parser và xử lý lỗi; tích hợp Google cần khóa/hạn mức thật để xác nhận.
+Python 3.13, CustomTkinter 5.2.2, Pillow 13, Tkinter, Node 22+, Chrome/Edge, FFmpeg/ffprobe trên PATH. `python CinecodeStudio/app.py`; kiểm tra `python -m unittest discover -s CinecodeStudio/tests`; thử render thật `python CinecodeStudio/tests/render_smoke.py`. AI được kiểm thử parser và xử lý lỗi; tích hợp Google cần khóa/hạn mức thật để xác nhận.
 
 Workflow `.github/workflows/cinecode-studio-windows.yml` dựng và thử bộ cài trên Windows. Giữ nguyên mã Vocal Studio. Backend Cinecode được ghim tại commit 67f9807112b97ae253d4a5f0eccaccc46c3b2633.
