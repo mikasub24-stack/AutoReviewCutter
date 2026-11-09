@@ -179,6 +179,14 @@ Tên truyện|Story name
 Truyện|Story
 Tự edit: cảnh nào lời đọc ngắn hơn clip thì cắt phần thừa; lời dài hơn clip thì giữ khung cuối cho đọc hết. Prompt đã dặn Muse tạo video im lặng, không âm thanh (nhân vật vẫn há miệng, cười, mấp máy trên hình); giọng đọc do app thêm.|Auto edit: if a scene's narration is shorter than its clip, the extra footage is cut; if it is longer, the last frame is held so it can finish. Prompts tell Muse to make the video silent with no audio (characters still open their mouths, laugh and mouth words on screen); the narration is added by the app.
 Xuất MP4|Export MP4
+Clip đã xong hết, chưa ghép thành video hoàn chỉnh|All clips are done, but the final video has not been assembled yet
+Đang ghép video hoàn chỉnh…|Assembling the final video…
+Đang tạo clip kể chuyện…|Creating story clips…
+Hàng đợi đang dừng|Queue stopped
+✓ Video hoàn chỉnh đã sẵn sàng|✓ The final video is ready
+Ghép video chưa xong|The video was not finished
+Nếu app chưa tự ghép, mở mục «Giọng, phụ đề & xuất MP4» rồi bấm «Xuất MP4».|If the app has not assembled it yet, open “Voice, subtitles & MP4 export” and press “Export MP4”.
+Mở mục «Giọng, phụ đề & xuất MP4» để xem video.|Open “Voice, subtitles & MP4 export” to watch the video.
 Mở video|Open video
 Tải video|Save video
 Video đã xuất|Exported video

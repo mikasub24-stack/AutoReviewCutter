@@ -883,6 +883,31 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       // Lượt đã xong sẵn từ trước (chưa từng thấy chạy dở) không tự xuất.
       await addGroup('Truyen-OLD', 'completed'); await nap(1200);
       assert.equal(await builds(), b0, 'lượt xong sẵn từ trước không tự xuất');
+      // Thanh % tiến trình nằm NGOÀI mục thu gọn và luôn hiện: xong hết clip mà chưa ghép → 85% + hướng dẫn; ghép xong → 100%.
+      await page.evaluate(() => { window.s.story.output = ''; window.s.story.srt = ''; window.s.story.error = ''; document.getElementById('storyOutput').open = false;
+        const open = new Set(window.s.jobs.filter(j => j.kind === 'story' && j.status !== 'completed').map(j => j.storyId));   // bỏ các lượt dở của phần thử trước: chỉ còn lượt đã xong
+        window.s.jobs = window.s.jobs.filter(j => !open.has(j.storyId)); window.s.active = false; window.push(); }); await nap(300);
+      await page.evaluate(() => { const p = document.getElementById('storyPick'); p.value = 'Truyen-OLD'; p.dispatchEvent(new Event('change')); window.push(); }); await nap(300);
+      assert.equal(await page.locator('#storyDone').isVisible(), true, 'clip xong hết mà chưa ghép: thanh vẫn hiện dù mục «Giọng, phụ đề & xuất MP4» đang thu gọn');
+      assert.equal(await page.locator('#sdBar').isVisible(), true);
+      assert.match(await page.locator('#sdTitle').textContent(), /not been assembled/);
+      assert.equal(await page.locator('#sdPct').textContent(), '85%');
+      if (process.env.SHOT) await page.locator('#storyDone').screenshot({ path: process.env.SHOT.replace('.png', '-todo.png') });
+      const bd = await builds();
+      await page.evaluate(() => { document.getElementById('storyOutput').open = true; }); await nap(100);
+      await page.locator('#storyExport').click();
+      await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyBuild').length > n, bd);
+      await page.waitForFunction(() => /final video is ready/.test(document.getElementById('sdTitle').textContent));
+      assert.equal(await page.locator('#sdPct').textContent(), '100%');
+      assert.match(await page.locator('#sdFile').textContent(), /Truyen-1\.mp4/);
+      await page.evaluate(() => { document.getElementById('storyOutput').open = false; }); await nap(100);
+      assert.equal(await page.locator('#storyDone').isVisible(), true, 'mục thu gọn vẫn thấy thanh 100%');
+      if (process.env.SHOT) await page.locator('#storyDone').screenshot({ path: process.env.SHOT });
+      await page.evaluate(() => { window.s.story.error = 'Không đọc được giọng'; window.push(); }); await nap(200);
+      assert.match(await page.locator('#sdTitle').textContent(), /not finished/);
+      assert.equal(await page.locator('#sdBar').isVisible(), true);
+      await page.evaluate(() => { window.s.story.error = ''; document.getElementById('storyOutput').open = true; window.push(); }); await nap(200);
+      await page.locator('#modeAd').click(); await nap(100); await page.locator('#modeStory').click(); await nap(100);
       // Thanh tiến trình %: tạo clip 0–85%, rồi đọc giọng / edit / nối; ẩn nút «Xuất MP4» và dòng hướng dẫn thủ công lúc đang chạy, hiện lại khi xong.
       await page.locator('#modeStory').click(); await setAuto(true);
       await page.evaluate(() => { window.s.active = true; window.push(); });
@@ -899,6 +924,13 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       await setAuto(false); await nap(200);
       assert.equal(await page.locator('#runProgress').isVisible(), false);
       assert.equal(await page.locator('#storyExport').isVisible(), true, 'tắt tự động thì có nút xuất tay');
+      // Thanh % ở khung «Video hoàn chỉnh» LUÔN hiện (kể cả tắt tự xuất, kể cả mục Giọng/xuất đang thu gọn).
+      await page.evaluate(() => { document.getElementById('storyOutput').open = false; }); await nap(100);
+      assert.equal(await page.locator('#storyDone').isVisible(), true, 'còn clip dở: khung tiến trình vẫn hiện khi tắt tự xuất');
+      assert.equal(await page.locator('#sdBar').isVisible(), true);
+      assert.equal(await page.locator('#sdPct').textContent(), '43%');
+      assert.match(await page.locator('#sdText').textContent(), /Queue stopped · 1\/2 clips|Creating clips 1\/2/);
+      await page.evaluate(() => { document.getElementById('storyOutput').open = true; });
       await setAuto(true); await page.evaluate(() => { window.s.active = false; window.push(); });
       await finish('Truyen-BAR');
       await page.waitForFunction(() => /Done: Truyen-1\.mp4/.test(document.getElementById('runLabel').textContent));

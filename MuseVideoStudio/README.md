@@ -142,6 +142,11 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.7.1
+- **Thanh % tiến trình luôn hiện** ở tab Kể chuyện, nằm ngoài các mục thu gọn (trước đây nằm trong mục «Giọng, phụ đề & xuất MP4», thu gọn lại là không thấy và bị ẩn khi tắt «Tự xuất MP4»). Tạo clip 0–85%, đọc giọng + edit khớp + nối MP4 85–100%, xong = 100% và ghi tên file video. Khi clip xong hết mà chưa ghép được video thì thanh dừng ở 85% kèm dòng hướng dẫn; ghép lỗi thì hiện lỗi ngay trên thanh.
+- Chỉ là thanh báo tiến trình, không thêm nút hay khung nào khác; việc tự đọc giọng, edit khớp và xuất MP4 vẫn chạy như cũ.
+- Chưa thử trên Windows thật: đã kiểm bằng giao diện Chromium thật với dữ liệu giả lập.
+
 ## Update 1.7.0
 - **Chỉnh tốc độ đọc và âm lượng giọng đọc** (khung «Giọng, phụ đề & xuất MP4» → «Giọng kể»):
   - **Tốc độ đọc**: thanh trượt 0.5×–2× (mỗi nấc 0.05×), thay cho 4 mức cố định cũ; đổi tốc độ không đổi cao độ giọng. Giá trị đã lưu trước đây (0.9 / 1 / 1.15 / 1.3) vẫn dùng được.

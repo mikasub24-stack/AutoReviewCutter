@@ -930,6 +930,43 @@
     $('runText').classList.toggle('warn', Boolean(info.stuck));
   }
   $('autoExport').addEventListener('change', () => { if (state) renderStatus(); });
+  // Thanh tiến trình % nằm NGOÀI các mục thu gọn và LUÔN hiện khi hàng đợi có clip kể chuyện (không phụ thuộc ô «Tự xuất MP4»):
+  // tạo clip 0–85%, đọc giọng + edit + nối 85–100%, xong = 100%. Chỉ báo tiến trình, không có nút.
+  function renderDone() {
+    const box = $('storyDone'), s = state?.story || {}, story = focusGroup();   // lượt đang chạy / vừa xong (không phải lượt chọn cũ trong ô «Truyện»)
+    let kind = '';
+    if (state && story && story.total > 0 && !$('storyOutput').hidden) {
+      if (exporting || s.busy) kind = 'busy';
+      else if (story.done < story.total) kind = 'making';
+      else if (s.error) kind = 'error';
+      else if (s.output && (!s.storyId || s.storyId === story.id)) kind = 'ready';
+      else kind = 'todo';
+    }
+    box.hidden = !kind;
+    if (!kind) return;
+    const live = Boolean(state.active || state.starting);
+    let pct = 0, title = '', text = '';
+    if (kind === 'making') {
+      pct = Math.round(85 * story.done / story.total);
+      title = live ? 'Đang tạo clip kể chuyện…' : 'Hàng đợi đang dừng';
+      text = live ? `Đang tạo clip ${story.done}/${story.total}` : `Hàng đợi đang dừng · ${story.done}/${story.total} clip. Bấm «Tiếp tục» ở Hàng đợi để làm tiếp`;
+    } else if (kind === 'busy') {
+      const info = runInfo();
+      pct = info ? info.pct : 85; title = 'Đang ghép video hoàn chỉnh…'; text = info?.label || s.progress || 'Đang xử lý…';
+    } else if (kind === 'ready') {
+      pct = 100; title = '✓ Video hoàn chỉnh đã sẵn sàng'; text = 'Mở mục «Giọng, phụ đề & xuất MP4» để xem video.';
+    } else if (kind === 'error') {
+      pct = Math.max(85, runMax.v); title = 'Ghép video chưa xong'; text = s.error;
+    } else {
+      pct = 85; title = 'Clip đã xong hết, chưa ghép thành video hoàn chỉnh'; text = 'Nếu app chưa tự ghép, mở mục «Giọng, phụ đề & xuất MP4» rồi bấm «Xuất MP4».';
+    }
+    box.classList.toggle('ready', kind === 'ready'); box.classList.toggle('warn', kind === 'error' || kind === 'todo');
+    $('sdTitle').textContent = title;
+    $('sdFile').textContent = kind === 'ready' ? baseName(s.output) + (s.srt ? ' + ' + baseName(s.srt) : '') : '';
+    $('sdText').textContent = text; $('sdText').classList.toggle('warn', kind === 'error');
+    $('sdPct').textContent = pct + '%';
+    $('sdFill').style.width = pct + '%'; $('sdBar').setAttribute('aria-valuenow', String(pct));
+  }
   function notesText(notes) {
     if (!Array.isArray(notes) || !notes.length) return '';
     const cut = notes.reduce((sum, n) => sum + (n.cut || 0), 0), held = notes.filter(n => n.hold > 0.05);
@@ -965,6 +1002,7 @@
     if (story && story.id !== lastStory) { lastStory = story.id; }
     checkAutoExport();
     renderRun();
+    renderDone();
     if (isPlant()) renderAnalyze();   // nhãn «Chạy tiếp (còn N cảnh)» theo hàng đợi
   }
 
