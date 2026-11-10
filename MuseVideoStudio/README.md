@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.7.2
+- **Chế độ «Cây trồng phát triển» quay time-lapse thật**: mỗi clip cho thấy cây lớn dần ngay trên màn hình (hạt nứt, mầm nhú, thân vươn cao, lá bung, nụ, hoa nở, quả to rồi chín), máy quay cố định như đặt trên chân máy (không đẩy / lia / phóng to để giả vờ cây lớn). Trước đây lệnh gửi Muse cấm cây lớn lên trong clip (chỉ chuyển từ cảnh này sang cảnh sau) nên video chỉ là các cảnh cây to nhỏ khác nhau.
+- Cuối clip của bước k phải khớp với ảnh đầu của bước k+1 (cùng chiều cao, số lá, nụ, hoa, quả) để ghép lại thành MỘT cây lớn liên tục. Ảnh đầu mỗi cảnh là hình thái cây ở ĐẦU giai đoạn.
+- Chế độ này không còn lựa chọn chuyển động «nhẹ / đầy đủ» (ô lựa chọn ẩn ở chế độ Cây trồng). Mẹo vặt và Lịch sử giữ nguyên.
+- Cảnh đã chia bằng luật cũ vẫn giữ prompt cũ: cần bấm chia cảnh lại rồi tạo lại clip.
+- Chưa thử với Muse thật: đã kiểm bằng test đơn vị (109 test câu chuyện đạt). AI video có thể làm méo hình khi tua nhanh, nên thử một video ngắn trước.
+
 ## Update 1.7.1
 - **Thanh % tiến trình luôn hiện** ở tab Kể chuyện, nằm ngoài các mục thu gọn (trước đây nằm trong mục «Giọng, phụ đề & xuất MP4», thu gọn lại là không thấy và bị ẩn khi tắt «Tự xuất MP4»). Tạo clip 0–85%, đọc giọng + edit khớp + nối MP4 85–100%, xong = 100% và ghi tên file video. Khi clip xong hết mà chưa ghép được video thì thanh dừng ở 85% kèm dòng hướng dẫn; ghép lỗi thì hiện lỗi ngay trên thanh.
 - Chỉ là thanh báo tiến trình, không thêm nút hay khung nào khác; việc tự đọc giọng, edit khớp và xuất MP4 vẫn chạy như cũ.

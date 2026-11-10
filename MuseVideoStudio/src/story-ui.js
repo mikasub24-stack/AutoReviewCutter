@@ -429,7 +429,7 @@
     $('storyCharacter').closest('label').hidden = tip && !hist; $('storyForm').closest('label').hidden = tip;
     $('tipAuto').checked = saved.plantAuto !== false; $('tipAutoLabel').hidden = !plant; renderAnalyze();
     applyHistLook();
-    $('tipMotionLabel').hidden = hist; $('tipPromptLabel').hidden = hist;   // lịch sử luôn chuyển động nhẹ và prompt tiếng Anh
+    $('tipMotionLabel').hidden = hist || plant; $('tipPromptLabel').hidden = hist;   // lịch sử luôn chuyển động nhẹ và prompt tiếng Anh; cây trồng luôn quay time-lapse (cây lớn lên trong clip) nên không có lựa chọn nhẹ / đầy đủ
     $('storyCreate').textContent = tip ? '▶ Tạo ảnh + clip' : '▶ Tạo clip';
     $('adBox').hidden = !ad; $('tipBox').hidden = !tip; $('storyCompose').classList.toggle('adMode', ad);
     // Ô «Tỉ lệ» là một: ở chế độ quảng cáo nằm trong khung quảng cáo, ngược lại về chỗ cũ.

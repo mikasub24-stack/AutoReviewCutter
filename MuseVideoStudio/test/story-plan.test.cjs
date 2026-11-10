@@ -1194,22 +1194,42 @@ test('cây trồng: câu lệnh Muse viết lời có đủ giai đoạn từ ch
   assert.match(tip, /MẸO VẶT hướng dẫn từng bước/);
 });
 
-test('cây trồng: câu lệnh chia cảnh dặn cùng MỘT chậu/chỗ đặt/góc máy, đúng hình thái theo giai đoạn, clip không cho cây lớn lên trong clip', () => {
+test('cây trồng: câu lệnh chia cảnh dặn cùng MỘT chậu/chỗ đặt/góc máy, đúng hình thái, clip time-lapse cho thấy cây lớn lên thấy được', () => {
   const script = 'Hôm nay trồng cà chua.\nBước 1: Chuẩn bị chậu có lỗ thoát nước.\nBước 2: Gieo hạt cà chua.\nSau mười ngày hạt đã nảy mầm.';
   for (const tipPrompt of ['en', 'vi']) {
-    const gentle = sp.buildMuseInstruction(script, { ...plantBase, tipPrompt });
-    assert.match(gentle, /video CÂY TRỒNG PHÁT TRIỂN/);
-    assert.match(gentle, /CÂY TRỒNG: mọi ảnh chụp CÙNG MỘT chậu cây, cùng chỗ đặt, cùng góc máy và ánh sáng/);
-    assert.match(gentle, /đúng hình thái thật của loài ở giai đoạn đó/);
-    assert.match(gentle, /không thêm hoa hay quả khi giai đoạn chưa tới/);
-    assert.match(gentle, /KHÔNG cho cây lớn lên, nở hoa hay chín quả ngay trong clip/);
-    assert.match(gentle, /loài cây \(tên\), chậu \(chất liệu, màu, kích cỡ, đĩa lót\)/);
-    assert.match(gentle, /NHÂN VẬT: <.*(?:plant species|loài cây)/);
-    assert.match(gentle, /«0–3 (?:s|giây) \[(?:line|câu) 5\]: …»/, 'vẫn giữ mốc giờ và thẻ số câu');
-    const full = sp.buildMuseInstruction(script, { ...plantBase, tipPrompt, tipMotion: 'full' });
-    assert.match(full, /tay được đổ đất, rắc hạt, tưới nước chậm rãi/);
-    assert.match(full, /cây KHÔNG được lớn lên, nở hoa hay chín quả ngay trong clip/);
+    // chế độ «nhẹ» hay «đầy đủ» đều như nhau: cây trồng luôn quay time-lapse (không còn cấm cây lớn lên trong clip)
+    for (const tipMotion of [undefined, 'full', 'gentle']) {
+      const text = sp.buildMuseInstruction(script, { ...plantBase, tipPrompt, ...(tipMotion ? { tipMotion } : {}) });
+      assert.match(text, /video CÂY TRỒNG PHÁT TRIỂN/);
+      assert.match(text, /CÂY TRỒNG: mọi ảnh chụp CÙNG MỘT chậu cây, cùng chỗ đặt, cùng góc máy và ánh sáng/);
+      assert.match(text, /đúng hình thái thật của loài ở giai đoạn đó/);
+      assert.match(text, /không thêm hoa hay quả khi giai đoạn chưa tới/);
+      assert.match(text, /ẢNH là hình thái cây ở ĐẦU giai đoạn/);
+      assert.match(text, /CÂY TRỒNG – TIME-LAPSE \(quay tua nhanh thời gian\)/);
+      assert.match(text, /PHÁT TRIỂN NGAY TRÊN MÀN HÌNH/);
+      assert.match(text, /Máy quay CỐ ĐỊNH như đặt trên chân máy/);
+      assert.match(text, /hạt nứt vỏ, mầm trắng nhú khỏi mặt đất/);
+      assert.match(text, /nụ xuất hiện rồi phồng to → hoa nở dần/);
+      assert.match(text, /LIÊN TỤC giữa các bước: hình thái cây ở CUỐI clip của bước k/);
+      assert.ok(!/KHÔNG cho cây lớn lên|cây KHÔNG được lớn lên/.test(text), 'không còn cấm cây lớn lên trong clip');
+      assert.ok(!text.includes('CHUYỂN ĐỘNG NHẸ, ỔN ĐỊNH') && !text.includes('mỗi mốc chỉ MỘT chuyển động nhỏ, chậm'), 'cây trồng không dùng luật chuyển động nhẹ (cấm đổi hình dạng)');
+      assert.match(text, /loài cây \(tên\), chậu \(chất liệu, màu, kích cỡ, đĩa lót\)/);
+      assert.match(text, /NHÂN VẬT: <.*(?:plant species|loài cây)/);
+      assert.match(text, /«0–3 (?:s|giây) \[(?:line|câu) 5\]: …»/, 'vẫn giữ mốc giờ và thẻ số câu');
+    }
+    const en = sp.buildMuseInstruction(script, { ...plantBase, tipPrompt: 'en' });
+    assert.match(en, /Time-lapse of a real plant growing: smooth, continuous, clearly visible growth at fast-forward speed/);
+    assert.match(en, /Static camera on a tripod, no push-in, no pan, no zoom/);
+    assert.ok(!en.includes('Every object keeps exactly the same shape, size and color as in the first frame'), 'câu kết cũ (giữ nguyên kích cỡ) bị bỏ cho cây trồng');
   }
+  // mẹo vặt thường vẫn giữ luật chuyển động nhẹ và câu kết cũ
+  const plain = sp.buildMuseInstruction(script, { ...plantBase, tipKind: 'tip', tipPrompt: 'en', tipMinutes: 2 });
+  assert.ok(plain.includes('Every object keeps exactly the same shape, size and color as in the first frame') && !plain.includes('TIME-LAPSE'));
+  // prompt mẫu tạo ngay trên máy (chưa qua Muse): cây trồng cũng là time-lapse, máy quay cố định
+  const offline = sp.scenePrompt('Hạt đã nảy mầm.', sp.options(plantBase));
+  assert.match(offline, /TIME-LAPSE quay tua nhanh/);
+  assert.match(offline, /Máy quay: CỐ ĐỊNH như đặt trên chân máy/);
+  assert.ok(!sp.scenePrompt('Hạt đã nảy mầm.', sp.options({ ...plantBase, tipKind: 'tip' })).includes('TIME-LAPSE'), 'mẹo vặt không dính');
   const tip = sp.buildMuseInstruction(script, { ...plantBase, tipKind: 'tip', tipPrompt: 'vi', tipMinutes: 2 });
   assert.ok(!tip.includes('CÂY TRỒNG') && !tip.includes('chậu cây'), 'mẹo vặt không dính câu cây trồng');
 });
