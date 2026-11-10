@@ -1448,3 +1448,26 @@ test('tốc độ đọc tiếng Việt ~20 ký tự/giây: bài mẫu 10 phút 
   } finally { sp.setRate('vi', 20); }
   assert.equal(sp.estimateSeconds('a'.repeat(100), 'vi'), keep, 'trả lại tốc độ mặc định');
 });
+
+test('Muse từ chối người thật và cảnh cầm/bắn súng: câu lệnh dặn viết prompt an toàn, lint cảnh báo trước khi gửi', () => {
+  const tale = 'Eugene Stoner thiết kế khẩu AR-15 năm 1957. Quân đội Mỹ sau đó đổi tên nó thành M16.';
+  const text = sp.buildMuseInstruction(tale, { seconds: 10 }, { marker: 'ab12cd' });
+  assert.match(text, /AN TOÀN NỘI DUNG/);
+  assert.match(text, /KHÔNG ghi tên thật/);
+  assert.match(text, /KHÔNG cho ai cầm, giơ, ngắm/);
+  assert.match(text, /bản vẽ kỹ thuật/);
+  assert.ok(text.indexOf('AN TOÀN NỘI DUNG') < text.indexOf('MSDONE'), 'quy tắc nằm trong phần dặn, trước mốc kết thúc');
+  const ad = sp.buildMuseInstruction(tale, { seconds: 10, ad: { length: 15 } }, { marker: 'ab12cd' });
+  assert.ok(!/AN TOÀN NỘI DUNG/.test(ad), 'quảng cáo giữ quy tắc 9 riêng của nó');
+  assert.match(ad, /Nhịp quảng cáo/);
+
+  const scene = prompt => ({ voiceover: 'Một người đàn ông nói về khẩu súng.', prompt: prompt + '\n' + sp.NO_SPEECH });
+  const warn = prompt => sp.lintScenes([scene(prompt)], { seconds: 10 })[0].filter(w => /blocked by policy/.test(w));
+  assert.equal(warn('Người lính giơ khẩu M16 lên ngắm về phía đồi, ánh nắng sớm.').length, 1);
+  assert.equal(warn('A soldier raises a rifle and aims at the hill.').length, 1);
+  assert.equal(warn('He loads the pistol, close-up of the magazine.').length, 1);
+  assert.equal(warn('Người dẫn chuyện đứng trước bản vẽ kỹ thuật khẩu súng trường trên bàn gỗ, chỉ tay vào sơ đồ.').length, 0, 'bản vẽ + người dẫn chuyện: không cảnh báo (chỉ tay không phải chĩa súng)');
+  assert.equal(warn('Bàn tay đặt một chiếc tách cà phê, hơi nước bay lên, cầm thìa khuấy.').length, 0, 'cầm nhưng không có vũ khí');
+  assert.equal(warn('Thanh kiếm gỗ trong tủ kính bảo tàng; người cầm đèn đi qua.').length, 0, 'không coi kiếm là súng; «đèn» không phải vũ khí');
+  assert.equal(warn('Cây đàn guitar trên giá; người cầm đàn lên.').length, 0, '«gun» không khớp giữa từ khác (guitar)');
+});

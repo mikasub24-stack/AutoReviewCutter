@@ -142,6 +142,11 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.7.3
+- **Tránh lời nhắc mà Muse từ chối («blocked by policy»)**: lệnh gửi Muse (chế độ Câu chuyện) có thêm quy tắc 9 «An toàn nội dung». Cảnh nhắc tới người thật thì prompt chỉ mô tả vai trò và ngoại hình chung (tên thật chỉ nằm ở lời đọc). Cảnh nhắc tới súng, đạn thì không cho ai cầm, giơ, ngắm, nạp hay bắn; thay bằng bản vẽ kỹ thuật, sơ đồ so sánh, tủ trưng bày bảo tàng hoặc người dẫn chuyện giới thiệu bằng lời. Cảnh khác viết như bình thường. Chế độ Quảng cáo giữ nguyên.
+- Bảng cảnh báo trước khi gửi có thêm dòng khi prompt có vũ khí kèm động từ cầm / ngắm / bắn (súng, đạn, M16, AK, rifle, pistol…); từ «kiếm» không bị tính.
+- Chưa thử với Muse thật: quy tắc dựa trên các dòng «blocked by policy» thấy trong nhật ký, Muse có thể còn chặn thêm thứ khác. Cảnh đã chia từ trước vẫn giữ prompt cũ: bấm chia cảnh lại hoặc sửa tay prompt đó.
+
 ## Update 1.7.2
 - **Chế độ «Cây trồng phát triển» quay time-lapse thật**: mỗi clip cho thấy cây lớn dần ngay trên màn hình (hạt nứt, mầm nhú, thân vươn cao, lá bung, nụ, hoa nở, quả to rồi chín), máy quay cố định như đặt trên chân máy (không đẩy / lia / phóng to để giả vờ cây lớn). Trước đây lệnh gửi Muse cấm cây lớn lên trong clip (chỉ chuyển từ cảnh này sang cảnh sau) nên video chỉ là các cảnh cây to nhỏ khác nhau.
 - Cuối clip của bước k phải khớp với ảnh đầu của bước k+1 (cùng chiều cao, số lá, nụ, hoa, quả) để ghép lại thành MỘT cây lớn liên tục. Ảnh đầu mỗi cảnh là hình thái cây ở ĐẦU giai đoạn.

@@ -699,6 +699,9 @@
     return out.join('\n');
   }
 
+  // Muse từ chối tạo video có người thật hoặc cảnh cầm / ngắm / bắn vũ khí («blocked by policy»), mà mỗi lần thử đều tốn lượt:
+  // bắt Muse viết prompt hình theo cách vẫn minh họa được chủ đề nhưng không vướng hai điều đó.
+  const SAFE_RULE = '9. AN TOÀN NỘI DUNG (Muse từ chối tạo video nếu vi phạm, mỗi lần thử đều tốn lượt): (a) NGƯỜI THẬT: nếu câu nói tới người thật (tên riêng, nhân vật lịch sử, người nổi tiếng) thì trong PROMPT KHÔNG ghi tên thật; mô tả bằng vai trò và ngoại hình chung (ví dụ «a 1950s weapons engineer, white shirt, glasses»), tên thật chỉ nằm ở lời đọc. (b) VŨ KHÍ: nếu câu nói tới súng, đạn hay vũ khí khác thì KHÔNG cho ai cầm, giơ, ngắm, chỉ, nạp hay bắn, không cận cảnh vũ khí đang được dùng, không máu và bạo lực; thể hiện bằng bản vẽ kỹ thuật trên bàn, sơ đồ so sánh hai thiết kế cạnh nhau, ảnh tư liệu kiểu tranh vẽ, tủ trưng bày bảo tàng, hoặc người dẫn chuyện đứng giữa cảnh vật giới thiệu bằng cử chỉ tay và nét mặt. Chỉ áp dụng cho cảnh thật sự có người thật hoặc vũ khí; các cảnh khác viết như bình thường.';
   /* Câu lệnh gửi cho Muse: đọc hiểu cả câu chuyện, gom các câu đánh số thành cảnh, viết prompt hình.
      ctx: { units, ranges: [[từ, đến]…] (mặc định cả truyện), cast, part, parts, marker } */
   function buildMuseInstruction(script, input = {}, ctx = {}) {
@@ -732,7 +735,7 @@
       ad ? '6. ÂM THANH: video phải hoàn toàn IM LẶNG, không có âm thanh nào (không tiếng người, không nhạc, không tiếng động); HÌNH ẢNH thì vẫn được mỉm cười, há miệng, ngạc nhiên, nét mặt và cử chỉ rõ ràng. Lời quảng cáo do người đọc, không phải người trong cảnh.' : '6. ÂM THANH: video phải hoàn toàn IM LẶNG, không có âm thanh nào (không tiếng người, không nhạc, không tiếng động); lời thoại trong truyện và lời kể do người đọc, không phải nhân vật. HÌNH ẢNH thì diễn đạt đầy đủ câu nói: nhân vật được há miệng, mấp máy miệng như đang nói, cười, ngạc nhiên, la hét, nét mặt và cử chỉ thật rõ — chỉ là không có tiếng. Câu có lời thoại: cho thấy ai đang nói với ai, khẩu hình, nét mặt, cử chỉ.',
       ad ? `7. Không thêm chữ, giá, phụ đề hay logo vào hình (nhãn thật trên sản phẩm giữ nguyên như ảnh)${config.style ? `; phong cách hình ảnh: ${config.style}` : ''}; tỷ lệ ${config.aspect}.` : `7. Không chèn chữ, phụ đề hay logo vào hình${config.style ? `; phong cách hình ảnh: ${config.style}` : ''}${config.reference ? '; nhân vật chính giữ đúng như ảnh tham chiếu' : ''}; tỷ lệ ${config.aspect}.`,
       '8. Viết PROMPT cùng ngôn ngữ với ' + (ad ? 'lời quảng cáo' : 'câu chuyện') + ', riêng câu cuối của PROMPT luôn là đúng câu tiếng Anh này: ' + NO_SPEECH,
-      ...(ad ? ['9. Nhịp quảng cáo: cảnh đầu phải thu hút ngay trong 1–2 giây đầu; các cảnh giữa cho thấy rõ từng điểm nổi bật bằng hình cụ thể (sản phẩm đang được dùng, cận cảnh chi tiết); cảnh cuối là khung hình đẹp nhất của sản phẩm. Mỗi cảnh chọn chuyển động máy quay hợp với cảnh trong danh sách đã chọn (nếu có) và ghi rõ trong PROMPT.'] : []),
+      ...(ad ? ['9. Nhịp quảng cáo: cảnh đầu phải thu hút ngay trong 1–2 giây đầu; các cảnh giữa cho thấy rõ từng điểm nổi bật bằng hình cụ thể (sản phẩm đang được dùng, cận cảnh chi tiết); cảnh cuối là khung hình đẹp nhất của sản phẩm. Mỗi cảnh chọn chuyển động máy quay hợp với cảnh trong danh sách đã chọn (nếu có) và ghi rõ trong PROMPT.'] : [SAFE_RULE]),
       '',
       'Trả lời đúng khuôn sau, KHÔNG viết thêm câu dẫn hay giải thích:',
       ...(ctx.cast ? ['(Chỉ khi có nhân vật MỚI xuất hiện ở phần này: thêm một dòng «NHÂN VẬT: …» ghi lại ĐỦ danh sách gồm cả người đã chốt; không thì bỏ qua dòng này.)'] : [ad ? 'NHÂN VẬT: <sản phẩm: mô tả cố định' + (config.reference ? ' theo ảnh tham chiếu' : '') + '; người mẫu nếu có: tuổi, vóc dáng, tóc, trang phục cố định>' : (lock ? 'NHÂN VẬT: <nhân vật chuẩn: ' + (config.reference ? 'ghi «theo ảnh tham chiếu»' : 'ghi kiểu người dùng mô tả') + '; mỗi nhân vật khác một mục: tên/vai – giới tính, màu và kiểu quần áo, kiểu tóc hoặc bộ lông, phụ kiện, chiều cao tương đối, cùng hình dạng với nhân vật chuẩn>' : 'NHÂN VẬT: <mọi nhân vật trong truyện, mỗi người một mục: tên/vai – tuổi, vóc dáng, tóc, trang phục cố định>')]),
@@ -1026,6 +1029,8 @@
 
   /* ---------- soát từng cảnh trước khi tạo (tránh tốn lượt tạo vì prompt sai) ---------- */
   const TIME_SKIP = /(sau đó|hôm sau|ngày hôm sau|năm sau|nhiều năm|một lúc sau|lát sau|cuối cùng|đồng thời|trong khi đó|the next day|years later|later that|meanwhile|a moment later|finally|flashback|hours later|weeks later|第二天|多年后|与此同时|後日|翌日|数年後|다음 날|몇 년 후|al día siguiente|años después|le lendemain|plus tard|am nächsten tag|später|на следующий день)/i;
+  const WEAPON = /(?<![\p{L}\p{N}])(?:súng|khẩu súng|rifle|gun|pistol|firearm|handgun|M16|AR-15|AK-47|AK|ammo|ammunition|bullet|cartridge|đạn|băng đạn|lựu đạn)(?![\p{L}\p{N}])/iu;
+  const HANDLING = /(?<![\p{L}\p{N}])(?:cầm|giơ|nâng|ngắm|nhắm|bắn|chĩa|chỉa|nạp|lên đạn|vuốt|hold(?:s|ing)?|aim(?:s|ing)?|point(?:s|ing)?|shoot(?:s|ing)?|fire[sd]?|firing|raise[sd]?|load(?:s|ing)?)(?![\p{L}\p{N}])/iu;
   const QUOTED = /["“”«»「」『』]([^"“”«»「」『』]{2,})["“”«»「」『』]/;
   // Trả về mảng cảnh báo (chuỗi) cho từng cảnh; mảng rỗng = ổn.
   /* ---------- kiểm tra chuyển động của cảnh ----------
@@ -1119,6 +1124,7 @@
       if (!prompt.trim()) w.push('Chưa có prompt: cảnh này sẽ không tạo được.');
       else if (count(prompt.replace(NO_SPEECH, '').replace(tipStartLine('vi'), '').replace(tipStartLine('en'), '').replace(lockLine(config, 'vi'), '').replace(lockLine(config, 'en'), '').replace(aspectLine(config, 'vi'), '').replace(aspectLine(config, 'en'), '').replace(ratioLead(config, 'vi'), '').replace(ratioLead(config, 'en'), '').trim()) < 40) w.push('Prompt quá ngắn, dễ ra hình sai. Mô tả rõ ai, ở đâu, làm gì, nét mặt.');
       if (prompt.trim() && !/no speech/i.test(prompt)) w.push('Prompt thiếu câu «no speech» — nhân vật có thể bị nói.');
+      if (WEAPON.test(prompt) && HANDLING.test(prompt)) w.push('Prompt có cảnh người cầm / ngắm / bắn súng hoặc đạn: Muse thường từ chối («blocked by policy») và mỗi lần thử đều tốn lượt. Nên thay bằng bản vẽ kỹ thuật, sơ đồ so sánh hoặc người dẫn chuyện giới thiệu bằng lời.');
       if (QUOTED.test(voice) || QUOTED.test(prompt)) w.push('Có lời thoại trong ngoặc kép — nhân vật sẽ không nói, chỉ thể hiện bằng cử chỉ và nét mặt.');
       if (TIME_SKIP.test(voice) || TIME_SKIP.test(prompt)) w.push(`Có chuyển mốc thời gian — ${own} giây khó chứa nhiều khoảnh khắc. Nên tách thành cảnh riêng.`);
       if (splitSentences(voice).length > 4) w.push(`Quá nhiều câu cho ${own} giây; hành động dễ bị bỏ sót hoặc dồn lại.`);
