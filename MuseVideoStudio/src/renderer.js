@@ -120,7 +120,9 @@ function makeCard(id){
   row.cancelBtn.title='Không chờ cảnh này nữa; tab khác vẫn chạy tiếp.';row.cancelBtn.classList.add('danger');
   row.restartBtn=action('Tạo lại ngay',async()=>{if(confirm('Bấm dừng cảnh này trong Muse rồi gửi lại prompt ngay? Nếu Muse đang tạo dở thì phần đó bị bỏ.'))render(await call('cancelJob',{id:row.job.id,mode:'again'}));});
   row.restartBtn.title='Dừng chờ và gửi lại prompt của cảnh này ngay.';
-  const previewActions=el('div','previewActions');previewActions.append(row.cancelBtn,row.restartBtn);preview.append(previewActions);
+  row.otherBtn=action('Thử TK khác',async()=>{if(confirm('Bấm dừng cảnh này ở tài khoản hiện tại rồi gửi lại prompt sang một tài khoản khác? Dùng khi tài khoản này đã hết lượt tạo video. Nếu Muse đang tạo dở thì phần đó bị bỏ.'))render(await call('cancelJob',{id:row.job.id,mode:'other'}));});
+  row.otherBtn.title='Dừng chờ ở tài khoản này và gửi cảnh sang tài khoản khác (khi tài khoản hết lượt tạo video).';
+  const previewActions=el('div','previewActions');previewActions.append(row.cancelBtn,row.restartBtn,row.otherBtn);preview.append(previewActions);
   row.edit=action('Đưa về sửa',async()=>{const result=await call('remove',row.job.id);if(result){drafts.push({...row.job});$('editorPanel').open=true;renderDrafts();render(result);$('editorPanel').scrollIntoView({block:'nearest'});}});
   body.append(badge,title,meta,steps,stage,fileLine,disclosure,source,error,actions);card.append(preview,body);return row;
 }
@@ -172,6 +174,7 @@ function updateCard(row,job,index){
   text(row.error,job.error||'');row.error.hidden=!job.error;
   row.reveal.hidden=!(job.output||job.previousOutput);
   row.cancelBtn.hidden=row.restartBtn.hidden=job.status!=='running';row.cancelBtn.disabled=row.restartBtn.disabled=Boolean(state.stopping||state.merging||state.packaging);
+  row.otherBtn.hidden=job.status!=='running'||!(Number(state.settings.accountCount)>1);row.otherBtn.disabled=row.cancelBtn.disabled;
   row.regenerate.hidden=job.status!=='completed';row.regenerate.disabled=Boolean(state.active||state.starting||state.stopping||state.testing||state.merging||state.packaging);
   const recoverable=['failed','interrupted'].includes(job.status)&&Boolean(job.mayHaveSubmitted||job.submittedAt||job.resultReadyAt);
   row.recover.hidden=!recoverable;row.recover.disabled=Boolean(state.active||state.starting||state.stopping||state.merging||state.packaging);

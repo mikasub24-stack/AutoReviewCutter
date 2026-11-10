@@ -309,6 +309,47 @@ test('Tạo lại ngay: cảnh về hàng đợi và được gửi lại ngay (
   assert.equal(calls.filter(p => p === 'b').length, 1); assert.equal(calls.filter(p => p === 'c').length, 1);
   assert.equal(q.jobs[0].late, undefined); assert.equal(q.jobs[0].error, '');
 });
+test('Thử TK khác: cảnh kẹt ở TK 1 (hết lượt) được gửi sang TK 2 dù TK 2 đã rảnh từ lâu, không quay lại TK 1', async () => {
+  const calls = [];
+  const q = new Queue({ ...base, concurrency: 2, run: async (j, slot, signal) => {
+    calls.push([j.prompt, slot, j.account]);
+    if (slot === 0) return new Promise((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(Error('x'), { name: 'AbortError' }))));
+    await new Promise(r => setTimeout(r, 5)); return j.prompt + '.mp4';
+  } });
+  await q.add([{ prompt: 'stuck' }]);
+  const running = q.start(); await new Promise(r => setTimeout(r, 40));
+  const job = q.jobs[0]; assert.equal(job.status, 'running'); job.account = 1; job.mayHaveSubmitted = true; job.late = true;
+  await q.cancelJob(job.id, 'other');
+  assert.equal(q.paused, false);
+  await running;
+  assert.equal(job.status, 'completed');
+  assert.deepEqual(calls.map(c => c[1]), [0, 1], 'lần hai chạy ở slot 1 (TK 2)');
+  assert.equal(job.avoidAccounts, undefined, 'xong thì xóa danh sách tránh');
+  assert.equal(job.error, ''); assert.equal(q.active, false);
+});
+test('Thử TK khác: cảnh khác vẫn chạy bình thường; khi đã tránh hết mọi tài khoản thì thử lại từ đầu; 1 tài khoản thì không kẹt', async () => {
+  const q = new Queue({ ...base, concurrency: 2, run: async () => 'ok.mp4' });
+  const job = { avoidAccounts: [1] };
+  assert.equal(q.avoids(job, 0), true); assert.equal(q.avoids(job, 1), false);
+  assert.equal(q.avoids({ avoidAccounts: [1, 2] }, 0), false, 'tránh hết thì bỏ qua');
+  assert.equal(q.avoids({ avoidAccounts: [1, 2] }, 1), false);
+  assert.equal(q.avoids({}, 0), false);
+  const one = new Queue({ ...base, concurrency: 1, run: async () => 'ok.mp4' });
+  assert.equal(one.avoids({ avoidAccounts: [1] }, 0), false, 'chỉ 1 tài khoản: không có chỗ khác để chuyển');
+  const slots = [];
+  const two = new Queue({ ...base, concurrency: 2, run: async (j, slot, signal) => {
+    slots.push([j.prompt, slot]);
+    if (j.prompt === 'stuck' && slot === 1 && slots.filter(x => x[0] === 'stuck').length === 1) return new Promise((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(Error('x'), { name: 'AbortError' }))));
+    await new Promise(r => setTimeout(r, 20)); return j.prompt + '.mp4';
+  } });
+  await two.add(['a', 'stuck', 'b', 'c'].map(prompt => ({ prompt })));
+  const run2 = two.start(); await new Promise(r => setTimeout(r, 10));
+  const stuck = two.jobs.find(j => j.prompt === 'stuck'); stuck.account = 2;
+  await two.cancelJob(stuck.id, 'other');
+  await run2;
+  assert.deepEqual(two.jobs.map(j => j.status), ['completed', 'completed', 'completed', 'completed']);
+  assert.deepEqual(slots.filter(x => x[0] === 'stuck').map(x => x[1]), [1, 0], 'kẹt ở TK 2 thì lần sau sang TK 1');
+});
 test('Dừng / Tạo lại riêng cảnh: đợi lệnh dừng trong Muse xong rồi mới trả chỗ cho lượt gửi sau', async () => {
   const order = []; let first = true;
   const q = new Queue({ ...base, concurrency: 1, run: async (j, slot, signal) => {

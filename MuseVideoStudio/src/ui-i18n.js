@@ -439,6 +439,9 @@ Tạo lại|Regenerate
 Tạo lại cảnh này; giữ video cũ.|Regenerate this scene; keep the previous video.
 Dừng cảnh này|Stop this scene
 Tạo lại ngay|Restart now
+Thử TK khác|Try another account
+Dừng chờ ở tài khoản này và gửi cảnh sang tài khoản khác (khi tài khoản hết lượt tạo video).|Stop waiting on this account and send the scene to another account (when this account is out of video credits).
+Bấm dừng cảnh này ở tài khoản hiện tại rồi gửi lại prompt sang một tài khoản khác? Dùng khi tài khoản này đã hết lượt tạo video. Nếu Muse đang tạo dở thì phần đó bị bỏ.|Stop this scene on the current account and resend its prompt to a different account? Use this when the account is out of video credits. Anything Muse is still generating for it is discarded.
 Không chờ cảnh này nữa; tab khác vẫn chạy tiếp.|Stop waiting for this scene; other tabs keep running.
 Dừng chờ và gửi lại prompt của cảnh này ngay.|Stop waiting and resend this scene's prompt now.
 Dừng chờ cảnh này? Các cảnh khác vẫn chạy tiếp. Cảnh này thành «Bị gián đoạn»: sau đó có thể «Tìm / tải video đã tạo» hoặc «Gửi lại prompt».|Stop waiting for this scene? Other scenes keep running. It becomes “Interrupted”: you can then use “Find / download generated video” or “Resubmit prompt”.

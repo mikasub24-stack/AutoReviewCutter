@@ -142,6 +142,11 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.7.4
+- **Nút «Thử TK khác» trên thẻ cảnh đang chạy**: khi một tài khoản hết lượt tạo video, cảnh kẹt ở tài khoản đó, bấm nút này để dừng cảnh ở tài khoản hiện tại và gửi lại prompt sang tài khoản khác (cần chạy song song từ 2 tài khoản). Cảnh nhớ tài khoản vừa hỏng và tránh nó; nếu mọi tài khoản đều đã thử thì thử lại từ đầu. Chạy lần lượt cũng chọn tài khoản kế tiếp không nằm trong danh sách tránh.
+- Trình duyệt / tài khoản rảnh không còn tự nghỉ khi tài khoản kia còn đang chạy cảnh. Trước đây, hết cảnh chờ thì tài khoản rảnh thoát, nên «Tạo lại ngay» chỉ gửi lại đúng tài khoản đang kẹt.
+- Chưa có tự phát hiện «hết lượt»: tool chưa biết Muse báo hết lượt bằng dòng chữ nào nên chưa tự chuyển. Hiện bấm tay nút «Thử TK khác». Chưa thử với Muse thật (đã kiểm bằng test hàng đợi và thử giao diện).
+
 ## Update 1.7.3
 - **Tránh lời nhắc mà Muse từ chối («blocked by policy»)**: lệnh gửi Muse (chế độ Câu chuyện) có thêm quy tắc 9 «An toàn nội dung». Cảnh nhắc tới người thật thì prompt chỉ mô tả vai trò và ngoại hình chung (tên thật chỉ nằm ở lời đọc). Cảnh nhắc tới súng, đạn thì không cho ai cầm, giơ, ngắm, nạp hay bắn; thay bằng bản vẽ kỹ thuật, sơ đồ so sánh, tủ trưng bày bảo tàng hoặc người dẫn chuyện giới thiệu bằng lời. Cảnh khác viết như bình thường. Chế độ Quảng cáo giữ nguyên.
 - Bảng cảnh báo trước khi gửi có thêm dòng khi prompt có vũ khí kèm động từ cầm / ngắm / bắn (súng, đạn, M16, AK, rifle, pistol…); từ «kiếm» không bị tính.

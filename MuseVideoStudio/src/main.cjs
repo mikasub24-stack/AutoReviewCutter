@@ -309,7 +309,8 @@ async function saveImages(muse,job,signal,count) {
 function transientDOM(error){return error?.code==='MUSE_DOM_TIMEOUT'||/Execution context was destroyed|context.*destroyed|Target closed|navigation|not respond|chưa phản hồi/i.test(error?.message||'');}
 async function runJob(job,worker,signal,{recover=false}={}) {
   const pinned=recover||Boolean(job.resumeMode);
-  const slot=pinned&&job.account?Number(job.account)-1:settings.dispatchMode==='parallel'?worker:nextAccount++%settings.accountCount;
+  const pickNext=()=>{for(let tries=0;tries<settings.accountCount;tries++){const next=nextAccount++%settings.accountCount;if(!(job.avoidAccounts||[]).includes(next+1))return next;}return nextAccount++%settings.accountCount;};
+  const slot=pinned&&job.account?Number(job.account)-1:settings.dispatchMode==='parallel'?worker:pickNext();
   validAccount(slot);
   const muse=browsers.get(slot),check=()=>{if(signal.aborted)throw stoppedError();},step=p=>abortable(p,signal);
   check();job.account=slot+1;assertMuse(muse);muse.pinPage?.(job.id);
@@ -597,10 +598,11 @@ app.whenReady().then(async () => {
     },
     // Nút riêng trên thẻ cảnh đang chạy: 'skip' = dừng cảnh này (các cảnh khác chạy tiếp), 'again' = dừng rồi gửi lại ngay.
     cancelJob: async data => {
-      const id=String(data?.id||''),mode=data?.mode==='again'?'again':'skip';
+      const id=String(data?.id||''),mode=data?.mode==='again'||data?.mode==='other'?data.mode:'skip';
       if(stopping||merging||packaging)throw Error('Chờ xử lý hiện tại hoàn tất.');
       const job=queue.jobs.find(j=>j.id===id);
       if(!job||job.status!=='running')throw Error('Cảnh này không còn đang chạy.');
+      if(mode==='other'&&settings.accountCount<2)throw Error('Cần chạy song song từ 2 tài khoản trở lên để chuyển cảnh sang tài khoản khác.');
       if(job.kind==='video')invalidateOutputs();
       const hold=remoteStopJob(job);
       await queue.cancelJob(id,mode,hold);

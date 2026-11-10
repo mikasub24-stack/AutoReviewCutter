@@ -37,6 +37,15 @@ const root=path.resolve(__dirname,'../src');
     await btn('busy',/^Tạo lại ngay$/).click();
     assert.deepEqual(await page.evaluate(()=>window.calls.filter(c=>c.name==='cancelJob').map(c=>c.data)),[{id:'stuck',mode:'skip'},{id:'busy',mode:'again'}]);
     assert.equal(dialogs.length,3);
+    // «Thử TK khác»: chỉ cảnh đang chạy, và chỉ khi có từ 2 tài khoản; gửi mode 'other'
+    for(const id of ['stuck','busy'])assert.equal(await btn(id,/^Thử TK khác$/).isVisible(),true,id);
+    for(const id of ['done','next'])assert.equal(await btn(id,/^Thử TK khác$/).isVisible(),false,id);
+    await btn('stuck',/^Thử TK khác$/).click();
+    assert.deepEqual(await page.evaluate(()=>window.calls.filter(c=>c.name==='cancelJob').pop().data),{id:'stuck',mode:'other'});
+    assert.equal(dialogs.length,4);
+    await page.evaluate(()=>{window.s.settings.accountCount=1;window.push();});
+    await page.waitForFunction(()=>![...document.querySelectorAll('[data-job-id=stuck] .previewActions button')].some(b=>/Thử TK khác/.test(b.textContent)&&!b.hidden));
+    await page.evaluate(()=>{window.s.settings.accountCount=2;window.push();});
     // đang dừng cả hàng đợi -> nút khóa
     await page.evaluate(()=>{window.s.stopping=true;window.push();});
     assert.equal(await btn('stuck',/^Dừng cảnh này$/).isDisabled(),true);assert.equal(await btn('busy',/^Tạo lại ngay$/).isDisabled(),true);
