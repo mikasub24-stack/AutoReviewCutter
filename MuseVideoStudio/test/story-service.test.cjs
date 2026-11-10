@@ -6,7 +6,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { Queue } = require('../src/queue.cjs');
 const { saveOrderedOutput } = require('../src/ordered-output.cjs');
-const { createStoryService, storyJobs, storyFolder } = require('../src/story-service.cjs');
+const { createStoryService, storyJobs, storyFolder, freeStoryId } = require('../src/story-service.cjs');
 const { command } = require('../src/merge.cjs');
 
 const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0 && spawnSync('ffprobe', ['-version']).status === 0;
@@ -103,4 +103,18 @@ test('Mẹo vặt: việc «ảnh» không bị tính là clip khi ghép MP4; c�
   assert.ok(storyJobs(jobs, 'T').every(j => j.phase === 'clip'));
   const service = createStoryService({ getSettings: () => ({ output: os.tmpdir() }), getJobs: () => jobs, voice: {}, userDataDir: os.tmpdir() });
   await assert.rejects(service.prepare({ storyId: 'T', engine: 'none' }), /Còn 1 cảnh chưa có clip \(cảnh 2\)/);
+});
+
+test('mã truyện lấy theo tiêu đề: bỏ ký tự lạ, thêm -2, -3 khi trùng truyện trong hàng đợi hoặc thư mục đã có', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'muse-free-'));
+  try {
+    assert.equal(await freeStoryId('Cay-xoai', { output: dir, jobs: [] }), 'Cay-xoai');
+    assert.equal(await freeStoryId('Cay-xoai', { output: dir, jobs: [{ storyId: 'Cay-xoai' }] }), 'Cay-xoai-2');
+    await fs.mkdir(storyFolder(dir, 'Cay-xoai-2'), { recursive: true });
+    assert.equal(await freeStoryId('Cay-xoai', { output: dir, jobs: [{ storyId: 'Cay-xoai' }] }), 'Cay-xoai-3', 'thư mục -2 đã có trên đĩa');
+    assert.equal(await freeStoryId('../x y/', { output: dir, jobs: [] }), 'xy');
+    assert.equal(await freeStoryId('', { output: dir, jobs: [] }), 'Truyen');
+    assert.equal(await freeStoryId('a'.repeat(100), { output: dir, jobs: [] }), 'a'.repeat(40));
+    assert.equal(await freeStoryId('Cay-xoai', { jobs: [] }), 'Cay-xoai', 'chưa chọn thư mục lưu thì chỉ so với hàng đợi');
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });

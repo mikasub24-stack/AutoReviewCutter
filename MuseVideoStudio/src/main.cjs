@@ -17,7 +17,7 @@ const {triggerDownload}=require('./download-trigger.cjs');
 const {createLicense,deviceCode}=require('./license.cjs');
 const {payment}=require('./payment.cjs');
 const {createVoiceService}=require('./story-voice.cjs');
-const {createStoryService,storyFolder}=require('./story-service.cjs');
+const {createStoryService,storyFolder,freeStoryId}=require('./story-service.cjs');
 const {createStoryAnalyzer}=require('./story-analyze.cjs');
 let licenseManager,paymentDetails,voiceService,storyService,storyAnalyzer;
 const { mergeVideos, checkTools } = require('./merge.cjs');
@@ -489,6 +489,30 @@ async function mergeProject() {
   } catch(e) { mergeError=e.message;mergeProgress='Nối video chưa hoàn tất'; }
   finally { merging=false;await save();notify(); }
 }
+const FONT_EXT=new Set(['.ttf','.otf','.woff','.woff2']),FONT_MAX=25*1024*1024;
+const fontDirectory=()=>path.join(app.getPath('userData'),'subtitle-fonts');
+const fontSignature=buffer=>{const tag=buffer.subarray(0,4).toString('latin1');return tag==='OTTO'||tag==='true'||tag==='wOFF'||tag==='wOF2'||tag==='ttcf'||(buffer[0]===0&&buffer[1]===1&&buffer[2]===0&&buffer[3]===0);};
+const fontFamily=file=>path.parse(file).name.replace(/[\u0000-\u001f"\\]/g,'').trim().slice(0,60)||'Phong-cua-ban';
+async function listUserFonts(){
+  let names=[];try{names=await fs.readdir(fontDirectory());}catch{return [];}
+  const out=[];
+  for(const name of names.filter(n=>FONT_EXT.has(path.extname(n).toLowerCase())).sort()){
+    try{const file=path.join(fontDirectory(),name),stat=await fs.stat(file);if(!stat.isFile()||stat.size>FONT_MAX)continue;const bytes=await fs.readFile(file);if(fontSignature(bytes))out.push({family:fontFamily(name),bytes});}catch{}
+  }
+  return out;
+}
+async function addUserFont(source){
+  const extension=path.extname(source).toLowerCase();
+  if(!FONT_EXT.has(extension))throw Error('Chỉ nhận file phông .ttf, .otf, .woff hoặc .woff2.');
+  const stat=await fs.stat(source);
+  if(!stat.isFile()||stat.size<1000||stat.size>FONT_MAX)throw Error('File phông phải nhỏ hơn 25 MB.');
+  const bytes=await fs.readFile(source);
+  if(!fontSignature(bytes))throw Error('File này không phải phông chữ hợp lệ.');
+  await fs.mkdir(fontDirectory(),{recursive:true});
+  const family=fontFamily(source);
+  await fs.writeFile(path.join(fontDirectory(),family+extension),bytes);
+  return {family,bytes};
+}
 function invalidateOutputs() {
   mergedOutput='';mergeProgress='';mergeError='';editPackageDir='';packageProgress='';packageError='';
 }
@@ -563,6 +587,14 @@ app.whenReady().then(async () => {
       finally{if(!starting&&!queue.active&&!flushingQuit&&main&&!main.isDestroyed()){main.show();main.focus();}}
     },
     storyAnalyzeCancel:async()=>{storyAnalyzer.cancel();return snapshot();},
+    // Phông phụ đề do bạn tự thêm: sao chép vào thư mục dữ liệu của app, lần sau mở app tự nạp lại.
+    storyFonts:async()=>listUserFonts(),
+    storyAddFont:async()=>{
+      const picked=await dialog.showOpenDialog(main,{title:ui('Chọn file phông chữ (.ttf, .otf, .woff, .woff2)','Choose a font file (.ttf, .otf, .woff, .woff2)'),properties:['openFile'],filters:[{name:ui('Phông chữ','Fonts'),extensions:['ttf','otf','woff','woff2']}]});
+      if(picked.canceled||!picked.filePaths?.[0])return null;
+      return addUserFont(picked.filePaths[0]);
+    },
+    storyFreeId:async data=>freeStoryId(String(data?.base||''),{output:settings.output,jobs:queue.jobs}),
     storyReveal:async()=>{const out=storyService.status().output;if(out)shell.showItemInFolder(out);return true;},
     // «Tải video»: hộp «Lưu như…» để chọn nơi lưu một bản sao MP4 (kèm .srt cùng tên nếu có và chưa có file trùng).
     storySave:async()=>{

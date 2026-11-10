@@ -10,14 +10,46 @@
   $('adLength').replaceChildren(...AD.AD_LENGTHS.map(n => { const o = el('option', '', n + ' giây'); o.value = String(n); return o; }));
   $('tipMinutes').replaceChildren(...AD.TIP_MINUTES.map(n => { const o = el('option', '', n + ' phút'); o.value = String(n); return o; }));
   $('tipSecs').replaceChildren(...AD.TIP_SECS.map(n => { const o = el('option', '', n + ' giây'); o.value = String(n); return o; }));
+  /* Phông phụ đề: chỉ liệt kê phông CÓ trên máy (dò bằng đo độ rộng chữ), cộng phông bạn tự thêm từ file. Phông đã lưu luôn được giữ trong danh sách. */
+  const SUB_FONT_GROUPS = [
+    ['Phổ biến', ['Arial', 'Segoe UI', 'Segoe UI Semibold', 'Tahoma', 'Verdana', 'Trebuchet MS', 'Calibri', 'Candara', 'Corbel', 'Century Gothic', 'Franklin Gothic Medium', 'Bahnschrift', 'Lucida Sans Unicode', 'Microsoft Sans Serif', 'Helvetica', 'Roboto', 'Open Sans', 'Noto Sans']],
+    ['Chữ đậm, làm tiêu đề', ['Impact', 'Arial Black', 'Segoe UI Black', 'Arial Narrow', 'Haettenschweiler', 'Franklin Gothic Heavy', 'Rockwell Extra Bold']],
+    ['Có chân (sách, điện ảnh)', ['Times New Roman', 'Georgia', 'Cambria', 'Constantia', 'Palatino Linotype', 'Book Antiqua', 'Sitka Text', 'Garamond', 'Bookman Old Style', 'Baskerville Old Face']],
+    ['Viết tay, trang trí', ['Comic Sans MS', 'Segoe Print', 'Segoe Script', 'Ink Free', 'Lucida Handwriting', 'Brush Script MT', 'Gabriola', 'Mistral', 'Kristen ITC']],
+    ['Chữ đơn cách', ['Consolas', 'Courier New', 'Lucida Console']]
+  ];
+  const fontProbe = document.createElement('canvas').getContext('2d');
+  const fontInstalled = name => {
+    const text = 'mmmmmmmmmmlli ẫềợ 0123';
+    return ['monospace', 'serif', 'sans-serif'].some(base => {
+      fontProbe.font = `72px ${base}`; const w0 = fontProbe.measureText(text).width;
+      fontProbe.font = `72px "${name}", ${base}`; return fontProbe.measureText(text).width !== w0;
+    });
+  };
+  const userFonts = new Set();
+  function addFontOption(group, name) {
+    const select = $('subFont');
+    if ([...select.options].some(o => o.value === name)) return;
+    let box = [...select.children].find(g => g.tagName === 'OPTGROUP' && g.label === group);
+    if (!box) { box = document.createElement('optgroup'); box.label = group; select.append(box); }
+    const option = el('option', '', name); option.value = name; box.append(option);
+  }
+  function buildFontOptions(keep) {
+    $('subFont').replaceChildren();
+    for (const [group, names] of SUB_FONT_GROUPS) for (const name of names) if (fontInstalled(name) || name === 'Arial') addFontOption(group, name);
+    for (const name of userFonts) addFontOption('Phông của bạn', name);
+    if (keep && ![...$('subFont').options].some(o => o.value === keep)) addFontOption('Đã lưu', keep);
+  }
+  try { buildFontOptions((JSON.parse(localStorage.getItem('museStudio.story') || '{}') || {}).subFont); } catch { buildFontOptions(''); }
   const FIELDS = {
     tipMotion: ['tipMotion', 'gentle'], tipPrompt: ['tipPrompt', 'en'],
     adProduct: ['adProduct', ''], adPoints: ['adPoints', ''], adAudience: ['adAudience', ''], adOffer: ['adOffer', ''], adCta: ['adCta', ''],
     adTone: ['adTone', AD.AD_TONE[0].id], adLength: ['adLength', '30'],
     storyEngine: ['engine', 'none'], storyTempo: ['tempo', '1'], storyVol: ['voiceVol', '100'], subFont: ['subFont', 'Arial'], subSize: ['subSize', '54'], subColor: ['subColor', '#ffffff'],
-    subOutline: ['subOutline', '#000000'], subPos: ['subPos', 'bottom'], storySfx: ['sfxMode', 'off'], storyName: ['name', '']
+    subOutline: ['subOutline', '#000000'], subPos: ['subPos', 'bottom'], storySfx: ['sfxMode', 'off'], storyName: ['name', ''],
+    subOutW: ['subOutW', '16'], subShadow: ['subShadow', 'none'], subGlow: ['subGlow', '#00d0ff'], subBoxColor: ['subBoxColor', '#000000'], subBoxOp: ['subBoxOp', '55']
   };
-  const CHECKS = { subOn: ['subOn', true], subSrt: ['subSrt', false], subBox: ['subBox', false], autoExport: ['autoExport', true] };
+  const CHECKS = { subOn: ['subOn', true], subSrt: ['subSrt', false], subBox: ['subBox', false], autoExport: ['autoExport', true], subBold: ['subBold', true], subItalic: ['subItalic', false], subCaps: ['subCaps', false] };
   let saved = {}, scenes = [], refs = [], analyzing = false, writing = false, exporting = false, listening = false, voiceSignature = '', windowsAsked = false, lastStory = '', lastVideo = '';
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { saved = {}; }
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch { /* không lưu được thì bỏ qua */ } };
@@ -473,6 +505,33 @@
     const d = new Date(), p = n => String(n).padStart(2, '0');
     return `Truyen-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
   }
+  /* Tên video / thư mục lấy theo tiêu đề truyện (không còn «Truyen-ngàygiờ»): ô «Tên video» nếu có gõ; chế độ có ô chủ đề thì lấy chủ đề; còn lại lấy dòng đầu kịch bản. */
+  const titleOfScript = text => {
+    const lines = String(text || '').split(/\r?\n/).map(l => l.replace(/^[\s#>*_\-–—"“”'`]+|[\s*_"“”'`]+$/g, '').replace(/^(?:tiêu đề|tên truyện|title)\s*[:：]\s*/i, '').trim()).filter(Boolean);
+    const first = lines[0] || '';
+    if (first && first.length <= 70 && !/[.!?…]$/.test(first)) return first;   // dòng đầu ngắn, không kết thúc như một câu: đó là tiêu đề
+    const sentence = (first.split(/(?<=[.!?…])\s/)[0] || first).replace(/[.!?…]+$/, '');
+    if (sentence.length <= 50) return sentence;
+    const cut = sentence.slice(0, 50), at = cut.lastIndexOf(' ');
+    return (at > 20 ? cut.slice(0, at) : cut).trim();
+  };
+  const storyTitle = () => {
+    const typed = $('storyName').value.trim();
+    if (typed) return typed.slice(0, 60);
+    const topic = isTip() ? $('tipTitle').value.trim() : '';
+    return (topic || titleOfScript($('storyScript').value)).slice(0, 60).trim();
+  };
+  // Tên thư mục: không dấu, chỉ chữ số và gạch ngang (tool bỏ mọi ký tự khác khỏi mã truyện).
+  const slugTitle = text => {
+    const full = String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    if (full.length <= 40) return full;
+    const cut = full.slice(0, 40);
+    return (full[40] === '-' ? cut : cut.slice(0, Math.max(cut.lastIndexOf('-'), 12))).replace(/-+$/g, '');   // cắt ở ranh giới từ, không bỏ lửng giữa chữ
+  };
+  // Tiêu đề của từng truyện đã thêm: tới lúc xuất MP4 (kể cả sau khi mở lại app) vẫn đặt đúng tên.
+  const TITLES_KEY = 'museStudio.storyTitles';
+  const titleMap = () => { try { return JSON.parse(localStorage.getItem(TITLES_KEY) || '{}') || {}; } catch { return {}; } };
+  const rememberTitle = (id, title) => { try { const m = titleMap(); m[id] = title; const keys = Object.keys(m); for (const k of keys.slice(0, Math.max(0, keys.length - 60))) delete m[k]; localStorage.setItem(TITLES_KEY, JSON.stringify(m)); } catch { /* không lưu được thì dùng mã truyện */ } };
   async function commit(startNow, opts = {}) {
     if (!scenes.length) return toast('Chia cảnh trước.');
     if (scenes.some(s => !String(s.prompt || '').trim())) return toast('Cảnh nào cũng cần prompt.');
@@ -486,7 +545,10 @@
       if (!opts.auto && !confirm(question)) return;   // chạy tự động: bạn đã bấm «Làm tự động» (số lượt Muse hiện sẵn dưới ô độ dài) nên không hỏi lại
     }
     const aspectNow = $('storyAspect').value;
-    const storyId = newStoryId();
+    const title = storyTitle(), slug = slugTitle(title);
+    const free = slug ? await call('storyFreeId', { base: slug }) : null;
+    const storyId = typeof free === 'string' && free ? free : newStoryId();
+    if (title && !storyId.startsWith('Truyen-')) rememberTitle(storyId, title);
     exportAspect[storyId] = aspectNow; exportWatch.add(storyId);
     const clipPrompt = s => (plan().stripBeatTags ? plan().stripBeatTags(s.prompt) : s.prompt);
     // Mẹo vặt: mỗi bước thành một việc ảnh rồi một việc clip. Tạo hết ảnh trước (ảnh rẻ, hỏng thì dừng sớm), clip chỉ chạy khi ảnh cùng số bước đã lưu.
@@ -634,9 +696,23 @@
   };
 
   /* ---------- phụ đề ---------- */
+  const numberOr = (value, fallback) => { const n = Number(value); return Number.isFinite(n) ? n : fallback; };
+  const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   function captionOptions() {
-    return { font: $('subFont').value, size: Math.min(120, Math.max(24, Number($('subSize').value) || 54)), color: $('subColor').value, outline: $('subOutline').value, position: $('subPos').value, box: $('subBox').checked };
+    return {
+      font: $('subFont').value, size: Math.min(120, Math.max(24, Number($('subSize').value) || 54)), color: $('subColor').value, outline: $('subOutline').value,
+      position: $('subPos').value, box: $('subBox').checked,
+      outPct: clamp(numberOr($('subOutW').value, 16), 0, 30), shadow: $('subShadow').value, glow: $('subGlow').value,
+      boxColor: $('subBoxColor').value, boxOp: clamp(numberOr($('subBoxOp').value, 55), 10, 100),
+      bold: $('subBold').checked, italic: $('subItalic').checked, caps: $('subCaps').checked,
+      px: clamp(numberOr(saved.subX, 0.5), 0, 1), py: clamp(numberOr(saved.subY, 0.88), 0, 1)
+    };
   }
+  const hexRgba = (hex, alpha) => { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''), n = m ? parseInt(m[1], 16) : 0; return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`; };
+  const fontSpec = (o, size) => `${o.italic ? 'italic ' : ''}${o.bold === false ? 400 : 700} ${size}px "${o.font}", "Segoe UI", Arial, sans-serif`;
+  // Phông bạn tự thêm nạp xong rồi mới vẽ (không thì chữ đầu tiên vẽ bằng phông dự phòng).
+  const ensureFont = o => (document.fonts && document.fonts.load ? document.fonts.load(fontSpec(o, 40), 'Ngày xưa Ẫ').catch(() => []) : Promise.resolve([]));
+  const fontReady = o => { try { return !document.fonts || document.fonts.check(fontSpec(o, 40), 'Ngày xưa Ẫ'); } catch { return true; } };
   function wrap(ctx, value, maxWidth) {
     const words = String(value).split(/\s+/).filter(Boolean), lines = [];
     let line = '';
@@ -656,36 +732,161 @@
     if (line) lines.push(line);
     return lines;
   }
-  function drawCaption(canvas, value, o, background) {
+  function drawCaption(canvas, value, o, background, guides) {
     const ctx = canvas.getContext('2d'), w = canvas.width, h = canvas.height;
     ctx.clearRect(0, 0, w, h);
     if (background) { const g = ctx.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#3a5877'); g.addColorStop(1, '#1b2836'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); }
     const size = Math.round(o.size * Math.min(w, h) / 1080), lineHeight = Math.round(size * 1.3);
-    ctx.font = `700 ${size}px "${o.font}", "Segoe UI", Arial, sans-serif`;
+    ctx.font = fontSpec(o, size);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
-    const lines = wrap(ctx, value, w * 0.86), block = lines.length * lineHeight, margin = Math.round(h * 0.08);
-    const top = o.position === 'top' ? margin : o.position === 'middle' ? (h - block) / 2 : h - margin - block;
+    const text = o.caps ? String(value).toLocaleUpperCase('vi') : String(value);
+    const lines = wrap(ctx, text, w * 0.86), block = lines.length * lineHeight, margin = Math.round(h * 0.08);
+    const widest = lines.length ? Math.max(...lines.map(l => ctx.measureText(l).width)) : 0, pad = size * (o.shadow === 'glow' ? 0.95 : 0.6);
+    // Vị trí: Dưới / Giữa / Trên, hoặc «Tự kéo thả» (px, py = tâm khối chữ theo tỉ lệ khung hình, luôn nằm gọn trong khung).
+    let top = o.position === 'top' ? margin : o.position === 'middle' ? (h - block) / 2 : h - margin - block, cx = w / 2;
+    if (o.position === 'custom') {
+      top = clamp((o.py === undefined ? 0.88 : o.py) * h - block / 2, size * 0.2, Math.max(size * 0.2, h - block - size * 0.2));
+      const half = widest / 2 + size * 0.5;
+      cx = clamp((o.px === undefined ? 0.5 : o.px) * w, Math.min(half, w / 2), Math.max(w - half, w / 2));
+    }
     if (o.box && lines.length) {
-      const widest = Math.max(...lines.map(l => ctx.measureText(l).width)), pad = size * 0.45, x = (w - widest) / 2 - pad, y = top - pad * 0.6;
-      ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(x, y, widest + pad * 2, block + pad * 1.2, size * 0.3); else ctx.rect(x, y, widest + pad * 2, block + pad * 1.2);
+      const boxPad = size * 0.45, x = cx - widest / 2 - boxPad, y = top - boxPad * 0.6;
+      ctx.fillStyle = hexRgba(o.boxColor || '#000000', (o.boxOp === undefined ? 55 : o.boxOp) / 100); ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, y, widest + boxPad * 2, block + boxPad * 1.2, size * 0.3); else ctx.rect(x, y, widest + boxPad * 2, block + boxPad * 1.2);
       ctx.fill();
     }
+    const strokeW = (o.outPct === undefined ? 16 : o.outPct) / 100 * size;
     lines.forEach((line, i) => {
       const y = top + i * lineHeight + lineHeight / 2;
-      ctx.lineWidth = Math.max(2, size * 0.16); ctx.strokeStyle = o.outline; ctx.strokeText(line, w / 2, y);
-      ctx.fillStyle = o.color; ctx.fillText(line, w / 2, y);
+      if (o.shadow === 'glow') { ctx.shadowColor = o.glow || '#00d0ff'; ctx.shadowBlur = size * 0.4; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; }
+      else if (o.shadow === 'soft') { ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = size * 0.14; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = size * 0.06; }
+      if (strokeW > 0) { ctx.lineWidth = Math.max(1, strokeW); ctx.strokeStyle = o.outline; ctx.strokeText(line, cx, y); }
+      ctx.fillStyle = o.color; ctx.fillText(line, cx, y);
+      if (o.shadow === 'glow') ctx.fillText(line, cx, y);   // vẽ lần hai cho quầng sáng đậm hơn
+      ctx.shadowColor = 'rgba(0,0,0,0)'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
     });
+    if (guides?.center) { ctx.save(); ctx.setLineDash([14, 10]); ctx.lineWidth = Math.max(2, h / 360); ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h); ctx.stroke(); ctx.restore(); }
     // Vùng chứa chữ (số chẵn, trong khung hình): chỉ vùng này được gửi đi và phủ lên video, nên dựng nhanh hơn nhiều.
-    const widest = lines.length ? Math.max(...lines.map(l => ctx.measureText(l).width)) : 0, pad = size * 0.6;
-    const x0 = Math.max(0, Math.floor((w - widest) / 2 - pad) & ~1), y0 = Math.max(0, Math.floor(top - pad) & ~1);
-    const x1 = Math.min(w, Math.ceil((w + widest) / 2 + pad)), y1 = Math.min(h, Math.ceil(top + block + pad));
-    return { x: x0, y: y0, w: Math.max(2, (x1 - x0 + 1) & ~1), h: Math.max(2, (y1 - y0 + 1) & ~1) };
+    const x0 = Math.max(0, Math.floor(cx - widest / 2 - pad) & ~1), y0 = Math.max(0, Math.floor(top - pad) & ~1);
+    const x1 = Math.min(w, Math.ceil(cx + widest / 2 + pad)), y1 = Math.min(h, Math.ceil(top + block + pad));
+    return { x: x0, y: y0, w: Math.max(2, (x1 - x0 + 1) & ~1), h: Math.max(2, (y1 - y0 + 1) & ~1), cx, cy: top + block / 2, tx: cx - widest / 2 - size * 0.5, ty: top - size * 0.3, tw: widest + size, th: block + size * 0.6 };
   }
-  function drawPreview() {
+  /* ---------- kiểu phụ đề có sẵn ---------- */
+  const SUB_STYLES = [
+    { id: 'classic', label: 'Cổ điển', fonts: ['Arial'], o: { color: '#ffffff', outline: '#000000', outPct: 16, shadow: 'none', glow: '#00d0ff', box: false, boxColor: '#000000', boxOp: 55, bold: true, italic: false, caps: false } },
+    { id: 'yellow', label: 'Vàng nổi bật', fonts: ['Arial Black', 'Impact', 'Arial'], o: { color: '#ffe033', outline: '#000000', outPct: 18, shadow: 'soft', glow: '#00d0ff', box: false, boxColor: '#000000', boxOp: 55, bold: true, italic: false, caps: false } },
+    { id: 'tv', label: 'Truyền hình', fonts: ['Impact', 'Arial Black', 'Arial'], o: { color: '#ffd400', outline: '#b3001b', outPct: 14, shadow: 'soft', glow: '#00d0ff', box: false, boxColor: '#000000', boxOp: 55, bold: false, italic: false, caps: true } },
+    { id: 'blackbox', label: 'Hộp đen', fonts: ['Segoe UI Semibold', 'Segoe UI', 'Arial'], o: { color: '#ffffff', outline: '#000000', outPct: 0, shadow: 'none', glow: '#00d0ff', box: true, boxColor: '#000000', boxOp: 72, bold: true, italic: false, caps: false } },
+    { id: 'news', label: 'Bản tin', fonts: ['Bahnschrift', 'Segoe UI', 'Arial'], o: { color: '#ffffff', outline: '#000000', outPct: 0, shadow: 'none', glow: '#00d0ff', box: true, boxColor: '#0b3d91', boxOp: 92, bold: true, italic: false, caps: false } },
+    { id: 'cinema', label: 'Điện ảnh', fonts: ['Georgia', 'Times New Roman'], o: { color: '#ffffff', outline: '#000000', outPct: 0, shadow: 'soft', glow: '#00d0ff', box: false, boxColor: '#000000', boxOp: 55, bold: false, italic: true, caps: false } },
+    { id: 'storybook', label: 'Truyện cổ tích', fonts: ['Georgia', 'Palatino Linotype', 'Times New Roman'], o: { color: '#fff4d6', outline: '#4a2f12', outPct: 14, shadow: 'soft', glow: '#00d0ff', box: true, boxColor: '#2b1a0a', boxOp: 40, bold: true, italic: false, caps: false } },
+    { id: 'cartoon', label: 'Hoạt hình', fonts: ['Comic Sans MS', 'Segoe Print', 'Arial'], o: { color: '#fffbe6', outline: '#e0245e', outPct: 24, shadow: 'soft', glow: '#00d0ff', box: false, boxColor: '#000000', boxOp: 55, bold: true, italic: false, caps: false } },
+    { id: 'neon', label: 'Neon', fonts: ['Segoe UI', 'Arial'], o: { color: '#e8fdff', outline: '#007a99', outPct: 6, shadow: 'glow', glow: '#00d0ff', box: false, boxColor: '#000000', boxOp: 55, bold: true, italic: false, caps: false } },
+    { id: 'minimal', label: 'Tối giản', fonts: ['Segoe UI', 'Arial'], o: { color: '#ffffff', outline: '#000000', outPct: 0, shadow: 'soft', glow: '#00d0ff', box: false, boxColor: '#000000', boxOp: 55, bold: false, italic: false, caps: false } }
+  ];
+  const STYLE_CONTROLS = { color: 'subColor', outline: 'subOutline', outPct: 'subOutW', shadow: 'subShadow', glow: 'subGlow', boxColor: 'subBoxColor', boxOp: 'subBoxOp' };
+  const STYLE_CHECKS = { box: 'subBox', bold: 'subBold', italic: 'subItalic', caps: 'subCaps' };
+  let applyingStyle = false;
+  const showSubLevels = () => { $('subOutWOut').textContent = numberOr($('subOutW').value, 16) + '%'; $('subBoxOpOut').textContent = numberOr($('subBoxOp').value, 55) + '%'; };
+  function markStyle() { for (const b of $('subStyles').children) b.setAttribute('aria-pressed', String(b.dataset.id === saved.subStyle)); }
+  const styleFont = style => style.fonts.find(name => [...$('subFont').options].some(o => o.value === name)) || style.fonts.at(-1);
+  function applyStyle(style) {
+    applyingStyle = true;
+    try {
+      const font = styleFont(style);
+      if (![...$('subFont').options].some(o => o.value === font)) addFontOption('Phổ biến', font);
+      $('subFont').value = font; $('subFont').dispatchEvent(new Event('input'));
+      for (const [key, id] of Object.entries(STYLE_CONTROLS)) { $(id).value = style.o[key]; $(id).dispatchEvent(new Event('input')); }
+      for (const [key, id] of Object.entries(STYLE_CHECKS)) { $(id).checked = Boolean(style.o[key]); $(id).dispatchEvent(new Event('change')); }
+    } finally { applyingStyle = false; }
+    saved.subStyle = style.id; persist(); markStyle(); showSubLevels(); drawPreview();
+  }
+  function drawStyleChips() {
+    for (const b of $('subStyles').children) {
+      const style = SUB_STYLES.find(x => x.id === b.dataset.id);
+      drawCaption(b.querySelector('canvas'), 'Phụ đề mẫu', { font: styleFont(style), size: 280, position: 'middle', px: 0.5, py: 0.5, ...style.o }, true);
+    }
+  }
+  function buildStyleChips() {
+    $('subStyles').replaceChildren(...SUB_STYLES.map(style => {
+      const button = el('button', '', ''), canvas = document.createElement('canvas');
+      canvas.width = 300; canvas.height = 96; button.type = 'button'; button.dataset.id = style.id;
+      button.append(canvas, document.createTextNode(style.label));
+      button.onclick = () => applyStyle(style);
+      return button;
+    }));
+    markStyle(); drawStyleChips();
+  }
+  // Sửa tay bất kỳ ô nào thì bỏ dấu «đang dùng kiểu có sẵn».
+  for (const id of ['subFont', 'subSize', 'subColor', 'subOutline', 'subOutW', 'subShadow', 'subGlow', 'subBoxColor', 'subBoxOp', 'subBold', 'subItalic', 'subCaps', 'subBox']) {
+    $(id).addEventListener(['subBold', 'subItalic', 'subCaps', 'subBox'].includes(id) ? 'change' : 'input', () => { if (applyingStyle || !saved.subStyle) return; saved.subStyle = ''; persist(); markStyle(); });
+  }
+  for (const id of ['subOutW', 'subBoxOp']) $(id).addEventListener('input', showSubLevels);
+  /* ---------- phông của bạn (file .ttf .otf .woff) ---------- */
+  async function registerFont(font) {
+    if (!font || typeof font.family !== 'string' || !font.bytes) return false;
+    try {
+      const face = new FontFace(font.family, font.bytes instanceof ArrayBuffer || ArrayBuffer.isView(font.bytes) ? font.bytes : new Uint8Array(font.bytes));
+      await face.load(); document.fonts.add(face);
+      userFonts.add(font.family); addFontOption('Phông của bạn', font.family);
+      return true;
+    } catch { toast('Không đọc được phông «' + font.family + '». Thử file .ttf hoặc .otf khác.'); return false; }
+  }
+  $('subAddFont').onclick = async () => {
+    const font = await call('storyAddFont');
+    if (await registerFont(font)) { $('subFont').value = font.family; $('subFont').dispatchEvent(new Event('input')); drawStyleChips(); toast('Đã thêm phông «' + font.family + '».'); }
+  };
+  async function loadUserFonts() {
+    const list = await call('storyFonts');
+    if (!Array.isArray(list) || !list.length) return;
+    for (const font of list) await registerFont(font);
+    if (saved.subFont && [...$('subFont').options].some(o => o.value === saved.subFont)) $('subFont').value = saved.subFont;
+    drawPreview(); drawStyleChips();
+  }
+  /* ---------- kéo thả vị trí phụ đề ---------- */
+  let lastBox = null, guides = null, drag = null;
+  const setCustom = box => {
+    if (saved.subPos === 'custom' && $('subPos').value === 'custom') return;
+    const canvas = $('subPreview');
+    saved.subX = box ? box.cx / canvas.width : 0.5; saved.subY = box ? box.cy / canvas.height : 0.88;
+    $('subPos').value = 'custom'; saved.subPos = 'custom'; persist();
+  };
+  const fraction = e => { const r = $('subPreview').getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }; };
+  const moveCaption = (x, y, snap = true) => {
+    const snapped = snap && Math.abs(x - 0.5) < 0.015;
+    saved.subX = snapped ? 0.5 : clamp(x, 0.02, 0.98); saved.subY = clamp(y, 0.03, 0.97);
+    guides = snapped ? { center: true } : null; persist(); drawPreview();
+  };
+  $('subPreview').addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    const f = fraction(e), c = $('subPreview'), b = lastBox;
+    const inside = Boolean(b) && f.x * c.width >= b.tx && f.x * c.width <= b.tx + b.tw && f.y * c.height >= b.ty && f.y * c.height <= b.ty + b.th;
+    setCustom(b);
+    drag = { dx: inside ? numberOr(saved.subX, 0.5) - f.x : 0, dy: inside ? numberOr(saved.subY, 0.88) - f.y : 0 };
+    try { c.setPointerCapture(e.pointerId); } catch { /* không hỗ trợ thì vẫn kéo được trong khung */ }
+    c.classList.add('dragging'); c.focus(); moveCaption(f.x + drag.dx, f.y + drag.dy); e.preventDefault();
+  });
+  $('subPreview').addEventListener('pointermove', e => { if (!drag) return; const f = fraction(e); moveCaption(f.x + drag.dx, f.y + drag.dy); });
+  const endDrag = () => { if (!drag) return; drag = null; guides = null; $('subPreview').classList.remove('dragging'); drawPreview(); };
+  $('subPreview').addEventListener('pointerup', endDrag); $('subPreview').addEventListener('pointercancel', endDrag);
+  $('subPreview').addEventListener('keydown', e => {
+    const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (!dir) return;
+    e.preventDefault(); setCustom(lastBox);
+    const step = e.shiftKey ? 0.05 : 0.01;
+    moveCaption(numberOr(saved.subX, 0.5) + dir[0] * step, numberOr(saved.subY, 0.88) + dir[1] * step, false);
+  });
+  $('subResetPos').onclick = () => { $('subPos').value = 'bottom'; saved.subPos = 'bottom'; delete saved.subX; delete saved.subY; persist(); drawPreview(); };
+  $('subPos').addEventListener('change', () => { if ($('subPos').value === 'custom') setCustom(lastBox); drawPreview(); });
+  function paintPreview() {
     const canvas = $('subPreview'), [w, h] = dims($('storyAspect').value);
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
-    drawCaption(canvas, 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông.', captionOptions(), true);
+    lastBox = drawCaption(canvas, 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông.', captionOptions(), true, guides);
+  }
+  function drawPreview() {
+    paintPreview();
+    const o = captionOptions();
+    if (!fontReady(o)) ensureFont(o).then(paintPreview);   // phông chưa nạp xong: vẽ lại ngay khi có
   }
   async function pngOf(canvas) {
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
@@ -718,6 +919,7 @@
       const [w, h] = dims(aspect), canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       const o = captionOptions(), out = [];
+      if (subtitles) await ensureFont(o);
       for (const scene of prep.scenes) {
         const chunks = [];
         // Phụ đề chạy theo độ dài GIỌNG ĐỌC (không tính nhịp lặng cuối) và dịch về đúng chỗ người đọc nghỉ; đoạn cuối giữ đến hết cảnh.
@@ -738,7 +940,7 @@
         }
         out.push({ id: scene.id, chunks });
       }
-      const result = await call('storyBuild', { runId: prep.runId, name: $('storyName').value.trim() || story.id, aspect, subtitles, srt, sfx: $('storySfx').value, scenes: out });
+      const result = await call('storyBuild', { runId: prep.runId, name: $('storyName').value.trim() || titleMap()[story.id] || story.id, aspect, subtitles, srt, sfx: $('storySfx').value, scenes: out });
       if (result) { exportOk = true; render(result); toast('Đã xuất MP4.'); if (saved.plantRun?.id === story.id) plantRunSet({ stage: 'done' }); }
     } finally { exporting = false; renderStatus(); }
   }
@@ -1027,10 +1229,11 @@
   for (const id of ['adLength', 'storyAspect']) $(id).addEventListener('change', () => autoAd());
   for (const id of ['adProduct', 'storyStyle', 'storyCharacter']) $(id).addEventListener('input', () => autoAd(500));
   $('adMore').addEventListener('toggle', () => $('storyCompose').classList.toggle('adOpen', $('adMore').open));
+  showSubLevels(); buildStyleChips(); loadUserFonts();
   renderChips(); applyMode(true); renderScenes(); drawPreview();
 
   window.storyUi = {
     render() { renderVoice(); renderStatus(); renderAnalyze(); },
-    drawCaption, wrap, get scenes() { return scenes; }
+    drawCaption, wrap, titleOfScript, slugTitle, storyTitle, get scenes() { return scenes; }
   };
 })();

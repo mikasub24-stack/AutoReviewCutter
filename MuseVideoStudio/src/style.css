@@ -294,7 +294,16 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .storyMuse > summary { cursor: pointer; font-size: 12px; color: #cbd7e9; }
 .storyMuse textarea { min-height: 70px; }
 #storyAudio { display: block; width: 100%; margin: 10px 0 4px; }
-#subPreview { display: block; width: 100%; max-width: 520px; height: auto; margin-top: 12px; border: 1px solid #34445e; border-radius: 8px; background: #0f1826; }
+#subPreview { display: block; width: 100%; max-width: 520px; height: auto; margin-top: 12px; border: 1px solid #34445e; border-radius: 8px; background: #0f1826; cursor: grab; touch-action: none; }
+#subPreview.dragging { cursor: grabbing; border-color: #6ea8ff; }
+#subPreview:focus-visible { outline: 2px solid #6ea8ff; outline-offset: 2px; }
+.subReset { margin-top: 8px; }
+.subChecks { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 4px 0; }
+.subStyleGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 8px 0 4px; }
+.subStyleGrid button { display: block; padding: 4px; border: 1px solid #34445e; border-radius: 8px; background: #141d2c; color: #cfe0f6; font-size: 11px; text-align: center; cursor: pointer; }
+.subStyleGrid button:hover { border-color: #52647f; background: #1a2638; }
+.subStyleGrid button[aria-pressed="true"] { border-color: #6ea8ff; background: #1b2c47; }
+.subStyleGrid canvas { display: block; width: 100%; height: auto; border-radius: 5px; margin-bottom: 4px; }
 #storySceneCount { color: #93a4bd; font-size: 11px; }
 .storyWarn { margin: 6px 0 0; padding: 6px 8px; border-left: 3px solid #e0b252; background: #3a2f12; color: #f1d28a; font-size: 11px; line-height: 1.45; white-space: pre-line; border-radius: 4px; }
 .storyCheck { margin: 8px 0; padding: 8px 10px; border-left: 3px solid #49d8ca; background: #12302d; color: #bff3ec; font-size: 12px; line-height: 1.5; white-space: pre-line; border-radius: 4px; }

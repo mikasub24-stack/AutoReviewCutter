@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.7.5
+- **Tên video và thư mục truyện lấy theo tiêu đề** thay cho «Truyen-ngàygiờ». Ô «Tên video» có gõ thì dùng đúng tên đó; để trống thì lấy tên chủ đề (chế độ Cây trồng, Mẹo vặt, Lịch sử) hoặc dòng đầu kịch bản (dòng ngắn không kết thúc như một câu), còn không thì cắt gọn câu đầu tiên. Tên file video giữ nguyên dấu tiếng Việt (vd `Cô bé bán diêm.mp4`); thư mục không dấu (`Co-be-ban-diem`), trùng thì thêm -2, -3.
+- **Phụ đề: 10 kiểu có sẵn** (Cổ điển, Vàng nổi bật, Truyền hình, Hộp đen, Bản tin, Điện ảnh, Truyện cổ tích, Hoạt hình, Neon, Tối giản), mỗi kiểu có hình xem trước, bấm là áp dụng rồi chỉnh thêm được.
+- **Phụ đề: nhiều phông hơn.** Tự dò phông có trên máy trong danh sách gồm gần 50 phông thường gặp (chia nhóm, máy chưa có phông nào thì phông đó không hiện), cộng nút «Chọn file phông» để thêm phông .ttf / .otf / .woff của bạn (lưu lại, lần sau mở app tự có). Thêm: chữ đậm / nghiêng / IN HOA, độ dày viền, đổ bóng nhẹ hoặc phát sáng, màu và độ đậm của nền chữ.
+- **Phụ đề: kéo thả vị trí** ngay trên khung xem trước (kéo gần giữa khung thì tự căn giữa, phím mũi tên chỉnh nhẹ, nút «Đặt lại vị trí»). Vị trí được lưu theo tỉ lệ khung hình nên dùng được cho cả video ngang và dọc.
+- Chưa thử trên Windows thật: kiểu chữ của từng phông phụ thuộc phông máy bạn có; phông nào thiếu dấu tiếng Việt sẽ tự dùng phông dự phòng cho chữ có dấu.
+
 ## Update 1.7.4
 - **Nút «Thử TK khác» trên thẻ cảnh đang chạy**: khi một tài khoản hết lượt tạo video, cảnh kẹt ở tài khoản đó, bấm nút này để dừng cảnh ở tài khoản hiện tại và gửi lại prompt sang tài khoản khác (cần chạy song song từ 2 tài khoản). Cảnh nhớ tài khoản vừa hỏng và tránh nó; nếu mọi tài khoản đều đã thử thì thử lại từ đầu. Chạy lần lượt cũng chọn tài khoản kế tiếp không nằm trong danh sách tránh.
 - Trình duyệt / tài khoản rảnh không còn tự nghỉ khi tài khoản kia còn đang chạy cảnh. Trước đây, hết cảnh chờ thì tài khoản rảnh thoát, nên «Tạo lại ngay» chỉ gửi lại đúng tài khoản đang kẹt.

@@ -169,6 +169,41 @@ Giữa|Middle
 Trên|Top
 Nền mờ sau chữ|Dim background behind text
 Xem trước phụ đề|Subtitle preview
+Kiểu phụ đề (kiểu có sẵn, phông, màu, vị trí)|Subtitle style (presets, font, color, position)
+Chọn một kiểu có sẵn, rồi chỉnh thêm nếu muốn.|Pick a ready-made style, then adjust if you like.
+Kiểu phụ đề có sẵn|Ready-made subtitle styles
+Thêm phông riêng|Add your own font
+Chọn file phông (.ttf .otf)|Choose a font file (.ttf .otf)
+Độ dày viền|Outline thickness
+Hiệu ứng chữ|Text effect
+Không|None
+Đổ bóng nhẹ|Soft shadow
+Phát sáng|Glow
+Màu phát sáng|Glow color
+Tự kéo thả|Drag to place
+Chữ đậm|Bold
+Chữ nghiêng|Italic
+IN HOA|UPPERCASE
+Màu nền|Background color
+Độ đậm nền|Background opacity
+Kéo chữ trên khung xem trước để đặt vị trí (kéo gần giữa khung thì tự căn giữa). Bấm vào khung rồi dùng phím mũi tên để chỉnh nhẹ.|Drag the text on the preview to place it (near the middle it snaps to center). Click the preview and use the arrow keys to nudge.
+Xem trước phụ đề, kéo để đặt vị trí|Subtitle preview, drag to place
+Đặt lại vị trí (dưới)|Reset position (bottom)
+Cổ điển|Classic
+Vàng nổi bật|Bold yellow
+Truyền hình|TV
+Hộp đen|Black box
+Bản tin|News
+Truyện cổ tích|Fairy tale
+Hoạt hình|Cartoon
+Neon|Neon
+Tối giản|Minimal
+Phổ biến|Popular
+Chữ đậm, làm tiêu đề|Bold, for titles
+Có chân (sách, điện ảnh)|Serif (books, film)
+Viết tay, trang trí|Handwriting, decorative
+Chữ đơn cách|Monospace
+Phông của bạn|Your fonts
 Âm thanh & xuất video|Audio & video export
 Tiếng động gốc của clip|Original clip sound effects
 Tắt|Off

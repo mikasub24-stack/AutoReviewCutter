@@ -53,6 +53,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
             return { script: 'Tủ lạnh có mùi thì thử cách này. Bước 1: Lấy hộp baking soda. Bước 2: Đặt vào ngăn giữa. Vậy là xong.', notes: ['Muse còn thiếu bước 3: bổ sung vào ô mẹo hoặc bấm viết lại.'] };
           }
           if (name === 'storyAnalyzeCancel') { s.story.analyze = { busy: false, progress: '', part: 0, parts: 0, error: '' }; }
+          if (name === 'storyAddFont') return window.fontPayload || null;
           if (name === 'images') return ['C:\\Refs\\mai.png'];
           if (name === 'add') s.jobs.push(...data.map(j => ({ ...j, id: String(++id), status: 'pending', stage: 'pending', order: s.jobs.filter(x => x.kind === 'story').length + 1 })));
           if (name === 'start') { s.active = true; s.paused = false; }
@@ -73,7 +74,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     // Giao diện gọn: các ô phụ nằm trong «Tùy chọn thêm» và đều đóng sẵn.
     assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('details.more')].map(d => [d.id || 'scene', d.open])), [['tipMore', false], ['subMore', false]]);
     assert.equal(await page.locator('#tipMore summary').textContent(), 'Tùy chọn thêm');
-    assert.equal(await page.locator('#subMore summary').textContent(), 'Kiểu chữ phụ đề (phông, cỡ, màu, vị trí)');
+    assert.equal(await page.locator('#subMore summary').textContent(), 'Kiểu phụ đề (kiểu có sẵn, phông, màu, vị trí)');
 
     // Video tab does not show story clips; the story tab counts them.
     assert.equal(await page.locator('.card').count(), 1);
@@ -127,6 +128,29 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await page.locator('#storyReply').fill('Xin lỗi tôi không làm được'); await page.locator('#storyParse').click();
     assert.match(await page.locator('#toast').textContent(), /Chưa thấy cảnh nào/);
     assert.equal(await page.locator('#storyScenes .draftRow').count(), 2, 'trả lời hỏng không xóa cảnh đang có');
+
+    // Tên video / thư mục theo tiêu đề truyện (không còn «Truyen-ngàygiờ»): dòng đầu ngắn là tiêu đề, không thì lấy câu đầu cắt gọn.
+    const names = await page.evaluate(() => {
+      const u = window.storyUi;
+      return {
+        heading: u.titleOfScript('# Cô bé bán diêm\n\nNgày xưa có một cô bé.'),
+        labelled: u.titleOfScript('Tiêu đề: Chú cá vàng\nMột hôm có chú cá.'),
+        sentence: u.titleOfScript('Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng Mai dậy sớm.'),
+        long: u.titleOfScript('Ngày xưa ở một ngôi làng nhỏ bên dòng sông rất xa có một cô bé tên Mai sống cùng bà ngoại già yếu mỗi ngày.'),
+        empty: u.titleOfScript('   '),
+        slug: u.slugTitle('Đường đến Sài Gòn: Chú cá vàng & Bà Ba!'),
+        slugLong: u.slugTitle('Ngày xưa ở một ngôi làng nhỏ bên dòng sông rất xa có một cô bé'),
+        slugEmpty: u.slugTitle('!!!'),
+        current: u.storyTitle()
+      };
+    });
+    assert.equal(names.heading, 'Cô bé bán diêm'); assert.equal(names.labelled, 'Chú cá vàng');
+    assert.equal(names.sentence, 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông');
+    assert.ok(names.long.length <= 50 && !/\s$/.test(names.long) && names.long.startsWith('Ngày xưa ở một ngôi làng nhỏ'), 'câu dài: cắt gọn ở ranh giới từ: ' + names.long);
+    assert.equal(names.empty, ''); assert.equal(names.slug, 'Duong-den-Sai-Gon-Chu-ca-vang-Ba-Ba'); assert.equal(names.slugEmpty, '');
+    assert.ok(names.slugLong.length <= 40 && /^Ngay-xua-o-mot-ngoi-lang/.test(names.slugLong) && !names.slugLong.endsWith('-'), names.slugLong);
+    assert.equal(names.current, 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông', 'ô «Tên video» để trống: lấy tiêu đề từ kịch bản');
+    assert.equal(await page.evaluate(() => { const box = document.getElementById('storyName'); box.value = 'Cô bé Mai'; const t = window.storyUi.storyTitle(); box.value = ''; return t; }), 'Cô bé Mai', 'ô «Tên video» đã gõ thì dùng đúng tên đó');
 
     await page.locator('#storyCreate').click();
     await page.waitForFunction(() => window.calls.some(c => c.name === 'start'));
@@ -267,6 +291,68 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await page.locator('#subPos').selectOption('top');
     assert.equal(await page.evaluate(() => { const c = document.getElementById('subPreview'); const d = c.getContext('2d').getImageData(0, c.height * 0.8, c.width, c.height * 0.2).data; for (let i = 0; i < d.length; i += 4) if (d[i] > 240 && d[i + 1] > 240 && d[i + 2] > 240) return true; return false; }), false, 'đổi vị trí lên trên thì phần dưới hết chữ');
     await page.locator('#subPos').selectOption('bottom');
+    // --- Phụ đề: kiểu có sẵn, phông, kéo thả vị trí, vẽ ---
+    await page.locator('#subMore').evaluate(d => { d.open = true; });
+    assert.equal(await page.locator('#subStyles button').count(), 10, '10 kiểu phụ đề có sẵn');
+    assert.equal(await page.locator('#subStyles button canvas').count(), 10, 'mỗi kiểu có hình xem trước');
+    assert.ok(await page.evaluate(() => [...document.querySelectorAll('#subStyles canvas')].every(c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let bright = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] > 150) bright++; return bright > 40; })), 'hình xem trước của mỗi kiểu có chữ');
+    assert.ok(await page.locator('#subFont option').count() >= 1 && await page.locator('#subFont option[value="Arial"]').count() === 1, 'danh sách phông luôn có Arial');
+    await page.locator('#subStyles button', { hasText: 'Vàng nổi bật' }).click();
+    assert.equal(await page.locator('#subColor').inputValue(), '#ffe033'); assert.equal(await page.locator('#subShadow').inputValue(), 'soft'); assert.equal(await page.locator('#subOutW').inputValue(), '18');
+    assert.equal(await page.locator('#subStyles button', { hasText: 'Vàng nổi bật' }).getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('#subStyles button[aria-pressed="true"]').count(), 1);
+    await page.locator('#subStyles button', { hasText: 'Hộp đen' }).click();
+    assert.equal(await page.locator('#subBox').isChecked(), true); assert.equal(await page.locator('#subBoxOp').inputValue(), '72'); assert.equal(await page.locator('#subOutW').inputValue(), '0');
+    await page.locator('#subStyles button', { hasText: 'Truyền hình' }).click();
+    assert.equal(await page.locator('#subCaps').isChecked(), true); assert.equal(await page.locator('#subBold').isChecked(), false);
+    await page.locator('#subSize').fill('60'); await page.locator('#subSize').dispatchEvent('input');
+    assert.equal(await page.locator('#subStyles button[aria-pressed="true"]').count(), 0, 'sửa tay thì bỏ dấu kiểu có sẵn');
+    await page.locator('#subStyles button', { hasText: 'Cổ điển' }).click();
+    await page.locator('#subSize').fill('54'); await page.locator('#subSize').dispatchEvent('input');
+    // phông riêng: thêm từ file, vào nhóm «Phông của bạn» và được chọn
+    const fontBytes = [...require('node:fs').readFileSync('/mnt/skills/examples/canvas-design/canvas-fonts/BigShoulders-Bold.ttf')];
+    await page.evaluate(bytes => { window.fontPayload = { family: 'BigShoulders-Bold', bytes: new Uint8Array(bytes) }; }, fontBytes);
+    await page.locator('#subAddFont').click();
+    await page.waitForFunction(() => document.getElementById('subFont').value === 'BigShoulders-Bold');
+    assert.equal(await page.locator('#subFont optgroup[label="Phông của bạn"] option').count(), 1);
+    assert.equal(await page.evaluate(() => document.fonts.check('700 40px "BigShoulders-Bold"', 'Ngày xưa')), true, 'phông riêng đã nạp vào trình duyệt');
+    await page.locator('#subFont').selectOption('Arial');
+    // kéo thả: kéo chữ lên góc trái phía trên; sát giữa khung thì tự căn giữa; phím mũi tên chỉnh nhẹ; nút đặt lại về dưới
+    await page.locator('#subPreview').scrollIntoViewIfNeeded();
+    const box = await page.locator('#subPreview').boundingBox();
+    const at = (fx, fy) => [box.x + box.width * fx, box.y + box.height * fy];
+    await page.mouse.move(...at(0.5, 0.88)); await page.mouse.down(); await page.mouse.move(...at(0.35, 0.5), { steps: 4 }); await page.mouse.move(...at(0.3, 0.2), { steps: 4 }); await page.mouse.up();
+    assert.equal(await page.locator('#subPos').inputValue(), 'custom');
+    let pos = await page.evaluate(() => { const v = JSON.parse(localStorage.getItem('museStudio.story')); return [v.subX, v.subY, v.subPos]; });
+    assert.ok(Math.abs(pos[0] - 0.3) < 0.04 && Math.abs(pos[1] - 0.2) < 0.04 && pos[2] === 'custom', 'vị trí kéo thả được lưu: ' + pos);
+    assert.equal(await page.evaluate(() => { const c = document.getElementById('subPreview'); const d = c.getContext('2d').getImageData(0, c.height * 0.8, c.width, c.height * 0.2).data; for (let i = 0; i < d.length; i += 4) if (d[i] > 240 && d[i + 1] > 240 && d[i + 2] > 240) return true; return false; }), false, 'chữ đã rời khỏi đáy khung');
+    assert.equal(await page.evaluate(() => { const c = document.getElementById('subPreview'); const d = c.getContext('2d').getImageData(0, c.height * 0.1, c.width * 0.6, c.height * 0.2).data; for (let i = 0; i < d.length; i += 4) if (d[i] > 240 && d[i + 1] > 240 && d[i + 2] > 240) return true; return false; }), true, 'chữ nằm ở vùng đã kéo tới');
+    await page.mouse.move(...at(0.3, 0.2)); await page.mouse.down(); await page.mouse.move(...at(0.5, 0.2), { steps: 3 }); await page.mouse.move(...at(0.508, 0.22), { steps: 2 }); await page.mouse.up();
+    pos = await page.evaluate(() => { const v = JSON.parse(localStorage.getItem('museStudio.story')); return [v.subX, v.subY]; });
+    assert.equal(pos[0], 0.5, 'kéo sát giữa khung thì căn giữa đúng 0,5');
+    await page.locator('#subPreview').focus(); await page.keyboard.press('ArrowLeft'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Shift+ArrowUp');
+    pos = await page.evaluate(() => { const v = JSON.parse(localStorage.getItem('museStudio.story')); return [v.subX, v.subY]; });
+    assert.ok(Math.abs(pos[0] - 0.49) < 0.001 && Math.abs(pos[1] - (0.22 + 0.01 - 0.05)) < 0.03, 'phím mũi tên: ' + pos);
+    // vẽ trực tiếp: tự kéo thả → khung cắt nằm đúng chỗ, trong khung hình, số chẵn; kiểu đậm / viền / phát sáng không làm vỡ hình
+    const geo = await page.evaluate(() => {
+      const c = document.createElement('canvas'); c.width = 1920; c.height = 1080;
+      const base = { font: 'Arial', size: 54, color: '#fff', outline: '#000', outPct: 16, shadow: 'none', glow: '#0cf', box: false, boxColor: '#000', boxOp: 55, bold: true, italic: false, caps: false };
+      const out = {};
+      out.bottom = window.storyUi.drawCaption(c, 'Xin chào các bạn', { ...base, position: 'bottom' });
+      out.custom = window.storyUi.drawCaption(c, 'Xin chào các bạn', { ...base, position: 'custom', px: 0.3, py: 0.2 });
+      out.edge = window.storyUi.drawCaption(c, 'Xin chào các bạn, đây là một dòng phụ đề khá dài để thử sát mép', { ...base, position: 'custom', px: 0, py: 1 });
+      out.glow = window.storyUi.drawCaption(c, 'Neon', { ...base, position: 'custom', px: 0.5, py: 0.5, shadow: 'glow' });
+      out.caps = window.storyUi.drawCaption(c, 'in hoa', { ...base, position: 'middle', caps: true, box: true });
+      return out;
+    });
+    assert.ok(geo.bottom.y > 800 && Math.abs(geo.bottom.cx - 960) < 1, 'mặc định vẫn nằm dưới, giữa');
+    assert.ok(Math.abs(geo.custom.cx - 576) < 2 && Math.abs(geo.custom.cy - 216) < 20, 'tự kéo thả đặt đúng tâm: ' + JSON.stringify(geo.custom));
+    for (const [name, b] of Object.entries(geo)) assert.ok(b.x >= 0 && b.y >= 0 && b.x + b.w <= 1920 && b.y + b.h <= 1080 && b.w % 2 === 0 && b.h % 2 === 0, name + ' nằm gọn trong khung, kích thước chẵn: ' + JSON.stringify(b));
+    assert.ok(geo.edge.x >= 0 && geo.edge.x + geo.edge.w <= 1920 && geo.edge.y + geo.edge.h <= 1080, 'kéo sát mép vẫn không tràn khung');
+    if (process.env.SUB_SHOT) { await page.locator('#subStyles button', { hasText: 'Neon' }).click(); await page.locator('#subMore').screenshot({ path: process.env.SUB_SHOT }); await page.locator('#subStyles button', { hasText: 'Cổ điển' }).click(); }
+    await page.locator('#subResetPos').click();
+    assert.equal(await page.locator('#subPos').inputValue(), 'bottom');
+    assert.equal(await page.evaluate(() => { const v = JSON.parse(localStorage.getItem('museStudio.story')); return [v.subPos, v.subX, v.subY].join(); }), 'bottom,,', 'đặt lại vị trí xóa tọa độ kéo thả');
     await page.evaluate(() => { window.s.jobs.find(j => j.id === 'story2').status = 'pending'; window.push(); });
     assert.equal(await page.locator('#storyExport').isDisabled(), true);
     assert.match(await page.locator('#storyStatus').textContent(), /Còn 1 cảnh chưa có clip/);
@@ -714,7 +800,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
         assert.equal(await page.locator('#storyRefRow').isVisible(), true, 'ảnh nhân vật dẫn chuyện (không bắt buộc)');
         assert.equal(await page.locator('#storyForm').isVisible(), false);
         assert.match(await page.locator('#storyStyle').getAttribute('placeholder'), /Flat cartoon illustration by default/);
-        assert.equal(await page.locator('#tipMore summary').textContent(), 'More options'); assert.equal(await page.locator('#subMore summary').textContent(), 'Subtitle style (font, size, color, position)');
+        assert.equal(await page.locator('#tipMore summary').textContent(), 'More options'); assert.equal(await page.locator('#subMore summary').textContent(), 'Subtitle style (presets, font, color, position)');
         assert.equal(await page.locator('#tipMotionLabel').evaluate(l => l.hidden), true, 'lịch sử luôn chuyển động nhẹ, prompt tiếng Anh');
         assert.deepEqual(await page.locator('#tipMinutes option').allTextContents(), ['1 minute', '2 minutes', '3 minutes', '5 minutes', '10 minutes', '15 minutes', '20 minutes', '30 minutes', '45 minutes', '60 minutes', '90 minutes', '120 minutes', '180 minutes']);
         // «Kiểu hình» chỉ có ở Lịch sử: hoạt hình phẳng (mặc định) hoặc ảnh phim tư liệu chân thực màu phục chế; đổi kiểu thì ô phong cách và lời giới thiệu đổi theo.

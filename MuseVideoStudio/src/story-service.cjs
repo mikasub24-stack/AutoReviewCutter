@@ -18,6 +18,19 @@ function storyFolder(output, storyId) {
   return path.join(output, 'KeChuyen', String(storyId || 'Truyen').replace(/[^\w-]/g, '') || 'Truyen');
 }
 
+// Mã truyện chưa dùng, bắt đầu bằng base (tên không dấu lấy từ tiêu đề): thêm -2, -3… khi trùng truyện đang có trong hàng đợi hoặc thư mục đã có trên đĩa.
+async function freeStoryId(base, { output = '', jobs = [] } = {}) {
+  const root = String(base || '').replace(/[^\w-]/g, '').slice(0, 40).replace(/^-+|-+$/g, '') || 'Truyen';
+  const used = new Set((jobs || []).map(j => j.storyId).filter(Boolean));
+  for (let n = 1; n <= 999; n++) {
+    const id = n === 1 ? root : `${root}-${n}`;
+    if (used.has(id)) continue;
+    if (output) { try { await fs.access(storyFolder(output, id)); continue; } catch { /* chưa có thư mục: dùng được */ } }
+    return id;
+  }
+  return `${root}-${Date.now().toString(36)}`;
+}
+
 function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async () => {}, notify = () => {}, userDataDir }) {
   const state = { busy: false, progress: '', error: '', output: '', srt: '', notes: [], storyId: '' };
   let prepared = null, controller = null;
@@ -106,4 +119,4 @@ function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async
   return { status, prepare, build, cancel, state };
 }
 
-module.exports = { createStoryService, storyJobs, storyFolder };
+module.exports = { createStoryService, storyJobs, storyFolder, freeStoryId };
