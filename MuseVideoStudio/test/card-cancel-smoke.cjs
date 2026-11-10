@@ -47,7 +47,7 @@ const root=path.resolve(__dirname,'../src');
     await page.waitForFunction(()=>![...document.querySelectorAll('[data-job-id=stuck] .previewActions button')].some(b=>/Thử TK khác/.test(b.textContent)&&!b.hidden));
     await page.evaluate(()=>{window.s.settings.accountCount=2;window.push();});
     // «Tải video lên»: hiện ở cảnh chưa xong (kể cả đang chạy), không hiện ở cảnh đã xong; cảnh đang chạy hỏi xác nhận trước
-    const up=id=>page.locator(`[data-job-id=${id}] .cardActions button`).filter({hasText:/^Tải video lên$/});
+    const up=id=>page.locator(`[data-job-id=${id}] .previewActions button`).filter({hasText:/^Tải video lên$/});
     for(const id of ['stuck','busy','next'])assert.equal(await up(id).isVisible(),true,id);
     assert.equal(await up('done').isVisible(),false);
     const before=dialogs.length;

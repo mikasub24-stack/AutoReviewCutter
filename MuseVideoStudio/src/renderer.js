@@ -113,7 +113,7 @@ function makeCard(id){
   row.recover=action('Tìm / tải video đã tạo',async()=>render(await call('retryDownload',row.job.id)));
   row.recover.title='Tìm kết quả từ prompt đã gửi, không gửi lại prompt mới.';
   row.retry=action('Gửi lại prompt',async()=>{if(confirm('Kiểm tra Muse trước. Gửi lại prompt có thể tạo video trùng nếu tác vụ trước đã gửi.'))render(await call('retry',row.job.id));});
-  row.upload=action('Tải video lên',async()=>{if(row.job.status==='running'&&!confirm('Cảnh này đang chờ Muse. Chọn video sẽ dừng cảnh ở Muse và dùng video bạn chọn thay thế. Tiếp tục?'))return;render(await call('attachVideo',{id:row.job.id}));});
+  row.upload=el('button','secondary','Tải video lên');row.upload.onclick=async()=>{if(row.job.status==='running'&&!confirm('Cảnh này đang chờ Muse. Chọn video sẽ dừng cảnh ở Muse và dùng video bạn chọn thay thế. Tiếp tục?'))return;render(await call('attachVideo',{id:row.job.id}));};
   row.upload.title='Tự thêm video cho cảnh này (đã tạo ở nơi khác): chọn file MP4 / WebM, tool đặt tên theo số cảnh và coi cảnh là đã xong.';
   row.remove=action('Xóa',async()=>render(await call('remove',row.job.id)));
   row.regenerate=action('Tạo lại',async()=>render(await call('regenerate',row.job.id)));
@@ -124,7 +124,7 @@ function makeCard(id){
   row.restartBtn.title='Dừng chờ và gửi lại prompt của cảnh này ngay.';
   row.otherBtn=action('Thử TK khác',async()=>{if(confirm('Bấm dừng cảnh này ở tài khoản hiện tại rồi gửi lại prompt sang một tài khoản khác? Dùng khi tài khoản này đã hết lượt tạo video. Nếu Muse đang tạo dở thì phần đó bị bỏ.'))render(await call('cancelJob',{id:row.job.id,mode:'other'}));});
   row.otherBtn.title='Dừng chờ ở tài khoản này và gửi cảnh sang tài khoản khác (khi tài khoản hết lượt tạo video).';
-  const previewActions=el('div','previewActions');previewActions.append(row.cancelBtn,row.restartBtn,row.otherBtn);preview.append(previewActions);
+  const previewActions=el('div','previewActions');previewActions.append(row.cancelBtn,row.restartBtn,row.otherBtn,row.upload);preview.append(previewActions);
   row.edit=action('Đưa về sửa',async()=>{const result=await call('remove',row.job.id);if(result){drafts.push({...row.job});$('editorPanel').open=true;renderDrafts();render(result);$('editorPanel').scrollIntoView({block:'nearest'});}});
   body.append(badge,title,meta,steps,stage,fileLine,disclosure,source,error,actions);card.append(preview,body);return row;
 }
