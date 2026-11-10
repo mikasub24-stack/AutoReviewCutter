@@ -310,12 +310,12 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await page.locator('#subStyles button', { hasText: 'Cổ điển' }).click();
     await page.locator('#subSize').fill('54'); await page.locator('#subSize').dispatchEvent('input');
     // phông riêng: thêm từ file, vào nhóm «Phông của bạn» và được chọn
-    const fontBytes = [...require('node:fs').readFileSync('/mnt/skills/examples/canvas-design/canvas-fonts/BigShoulders-Bold.ttf')];
-    await page.evaluate(bytes => { window.fontPayload = { family: 'BigShoulders-Bold', bytes: new Uint8Array(bytes) }; }, fontBytes);
+    const fontBytes = [...require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures', 'test-font.ttf'))];
+    await page.evaluate(bytes => { window.fontPayload = { family: 'TestCaptionFont', bytes: new Uint8Array(bytes) }; }, fontBytes);
     await page.locator('#subAddFont').click();
-    await page.waitForFunction(() => document.getElementById('subFont').value === 'BigShoulders-Bold');
+    await page.waitForFunction(() => document.getElementById('subFont').value === 'TestCaptionFont');
     assert.equal(await page.locator('#subFont optgroup[label="Phông của bạn"] option').count(), 1);
-    assert.equal(await page.evaluate(() => document.fonts.check('700 40px "BigShoulders-Bold"', 'Ngày xưa')), true, 'phông riêng đã nạp vào trình duyệt');
+    assert.equal(await page.evaluate(() => document.fonts.check('700 40px "TestCaptionFont"', 'Nxayg')), true, 'phông riêng đã nạp vào trình duyệt');
     await page.locator('#subFont').selectOption('Arial');
     // kéo thả: kéo chữ lên góc trái phía trên; sát giữa khung thì tự căn giữa; phím mũi tên chỉnh nhẹ; nút đặt lại về dưới
     await page.locator('#subPreview').scrollIntoViewIfNeeded();
