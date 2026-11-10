@@ -609,6 +609,42 @@ app.whenReady().then(async () => {
       browsers.get(Number(job.account)-1)?.releasePage?.(id);
       notify();return snapshot();
     },
+    // Thêm video làm tay cho một cảnh chưa xong (vd tạo ở tài khoản khác rồi tải lên): sao chép vào thư mục lưu, đặt tên theo số cảnh.
+    attachVideo: async data => {
+      const id=String(data?.id||'');
+      if(stopping||merging||packaging)throw Error('Chờ xử lý hiện tại hoàn tất.');
+      const find=()=>{const j=queue.jobs.find(x=>x.id===id);if(!j||j.kind==='image'||isPhoto(j))throw Error('Chỉ thêm video cho cảnh video.');if(j.status==='completed')throw Error('Cảnh này đã có video. Bấm «Tạo lại» nếu muốn làm lại.');return j;};
+      find();
+      if(!settings.output)throw Error('Chọn thư mục lưu video trước.');
+      const picked=await dialog.showOpenDialog(main,{title:ui('Chọn video của cảnh này (MP4 hoặc WebM)','Choose the video for this scene (MP4 or WebM)'),properties:['openFile'],filters:[{name:ui('Video MP4 / WebM','MP4 / WebM video'),extensions:['mp4','webm']}]});
+      if(picked.canceled||!picked.filePaths?.[0])return snapshot();
+      let job=find();
+      const outputDir=job.kind==='story'?storyFolder(settings.output,job.storyId):settings.output;
+      await fs.mkdir(outputDir,{recursive:true});
+      const temporary=path.join(outputDir,`.muse-${job.id}-${randomUUID().slice(0,8)}.part`);
+      let target='';
+      try{
+        // Sao chép (không di chuyển) để file gốc của người dùng còn nguyên.
+        await fs.copyFile(picked.filePaths[0],temporary,fs.constants.COPYFILE_EXCL);
+        let format;
+        try{format=await validateVideo(temporary);}catch{throw Error('File này không phải video MP4 / WebM hợp lệ hoặc bị hỏng. Chọn file khác.');}
+        target=await saveOrderedOutput(temporary,outputDir,job,format.extension);
+        job=find();
+        if(job.status==='running'){
+          // Cảnh còn đang chờ Muse: dừng ở Muse rồi mới thay bằng video đã chọn.
+          const hold=remoteStopJob(job);
+          await queue.cancelJob(id,'skip',hold);
+          browsers.get(Number(job.account)-1)?.releasePage?.(id);
+        }
+        invalidateOutputs();
+        await queue.attachManual(id,target);
+      }catch(error){
+        await fs.rm(temporary,{force:true}).catch(()=>{});
+        if(target)await fs.rm(target,{force:true}).catch(()=>{});
+        throw error;
+      }
+      notify();return snapshot();
+    },
     retry: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); const target=queue.jobs.find(j=>j.id===id),browser=browsers.get(Number(target?.account)-1);if(target?.kind==='video')invalidateOutputs(); await queue.retry(id);browser?.releasePage?.(id); return snapshot(); },
     remove: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); const removed=queue.jobs.find(j=>j.id===id);if(removed?.kind==='video')invalidateOutputs(); await queue.remove(id);browsers.get(Number(removed?.account)-1)?.releasePage?.(id);if(removed?.trackerId)void dom(browsers.get(Number(removed.account)-1),endTracking,{id:removed.trackerId}).catch(()=>{}); return snapshot(); },
     browser: async index => { await openMuse(Number(index ?? 0)); return true; },

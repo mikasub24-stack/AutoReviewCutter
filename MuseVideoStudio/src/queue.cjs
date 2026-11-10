@@ -55,6 +55,17 @@ class Queue {
     job.references=[image.output];job.image=image.output;
     if(!job.mayHaveSubmitted)delete job.lockedInput;
   }
+  // Cảnh được người dùng thêm video làm tay (tự tạo ở nơi khác rồi tải lên): đánh dấu đã xong, không gửi gì tới Muse.
+  async attachManual(id,output){
+    const job=this.jobs.find(j=>j.id===id);
+    if(!job||job.kind==='image'||isPhoto(job))throw Error('Chỉ thêm video cho cảnh video.');
+    if(job.status==='running')throw Error('Dừng cảnh này trước khi thêm video.');
+    if(job.status==='completed')throw Error('Cảnh này đã có video.');
+    if(typeof output!=='string'||!output.trim())throw Error('Thiếu đường dẫn video.');
+    delete job.resumeMode;delete job.avoidAccounts;delete job.late;
+    Object.assign(job,{status:'completed',stage:'completed',stageMessage:'Đã thêm video thủ công',progress:100,downloadProgress:null,error:'',output,outputs:[output],manual:true,finishedAt:new Date().toISOString()});
+    await this.publish();
+  }
   // Dừng RIÊNG một cảnh đang chạy mà không dừng cả hàng đợi.
   //   mode 'again': bỏ lượt chờ này và đưa cảnh về «đang chờ» để gửi lại ngay (worker rảnh sẽ nhặt lại đúng cảnh này, vì cảnh đứng đầu hàng).
   //   mode 'other': như 'again' nhưng gửi sang tài khoản KHÁC (tài khoản hiện tại hết lượt tạo video / lỗi). Cảnh nhớ tài khoản cần tránh trong avoidAccounts;

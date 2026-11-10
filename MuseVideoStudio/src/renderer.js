@@ -113,6 +113,8 @@ function makeCard(id){
   row.recover=action('Tìm / tải video đã tạo',async()=>render(await call('retryDownload',row.job.id)));
   row.recover.title='Tìm kết quả từ prompt đã gửi, không gửi lại prompt mới.';
   row.retry=action('Gửi lại prompt',async()=>{if(confirm('Kiểm tra Muse trước. Gửi lại prompt có thể tạo video trùng nếu tác vụ trước đã gửi.'))render(await call('retry',row.job.id));});
+  row.upload=action('Tải video lên',async()=>{if(row.job.status==='running'&&!confirm('Cảnh này đang chờ Muse. Chọn video sẽ dừng cảnh ở Muse và dùng video bạn chọn thay thế. Tiếp tục?'))return;render(await call('attachVideo',{id:row.job.id}));});
+  row.upload.title='Tự thêm video cho cảnh này (đã tạo ở nơi khác): chọn file MP4 / WebM, tool đặt tên theo số cảnh và coi cảnh là đã xong.';
   row.remove=action('Xóa',async()=>render(await call('remove',row.job.id)));
   row.regenerate=action('Tạo lại',async()=>render(await call('regenerate',row.job.id)));
   row.regenerate.title='Tạo lại cảnh này; giữ video cũ.';
@@ -175,6 +177,7 @@ function updateCard(row,job,index){
   row.reveal.hidden=!(job.output||job.previousOutput);
   row.cancelBtn.hidden=row.restartBtn.hidden=job.status!=='running';row.cancelBtn.disabled=row.restartBtn.disabled=Boolean(state.stopping||state.merging||state.packaging);
   row.otherBtn.hidden=job.status!=='running'||!(Number(state.settings.accountCount)>1);row.otherBtn.disabled=row.cancelBtn.disabled;
+  row.upload.hidden=photo||job.kind==='image'||job.status==='completed';row.upload.disabled=Boolean(state.stopping||state.merging||state.packaging);
   row.regenerate.hidden=job.status!=='completed';row.regenerate.disabled=Boolean(state.active||state.starting||state.stopping||state.testing||state.merging||state.packaging);
   const recoverable=['failed','interrupted'].includes(job.status)&&Boolean(job.mayHaveSubmitted||job.submittedAt||job.resultReadyAt);
   row.recover.hidden=!recoverable;row.recover.disabled=Boolean(state.active||state.starting||state.stopping||state.merging||state.packaging);

@@ -46,6 +46,17 @@ const root=path.resolve(__dirname,'../src');
     await page.evaluate(()=>{window.s.settings.accountCount=1;window.push();});
     await page.waitForFunction(()=>![...document.querySelectorAll('[data-job-id=stuck] .previewActions button')].some(b=>/Thử TK khác/.test(b.textContent)&&!b.hidden));
     await page.evaluate(()=>{window.s.settings.accountCount=2;window.push();});
+    // «Tải video lên»: hiện ở cảnh chưa xong (kể cả đang chạy), không hiện ở cảnh đã xong; cảnh đang chạy hỏi xác nhận trước
+    const up=id=>page.locator(`[data-job-id=${id}] .cardActions button`).filter({hasText:/^Tải video lên$/});
+    for(const id of ['stuck','busy','next'])assert.equal(await up(id).isVisible(),true,id);
+    assert.equal(await up('done').isVisible(),false);
+    const before=dialogs.length;
+    accept=false;await up('stuck').click();
+    assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='attachVideo').length),0,'từ chối xác nhận thì chưa mở hộp chọn file');
+    accept=true;await up('stuck').click();
+    await up('next').click();
+    assert.deepEqual(await page.evaluate(()=>window.calls.filter(c=>c.name==='attachVideo').map(c=>c.data)),[{id:'stuck'},{id:'next'}]);
+    assert.equal(dialogs.length,before+2,'cảnh đang chạy hỏi xác nhận, cảnh đang chờ thì không');
     // đang dừng cả hàng đợi -> nút khóa
     await page.evaluate(()=>{window.s.stopping=true;window.push();});
     assert.equal(await btn('stuck',/^Dừng cảnh này$/).isDisabled(),true);assert.equal(await btn('busy',/^Tạo lại ngay$/).isDisabled(),true);

@@ -145,6 +145,7 @@ Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang 
 ## Update 1.7.4
 - **Nút «Thử TK khác» trên thẻ cảnh đang chạy**: khi một tài khoản hết lượt tạo video, cảnh kẹt ở tài khoản đó, bấm nút này để dừng cảnh ở tài khoản hiện tại và gửi lại prompt sang tài khoản khác (cần chạy song song từ 2 tài khoản). Cảnh nhớ tài khoản vừa hỏng và tránh nó; nếu mọi tài khoản đều đã thử thì thử lại từ đầu. Chạy lần lượt cũng chọn tài khoản kế tiếp không nằm trong danh sách tránh.
 - Trình duyệt / tài khoản rảnh không còn tự nghỉ khi tài khoản kia còn đang chạy cảnh. Trước đây, hết cảnh chờ thì tài khoản rảnh thoát, nên «Tạo lại ngay» chỉ gửi lại đúng tài khoản đang kẹt.
+- **Nút «Tải video lên» trên thẻ cảnh chưa xong** (kể cả cảnh đang chờ Muse): tự tạo video cảnh đó ở nơi khác (vd đăng nhập tài khoản khác trên web Muse), rồi chọn file MP4 / WebM. Tool sao chép file (file gốc còn nguyên), đặt tên theo số cảnh (vd `039.mp4`) trong thư mục lưu và coi cảnh là đã xong để ghép phim như cảnh thường. Cảnh đang chờ thì được dừng ở Muse trước. File không phải MP4 / WebM đầy đủ bị từ chối.
 - Chưa có tự phát hiện «hết lượt»: tool chưa biết Muse báo hết lượt bằng dòng chữ nào nên chưa tự chuyển. Hiện bấm tay nút «Thử TK khác». Chưa thử với Muse thật (đã kiểm bằng test hàng đợi và thử giao diện).
 
 ## Update 1.7.3

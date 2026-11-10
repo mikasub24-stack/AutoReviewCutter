@@ -350,6 +350,28 @@ test('Thử TK khác: cảnh khác vẫn chạy bình thường; khi đã tránh
   assert.deepEqual(two.jobs.map(j => j.status), ['completed', 'completed', 'completed', 'completed']);
   assert.deepEqual(slots.filter(x => x[0] === 'stuck').map(x => x[1]), [1, 0], 'kẹt ở TK 2 thì lần sau sang TK 1');
 });
+test('Tải video lên: cảnh chưa xong thành «đã xong» với file người dùng chọn, không gửi gì tới Muse; cảnh đang chạy / đã xong / ảnh bị từ chối', async () => {
+  const ran = [];
+  const q = new Queue({ ...base, concurrency: 1, run: async j => { ran.push(j.prompt); return j.prompt + '.mp4'; } });
+  await q.add([{ prompt: 'a', kind: 'story', number: 1 }, { prompt: 'b', kind: 'story', number: 2 }]);
+  const [a, b] = q.jobs;
+  Object.assign(a, { status: 'interrupted', error: 'hết lượt', resumeMode: 'resubmit', avoidAccounts: [1], late: true, account: 1, mayHaveSubmitted: true });
+  await q.attachManual(a.id, 'C:/Videos/KeChuyen/001.mp4');
+  assert.equal(a.status, 'completed'); assert.equal(a.output, 'C:/Videos/KeChuyen/001.mp4'); assert.deepEqual(a.outputs, ['C:/Videos/KeChuyen/001.mp4']);
+  assert.equal(a.error, ''); assert.equal(a.progress, 100); assert.equal(a.manual, true);
+  assert.equal(a.resumeMode, undefined); assert.equal(a.avoidAccounts, undefined); assert.equal(a.late, undefined);
+  await assert.rejects(() => q.attachManual(a.id, 'x.mp4'), /đã có video/);
+  await assert.rejects(() => q.attachManual('khong-co', 'x.mp4'), /Chỉ thêm video/);
+  b.status = 'running';
+  await assert.rejects(() => q.attachManual(b.id, 'x.mp4'), /Dừng cảnh này trước/);
+  b.status = 'pending';
+  await assert.rejects(() => q.attachManual(b.id, ''), /Thiếu đường dẫn/);
+  await q.attachManual(b.id, 'C:/Videos/KeChuyen/002.mp4');
+  await q.start(); assert.deepEqual(ran, [], 'cảnh đã có video thủ công không bị chạy lại');
+  const photo = new Queue({ ...base, concurrency: 1, run: async () => 'x' });
+  await photo.add([{ prompt: 'i', kind: 'image' }]);
+  await assert.rejects(() => photo.attachManual(photo.jobs[0].id, 'x.png'), /Chỉ thêm video/);
+});
 test('Dừng / Tạo lại riêng cảnh: đợi lệnh dừng trong Muse xong rồi mới trả chỗ cho lượt gửi sau', async () => {
   const order = []; let first = true;
   const q = new Queue({ ...base, concurrency: 1, run: async (j, slot, signal) => {

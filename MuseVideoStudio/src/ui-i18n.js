@@ -440,6 +440,10 @@ Tạo lại cảnh này; giữ video cũ.|Regenerate this scene; keep the previo
 Dừng cảnh này|Stop this scene
 Tạo lại ngay|Restart now
 Thử TK khác|Try another account
+Tải video lên|Upload video
+Tự thêm video cho cảnh này (đã tạo ở nơi khác): chọn file MP4 / WebM, tool đặt tên theo số cảnh và coi cảnh là đã xong.|Add a video for this scene yourself (made elsewhere): pick an MP4 / WebM file; the tool names it by scene number and marks the scene done.
+Cảnh này đang chờ Muse. Chọn video sẽ dừng cảnh ở Muse và dùng video bạn chọn thay thế. Tiếp tục?|This scene is waiting on Muse. Choosing a video stops it in Muse and uses your file instead. Continue?
+Đã thêm video thủ công|Video added manually
 Dừng chờ ở tài khoản này và gửi cảnh sang tài khoản khác (khi tài khoản hết lượt tạo video).|Stop waiting on this account and send the scene to another account (when this account is out of video credits).
 Bấm dừng cảnh này ở tài khoản hiện tại rồi gửi lại prompt sang một tài khoản khác? Dùng khi tài khoản này đã hết lượt tạo video. Nếu Muse đang tạo dở thì phần đó bị bỏ.|Stop this scene on the current account and resend its prompt to a different account? Use this when the account is out of video credits. Anything Muse is still generating for it is discarded.
 Không chờ cảnh này nữa; tab khác vẫn chạy tiếp.|Stop waiting for this scene; other tabs keep running.
