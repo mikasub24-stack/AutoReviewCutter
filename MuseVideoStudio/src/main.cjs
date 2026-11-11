@@ -18,6 +18,8 @@ const {createLicense,deviceCode}=require('./license.cjs');
 const {payment}=require('./payment.cjs');
 const {createVoiceService}=require('./story-voice.cjs');
 const {createStoryService,storyFolder,freeStoryId}=require('./story-service.cjs');
+const {restoreFolder,extractLastFrame,frameSimilarity,assembleRestore,MUSIC_EXT}=require('./restore-render.cjs');
+const restorePlan=require('./restore-plan.js');
 const {createStoryAnalyzer}=require('./story-analyze.cjs');
 let licenseManager,paymentDetails,voiceService,storyService,storyAnalyzer;
 const { mergeVideos, checkTools } = require('./merge.cjs');
@@ -43,11 +45,11 @@ const browserTests=new Map();
 const nextDispatchAt=new Map();
 const MAX_ACCOUNTS = 10;
 const resettingAccounts = new Set(), accountResets = new Map();
-const defaults = { language:'en', accountSessionIds:{}, dispatchMode:'parallel', cooldownSeconds:3, messageSelector:'', stopSelector:'', attachmentReadySelector:'', browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', image: 'img', timeoutMinutes: 15 };
+const defaults = { language:'en', accountSessionIds:{}, dispatchMode:'parallel', cooldownSeconds:3, messageSelector:'', stopSelector:'', attachmentReadySelector:'', browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', restoreStories: {}, accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', image: 'img', timeoutMinutes: 15 };
 function ui(vi,en){return settings?.language==='vi'?vi:en;}
 async function atomic(file, data) { await fs.writeFile(file + '.tmp', JSON.stringify(data, null, 2)); await fs.rename(file + '.tmp', file); }
 function snapshot() {
-  return {version:app.getVersion?.()||require('../package.json').version,jobs:queue.jobs,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,story:{...(storyService?.status()||{}),analyze:storyAnalyzer?.status()||{},voice:voiceService?.status()||{}},
+  return {version:app.getVersion?.()||require('../package.json').version,jobs:queue.jobs,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,restore:{...restoreState,stories:settings.restoreStories||{}},story:{...(storyService?.status()||{}),analyze:storyAnalyzer?.status()||{},voice:voiceService?.status()||{}},
     accounts:Array.from({length:Math.max(settings.accountCount,MAX_ACCOUNTS)},(_,index)=>{
       const browser=browsers.get(index),external=settings.browserChoice !== 'builtin';
       return {index,opened:Boolean(browser && !browser.isDestroyed()),rememberSession:external ? Boolean(browser?.external && browser.isSessionEnabled()) : profiles.get(index)?.store.isEnabled() || false,warning:external ? browserWarnings.get(index) || '' : profiles.get(index)?.warning || ''};
@@ -229,8 +231,30 @@ async function rightClickAt(muse,x,y) {
 function triggerTrackedDownload(muse,id,signal,extra={}) {
   return triggerDownload({id,signal,delay,stopped:stoppedError,abortable,call:arg=>dom(muse,downloadAction,arg),rightClick:(x,y)=>rightClickAt(muse,x,y),...extra});
 }
+// Thư mục lưu clip: kể chuyện → KeChuyen/<truyện>, dọn nhà → DonNha/<truyện>, còn lại → thư mục lưu chung.
+const jobFolder=job=>job.kind==='story'?storyFolder(settings.output,job.storyId):job.kind==='restore'?restoreFolder(settings.output,job.storyId):settings.output;
+// Tab «Dọn nhà · Sinh tồn»: ảnh đầu của cảnh kế tiếp là khung cuối THẬT của clip này.
+async function saveLastFrame(job,clip){
+  const out=path.join(restoreFolder(settings.output,job.storyId),'khung-cuoi',String(job.number).padStart(3,'0')+'-cuoi.png');
+  return extractLastFrame({ffmpeg:settings.ffmpeg,clip,out});
+}
+// Giữ đồng nhất: khung ĐẦU của clip phải giống ảnh đã đưa cho Muse (khung cuối clip trước). Nếu Muse bỏ qua ảnh và dựng cảnh / nhà / người khác thì tự tạo lại
+// (tối đa DRIFT_TRIES lần để khỏi tốn lượt vô hạn; hết lần thì giữ clip và ghi chú). Không so được (thiếu FFmpeg…) thì không chặn.
+const DRIFT_MIN=0.4,DRIFT_TRIES=2;
+async function restoreFrameGuard(job,clip){
+  const ref=job.references?.[0]||job.image;
+  if(!ref)return;
+  let sim;
+  try{sim=await frameSimilarity({ffmpeg:settings.ffmpeg||'ffmpeg',clip,image:ref});}catch{return;}
+  job.startMatch=Math.round(sim*100)/100;
+  if(sim>=DRIFT_MIN){delete job.driftNote;return;}
+  if((job.driftTries||0)>=DRIFT_TRIES){job.driftNote=`Khung đầu chỉ giống ảnh đưa vào ${Math.round(sim*100)}%: cảnh này có thể lệch so với cảnh trước.`;return;}
+  job.driftTries=(job.driftTries||0)+1;
+  await fs.rm(clip,{force:true}).catch(()=>{});
+  throw Error(`Cảnh không bắt đầu từ ảnh đã đưa (giống ${Math.round(sim*100)}%): Muse đã dựng cảnh hoặc người khác. Tự tạo lại lần ${job.driftTries}/${DRIFT_TRIES}.`);
+}
 async function download(muse,job,signal) {
-  const outputDir=job.kind==='story'?storyFolder(settings.output,job.storyId):settings.output;
+  const outputDir=jobFolder(job);
   const temporary=path.join(outputDir,`.muse-${job.id}-${randomUUID().slice(0,8)}.part`);
   await fs.mkdir(outputDir,{recursive:true});
   let lastNotify=0;
@@ -245,13 +269,16 @@ async function download(muse,job,signal) {
     const format=await validateVideo(temporary);
     if(signal.aborted)throw stoppedError();
     const target=await saveOrderedOutput(temporary,outputDir,job,format.extension);
-    job.downloadCompletedAt=new Date().toISOString();return target;
+    job.downloadCompletedAt=new Date().toISOString();
+    if(job.kind==='restore'&&job.phase==='clip')await restoreFrameGuard(job,target);
+    if(job.kind==='restore')job.lastFrame=await saveLastFrame(job,target);
+    return target;
   }catch(error){await fs.rm(temporary,{force:true}).catch(()=>{});throw error;}
 }
 const imageDirectory=()=>path.join(settings.output,'Anh');
 // Việc «ảnh» của chế độ Mẹo vặt (nằm trong hàng đợi kể chuyện): ảnh lưu cạnh clip của truyện, thư mục «anh».
 const isPhoto=job=>job.kind==='image'||job.phase==='image';
-const photoDirectory=job=>job.kind==='story'?path.join(storyFolder(settings.output,job.storyId),'anh'):imageDirectory();
+const photoDirectory=job=>job.kind==='story'?path.join(storyFolder(settings.output,job.storyId),'anh'):job.kind==='restore'?path.join(restoreFolder(settings.output,job.storyId),'anh'):imageDirectory();
 async function fetchImageInMain(muse,url,signal){
   // Built-in browser only: the main process reads the picture with the account's own
   // cookies, which also works when the page's CSP blocks fetch() to the image CDN.
@@ -316,7 +343,7 @@ async function runJob(job,worker,signal,{recover=false}={}) {
   check();job.account=slot+1;assertMuse(muse);muse.pinPage?.(job.id);
   const profileKey=accountProfileKey(slot),currentSession=sessionId(profileKey);
   if(recover&&((job.submissionProfileKey&&job.submissionProfileKey!==profileKey)||(job.submissionSessionId&&job.submissionSessionId!==currentSession)))throw Error('Mở lại đúng trình duyệt và phiên tài khoản đã gửi prompt.');
-  if(!recover)await step(licenseManager.ensureAllowed());
+  if(!recover)await step(job.kind==='restore'?licenseManager.requireLongTerm():licenseManager.ensureAllowed());
   if(!settings.output)throw Error('Chọn thư mục lưu video trước.');
   const stage=(value,message)=>{check();job.stage=value;job.stageMessage=message;notify();};
   const input=recover?(job.lockedInput||{prompt:job.prompt,references:[]}):await step(lockInput(job,path.join(app.getPath('userData'),'locked-references')));
@@ -470,7 +497,7 @@ async function remoteStopJob(job){
 async function stopAll(){
   if(stopping){while(stopping)await delay(50);return snapshot();}
   storyAnalyzer?.cancel();
-  stopping=true;runEpoch++;starting=false;probeController?.abort();queue.pause();
+  stopping=true;lastStopAt=Date.now();runEpoch++;starting=false;probeController?.abort();queue.pause();
   const probes=[...browserTests.values()].filter(t=>testing&&t.mayHaveSubmitted&&t.status!=='ready').map(t=>({id:t.id,trackerId:t.id,account:t.index+1,mayHaveSubmitted:true}));
   const jobs=[...queue.jobs.filter(j=>!probes.some(t=>t.account===j.account)&&(j.status==='running'||(['failed','interrupted'].includes(j.status)&&j.mayHaveSubmitted&&!['confirmed','ui-stopped'].includes(j.remoteStop?.state)))),...probes];notify();
   const requests=jobs.map(remoteStopJob);
@@ -512,6 +539,75 @@ async function addUserFont(source){
   const family=fontFamily(source);
   await fs.writeFile(path.join(fontDirectory(),family+extension),bytes);
   return {family,bytes};
+}
+// ---- Tab «Dọn nhà · Sinh tồn»: dựng các clip đã xong thành một video, tự động khi hàng đợi xong (không cần bấm gì).
+let restoreState={busy:false,progress:'',error:'',storyId:''};
+const restoreClips=storyId=>queue.jobs.filter(j=>j.kind==='restore'&&j.phase==='clip'&&j.storyId===storyId).sort((a,b)=>(a.number||0)-(b.number||0));
+const restoreDone=clips=>clips.length>0&&clips.every(j=>j.status==='completed'&&j.output);
+function pruneRestoreStories(){
+  const ids=new Set(queue.jobs.filter(j=>j.kind==='restore').map(j=>j.storyId));
+  const all=settings.restoreStories||(settings.restoreStories={});
+  for(const id of Object.keys(all))if(!ids.has(id))delete all[id];
+}
+async function freeRestoreId(base){
+  const root=String(base||'').replace(/[^\w-]/g,'').slice(0,40).replace(/^-+|-+$/g,'')||'DonNha';
+  const used=new Set(queue.jobs.map(j=>j.storyId).filter(Boolean));
+  for(let n=1;n<=999;n++){
+    const id=n===1?root:`${root}-${n}`;
+    if(used.has(id))continue;
+    try{await fs.access(restoreFolder(settings.output,id));continue;}catch{}
+    return id;
+  }
+  return `${root}-${Date.now().toString(36)}`;
+}
+async function buildRestoreStory(storyId){
+  const meta=settings.restoreStories?.[storyId];
+  if(!meta)throw Error('Không thấy thông tin video này.');
+  const clips=restoreClips(storyId);
+  if(!restoreDone(clips))throw Error('Chỉ dựng video khi mọi cảnh đã xong.');
+  restoreState={busy:true,progress:'Chuẩn bị dựng video…',error:'',storyId};notify();
+  try{
+    await licenseManager.requireLongTerm();
+    const file=await assembleRestore({clips:clips.map(j=>j.output),dir:restoreFolder(settings.output,storyId),name:meta.name||storyId,ffmpeg:settings.ffmpeg,aspect:meta.aspect,music:meta.music,onProgress:t=>{restoreState.progress=t;notify();}});
+    Object.assign(meta,{output:file,builtAt:Date.now(),clipSig:clips.map(j=>j.output).join('|')});
+    restoreState={busy:false,progress:'Video đã dựng xong',error:'',storyId};
+  }catch(e){restoreState={busy:false,progress:'',error:e.message,storyId};}
+  finally{await save();notify();}
+}
+// Sau khi hàng đợi chạy xong: truyện nào đủ cảnh và chưa dựng đúng bản clip này thì dựng.
+async function buildRestoreStories({auto=false}={}){
+  if(restoreState.busy||merging||packaging)return;
+  for(const [storyId,meta] of Object.entries(settings.restoreStories||{})){
+    const clips=restoreClips(storyId);
+    if(!restoreDone(clips))continue;
+    if(auto&&(!meta.auto||meta.clipSig===clips.map(j=>j.output).join('|')))continue;
+    await buildRestoreStory(storyId);
+  }
+}
+// Video dài chạy nhiều giờ: một cảnh lỗi (mạng, Muse báo bận…) không được làm đứng cả chuỗi. Cảnh lỗi tự thử lại tối đa 3 lần, mỗi lần chờ 90 giây.
+// Không thử lại lỗi giấy phép / thiếu FFmpeg (thử lại cũng vô ích), và không đụng việc người dùng đã bấm Dừng (cảnh «bị gián đoạn», không phải «lỗi»).
+const RESTORE_RETRIES=3,RESTORE_RETRY_WAIT=90000;
+let restoreRetrying=false,lastStopAt=0;
+async function restoreAutoRetry({retry,start}){
+  if(restoreRetrying||stopping||flushingQuit||queue.active||starting||merging||packaging)return;
+  const job=queue.jobs.find(j=>j.kind==='restore'&&j.status==='failed'&&(j.autoRetries||0)<RESTORE_RETRIES&&!/gói Năm|Vĩnh viễn|FFmpeg|ffprobe|key/i.test(j.error||''));
+  if(!job||lastStopAt>=(Date.parse(job.finishedAt||'')||0))return;       // người dùng đã bấm Dừng sau khi cảnh lỗi: để yên
+  restoreRetrying=true;
+  try{
+    job.autoRetries=(job.autoRetries||0)+1;
+    const why=job.error,t0=Date.now();
+    // Muse chặn vì nội dung (người nổi tiếng, nhân vật, chính sách…): gửi lại y nguyên vẫn bị chặn, nên đổi sang prompt an toàn hơn (người nhỏ / sau lưng, rồi bỏ hẳn người).
+    const blocked=restorePlan.isPolicyError(why);
+    if(blocked)await queue.editPrompt(job.id,restorePlan.safeRetryPrompt(job.prompt,job.autoRetries,{image:job.phase==='image'})).catch(()=>{});
+    job.stageMessage=blocked
+      ?`Muse chặn cảnh này vì nội dung: tự đổi prompt an toàn hơn và thử lại lần ${job.autoRetries}/${RESTORE_RETRIES} sau ${RESTORE_RETRY_WAIT/1000} giây · ${why}`
+      :`Cảnh lỗi: tự thử lại lần ${job.autoRetries}/${RESTORE_RETRIES} sau ${RESTORE_RETRY_WAIT/1000} giây · ${why}`;notify();
+    await delay(RESTORE_RETRY_WAIT);
+    if(stopping||flushingQuit||queue.active||starting||job.status!=='failed'||lastStopAt>=t0)return;
+    await retry(job.id);
+    await start();
+  }catch(e){job.stageMessage='Tự thử lại không được: '+e.message;}
+  finally{restoreRetrying=false;notify();}
 }
 function invalidateOutputs() {
   mergedOutput='';mergeProgress='';mergeError='';editPackageDir='';packageProgress='';packageError='';
@@ -615,9 +711,9 @@ app.whenReady().then(async () => {
     },
     language:async value=>{if(!['vi','en'].includes(value))throw Error('Unsupported language');settings.language=value;await save();notify();return snapshot();},
     testBrowsers,
-    openOutput:async data=>{if(!settings.output)throw Error('Chọn thư mục lưu video trước.');const folder=data?.kind==='image'?imageDirectory():data?.kind==='story'?path.join(settings.output,'KeChuyen'):settings.output;await fs.mkdir(folder,{recursive:true});const error=await shell.openPath(folder);if(error)throw Error(error);},
+    openOutput:async data=>{if(!settings.output)throw Error('Chọn thư mục lưu video trước.');const folder=data?.kind==='image'?imageDirectory():data?.kind==='story'?path.join(settings.output,'KeChuyen'):data?.kind==='restore'?path.join(settings.output,'DonNha'):settings.output;await fs.mkdir(folder,{recursive:true});const error=await shell.openPath(folder);if(error)throw Error(error);},
     activateKey:async token=>{await licenseManager.activate(token);notify();return snapshot();},
-    add: async data => { if (merging || packaging) throw Error('Chờ xử lý đầu ra xong trước khi thêm prompt.'); if(!(Array.isArray(data)&&data.length&&data.every(j=>j?.kind==='image'||j?.kind==='story')))invalidateOutputs(); await queue.add(data); return snapshot(); },
+    add: async data => { if (merging || packaging) throw Error('Chờ xử lý đầu ra xong trước khi thêm prompt.'); if(Array.isArray(data)&&data.some(j=>j?.kind==='restore'))await licenseManager.requireLongTerm(); if(!(Array.isArray(data)&&data.length&&data.every(j=>j?.kind==='image'||j?.kind==='story'||j?.kind==='restore')))invalidateOutputs(); await queue.add(data); return snapshot(); },
     retryDownload: async id=>{
       if(stopping||queue.active||merging||packaging||starting||resettingAccounts.size)throw Error('Chờ xử lý hiện tại hoàn tất.');
       invalidateOutputs();queue.recover(id,(job,signal)=>runJob(job,0,signal,{recover:true})).catch(e=>dialog.showErrorBox(ui('Lấy video đã tạo','Recover existing video'),e.message)).finally(notify);return snapshot();
@@ -657,7 +753,8 @@ app.whenReady().then(async () => {
       const picked=await dialog.showOpenDialog(main,{title:ui('Chọn video của cảnh này (MP4 hoặc WebM)','Choose the video for this scene (MP4 or WebM)'),properties:['openFile'],filters:[{name:ui('Video MP4 / WebM','MP4 / WebM video'),extensions:['mp4','webm']}]});
       if(picked.canceled||!picked.filePaths?.[0])return snapshot();
       let job=find();
-      const outputDir=job.kind==='story'?storyFolder(settings.output,job.storyId):settings.output;
+      if(job.kind==='restore')await licenseManager.requireLongTerm();
+      const outputDir=jobFolder(job);
       await fs.mkdir(outputDir,{recursive:true});
       const temporary=path.join(outputDir,`.muse-${job.id}-${randomUUID().slice(0,8)}.part`);
       let target='';
@@ -675,7 +772,9 @@ app.whenReady().then(async () => {
           browsers.get(Number(job.account)-1)?.releasePage?.(id);
         }
         invalidateOutputs();
+        const lastFrame=job.kind==='restore'?await saveLastFrame(job,target):'';
         await queue.attachManual(id,target);
+        if(lastFrame){const done=queue.jobs.find(j=>j.id===id);if(done)done.lastFrame=lastFrame;}
       }catch(error){
         await fs.rm(temporary,{force:true}).catch(()=>{});
         if(target)await fs.rm(target,{force:true}).catch(()=>{});
@@ -713,7 +812,7 @@ app.whenReady().then(async () => {
     },
     logoutAccount: async index => {await logoutAccount(Number(index??0));return snapshot();},
     start: async data => {
-      const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':'video';
+      const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':data?.kind==='restore'?'restore':'video';
       if(merging || packaging) throw Error('Đang xử lý đầu ra video.');
       if(storyAnalyzer?.busy) throw Error('Muse đang phân tích câu chuyện. Chờ xong hoặc bấm Dừng phân tích.');
       if(resettingAccounts.size) throw Error('Chờ đăng xuất tài khoản hoàn tất trước khi chạy.');
@@ -722,7 +821,8 @@ app.whenReady().then(async () => {
       try {
         if(testing){probeController?.abort();await Promise.allSettled([...probeMutations]);await probeSettled;}
         if(epoch!==runEpoch || flushingQuit)return snapshot();
-        await licenseManager.ensureAllowed();
+        if(kind==='restore'){await licenseManager.requireLongTerm();await checkTools(settings.ffmpeg).catch(()=>{throw Error('Tab «Dọn nhà · Sinh tồn» cần FFmpeg để nối cảnh và dựng video. Chọn ffmpeg.exe (cùng thư mục ffprobe.exe) ở «Kết nối & cài đặt».');});}
+        else await licenseManager.ensureAllowed();
         if(epoch!==runEpoch || flushingQuit)return snapshot();
         await Promise.all(Array.from({length:settings.accountCount},async(_,index)=>{
           if(epoch!==runEpoch||flushingQuit)return;
@@ -742,10 +842,64 @@ app.whenReady().then(async () => {
           if(kind==='video' && !queue.paused && videos.length && videos.every(j=>j.status==='completed')) {
             if(settings.autoMerge) await mergeProject();else if(settings.autoPackage) await packageProject();
           }
+          if(kind==='restore' && !queue.paused && !flushingQuit) await buildRestoreStories({auto:true});
+          if(kind==='restore' && queue.paused && !flushingQuit) void restoreAutoRetry({retry:id=>handlers.retry(id),start:()=>handlers.start({kind:'restore'})});
         }).catch(e=>dialog.showErrorBox(ui('Lỗi xử lý hàng đợi','Queue processing error'),e.message)).finally(notify);
         return snapshot();
       } catch(e){startError=e.message;throw e;} finally {if(epoch===runEpoch)starting=false;notify();}
     },
+    // Tab «Dọn nhà · Sinh tồn»: thêm các cảnh (đã lập sẵn ở giao diện), nhớ cách dựng video, rồi tự chạy nếu được chọn.
+    restoreCreate: async data => {
+      if(merging||packaging)throw Error('Chờ xử lý đầu ra xong trước khi thêm cảnh.');
+      await licenseManager.requireLongTerm();
+      if(!settings.output)throw Error('Chọn thư mục lưu video trước.');
+      const jobs=Array.isArray(data?.jobs)?JSON.parse(JSON.stringify(data.jobs)):[];
+      if(!jobs.length||jobs.length>740||jobs.some(j=>!j||j.kind!=='restore'||typeof j.prompt!=='string'))throw Error('Không có cảnh hợp lệ để thêm.');
+      const meta=data?.meta||{};
+      const storyId=await freeRestoreId(String(data?.idBase||'DonNha'));
+      const folder=restoreFolder(settings.output,storyId);
+      // Ảnh gốc của người dùng: sao chép vào thư mục video để xóa / đổi tên ảnh sau này không làm hỏng các cảnh sau.
+      const photos=new Map();
+      for(const j of jobs)for(const r of j.refList||[])if(r?.file&&!photos.has(r.file)){
+        if(typeof r.file!=='string'||!/\.(png|jpe?g|webp)$/i.test(r.file))throw Error('Ảnh gốc phải là PNG, JPG hoặc WEBP.');
+        const stat=await fs.stat(r.file).catch(()=>null);
+        if(!stat?.isFile()||stat.size>62914560)throw Error('Không đọc được ảnh gốc (hoặc ảnh lớn hơn 60 MB).');
+        await fs.mkdir(path.join(folder,'anh'),{recursive:true});
+        const copy=path.join(folder,'anh','000-goc'+path.extname(r.file).toLowerCase());
+        await fs.copyFile(r.file,copy);photos.set(r.file,copy);
+      }
+      for(const j of jobs){j.storyId=storyId;for(const r of j.refList||[])if(r?.file)r.file=photos.get(r.file);}
+      for(const j of jobs){const first=(j.refList||[]).find(r=>r.file);if(first&&!j.needs?.length)j.references=[first.file];}
+      let music='';
+      if(typeof meta.music==='string'&&meta.music){
+        if(!MUSIC_EXT.has(path.extname(meta.music).toLowerCase())||!(await fs.stat(meta.music).catch(()=>null))?.isFile())throw Error('Không đọc được tệp nhạc nền.');
+        await fs.mkdir(folder,{recursive:true});
+        music=path.join(folder,'nhac-nen'+path.extname(meta.music).toLowerCase());await fs.copyFile(meta.music,music);
+      }
+      const all=settings.restoreStories||(settings.restoreStories={});
+      all[storyId]={name:String(meta.name||storyId).slice(0,120),aspect:['16:9','9:16'].includes(meta.aspect)?meta.aspect:'16:9',music,auto:meta.auto!==false,theme:String(meta.theme||'').slice(0,40),createdAt:Date.now()};
+      for(const id of Object.keys(all).slice(0,Math.max(0,Object.keys(all).length-40)))delete all[id];
+      await queue.add(jobs);
+      await save();notify();
+      let startError2='';
+      if(all[storyId].auto&&!queue.active&&!starting){try{await handlers.start({kind:'restore'});}catch(e){startError2=e.message;}}
+      return {storyId,startError:startError2};
+    },
+    // Dựng (lại) video từ các cảnh đã xong, ví dụ sau khi «Tạo lại» một cảnh.
+    restoreBuild: async data => {
+      if(queue.active||starting||merging||packaging||restoreState.busy)throw Error('Chờ xử lý hiện tại hoàn tất.');
+      const meta=settings.restoreStories?.[String(data?.storyId||'')];
+      if(!meta)throw Error('Không thấy video này.');
+      if(typeof data?.music==='string'&&(data.music===''||MUSIC_EXT.has(path.extname(data.music).toLowerCase()))){
+        if(data.music){if(!(await fs.stat(data.music).catch(()=>null))?.isFile())throw Error('Không đọc được tệp nhạc nền.');
+          const copy=path.join(restoreFolder(settings.output,data.storyId),'nhac-nen'+path.extname(data.music).toLowerCase());await fs.mkdir(path.dirname(copy),{recursive:true});await fs.copyFile(data.music,copy);meta.music=copy;}
+        else meta.music='';
+      }
+      await buildRestoreStory(String(data.storyId));
+      return snapshot();
+    },
+    restoreReveal: async data => { const out=settings.restoreStories?.[String(data?.storyId||'')]?.output;if(out)shell.showItemInFolder(out);return true; },
+    chooseMusic: async () => { const r=await dialog.showOpenDialog(main,{properties:['openFile'],filters:[{name:ui('Nhạc nền','Background music'),extensions:['mp3','wav','m4a','aac','ogg','flac']}]});return r.canceled?'':r.filePaths[0]; },
     merge: async () => { await mergeProject(); return snapshot(); },
     packageClips: async () => { await packageProject(); return snapshot(); },
     openPackage: () => { if(editPackageDir) return shell.openPath(editPackageDir); },
@@ -761,8 +915,8 @@ app.whenReady().then(async () => {
     },
     pause: stopAll,
     stop: stopAll,
-    clearPending: async data=>{if(merging||packaging)throw Error('Chờ xử lý đầu ra hoàn tất.');const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':data?.kind==='video'?'video':'';if(kind==='video'||kind==='')invalidateOutputs();await queue.clearPending(kind);return snapshot();},
-    clearList: async data=>{if(stopping||merging||packaging)throw Error('Chờ xử lý đầu ra hoàn tất.');const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':data?.kind==='video'?'video':'';await stopAll();for(const job of queue.jobs.filter(j=>!kind||j.kind===kind)){browsers.get(Number(job.account)-1)?.releasePage?.(job.id);if(job.trackerId)void dom(browsers.get(Number(job.account)-1),endTracking,{id:job.trackerId}).catch(()=>{});}await queue.clearAll(kind);if(kind==='video'||kind==='')invalidateOutputs();await save();notify();return snapshot();},
+    clearPending: async data=>{if(merging||packaging)throw Error('Chờ xử lý đầu ra hoàn tất.');const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':data?.kind==='restore'?'restore':data?.kind==='video'?'video':'';if(kind==='video'||kind==='')invalidateOutputs();await queue.clearPending(kind);return snapshot();},
+    clearList: async data=>{if(stopping||merging||packaging)throw Error('Chờ xử lý đầu ra hoàn tất.');const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':data?.kind==='restore'?'restore':data?.kind==='video'?'video':'';await stopAll();for(const job of queue.jobs.filter(j=>!kind||j.kind===kind)){browsers.get(Number(job.account)-1)?.releasePage?.(job.id);if(job.trackerId)void dom(browsers.get(Number(job.account)-1),endTracking,{id:job.trackerId}).catch(()=>{});}await queue.clearAll(kind);if(kind==='video'||kind==='')invalidateOutputs();if(kind==='restore'||kind==='')pruneRestoreStories();await save();notify();return snapshot();},
     applyReferences: async data=>{
       if(data?.assignments){for(const row of data.assignments){const j=queue.jobs.find(x=>x.id===row.id&&x.status==='pending'&&!x.lockedInput);if(j){if(!Array.isArray(row.references)||row.references.some(x=>typeof x!=='string'))throw Error('Ảnh không hợp lệ.');j.references=[...row.references];j.image=j.references[0]||'';}}await queue.publish();}
       else await queue.applyReferences(data?.files||[]);return snapshot();

@@ -9,11 +9,25 @@ function abortable(promise,signal){
     Promise.resolve(promise).then(v=>{cleanup();resolve(v);},e=>{cleanup();reject(e);});
   });
 }
-const kindOf=k=>k==='image'?'image':k==='story'?'story':'video';
+const kindOf=k=>k==='image'?'image':k==='story'?'story':k==='restore'?'restore':'video';
+// Tab «Dọn nhà · Sinh tồn» (kind 'restore'): cảnh k chỉ chạy sau cảnh k-1, và ảnh đầu của nó là KHUNG CUỐI THẬT của cảnh k-1.
+//   needs   = [{phase,number}]            những việc cùng truyện phải xong trước
+//   refList = [{file}|{phase,number,part}] ảnh đính kèm: tệp có sẵn, ảnh đã lưu của việc đó, hoặc khung cuối (part:'lastFrame') của clip đó
+const PHASES=['image','clip'];
+function sanitizeNeeds(list){return Array.isArray(list)?list.filter(n=>n&&PHASES.includes(n.phase)&&Number.isInteger(n.number)).slice(0,6).map(n=>({phase:n.phase,number:n.number})):[];}
+function sanitizeRefs(list){
+  if(!Array.isArray(list))return [];
+  const out=[];
+  for(const r of list.slice(0,6)){
+    if(r&&typeof r.file==='string'&&r.file.trim())out.push({file:r.file});
+    else if(r&&PHASES.includes(r.phase)&&Number.isInteger(r.number))out.push(r.part==='lastFrame'?{phase:r.phase,number:r.number,part:'lastFrame'}:{phase:r.phase,number:r.number});
+  }
+  return out;
+}
 // Việc «ảnh» của chế độ Mẹo vặt nằm trong hàng đợi kể chuyện nhưng xử lý như tác vụ ảnh.
 const isPhoto=j=>j.kind==='image'||j.phase==='image';
 function resetRunFields(job, stage='pending') {
-  Object.assign(job,{stage,stageMessage:'',progress:null,downloadProgress:null,submissionProtocol:null,submissionReceipt:null,acknowledgedAt:null,confirmedResponseAt:null,submittedAt:null,mayHaveSubmitted:false,submissionProfileKey:null,submissionSessionId:null,resultReadyAt:null,downloadStartedAt:null,downloadCompletedAt:null,startedAt:null,finishedAt:null,error:'',output:''});
+  Object.assign(job,{stage,stageMessage:'',progress:null,downloadProgress:null,submissionProtocol:null,submissionReceipt:null,acknowledgedAt:null,confirmedResponseAt:null,submittedAt:null,mayHaveSubmitted:false,submissionProfileKey:null,submissionSessionId:null,resultReadyAt:null,downloadStartedAt:null,downloadCompletedAt:null,startedAt:null,finishedAt:null,error:'',output:'',lastFrame:''});
   job.account=undefined;
   return job;
 }
@@ -38,7 +52,7 @@ class Queue {
   async add(items){
     if(!Array.isArray(items)||!items.length||items.some(j=>typeof j.prompt!=='string'||!j.prompt.trim()))throw Error('Mỗi tác vụ cần một prompt.');
     const batchKind=kindOf(items[0]?.kind),nextOrder=Math.max(0,...this.jobs.filter(j=>j.kind===batchKind).map(j=>j.order||0));
-    this.jobs.push(...items.map((j,index)=>({order:nextOrder+index+1,id:randomUUID(),kind:kindOf(j.kind),storyId:typeof j.storyId==='string'?j.storyId.replace(/[^\w-]/g,'').slice(0,60):'',prompt:j.prompt.trim(),source:typeof j.source==='string'?j.source:'',phase:j.phase==='image'||j.phase==='clip'?j.phase:'',dependsOn:j.dependsOn==='image'?'image':'',title:typeof j.title==='string'?j.title:'',number:Number.isInteger(j.number)?j.number:null,voiceover:typeof j.voiceover==='string'?j.voiceover:'',durationSeconds:Number.isFinite(j.durationSeconds)&&j.durationSeconds>0?j.durationSeconds:null,image:j.image||j.references?.[0]||'',references:Array.isArray(j.references)?[...j.references]:j.image?[j.image]:[],status:'pending',stage:'pending',stageMessage:'',progress:null,downloadProgress:null,submissionProtocol:null,submissionReceipt:null,acknowledgedAt:null,confirmedResponseAt:null,submittedAt:null,mayHaveSubmitted:false,submissionProfileKey:null,submissionSessionId:null,resultReadyAt:null,downloadStartedAt:null,downloadCompletedAt:null,startedAt:null,finishedAt:null,error:'',output:'',createdAt:Date.now()})));
+    this.jobs.push(...items.map((j,index)=>({order:nextOrder+index+1,id:randomUUID(),kind:kindOf(j.kind),storyId:typeof j.storyId==='string'?j.storyId.replace(/[^\w-]/g,'').slice(0,60):'',prompt:j.prompt.trim(),source:typeof j.source==='string'?j.source:'',phase:j.phase==='image'||j.phase==='clip'?j.phase:'',dependsOn:j.dependsOn==='image'?'image':'',title:typeof j.title==='string'?j.title:'',number:Number.isInteger(j.number)?j.number:null,voiceover:typeof j.voiceover==='string'?j.voiceover:'',durationSeconds:Number.isFinite(j.durationSeconds)&&j.durationSeconds>0?j.durationSeconds:null,image:j.image||j.references?.[0]||'',references:Array.isArray(j.references)?[...j.references]:j.image?[j.image]:[],needs:sanitizeNeeds(j.needs),refList:sanitizeRefs(j.refList),status:'pending',stage:'pending',stageMessage:'',progress:null,downloadProgress:null,submissionProtocol:null,submissionReceipt:null,acknowledgedAt:null,confirmedResponseAt:null,submittedAt:null,mayHaveSubmitted:false,submissionProfileKey:null,submissionSessionId:null,resultReadyAt:null,downloadStartedAt:null,downloadCompletedAt:null,startedAt:null,finishedAt:null,error:'',output:'',createdAt:Date.now()})));
     await this.publish();
   }
   // Sửa prompt của cảnh chưa chạy / lỗi / bị gián đoạn. Cảnh đang chạy thì sửa qua cancelJob(…,'again',…,prompt) để dừng rồi gửi lại.
@@ -71,13 +85,22 @@ class Queue {
   async clearAll(kind){await this.stop();this.jobs=kind?this.jobs.filter(j=>j.kind!==kind):[];await this.publish();}
   async applyReferences(files){
     if(!Array.isArray(files)||files.some(x=>typeof x!=='string'||!x))throw Error('Ảnh tham chiếu không hợp lệ.');
-    for(const j of this.jobs)if(j.kind!=='story'&&j.status==='pending'&&!j.lockedInput){j.references=[...files];j.image=files[0]||'';}
+    for(const j of this.jobs)if(j.kind!=='story'&&j.kind!=='restore'&&j.status==='pending'&&!j.lockedInput){j.references=[...files];j.image=files[0]||'';}
     await this.publish();
   }
   // Clip của chế độ Mẹo vặt (dependsOn:'image') chỉ chạy sau khi ảnh cùng số cảnh trong cùng truyện đã lưu xong.
   imageOf(job){return job.dependsOn==='image'?this.jobs.find(d=>d!==job&&d.kind===job.kind&&d.storyId===job.storyId&&d.phase==='image'&&d.number===job.number):null;}
   // 'ready' = chạy được; 'wait' = ảnh đang được tạo (chờ); 'blocked' = ảnh chưa xong và chưa ai đang tạo (không chạy).
+  depJob(job,n){return this.jobs.find(d=>d!==job&&d.kind===job.kind&&d.storyId===job.storyId&&(d.phase||'')===n.phase&&d.number===n.number)||null;}
+  // Clip kể chuyện chuỗi: sẵn sàng khi MỌI việc cần có đã xong (và có khung cuối nếu cần); chờ khi có việc đang chạy; ngược lại bị chặn.
+  chainGate(job){
+    const deps=job.needs.map(n=>({n,d:this.depJob(job,n)}));
+    const ok=({n,d})=>Boolean(d&&d.status==='completed'&&d.output&&(!job.refList?.some(r=>r.phase===n.phase&&r.number===n.number&&r.part==='lastFrame')||d.lastFrame));
+    if(deps.every(ok))return 'ready';
+    return deps.some(({d})=>d&&d.status==='running')?'wait':'blocked';
+  }
   gate(job){
+    if(job.needs?.length)return this.chainGate(job);
     if(job.dependsOn!=='image')return 'ready';
     const image=this.imageOf(job);
     if(image&&image.status==='completed'&&image.output)return 'ready';
@@ -85,6 +108,18 @@ class Queue {
   }
   // Gắn ảnh đã tạo làm ảnh tham chiếu của clip. Prompt đã có thể gửi với ảnh cũ thì giữ nguyên bản đã khóa.
   attachImage(job){
+    if(job.refList?.length){
+      const refs=job.refList.map(r=>{
+        if(r.file)return r.file;
+        const d=this.depJob(job,r);
+        return d?(r.part==='lastFrame'?d.lastFrame:d.output):'';
+      });
+      if(refs.some(x=>!x))return;
+      if(refs.length===job.references?.length&&refs.every((x,i)=>x===job.references[i]))return;
+      job.references=refs;job.image=refs[0];
+      if(!job.mayHaveSubmitted)delete job.lockedInput;
+      return;
+    }
     const image=this.imageOf(job);
     if(!image||!image.output)return;
     if(job.references?.length===1&&job.references[0]===image.output&&job.image===image.output)return;
@@ -122,7 +157,7 @@ class Queue {
   async executeJob(job, runner, fresh) {
     const controller=new AbortController();this.controllers.set(job.id,controller);
     if(fresh)resetRunFields(job,'starting');
-    else Object.assign(job,{stage:'confirming',stageMessage:'',progress:null,downloadProgress:null,downloadStartedAt:null,downloadCompletedAt:null,error:'',output:''});
+    else Object.assign(job,{stage:'confirming',stageMessage:'',progress:null,downloadProgress:null,downloadStartedAt:null,downloadCompletedAt:null,error:'',output:'',lastFrame:''});
     job.status='running';job.startedAt=new Date().toISOString();job.finishedAt=null;
     try {
       await this.publish();
@@ -171,7 +206,7 @@ class Queue {
   }
   start(kind){
     if(this.active)return Promise.resolve();
-    this.kind=kind==='image'||kind==='video'||kind==='story'?kind:null;
+    this.kind=kind==='image'||kind==='video'||kind==='story'||kind==='restore'?kind:null;
     if(!Number.isInteger(this.concurrency)||this.concurrency<1)throw Error('Số tác vụ chạy đồng thời phải là số nguyên dương.');
     this.paused=false;this.active=true;
     this.runningPromise=(async()=>{
@@ -219,7 +254,7 @@ class Queue {
     if(!job||job.status!=='completed'||!job.output)throw Error('Chỉ tạo lại cảnh đã hoàn thành.');
     job.previousOutputs=[...new Set([...(job.previousOutputs||[]),job.output])];
     job.previousOutput=job.output;job.resumeMode='resubmit';
-    if(job.dependsOn==='image'){job.mayHaveSubmitted=false;job.lockedInput&&delete job.lockedInput;this.attachImage(job);}
+    if(job.dependsOn==='image'||job.refList?.length){job.mayHaveSubmitted=false;job.lockedInput&&delete job.lockedInput;this.attachImage(job);}
     this.paused=false;this.active=true;
     this.runningPromise=(async()=>{
       try{await this.executeJob(job,(item,signal)=>this.run(item,Math.max(0,Number(item.account||1)-1),signal),false);if(job.status==='completed')delete job.resumeMode;}

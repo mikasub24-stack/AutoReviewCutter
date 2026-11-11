@@ -689,13 +689,56 @@ Prompt chuyển động gửi Muse|Motion prompt sent to Muse
 Bước nào cũng cần prompt ảnh.|Every step needs an image prompt.
 ⚠ Chưa có prompt ảnh: bước này sẽ không tạo được ảnh, nên cũng không có clip.|⚠ No image prompt: this step cannot create its picture, so there will be no clip either.
 ⚠ Prompt ảnh quá ngắn, dễ ra ảnh sai. Mô tả rõ vật gì, ở đâu, tay đang làm gì.|⚠ Image prompt too short; the picture may come out wrong. Say what object, where, and what the hands are doing.
+Dọn nhà · Sinh tồn|House cleanup · Survival
+Dọn nhà · Sinh tồn · Phục hồi|House cleanup · Survival · Restoration
+Một ảnh → video liền mạch, tự dựng xong|One photo → seamless video, edited automatically
+Cần gói Năm hoặc Vĩnh viễn|Year or Lifetime plan required
+Nhập key|Enter key
+Chọn chủ đề và số phút. Tool tự chia việc thành các cảnh liền mạch: mỗi cảnh bắt đầu đúng bằng khung cuối của cảnh trước, rồi tự dựng thành một video hoàn chỉnh.|Pick a topic and the number of minutes. The tool splits the work into connected scenes: each scene starts exactly from the last frame of the previous one, then everything is edited into one finished video.
+Chủ đề|Topic
+Ảnh gốc (không bắt buộc)|Start photo (optional)
+Chọn ảnh gốc|Choose photo
+Bỏ ảnh|Remove photo
+Chưa chọn. Muse sẽ tạo ảnh gốc từ mô tả bên dưới.|None chosen. Muse will create the first image from the description below.
+Mô tả nơi chốn (không bắt buộc nếu đã có ảnh)|Describe the place (optional if you chose a photo)
+Mỗi cảnh dài|Each scene lasts
+Ngang 16:9 (YouTube)|Horizontal 16:9 (YouTube)
+Dọc 9:16 (Shorts, TikTok, Reels)|Vertical 9:16 (Shorts, TikTok, Reels)
+Có người làm việc trong video|A person works in the video
+Mô tả người (giữ y nguyên ở mọi cảnh)|Describe the person (kept identical in every scene)
+Ánh sáng và thời tiết (giữ y nguyên ở mọi cảnh)|Light and weather (kept identical in every scene)
+Các bước, mỗi dòng một bước (để trống thì tool tự chia)|Steps, one per line (leave empty to let the tool split the work)
+Đính kèm thêm ảnh gốc ở mọi cảnh để chống lệch (thử nghiệm: nếu video bị kéo về nguyên trạng thì tắt mục này)|Also attach the start photo to every scene to reduce drift (experimental: turn this off if the video gets pulled back to its original state)
+Chọn nhạc nền|Choose music
+Bỏ nhạc|Remove music
+Không nhạc nền (video im lặng).|No background music (silent video).
+Tự động làm hết: tạo các cảnh, nối cảnh và dựng video hoàn chỉnh|Do everything automatically: create the scenes, connect them and build the finished video
+Tạo và chạy tự động|Create and run automatically
+Danh sách cảnh dọn nhà · sinh tồn|House cleanup · survival scene list
+Cảnh lưu trong thư mục «DonNha» theo từng video; video hoàn chỉnh được dựng tự động ở cuối.|Scenes are saved in the “DonNha” folder, one per video; the finished video is built automatically at the end.
+Sẵn sàng cho video dọn nhà / sinh tồn mới|Ready for a new house cleanup / survival video
+Đã kích hoạt key (gói Năm).|License activated (Year plan).
+Đã kích hoạt key (gói Vĩnh viễn).|License activated (Lifetime plan).
+Tab «Dọn nhà · Sinh tồn» chỉ dùng được với gói Năm hoặc Vĩnh viễn. Bản dùng thử và gói 30 ngày không dùng được tab này. Liên hệ chủ phần mềm để nâng cấp gói rồi nhập key mới.|The “House cleanup · Survival” tab is available with the Year or Lifetime plan only. The trial and the 30-day plan cannot use it. Contact the software owner to upgrade, then enter the new key.
+Tab «Dọn nhà · Sinh tồn» cần FFmpeg để nối cảnh và dựng video. Chọn ffmpeg.exe (cùng thư mục ffprobe.exe) ở «Kết nối & cài đặt».|The “House cleanup · Survival” tab needs FFmpeg to connect scenes and build the video. Choose ffmpeg.exe (with ffprobe.exe in the same folder) under “Connection & settings”.
+Chỉ dựng video khi mọi cảnh đã xong.|Build the video only when every scene is done.
+Không thấy thông tin video này.|Cannot find this video.
+Không có cảnh hợp lệ để thêm.|No valid scenes to add.
+Ảnh gốc phải là PNG, JPG hoặc WEBP.|The start photo must be PNG, JPG or WEBP.
+Không đọc được ảnh gốc (hoặc ảnh lớn hơn 60 MB).|Cannot read the start photo (or it is larger than 60 MB).
+Không đọc được tệp nhạc nền.|Cannot read the music file.
+Chờ xử lý đầu ra xong trước khi thêm cảnh.|Wait for the output to finish before adding scenes.
+Góc quay|Camera
+Xa · vừa · gần xen kẽ (như video làm nhà thật)|Wide · medium · close-up mixed (like a real renovation video)
+Cố định một góc (giống nhau nhất)|One fixed angle (most consistent)
+Không lộ mặt (quay từ sau lưng hoặc ở xa: Muse ít từ chối hơn, người ít bị lệch giữa các cảnh)|Hide the face (filmed from behind or far away: Muse refuses less, and the person drifts less between scenes)
 `.trim().split('\n').map(line=>line.split('|')));
   const norm=s=>String(s).replace(/\s+/g,' ').trim();
   let language='en';try{language=localStorage.getItem('museStudio.language')==='vi'?'vi':'en';}catch{}
   function t(value){
     const raw=String(value??'');if(language==='vi')return raw;
     const key=norm(raw);if(dictionary[key])return raw.replace(key,dictionary[key]);
-    const decorated=key.match(/^([▶■▱▦▧✎↗⚙✓＋+\s]*)(.*?)([＋▾\s]*)$/u);
+    const decorated=key.match(/^([▶■▱▦▧✎⌂↗⚙✓＋+\s]*)(.*?)([＋▾\s]*)$/u);
     if(decorated&&dictionary[decorated[2]])return decorated[1]+dictionary[decorated[2]]+decorated[3];
     const photoRetry=key.match(/^Chưa lưu được ảnh · giữ đúng kết quả và thử lại: (.+)$/);if(photoRetry)return 'Image not saved yet · Retrying the same result: '+t(photoRetry[1]);
     const retry=key.match(/^Chưa lưu được video · giữ đúng kết quả và thử tải lại: (.+)$/);if(retry)return 'Video not saved yet · Retrying the same result: '+t(retry[1]);

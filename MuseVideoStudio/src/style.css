@@ -361,6 +361,13 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .more > summary::before { content: '＋ '; }
 .more[open] > summary::before { content: '－ '; }
 .more > summary:hover { color: #cbd7e9; }
+.restoreMore { margin: 10px 0 0; }
+.restoreMore > summary { cursor: pointer; width: fit-content; font-size: 12px; color: #8fa5c3; list-style: none; padding: 4px 0; }
+.restoreMore > summary::before { content: '＋ '; }
+.restoreMore[open] > summary::before { content: '－ '; }
+.restoreMore > summary:hover { color: #cbd7e9; }
+.restoreMore > summary::-webkit-details-marker { display: none; }
+.restoreMore[open] > summary { margin-bottom: 4px; }
 .more > summary::-webkit-details-marker { display: none; }
 .more[open] > summary { margin-bottom: 4px; }
 .sceneMore { margin: 6px 0 0; }
@@ -377,3 +384,22 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 #runProgress { margin: 10px 0 4px; }
 #runText { font-size: 14px; }
 #runText b { font-size: 16px; }
+
+/* Tab «Dọn nhà · Sinh tồn» */
+.restoreRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.restoreRow .hint { margin: 0; }
+.restorePreview { display: block; max-width: 260px; max-height: 150px; margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; object-fit: cover; }
+.restorePreview[hidden], #restoreBody[hidden], #restoreLock[hidden] { display: none; }
+.restoreRuns { display: grid; gap: 10px; margin-top: 16px; }
+.restoreRuns:empty { display: none; }
+.restoreRun { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: #121d2c; }
+.restoreRun.done { border-color: #2f6b64; }
+.restoreRun.error { border-color: #76504b; }
+.restoreRunTop { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.restoreRunTop strong { font-size: 13px; }
+.restoreRunTop span { font-size: 11px; color: #9fb2cc; }
+.restoreRun .autoBar { margin-top: 8px; }
+.restoreRunText { margin: 8px 0 0; font-size: 11px; color: #b6c5da; }
+.restoreRunText.warn { color: #e0b9ad; }
+.restoreRunActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.restoreRunActions button { padding: 8px 12px; font-size: 11px; }

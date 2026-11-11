@@ -2,3 +2,25 @@ const{test}=require('node:test'),assert=require('node:assert/strict'),fs=require
 const pair=crypto.generateKeyPairSync('ed25519'),aes=crypto.randomBytes(32),storage={isEncryptionAvailable:()=>true,getSelectedStorageBackend:()=> 'test',encryptString(s){const iv=crypto.randomBytes(12),c=crypto.createCipheriv('aes-256-gcm',aes,iv);return Buffer.concat([iv,c.update(s),c.final(),c.getAuthTag()]);},decryptString(b){const d=crypto.createDecipheriv('aes-256-gcm',aes,b.subarray(0,12));d.setAuthTag(b.subarray(-16));return Buffer.concat([d.update(b.subarray(12,-16)),d.final()]).toString();}};
 test('trial lasts24h across restart and clock rollback does not extend it; signed key is device-bound',async()=>{const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-license-'));try{let clock=1000000;const opts={file:path.join(dir,'trial.enc'),safeStorage:storage,device:'DEVICE1',publicKey:pair.publicKey,now:()=>clock};let license=await createLicense(opts);assert.equal(license.status().status,'trial');clock+=DAY;assert.equal(license.status().status,'expired');license=await createLicense(opts);assert.equal(license.status().status,'expired');await assert.rejects(license.ensureAllowed());const data={product:'MuseVideoStudio',device:'DEVICE1',issuedAt:clock,expiresAt:clock+DAY};const bytes=Buffer.from(JSON.stringify(data)),token=bytes.toString('base64url')+'.'+crypto.sign(null,bytes,pair.privateKey).toString('base64url');await license.activate(token);assert.equal(license.status().status,'active');assert.throws(()=>verifyToken(token,{publicKey:pair.publicKey,device:'OTHER',now:clock}));await license.ensureAllowed();clock-=300000;assert.equal(license.status().status,'locked');}finally{await fs.rm(dir,{recursive:true,force:true});}});
 test('payment QR targets only provided bank/account and has a correct CRC; no branch label',()=>{const p=payload('DEVICE1');assert.ok(p.includes('970418'));assert.ok(p.includes(details.account));assert.ok(p.includes(details.name));assert.equal(p.slice(-4),crc16(p.slice(0,-4)));assert.equal(/PGD|CHO DON|CHỢ ĐỒN/i.test(p),false);});
+test('gói dài hạn: key ≥360 ngày (Năm / Vĩnh viễn) mở được tab Dọn nhà; dùng thử và key 30 / 90 ngày thì không', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'muse-license-plan-'));
+  try {
+    let clock = 5000000;
+    const license = await createLicense({ file: path.join(dir, 'p.enc'), safeStorage: storage, device: 'DEVICE9', publicKey: pair.publicKey, now: () => clock });
+    const key = days => { const bytes = Buffer.from(JSON.stringify({ product: 'MuseVideoStudio', device: 'DEVICE9', issuedAt: clock, expiresAt: clock + days * DAY })); return bytes.toString('base64url') + '.' + crypto.sign(null, bytes, pair.privateKey).toString('base64url'); };
+    assert.equal(license.status().plan, 'trial'); assert.equal(license.status().longTerm, false);
+    await assert.rejects(license.requireLongTerm(), /gói Năm hoặc Vĩnh viễn/);
+    await license.ensureAllowed();                                   // dùng thử vẫn tạo video ở các tab khác
+    for (const [days, plan, ok] of [[30, 'short', false], [90, 'short', false], [359, 'short', false], [365, 'year', true], [3650, 'lifetime', true]]) {
+      await license.activate(key(days));
+      const s = license.status();
+      assert.equal(s.status, 'active'); assert.equal(s.plan, plan, days + ' ngày'); assert.equal(s.longTerm, ok);
+      if (ok) assert.equal((await license.requireLongTerm()).plan, plan);
+      else await assert.rejects(license.requireLongTerm(), /gói Năm hoặc Vĩnh viễn/);
+      await license.ensureAllowed();                                 // gói ngắn vẫn dùng các tab khác bình thường
+    }
+    // key dài hạn hết hạn thì hết quyền
+    await license.activate(key(365)); clock += 366 * DAY;
+    await assert.rejects(license.requireLongTerm());
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});

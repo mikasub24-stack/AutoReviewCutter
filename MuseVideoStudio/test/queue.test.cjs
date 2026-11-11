@@ -458,3 +458,66 @@ test('10 trình duyệt chạy song song: dừng / tạo lại MỘT cảnh kẹ
   assert.equal(q.jobs.filter(j => j.status === 'completed').length, 19);
   assert.equal(q.paused, false);
 });
+// ---- Tab «Dọn nhà · Sinh tồn»: cảnh nối cảnh, mỗi cảnh bắt đầu từ KHUNG CUỐI THẬT của cảnh trước ----
+const chain = (storyId, photo, n = 3) => {
+  const items = [];
+  if (!photo) items.push({ kind: 'restore', storyId, phase: 'image', number: 1, prompt: 'base', references: [] });
+  for (let k = 1; k <= n; k++) items.push({
+    kind: 'restore', storyId, phase: 'clip', number: k, prompt: 'clip' + k,
+    needs: k === 1 ? (photo ? [] : [{ phase: 'image', number: 1 }]) : [{ phase: 'clip', number: k - 1 }],
+    refList: k === 1 ? [photo ? { file: photo } : { phase: 'image', number: 1 }] : [{ phase: 'clip', number: k - 1, part: 'lastFrame' }]
+  });
+  return items;
+};
+test('restore: cảnh k chỉ chạy sau cảnh k-1 và nhận khung cuối của nó làm ảnh đầu (kể cả khi chạy 3 trình duyệt)', async () => {
+  const seen = []; let running = 0, maxRunning = 0;
+  const q = new Queue({ ...base, concurrency: 3, run: async j => {
+    running++; maxRunning = Math.max(maxRunning, running);
+    seen.push({ p: j.prompt, refs: [...j.references] });
+    await new Promise(r => setTimeout(r, 15)); running--;
+    if (j.phase === 'clip') j.lastFrame = `/f/${j.number}-cuoi.png`;
+    return j.phase === 'image' ? '/a/001.png' : `/v/00${j.number}.mp4`;
+  } });
+  await q.add(chain('S1', ''));
+  await q.start('restore');
+  assert.deepEqual(seen.map(x => x.p), ['base', 'clip1', 'clip2', 'clip3']);
+  assert.equal(maxRunning, 1, 'chuỗi nối tiếp: không bao giờ hai cảnh của cùng một truyện chạy cùng lúc');
+  assert.deepEqual(seen.map(x => x.refs), [[], ['/a/001.png'], ['/f/1-cuoi.png'], ['/f/2-cuoi.png']]);
+  assert.ok(q.jobs.every(j => j.status === 'completed'));
+});
+test('restore: có ảnh gốc của người dùng thì cảnh 1 dùng đúng tệp đó; hai truyện chạy song song', async () => {
+  const seen = {}; let running = 0, maxRunning = 0;
+  const q = new Queue({ ...base, concurrency: 2, run: async j => {
+    running++; maxRunning = Math.max(maxRunning, running);
+    (seen[j.storyId] ||= []).push(j.references[0]);
+    await new Promise(r => setTimeout(r, 20)); running--;
+    j.lastFrame = `/f/${j.storyId}${j.number}.png`; return `/v/${j.storyId}${j.number}.mp4`;
+  } });
+  await q.add([...chain('A', '/p/a.png', 2), ...chain('B', '/p/b.png', 2)]);
+  await q.start('restore');
+  assert.deepEqual(seen.A, ['/p/a.png', '/f/A1.png']); assert.deepEqual(seen.B, ['/p/b.png', '/f/B1.png']);
+  assert.equal(maxRunning, 2, 'hai truyện khác nhau dùng được hai trình duyệt');
+});
+test('restore: cảnh giữa chuỗi lỗi thì cảnh sau KHÔNG chạy; thiếu khung cuối cũng không chạy', async () => {
+  let calls = [];
+  const q = new Queue({ ...base, concurrency: 2, run: async j => { calls.push(j.prompt); if (j.prompt === 'clip2') throw Error('hết lượt'); j.lastFrame = '/f.png'; return '/v.mp4'; } });
+  await q.add(chain('S2', '/p.png', 3));
+  await q.start('restore');
+  assert.deepEqual(calls, ['clip1', 'clip2']);
+  assert.deepEqual(q.jobs.map(j => j.status), ['completed', 'failed', 'pending']);
+  const q2 = new Queue({ ...base, run: async j => '/v.mp4' });   // không ai ghi lastFrame
+  await q2.add(chain('S3', '/p.png', 2)); await q2.start('restore');
+  assert.deepEqual(q2.jobs.map(j => j.status), ['completed', 'pending'], 'không có khung cuối thì cảnh sau bị chặn, không gửi ảnh sai');
+});
+test('restore: tab khác không chạy việc của restore; applyReferences không đụng cảnh restore; dữ liệu needs/refList được lọc', async () => {
+  const q = new Queue({ ...base, run: async () => '/x.mp4' });
+  await q.add([...chain('S4', '/p.png', 1), { prompt: 'video thường' }]);
+  await q.applyReferences(['/shared.png']);
+  assert.deepEqual(q.jobs[0].references, [], 'cảnh restore giữ ảnh riêng');
+  assert.equal(q.jobs[1].image, '/shared.png');
+  await q.start('video');
+  assert.deepEqual(q.jobs.map(j => j.status), ['pending', 'completed']);
+  const q3 = new Queue({ ...base, run: async () => '/x' });
+  await q3.add([{ kind: 'restore', storyId: 'Z', phase: 'clip', number: 1, prompt: 'p', needs: [{ phase: 'hack', number: 1 }, { phase: 'clip', number: 'x' }, null, { phase: 'clip', number: 2 }], refList: [{ file: '' }, { phase: 'clip', number: 2, part: 'zzz' }, { evil: 1 }] }]);
+  assert.deepEqual(q3.jobs[0].needs, [{ phase: 'clip', number: 2 }]); assert.deepEqual(q3.jobs[0].refList, [{ phase: 'clip', number: 2 }]);
+});

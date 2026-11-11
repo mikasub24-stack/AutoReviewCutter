@@ -1,10 +1,11 @@
 const $=id=>document.getElementById(id);
 // Three tabs share one queue, one login and one set of accounts. Each job carries its
 // own kind; a tab only shows and runs jobs of its kind.
-let mode='video';try{const saved=localStorage.getItem('museStudio.mode');if(saved==='image'||saved==='story')mode=saved;}catch{}
+let mode='video';try{const saved=localStorage.getItem('museStudio.mode');if(saved==='image'||saved==='story'||saved==='restore')mode=saved;}catch{}
 const isImage=()=>mode==='image';
 const isStory=()=>mode==='story';
-const kindOfJob=j=>j.kind==='image'?'image':j.kind==='story'?'story':'video';
+const isRestore=()=>mode==='restore';
+const kindOfJob=j=>j.kind==='image'?'image':j.kind==='story'?'story':j.kind==='restore'?'restore':'video';
 // Việc «ảnh» của chế độ Mẹo vặt nằm trong danh sách kể chuyện nhưng hiện như tác vụ ảnh.
 const isPhotoJob=j=>j.kind==='image'||j.phase==='image';
 const jobsOf=(list,kind=mode)=>(list||[]).filter(j=>kindOfJob(j)===kind);
@@ -221,7 +222,7 @@ function updateCard(row,job,index){
   row.regenerate.hidden=job.status!=='completed';row.regenerate.disabled=Boolean(state.active||state.starting||state.stopping||state.testing||state.merging||state.packaging);
   const recoverable=['failed','interrupted'].includes(job.status)&&Boolean(job.mayHaveSubmitted||job.submittedAt||job.resultReadyAt);
   row.recover.hidden=!recoverable;row.recover.disabled=Boolean(state.active||state.starting||state.stopping||state.merging||state.packaging);
-  row.retry.hidden=!['failed','interrupted'].includes(job.status);row.remove.hidden=job.status==='running';row.edit.hidden=job.kind==='story'||job.status!=='pending'||Boolean(job.lockedInput);row.retry.disabled=Boolean(state.active||state.starting||state.stopping);
+  row.retry.hidden=!['failed','interrupted'].includes(job.status);row.remove.hidden=job.status==='running';row.edit.hidden=job.kind==='story'||job.kind==='restore'||job.status!=='pending'||Boolean(job.lockedInput);row.retry.disabled=Boolean(state.active||state.starting||state.stopping);
   row.card.hidden=!(filter==='all'||(filter==='failed'?['failed','interrupted'].includes(job.status):job.status===filter));
 }
 function renderJobs(jobs){
@@ -247,13 +248,13 @@ function renderJobs(jobs){
 setInterval(()=>{for(const row of jobCards.values())if(row.job?.status==='running')updateElapsed(row);},1000);
 
 function applyMode(){
-  const image=isImage(),story=isStory();
-  text($('headingText'),story?'Danh sách clip kể chuyện':image?'Danh sách tạo ảnh':'Danh sách tạo video');
-  for(const [id,on] of [['navQueue',!image&&!story],['navImage',image],['navStory',story]]){$(id).classList.toggle('selected',on);$(id).setAttribute('aria-pressed',String(on));}
-  $('outputTools').hidden=image||story;$('imagePrefixControl').hidden=!image;
-  $('editorPanel').hidden=story;$('toggleEditor').hidden=story;$('storyPanel').hidden=!story;$('storyOutput').hidden=!story;
-  text($('footNote'),story?'Clip kể chuyện lưu trong thư mục «KeChuyen» theo từng truyện, đánh số cảnh 001, 002, 003…':image?'Ảnh lưu vào thư mục «Anh» theo số prompt: 001, 002, 003…':'Video lưu theo số prompt: 001, 002, 003…');
-  text($('emptyTitle'),story?'Sẵn sàng cho câu chuyện mới':image?'Sẵn sàng cho ảnh mới':'Sẵn sàng cho video mới');
+  const image=isImage(),restore=isRestore(),story=isStory(),folderTab=story||restore;
+  text($('headingText'),restore?'Danh sách cảnh dọn nhà · sinh tồn':story?'Danh sách clip kể chuyện':image?'Danh sách tạo ảnh':'Danh sách tạo video');
+  for(const [id,on] of [['navQueue',!image&&!story&&!restore],['navImage',image],['navStory',story],['navRestore',restore]]){$(id).classList.toggle('selected',on);$(id).setAttribute('aria-pressed',String(on));}
+  $('outputTools').hidden=image||folderTab;$('imagePrefixControl').hidden=!image;
+  $('editorPanel').hidden=folderTab;$('toggleEditor').hidden=folderTab;$('storyPanel').hidden=!story;$('storyOutput').hidden=!story;$('restorePanel').hidden=!restore;
+  text($('footNote'),restore?'Cảnh lưu trong thư mục «DonNha» theo từng video; video hoàn chỉnh được dựng tự động ở cuối.':story?'Clip kể chuyện lưu trong thư mục «KeChuyen» theo từng truyện, đánh số cảnh 001, 002, 003…':image?'Ảnh lưu vào thư mục «Anh» theo số prompt: 001, 002, 003…':'Video lưu theo số prompt: 001, 002, 003…');
+  text($('emptyTitle'),restore?'Sẵn sàng cho video dọn nhà / sinh tồn mới':story?'Sẵn sàng cho câu chuyện mới':image?'Sẵn sàng cho ảnh mới':'Sẵn sàng cho video mới');
   text($('quickCreate'),image?'▶ Tạo ảnh':'▶ Tạo video');text($('createDrafts'),image?'▶ Tạo ảnh':'▶ Tạo video');
   const script=$('importMode').querySelector('option[value="script"]');script.disabled=image;
   if(image&&$('importMode').value==='script'){$('importMode').value='auto';$('rawOptions').hidden=true;}
@@ -281,7 +282,7 @@ function render(next){
   if(license){const expires=license.expiresAt?new Date(license.expiresAt).toLocaleString(window.studioI18n.language==='vi'?'vi-VN':'en-US'):'';$('licenseSummary').textContent=license.status==='trial'?'Dùng thử đến '+expires:license.message;$('licenseStatus').textContent=license.message+(expires?' Hạn: '+expires:'');$('deviceCode').value=license.device;}
   if(state.payment){$('paymentQR').src=state.payment.qr;$('paymentContent').textContent='Nội dung chuyển khoản: '+state.payment.content;}
   $('parallelInfo').textContent=state.settings.dispatchMode==='parallel'?`Song song ${state.settings.accountCount} trình duyệt · mỗi trình duyệt 1 prompt`:'Lần lượt · tải xong từng video mới gửi tiếp';
-  $('total').textContent=$('allCount').textContent=jobs.length;$('navCount').textContent=jobsOf(state.jobs,'video').length;$('navImageCount').textContent=jobsOf(state.jobs,'image').length;$('navStoryCount').textContent=jobsOf(state.jobs,'story').length;$('folderPath').textContent=state.settings.output?(isImage()||isStory()?state.settings.output+(/\\/.test(state.settings.output)?'\\':'/')+(isStory()?'KeChuyen':'Anh'):state.settings.output):'Chưa chọn thư mục';
+  $('total').textContent=$('allCount').textContent=jobs.length;$('navCount').textContent=jobsOf(state.jobs,'video').length;$('navImageCount').textContent=jobsOf(state.jobs,'image').length;$('navStoryCount').textContent=jobsOf(state.jobs,'story').length;$('navRestoreCount').textContent=jobsOf(state.jobs,'restore').length;$('folderPath').textContent=state.settings.output?(isImage()||isStory()||isRestore()?state.settings.output+(/\\/.test(state.settings.output)?'\\':'/')+(isRestore()?'DonNha':isStory()?'KeChuyen':'Anh'):state.settings.output):'Chưa chọn thư mục';
   $('queueState').textContent=state.stopping?'Đang bấm dừng trong Muse…':state.starting?'Đang kiểm tra trước khi chạy':state.active?state.paused?'Đang dừng…':'Đang chạy':'Đã dừng';
   $('start').disabled=state.active||state.starting||state.stopping||state.merging||state.packaging||!jobs.some(j=>['pending','interrupted','failed'].includes(j.status));$('start').textContent=jobs.some(j=>['interrupted','failed'].includes(j.status))?'▶ Tiếp tục hàng đợi':'▶ Chạy hàng đợi';$('pause').disabled=state.stopping||(!state.active&&!state.starting&&!jobs.some(j=>j.mayHaveSubmitted&&['interrupted','failed'].includes(j.status)));
   $('clearPending').disabled=!jobs.some(j=>j.status==='pending');$('clearList').disabled=state.stopping||!jobs.length;
@@ -291,7 +292,7 @@ function render(next){
   $('packageStatus').textContent=state.packageError||state.packageProgress||state.editPackageDir||'Xuất clip rời đúng thứ tự để nhập vào CapCut.';$('openPackage').hidden=!state.editPackageDir;
   $('finishMode').textContent='Sau khi tạo xong: '+(state.settings.autoMerge?'Nối MP4':state.settings.autoPackage?'Xuất clip CapCut':'Giữ clip riêng');
   const done=jobs.filter(j=>j.status==='completed'),running=jobs.filter(j=>j.status==='running'),pending=jobs.filter(j=>j.status==='pending'),interrupted=jobs.filter(j=>['failed','interrupted'].includes(j.status));
-  $('summary').textContent=`${done.length} / ${jobs.length} ${isImage()?'ảnh':isStory()?'clip':'video'} đã lưu`;
+  $('summary').textContent=`${done.length} / ${jobs.length} ${isImage()?'ảnh':isStory()||isRestore()?'clip':'video'} đã lưu`;
   $('runningCount').textContent=`${running.length} đang làm`;$('pendingCount').textContent=`${pending.length} đang chờ`;$('attentionCount').textContent=`${interrupted.length} cảnh dở / lỗi`;
   $('overallProgress').setAttribute('aria-label',isImage()?'Số ảnh đã lưu':'Số video đã lưu');$('overallProgress').max=Math.max(1,jobs.length);$('overallProgress').value=done.length;$('overallPct').textContent=Math.round(100*done.length/Math.max(1,jobs.length))+'%';
   $('testBrowsers').disabled=Boolean(busy);$('testBrowsers').textContent=state.testing?'Đang gửi câu bắt đầu…':'Gửi câu bắt đầu';
@@ -314,6 +315,7 @@ function render(next){
   $('queueFailureText').textContent=failed.length?`${failed[0].title||'Prompt '+(jobs.indexOf(failed[0])+1)} · ${failed[0].error}`:'';
   renderJobs(jobs);
   try{window.storyUi?.render(state);}catch(e){console.error(e);}
+  try{window.restoreUi?.render(state);}catch(e){console.error(e);}
 }
 $('prompts').oninput=()=>{dirty=true;committed=false;};$('importMode').onchange=()=>{dirty=true;$('rawOptions').hidden=$('importMode').value!=='script';};
 $('add').onclick=prepare;$('quickCreate').onclick=()=>create(true,true);$('commitDrafts').onclick=()=>create(false);$('createDrafts').onclick=()=>create(true);
@@ -336,7 +338,7 @@ $('closeSettings').onclick=()=>$('settingsDialog').close();$('settingsForm').ons
 for(const[id,method,name]of[['chooseBrowser','chooseBrowser','browserPath']])$(id).onclick=async()=>{const file=await call(method);if(file){$('settingsForm').elements.namedItem(name).value=file;if(id==='chooseBrowser')$('settingsForm').elements.namedItem('browserChoice').value='custom';}};
 $('chooseFfmpeg').onclick=async()=>{const result=await call('chooseFfmpeg');if(result){render(result);$('settingsForm').elements.namedItem('ffmpeg').value=result.settings.ffmpeg;}};
 $('mergeNow').onclick=async()=>render(await call('merge'));$('revealMerged').onclick=()=>call('revealMerged');$('packageClips').onclick=async()=>render(await call('packageClips'));$('openPackage').onclick=()=>call('openPackage');
-document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{filter=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===b));render(state);});$('navQueue').onclick=()=>setMode('video');$('navImage').onclick=()=>setMode('image');$('navStory').onclick=()=>setMode('story');
+document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{filter=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===b));render(state);});$('navQueue').onclick=()=>setMode('video');$('navImage').onclick=()=>setMode('image');$('navStory').onclick=()=>setMode('story');$('navRestore').onclick=()=>setMode('restore');
 window.studio.onUpdate(render);call('state').then(render);renderDrafts();mappingInfo();
 
 $('contactButton').onclick=()=>$('contactDialog').showModal();$('closeContact').onclick=()=>$('contactDialog').close();$('contactDialog').onclick=e=>{if(e.target===$('contactDialog'))$('contactDialog').close();};$('licenseButton').onclick=()=>$('licenseDialog').showModal();$('closeLicense').onclick=()=>$('licenseDialog').close();$('copyDevice').onclick=async()=>{try{await navigator.clipboard.writeText($('deviceCode').value);toast('Đã sao chép mã máy.');}catch{$('deviceCode').select();toast('Nhấn Ctrl+C để sao chép mã máy.');}};$('activateKey').onclick=async()=>{const result=await call('activateKey',$('activationKey').value.trim());if(result){render(result);toast('Đã kích hoạt key.');}};

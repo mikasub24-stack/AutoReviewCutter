@@ -18,3 +18,5 @@ require('./story-plan.test.cjs');
 require('./story-render.test.cjs');
 require('./story-voice.test.cjs');
 require('./story-service.test.cjs');
+require('./restore-plan.test.cjs');
+require('./restore-render.test.cjs');
