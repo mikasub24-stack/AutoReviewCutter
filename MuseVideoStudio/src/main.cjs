@@ -594,6 +594,12 @@ app.whenReady().then(async () => {
       if(picked.canceled||!picked.filePaths?.[0])return null;
       return addUserFont(picked.filePaths[0]);
     },
+    // Thêm truyện mới thì dọn truyện cũ đã xong và đã xuất MP4 khỏi hàng đợi (clip đã tải vẫn nằm trong thư mục).
+    storyClearDone:async data=>{
+      const ids=(Array.isArray(data?.ids)?data.ids:[]).map(String).filter(Boolean).slice(0,200);
+      if(ids.length)await queue.removeFinishedStories(ids);
+      await save();notify();return snapshot();
+    },
     storyFreeId:async data=>freeStoryId(String(data?.base||''),{output:settings.output,jobs:queue.jobs}),
     storyReveal:async()=>{const out=storyService.status().output;if(out)shell.showItemInFolder(out);return true;},
     // «Tải video»: hộp «Lưu như…» để chọn nơi lưu một bản sao MP4 (kèm .srt cùng tên nếu có và chưa có file trùng).

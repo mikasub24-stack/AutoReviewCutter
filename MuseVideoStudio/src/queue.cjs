@@ -32,6 +32,15 @@ class Queue {
   async retry(id){const j=this.jobs.find(x=>x.id===id);if(!j||!['failed','interrupted'].includes(j.status))throw Error('Chỉ chạy lại tác vụ lỗi hoặc bị gián đoạn.');delete j.resumeMode;resetRunFields(j);j.status='pending';await this.publish();}
   async remove(id){if(this.jobs.find(j=>j.id===id)?.status==='running')throw Error('Dừng tác vụ trước khi xóa.');this.jobs=this.jobs.filter(j=>j.id!==id);await this.publish();}
   async clearPending(kind){this.jobs=this.jobs.filter(j=>(kind&&j.kind!==kind)||j.status!=='pending'||j.mayHaveSubmitted);await this.publish();}
+  // Dọn truyện cũ: chỉ bỏ truyện mà MỌI việc (kể cả việc ảnh) đã xong; truyện còn dở được giữ nguyên. Trả về số việc đã bỏ. File video đã tải không bị xóa.
+  async removeFinishedStories(ids){
+    const want=new Set([...ids].map(String));
+    const finished=new Set([...want].filter(id=>{const own=this.jobs.filter(j=>j.kind==='story'&&j.storyId===id);return own.length>0&&own.every(j=>j.status==='completed');}));
+    const before=this.jobs.length;
+    this.jobs=this.jobs.filter(j=>!(j.kind==='story'&&finished.has(j.storyId)));
+    if(this.jobs.length!==before)await this.publish();
+    return before-this.jobs.length;
+  }
   async clearAll(kind){await this.stop();this.jobs=kind?this.jobs.filter(j=>j.kind!==kind):[];await this.publish();}
   async applyReferences(files){
     if(!Array.isArray(files)||files.some(x=>typeof x!=='string'||!x))throw Error('Ảnh tham chiếu không hợp lệ.');

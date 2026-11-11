@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.7.6
+- **Thêm truyện mới thì dọn tác vụ của truyện cũ.** Khi bạn bấm thêm câu chuyện mới vào hàng đợi, các truyện cũ **đã tạo xong hết clip VÀ đã xuất MP4 thành công** được bỏ khỏi danh sách (file clip đã tải vẫn còn trong thư mục, chỉ bỏ dòng trong hàng đợi). Truyện cũ xong clip mà chưa xuất MP4 hoặc còn cảnh dở **được giữ lại** (xóa là mất khả năng ghép trong app), và có thông báo nói rõ truyện nào được giữ.
+- **Ô «Truyện» tự chuyển sang truyện vừa thêm**, nên nút «Xuất MP4» và dòng trạng thái luôn nói về truyện bạn vừa dán, không còn nằm ở truyện cũ.
+- Mỗi truyện luôn là một nhóm riêng (thư mục và video riêng): truyện mới **không ghi đè và không nối vào** truyện cũ, và khi ghép/xuất chỉ ghép các cảnh của đúng truyện đang chọn.
+- Chưa thử trên Windows thật (đã kiểm bằng test hàng đợi và thử giao diện với dữ liệu giả).
+
 ## Update 1.7.5
 - **Tên video và thư mục truyện lấy theo tiêu đề** thay cho «Truyen-ngàygiờ». Ô «Tên video» có gõ thì dùng đúng tên đó; để trống thì lấy tên chủ đề (chế độ Cây trồng, Mẹo vặt, Lịch sử) hoặc dòng đầu kịch bản (dòng ngắn không kết thúc như một câu), còn không thì cắt gọn câu đầu tiên. Tên file video giữ nguyên dấu tiếng Việt (vd `Cô bé bán diêm.mp4`); thư mục không dấu (`Co-be-ban-diem`), trùng thì thêm -2, -3.
 - **Phụ đề: 10 kiểu có sẵn** (Cổ điển, Vàng nổi bật, Truyền hình, Hộp đen, Bản tin, Điện ảnh, Truyện cổ tích, Hoạt hình, Neon, Tối giản), mỗi kiểu có hình xem trước, bấm là áp dụng rồi chỉnh thêm được.

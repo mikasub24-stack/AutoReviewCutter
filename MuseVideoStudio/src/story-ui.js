@@ -216,6 +216,7 @@
   // App không tự chia thay Muse.
   let resume = null;   // { script, from, cast, understanding }
   const exportWatch = new Set(), exportDone = new Set(), exportAspect = {};   // tự xuất MP4: lượt đã thấy chạy dở / đã xuất rồi / khung hình lúc tạo
+  const exportedOk = new Set();   // truyện đã xuất MP4 THÀNH CÔNG trong lần mở app này (exportDone chỉ nghĩa là «đã xử lý», kể cả khi tắt tự xuất)
   let autoScript = '', pendingExport = null, autoRun = null, exportOk = false, autoWhy = '';   // autoRun: { phase: write|split|make|export|done|stopped|error, id, pct, msg, why }
   // Chạy tự động (Cây trồng): autoScript = bài Muse vừa viết; pendingExport = lượt đang chờ xuất MP4 { id, aspect, armed, since }.
   const canResume = () => Boolean(resume && scenes.length && $('storyScript').value === resume.script);
@@ -561,6 +562,8 @@
     const result = await callAuto('add', jobs);
     if (!result) return;
     scenes = []; renderScenes(); render(result);
+    $('storyPick').value = storyId; renderStatus();   // ô «Truyện» chuyển sang truyện mới (không thì «Xuất MP4» tay vẫn ghép truyện cũ)
+    await clearOldStories(storyId);
     if (opts.auto) plantRunSet({ stage: 'make', id: storyId, aspect: aspectNow });   // đã vào hàng đợi: lần sau chỉ chạy tiếp, không thêm lại
     if (startNow) {
       const started = await callAuto('start', { kind: 'story' });
@@ -905,6 +908,19 @@
     const picked = $('storyPick').value;
     return list.find(g => g.id === picked) || list.at(-1) || null;
   }
+  // Thêm truyện mới thì bỏ truyện cũ đã tạo xong và đã xuất MP4 khỏi hàng đợi. Truyện cũ chưa xuất MP4 được giữ lại (xóa là mất khả năng ghép trong app).
+  async function clearOldStories(keepId) {
+    const old = groups().filter(g => g.id !== keepId && g.total > 0 && g.done === g.total);
+    const exported = g => exportedOk.has(g.id) || Boolean(state?.story?.output && state.story.storyId === g.id);
+    const gone = old.filter(exported), kept = old.filter(g => !exported(g));
+    if (gone.length) { const r = await call('storyClearDone', { ids: gone.map(g => g.id) }); if (r) render(r); }
+    if (gone.length || kept.length) {
+      const parts = [];
+      if (gone.length) parts.push(`Đã dọn ${gone.length} truyện cũ đã xong khỏi hàng đợi (${gone.map(g => g.id).join(', ')}). Video đã tải vẫn còn trong thư mục.`);
+      if (kept.length) parts.push(`${kept.map(g => g.id).join(', ')}: chưa xuất MP4 nên được giữ lại.`);
+      toast(parts.join(' '));
+    }
+  }
   async function exportVideo(opts = {}) {
     const story = currentStory();
     if (!story) return toast('Chưa có clip kể chuyện nào trong hàng đợi.');
@@ -941,7 +957,7 @@
         out.push({ id: scene.id, chunks });
       }
       const result = await call('storyBuild', { runId: prep.runId, name: $('storyName').value.trim() || titleMap()[story.id] || story.id, aspect, subtitles, srt, sfx: $('storySfx').value, scenes: out });
-      if (result) { exportOk = true; render(result); toast('Đã xuất MP4.'); if (saved.plantRun?.id === story.id) plantRunSet({ stage: 'done' }); }
+      if (result) { exportOk = true; exportedOk.add(story.id); render(result); toast('Đã xuất MP4.'); if (saved.plantRun?.id === story.id) plantRunSet({ stage: 'done' }); }
     } finally { exporting = false; renderStatus(); }
   }
   /* ---------- Cây trồng chạy tự động: bố cục gọn + thanh tiến trình % ---------- */
@@ -1234,6 +1250,6 @@
 
   window.storyUi = {
     render() { renderVoice(); renderStatus(); renderAnalyze(); },
-    drawCaption, wrap, titleOfScript, slugTitle, storyTitle, get scenes() { return scenes; }
+    drawCaption, wrap, titleOfScript, slugTitle, storyTitle, clearOldStories, get scenes() { return scenes; }
   };
 })();

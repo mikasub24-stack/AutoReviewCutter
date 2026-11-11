@@ -372,6 +372,21 @@ test('Tải video lên: cảnh chưa xong thành «đã xong» với file ngư�
   await photo.add([{ prompt: 'i', kind: 'image' }]);
   await assert.rejects(() => photo.attachManual(photo.jobs[0].id, 'x.png'), /Chỉ thêm video/);
 });
+test('removeFinishedStories: chỉ bỏ truyện đã xong hết, giữ truyện còn dở / chưa có / loại khác', async () => {
+  let saved = 0;
+  const q = new Queue({ ...base, save: async () => { saved++; }, concurrency: 1, run: async () => 'x' });
+  await q.add([
+    { prompt: 'a1', kind: 'story', storyId: 'Xong', number: 1 }, { prompt: 'a2', kind: 'story', storyId: 'Xong', number: 2 },
+    { prompt: 'b1', kind: 'story', storyId: 'Do', number: 1 }, { prompt: 'b2', kind: 'story', storyId: 'Do', number: 2 },
+    { prompt: 'c1', kind: 'video', storyId: 'Xong' }, { prompt: 'solo' }]);
+  for (const j of q.jobs.filter(j => j.storyId === 'Xong' && j.kind === 'story')) j.status = 'completed';
+  q.jobs.find(j => j.prompt === 'b1').status = 'completed';
+  const n = saved;
+  assert.equal(await q.removeFinishedStories(['Do', 'khong-co']), 0, 'còn một cảnh chưa xong → giữ nguyên'); assert.equal(saved, n, 'không đổi gì thì không lưu');
+  assert.equal(await q.removeFinishedStories(['Xong']), 2); assert.ok(saved > n);
+  assert.deepEqual(q.jobs.map(j => j.prompt).sort(), ['b1', 'b2', 'c1', 'solo'], 'chỉ bỏ cảnh kể chuyện của truyện đã xong');
+  assert.equal(await q.removeFinishedStories([]), 0);
+});
 test('Dừng / Tạo lại riêng cảnh: đợi lệnh dừng trong Muse xong rồi mới trả chỗ cho lượt gửi sau', async () => {
   const order = []; let first = true;
   const q = new Queue({ ...base, concurrency: 1, run: async (j, slot, signal) => {

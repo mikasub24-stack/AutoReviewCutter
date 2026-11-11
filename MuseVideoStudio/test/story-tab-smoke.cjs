@@ -54,6 +54,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
           }
           if (name === 'storyAnalyzeCancel') { s.story.analyze = { busy: false, progress: '', part: 0, parts: 0, error: '' }; }
           if (name === 'storyAddFont') return window.fontPayload || null;
+          if (name === 'storyClearDone') { const ids = new Set(data.ids); s.jobs = s.jobs.filter(j => !(j.kind === 'story' && ids.has(j.storyId) && s.jobs.filter(x => x.storyId === j.storyId).every(x => x.status === 'completed'))); }
           if (name === 'images') return ['C:\\Refs\\mai.png'];
           if (name === 'add') s.jobs.push(...data.map(j => ({ ...j, id: String(++id), status: 'pending', stage: 'pending', order: s.jobs.filter(x => x.kind === 'story').length + 1 })));
           if (name === 'start') { s.active = true; s.paused = false; }
@@ -353,6 +354,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     await page.locator('#subResetPos').click();
     assert.equal(await page.locator('#subPos').inputValue(), 'bottom');
     assert.equal(await page.evaluate(() => { const v = JSON.parse(localStorage.getItem('museStudio.story')); return [v.subPos, v.subX, v.subY].join(); }), 'bottom,,', 'đặt lại vị trí xóa tọa độ kéo thả');
+    await page.locator('#storyPick').selectOption(await page.evaluate(() => window.s.jobs.find(j => j.id === 'story2').storyId));   // thêm truyện mới đã chuyển ô «Truyện» sang truyện mới; chọn lại truyện có story1/story2
     await page.evaluate(() => { window.s.jobs.find(j => j.id === 'story2').status = 'pending'; window.push(); });
     assert.equal(await page.locator('#storyExport').isDisabled(), true);
     assert.match(await page.locator('#storyStatus').textContent(), /Còn 1 cảnh chưa có clip/);
@@ -560,6 +562,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       const add = (await called('add')).at(-1).data;
       assert.deepEqual(add.map(j => [j.phase, j.number, j.dependsOn || '']), [['image', 1, ''], ['image', 2, ''], ['clip', 1, 'image'], ['clip', 2, 'image']]);
       assert.ok(add.every(j => j.kind === 'story' && /^Truyen-\d{8}-\d{6}$/.test(j.storyId) && j.storyId === add[0].storyId));
+      assert.equal(await page.locator('#storyPick').inputValue(), add[0].storyId, 'thêm truyện mới thì ô «Truyện» chuyển sang truyện mới (Xuất MP4 tay không ghép nhầm truyện cũ)');
       assert.ok(add.slice(0, 2).every(j => /^Tạo ảnh chụp thật cận cảnh/.test(j.prompt) && !j.voiceover && !j.references?.length && !j.image), 'việc ảnh: prompt ảnh, không lời đọc, không ảnh tham chiếu');
       assert.ok(add.slice(2).every(j => /^Bếp gỗ sáng\./.test(j.prompt) && !/\[\s*câu/i.test(j.prompt) && j.voiceover && j.durationSeconds >= 3 && !j.references?.length), 'việc clip: prompt chuyển động bỏ thẻ [câu N], có lời đọc, ảnh sẽ do hàng đợi gắn');
       assert.deepEqual(add.map(j => j.title), ['Cảnh 1 · ảnh', 'Cảnh 2 · ảnh', 'Cảnh 1 · clip', 'Cảnh 2 · clip']);
@@ -960,6 +963,24 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       await page.evaluate(() => window.push()); await nap(800);
       assert.equal(await builds(), b0 + 1, 'xuất đúng một lần, cập nhật trạng thái tiếp theo không xuất lại');
       assert.match(await page.locator('#storyStatus').textContent(), /✓ Truyen-1\.mp4/);
+      // Thêm truyện mới → dọn truyện cũ đã xong VÀ đã xuất MP4; truyện xong mà chưa xuất, hoặc còn dở, được giữ lại.
+      {
+        await setAuto(false);   // tắt tự xuất để OldKept xong mà KHÔNG bị tự xuất
+        await addGroup('OldDone', 'pending'); await addGroup('OldKept', 'pending'); await addGroup('OldRun', 'pending');
+        await finish('OldDone'); await finish('OldKept');
+        await page.evaluate(() => { window.s.story.output = 'C:\\Videos\\OldDone.mp4'; window.s.story.storyId = 'OldDone'; window.push(); });
+        await nap(300);
+        const before = (await called('storyClearDone')).length;
+        await page.evaluate(() => window.storyUi.clearOldStories('NewOne'));
+        const cleared = (await called('storyClearDone')).slice(before);
+        assert.equal(cleared.length, 1, 'một lần dọn');
+        assert.ok(cleared[0].data.ids.includes('OldDone') && !cleared[0].data.ids.includes('OldKept') && !cleared[0].data.ids.includes('OldRun') && !cleared[0].data.ids.includes('NewOne'), 'chỉ dọn truyện xong và đã xuất: ' + cleared[0].data.ids);
+        const left = await page.evaluate(() => [...new Set(window.s.jobs.filter(j => j.kind === 'story').map(j => j.storyId))]);
+        assert.ok(!left.includes('OldDone') && left.includes('OldKept') && left.includes('OldRun'), 'còn lại: ' + left);
+        assert.match(await page.locator('#toast').textContent(), /OldDone/); assert.match(await page.locator('#toast').textContent(), /^Removed \d+ finished old stories from the queue \(.*OldDone.*\)\. Downloaded videos are still in the folder\. .*OldKept.*: not exported to MP4 yet, so it was kept\.$/);
+        await page.evaluate(() => { window.s.jobs = window.s.jobs.filter(j => !/^Old/.test(j.storyId)); window.s.story.output = ''; window.s.story.storyId = ''; window.push(); }); await nap(300);
+        await setAuto(true);
+      }
       // Tắt: xong hết clip thì KHÔNG tự xuất, và bật lại sau đó cũng không xuất bù lượt cũ.
       await setAuto(false); b0 = await builds();
       await addGroup('Truyen-OFF', 'pending'); await nap(300); await finish('Truyen-OFF'); await nap(1200);
