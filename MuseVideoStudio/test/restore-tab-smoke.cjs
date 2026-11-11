@@ -17,7 +17,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.addInitScript(() => {
       localStorage.setItem('museStudio.language', localStorage.getItem('testLang') || 'vi');
       const s = {
-        version: '1.7.9', active: false, paused: true, jobs: [],
+        version: '1.7.10', active: false, paused: true, jobs: [],
         license: { status: 'active', plan: 'short', longTerm: false, device: 'TESTDEVICE', expiresAt: Date.now() + 86400000 * 30, message: 'Đã kích hoạt key.' },
         story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: false, clone: false }, platform: 'win32', edgeVoices: [], clones: [] } },
         restore: { busy: false, progress: '', error: '', storyId: '', stories: {} },
@@ -119,6 +119,24 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.fill('#restorePlace', 'căn nhà gạch hai tầng trên đồi, cỏ cao quá đầu');
     assert.doesNotMatch(await page.locator('#restoreCount').textContent(), /người nổi tiếng/);
 
+    // Người trong video: ô chọn hiện ngay ở màn hình chính, mặc định NỮ; chọn Nam / Giống ảnh gốc đổi mô tả; «giống ảnh» mà chưa có ảnh thì không tạo.
+    assert.equal(await page.locator('#restoreWho').isVisible(), true, 'ô chọn người nằm ở màn hình chính, không giấu trong Tùy chọn thêm');
+    assert.equal(await page.locator('#restoreWho').inputValue(), 'female');
+    assert.deepEqual(await page.$$eval('#restoreWho option', els => els.map(e => e.value)), ['female', 'male', 'photo']);
+    assert.match(await page.locator('#restorePersonDesc').getAttribute('placeholder'), /woman/);
+    await page.selectOption('#restoreWho', 'male');
+    assert.match(await page.locator('#restorePersonDesc').getAttribute('placeholder'), /\bman\b/);
+    await page.selectOption('#restoreWho', 'photo');
+    assert.match(await page.locator('#restorePersonDesc').getAttribute('placeholder'), /attached reference photo/);
+    await page.click('#restoreCreate');
+    await page.waitForTimeout(200);
+    assert.equal((await calls('restoreCreate')).length, 0, 'giống người trong ảnh mà chưa chọn ảnh thì bị chặn');
+    await page.selectOption('#restoreWho', 'female');
+    await page.evaluate(() => { document.getElementById('restorePerson').checked = false; document.getElementById('restorePerson').dispatchEvent(new Event('change')); });
+    assert.equal(await page.locator('#restoreWho').isVisible(), false, 'tắt «có người» thì ẩn ô chọn người');
+    await page.evaluate(() => { document.getElementById('restorePerson').checked = true; document.getElementById('restorePerson').dispatchEvent(new Event('change')); });
+    assert.equal(await page.locator('#restoreWho').isVisible(), true);
+
     // Ảnh gốc + nhạc nền.
     await page.click('#restorePhoto');
     await page.waitForFunction(() => /nha\.jpg/.test(document.getElementById('restorePhotoName').textContent));
@@ -136,6 +154,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.deepEqual(create.data.jobs[0].refList, [{ file: 'C:\\Refs\\nha.jpg' }]);
     assert.deepEqual(create.data.jobs[1].refList, [{ phase: 'clip', number: 1, part: 'lastFrame' }]);
     assert.equal(create.data.meta.aspect, '9:16');
+    assert.ok(create.data.jobs.every(j => /woman/.test(j.prompt)), 'mặc định người nữ ở mọi cảnh');
     assert.equal(create.data.meta.name, 'Nhà ma thành biệt thự');
     assert.match(create.data.idBase, /^Nha-ma-thanh-biet-thu/);
     assert.equal(await page.locator('#restoreName').inputValue(), '', 'ô tên được xóa sau khi tạo');

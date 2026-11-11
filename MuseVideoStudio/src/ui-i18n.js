@@ -735,6 +735,10 @@ Không lộ mặt (quay từ sau lưng hoặc ở xa: Muse ít từ chối hơn,
 Tên video (không bắt buộc; để trống thì lấy tên chủ đề)|Video name (optional; leave empty to use the topic name)
 Chưa có video hoàn chỉnh để lưu.|There is no finished video to save yet.
 Chạy song song|Run in parallel
+Người trong video|Person in the video
+Nữ trẻ, da trắng, xinh|Young woman, fair skin, pretty
+Nam|Man
+Giống người trong ảnh gốc|Same person as in the photo
 `.trim().split('\n').map(line=>line.split('|')));
   const norm=s=>String(s).replace(/\s+/g,' ').trim();
   let language='en';try{language=localStorage.getItem('museStudio.language')==='vi'?'vi':'en';}catch{}

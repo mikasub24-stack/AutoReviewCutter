@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.7.10
+- **Tab «Dọn nhà · Sinh tồn»: chọn giới tính người trong video.** Bản 1.7.9 trở về trước luôn mô tả người làm việc là NAM (nên làm nhân vật nữ vẫn ra nam). Giờ có ô **«Người trong video»** hiện ngay ở màn hình chính: **Nữ trẻ, da trắng, xinh** (mặc định), **Nam**, hoặc **Giống người trong ảnh gốc** (bắt buộc chọn ảnh có người; prompt dặn giữ nguyên mặt, tóc, da, tuổi, giới tính và quần áo của người trong ảnh). Ô «Mô tả người» trong Tùy chọn thêm vẫn thắng nếu bạn tự gõ.
+- Người nữ mặc đồ lao động kín đáo (áo sơ mi làm việc, quần jeans, găng tay, ủng, mũ bảo hộ; chủ đề sinh tồn thì áo khoác, quần túi hộp, ủng, mũ len), là người trưởng thành, vô danh.
+- Ảnh nền và ảnh mốc của các đoạn chạy song song giờ cũng ghi rõ người (trước đây không nhắc nên Muse tự chọn người, hay ra nam).
+- Lưu ý: các cảnh đã tạo trước đó vẫn mang mô tả cũ; muốn đổi người thì «Xóa» rồi tạo lại. Muse vẫn quyết định gương mặt thật sự, tool chỉ dặn càng rõ càng tốt.
+
 ## Update 1.7.9
 - **Tab «Dọn nhà · Sinh tồn» chạy song song nhiều tài khoản.** Video dài (40–120 phút = vài trăm cảnh) không còn chạy một chuỗi trên một tài khoản. Ô «Chạy song song» mặc định **Tự động**: tool dùng hết số tài khoản bạn đã cài (tối đa 10, chế độ gửi «Song song» trong Cài đặt) và chia video thành từng đoạn liên tục, mỗi đoạn một tài khoản; trong mỗi đoạn các cảnh vẫn nối cảnh bằng khung cuối thật của clip trước. Chọn «1 chuỗi» nếu cần đồng nhất tuyệt đối (chậm).
 - **Ảnh mốc:** đầu mỗi đoạn không có khung cuối clip trước để nối, nên tool nhờ Muse tạo một ảnh mốc cho từng đoạn từ ảnh gốc và sổ cảnh (cùng nhà, cùng người, đúng bước công việc của đoạn đó), rồi cảnh đầu đoạn xuất phát từ ảnh mốc đó. Các ảnh mốc làm ngay khi ảnh gốc xong, nên các đoạn khởi động cùng lúc.

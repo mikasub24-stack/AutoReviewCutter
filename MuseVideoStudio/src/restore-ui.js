@@ -36,14 +36,14 @@
   function config() {
     return P.options({
       theme, name: $('restoreName').value, parallel: $('restoreParallel').value, minutes: $('restoreMinutes').value, seconds: $('restoreSecs').value, aspect: $('restoreAspect').value, camera: $('restoreCamera').value, place: $('restorePlace').value,
-      person: $('restorePerson').checked, personDesc: $('restorePersonDesc').value, light: $('restoreLight').value, anchor: $('restoreAnchor').checked, faceless: $('restoreFaceless').checked,
+      person: $('restorePerson').checked, who: $('restoreWho').value, personDesc: $('restorePersonDesc').value, light: $('restoreLight').value, anchor: $('restoreAnchor').checked, faceless: $('restoreFaceless').checked,
       customSteps: $('restoreCustom').value, lang: lang()
     });
   }
   function remember() {
     Object.assign(saved, {
       theme, parallel: $('restoreParallel').value, minutes: Number($('restoreMinutes').value), seconds: Number($('restoreSecs').value), aspect: $('restoreAspect').value, camera: $('restoreCamera').value, place: $('restorePlace').value,
-      person: $('restorePerson').checked, personDesc: $('restorePersonDesc').value, light: $('restoreLight').value, anchor: $('restoreAnchor').checked, faceless: $('restoreFaceless').checked,
+      person: $('restorePerson').checked, who: $('restoreWho').value, personDesc: $('restorePersonDesc').value, light: $('restoreLight').value, anchor: $('restoreAnchor').checked, faceless: $('restoreFaceless').checked,
       custom: $('restoreCustom').value, auto: $('restoreAuto').checked
     });
     persist();
@@ -66,7 +66,8 @@
     $('restorePlaceLabel').textContent = tr('Mô tả nơi chốn (không bắt buộc nếu đã có ảnh)', 'Describe the place (optional if you chose a photo)');
     const person = $('restorePerson');
     if (t.person) { person.checked = true; person.disabled = true; } else { person.disabled = false; person.checked = saved.person !== false; }
-    $('restorePersonDesc').placeholder = t.personDefault;
+    $('restorePersonDesc').placeholder = P.personFor(t, $('restoreWho').value);
+    $('restoreWhoLine').hidden = !person.checked;
     $('restorePersonDescLabel').hidden = !person.checked;
     $('restoreFacelessLine').hidden = !person.checked;
     const camera = $('restoreCamera');
@@ -96,6 +97,8 @@
     $('restoreCount').textContent = text;
     $('restorePersonDescLabel').hidden = !$('restorePerson').checked;
     $('restoreFacelessLine').hidden = !$('restorePerson').checked;
+    $('restoreWhoLine').hidden = !$('restorePerson').checked;
+    $('restorePersonDesc').placeholder = P.personFor(P.themeOf(theme), $('restoreWho').value);
   }
 
   // ---- ảnh gốc, nhạc nền
@@ -229,6 +232,7 @@
   $('restoreCamera').value = saved.camera === 'fixed' ? 'fixed' : 'varied';
   $('restorePlace').value = saved.place || '';
   $('restorePerson').checked = saved.person !== false;
+  $('restoreWho').value = P.WHO.includes(saved.who) ? saved.who : 'female';
   $('restorePersonDesc').value = saved.personDesc || '';
   $('restoreLight').value = saved.light || '';
   $('restoreAnchor').checked = Boolean(saved.anchor);
@@ -238,7 +242,7 @@
   shownLang = lang();
   renderThemes(); syncTheme(); renderPhoto(); renderMusic(); renderCount();
 
-  for (const id of ['restoreMinutes', 'restoreParallel', 'restoreSecs', 'restoreAspect', 'restoreCamera', 'restorePerson', 'restoreFaceless', 'restoreAnchor', 'restoreAuto']) $(id).onchange = () => { remember(); renderCount(); };
+  for (const id of ['restoreMinutes', 'restoreParallel', 'restoreSecs', 'restoreAspect', 'restoreCamera', 'restorePerson', 'restoreWho', 'restoreFaceless', 'restoreAnchor', 'restoreAuto']) $(id).onchange = () => { remember(); renderCount(); };
   for (const id of ['restorePlace', 'restorePersonDesc', 'restoreLight', 'restoreCustom']) $(id).oninput = () => { remember(); renderCount(); };
   $('restorePhoto').onclick = async () => { const list = await call('images', { multiple: false }); if (list && list[0]) { photo = list[0]; renderPhoto(); } };
   $('restorePhotoClear').onclick = () => { photo = ''; renderPhoto(); };

@@ -29,6 +29,16 @@
   const DEFAULT_LIGHT = 'soft natural daylight, the same time of day and the same weather in every clip';
   const SURVIVOR = 'a 35-year-old man with tanned skin, short dark brown hair, brown eyes, a short neat dark beard and an ordinary friendly face, wearing a green work jacket, brown cargo trousers, black boots and a grey beanie';
   const WORKER = 'a 30-year-old man with lightly tanned skin, short black hair, brown eyes, a clean-shaven ordinary friendly face, wearing a grey work shirt, blue jeans, brown work gloves, black boots and a yellow hard hat';
+  // Người trong video: mặc định NỮ trẻ (người dùng chọn nữ nhưng bản cũ luôn ra nam). Chỉ mô tả người trưởng thành, quần áo lao động kín đáo.
+  const SURVIVOR_F = 'a 28-year-old woman with fair light skin, long dark brown hair in a neat braid, brown eyes and a pretty, youthful, friendly natural face, wearing a green work jacket, brown cargo trousers, black boots and a grey beanie';
+  const WORKER_F = 'a 27-year-old woman with fair light skin, long dark brown hair tied back in a ponytail, brown eyes and a pretty, youthful, friendly natural face, wearing a fitted grey work shirt, blue jeans, brown work gloves, black boots and a yellow hard hat';
+  const PHOTO_PERSON = 'the same single person who appears in the attached reference photo, with exactly the same face, hairstyle, hair color, skin tone, apparent age, gender, body shape and clothes as in that photo; do not change how this person looks';
+  const WHO = ['female', 'male', 'photo'];
+  // Người mặc định theo chủ đề và lựa chọn nữ / nam / giống ảnh gốc.
+  const personFor = (theme, who) => {
+    const t = typeof theme === 'string' ? themeOf(theme) : theme, survivor = t.personDefault === SURVIVOR;
+    return who === 'photo' ? PHOTO_PERSON : who === 'male' ? t.personDefault : survivor ? SURVIVOR_F : WORKER_F;
+  };
 
   // Mỗi chủ đề: base = hiện trạng ban đầu (dùng khi để Muse tạo ảnh gốc); steps = 15 việc nối tiếp nhau (vi = nhãn trên thẻ, en = việc làm trong clip).
   const THEMES = [
@@ -258,7 +268,7 @@
       place: clean(input.place, 300),
       minutes, seconds: minutes >= LONG_MINUTES ? MAX_SECONDS : Math.min(MAX_SECONDS, seconds),
       aspect: ASPECTS.includes(input.aspect) ? input.aspect : '16:9',
-      person, personDesc: clean(input.personDesc, 300) || theme.personDefault,
+      person, who: WHO.includes(input.who) ? input.who : 'female', personDesc: clean(input.personDesc, 300) || personFor(theme, WHO.includes(input.who) ? input.who : 'female'),
       lang: input.lang === 'en' ? 'en' : 'vi',
       light: clean(input.light, 200) || DEFAULT_LIGHT,
       anchor: Boolean(input.anchor),
@@ -422,6 +432,7 @@
   function problems(config, { hasPhoto = false } = {}) {
     const out = [], en = config.lang === 'en';
     if (themeOf(config.theme).id === 'custom' && !hasPhoto && !config.place) out.push(en ? 'Custom topic: choose a photo or describe the place.' : 'Chủ đề tự nhập: chọn ảnh gốc hoặc mô tả nơi chốn.');
+    if (config.person && config.who === 'photo' && config.personDesc === PHOTO_PERSON && !hasPhoto) out.push(en ? 'You chose “Same person as in the photo”: pick a photo that shows the person, or choose female / male.' : 'Bạn chọn «Giống người trong ảnh gốc»: hãy chọn ảnh có người đó, hoặc chọn Nữ / Nam.');
     const names = screenConfig(config);
     if (names.length) out.push(en
       ? `Your text names a famous person or a copyrighted character (“${names.join('”, “')}”). Muse refuses this and the attempt costs a credit. Remove the name and describe an anonymous person (age, hair, clothes).`
@@ -465,6 +476,7 @@
     }
     return [
       'Edit the attached photo. Keep exactly the same place, the same building or object, the same viewpoint and framing, the same light and the same person (same face, hair, body and clothes) as in the attached photo.',
+      config.person ? `The person in the picture is ${config.personDesc}, ${config.faceless ? 'seen from behind or from far away' : 'seen clearly'}, working in the scene.` : '',
       `Change only the state of the work so that the picture shows this moment: ${progress}.`,
       'Everything that is not mentioned keeps exactly the same shape, size, position and color as in the attached photo.',
       IMG_RATIO[config.aspect],
@@ -473,7 +485,7 @@
       SAFE_PEOPLE_IMAGE,
       'Sharp, crisp, high-detail photograph look, natural colors and real textures; not animation, not a painting, not CGI.',
       'No text, lettering, numbers, logos, watermarks or captions in the image.'
-    ].join('\n');
+    ].filter(Boolean).join('\n');
   }
 
   // Việc đưa vào hàng đợi. Cảnh 1 làm từ ảnh gốc (ảnh người dùng chọn, hoặc ảnh Muse tạo trước); cảnh k>1 làm từ KHUNG CUỐI THẬT của cảnh k-1 (tool tự cắt bằng FFmpeg).
@@ -516,5 +528,5 @@
   function storyIdBase(config) { return slug(config.name) || slug(themeOf(config.theme).label) || 'DonNha'; }
   function videoTitle(config) { return config.name || text(config.theme, config.lang).label; }
 
-  return { ASPECTS, MINUTES, LONG_MINUTES, VERY_LONG_MINUTES, SECONDS, MAX_CLIPS, clipCount, THEMES, EN, text, themeOf, options, stepsOf, sceneBible, baseImagePrompt, clipPrompt, segmentsOf, seamsOf, keyframePrompt, MAX_PARALLEL, MIN_SEGMENT, problems, screenText, screenConfig, isPolicyError, safeRetryPrompt, buildJobs, storyIdBase, videoTitle, SURVIVOR, WORKER, DEFAULT_LIGHT };
+  return { ASPECTS, MINUTES, LONG_MINUTES, VERY_LONG_MINUTES, SECONDS, MAX_CLIPS, clipCount, THEMES, EN, text, themeOf, options, stepsOf, sceneBible, baseImagePrompt, clipPrompt, segmentsOf, seamsOf, keyframePrompt, MAX_PARALLEL, MIN_SEGMENT, problems, screenText, screenConfig, isPolicyError, safeRetryPrompt, buildJobs, storyIdBase, videoTitle, SURVIVOR, WORKER, SURVIVOR_F, WORKER_F, PHOTO_PERSON, WHO, personFor, DEFAULT_LIGHT };
 });

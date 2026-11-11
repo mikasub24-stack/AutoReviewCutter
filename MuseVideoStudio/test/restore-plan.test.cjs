@@ -289,3 +289,48 @@ test('các đoạn chạy thật sự song song trên nhiều tài khoản, mỗ
   assert.deepEqual(refs['clip2'], ['/f/1.png'], 'trong đoạn dùng khung cuối cảnh trước');
   assert.deepEqual(refs['clip' + (starts[1] + 2)], ['/f/' + (starts[1] + 1) + '.png']);
 });
+
+test('người trong video: mặc định NỮ trẻ ở mọi chủ đề, chọn Nam thì ra nam, nữ có trong mọi clip, ảnh nền và ảnh mốc', () => {
+  const female = /woman/, male = /\bman\b/;
+  for (const theme of P.THEMES) {
+    const c = P.options({ theme: theme.id, minutes: 3, place: 'x', customSteps: 'a\nb\nc' });
+    assert.equal(c.who, 'female');
+    assert.match(c.personDesc, female, theme.id);
+    assert.doesNotMatch(c.personDesc, male, theme.id);
+    assert.match(c.personDesc, /fair light skin/);
+    assert.match(c.personDesc, /pretty, youthful/);
+    assert.doesNotMatch(c.personDesc, /beard|clean-shaven/);
+  }
+  // Nữ ở sinh tồn và ở dọn nhà là hai bộ đồ khác nhau, đều là người trưởng thành.
+  assert.match(P.options({ theme: 'cabin' }).personDesc, /28-year-old woman.*work jacket/);
+  assert.match(P.options({ theme: 'house_full' }).personDesc, /27-year-old woman.*hard hat/);
+  // Nam: đúng mô tả cũ.
+  const m = P.options({ theme: 'house_full', who: 'male' });
+  assert.equal(m.personDesc, P.WORKER); assert.match(m.personDesc, male);
+  assert.equal(P.options({ theme: 'cabin', who: 'male' }).personDesc, P.SURVIVOR);
+  // Giá trị lạ → nữ; tự mô tả thì thắng lựa chọn.
+  assert.equal(P.options({ who: 'robot' }).who, 'female');
+  assert.equal(P.options({ who: 'male', personDesc: 'a 25-year-old woman with red hair' }).personDesc, 'a 25-year-old woman with red hair');
+  // Mọi chỗ cần người đều nói đúng người nữ: sổ cảnh trong mọi clip, ảnh nền, ảnh mốc.
+  const c = P.options({ theme: 'house_full', minutes: 10, place: 'brick house' });
+  const jobs = P.buildJobs(c, { storyId: 'S', photo: '', accounts: 3 });
+  const prompts = jobs.map(j => j.prompt);
+  assert.ok(prompts.length > 70);
+  assert.ok(prompts.every(t => /woman/.test(t)), 'mọi prompt (ảnh nền, cảnh, ảnh mốc) phải nói là nữ');
+  assert.ok(prompts.every(t => !/\ba (30|35)-year-old man\b/.test(t)));
+  assert.match(jobs.find(j => j.phase === 'image' && j.number === 2).prompt, /The person in the picture is a 27-year-old woman/);
+});
+
+test('«Giống người trong ảnh gốc»: bắt buộc có ảnh, prompt giữ nguyên mặt, tóc, da, giới tính của người trong ảnh', () => {
+  const c = P.options({ theme: 'house_full', who: 'photo', place: 'x' });
+  assert.equal(c.personDesc, P.PHOTO_PERSON);
+  assert.match(c.personDesc, /exactly the same face, hairstyle, hair color, skin tone, apparent age, gender/);
+  assert.ok(P.problems(c, { hasPhoto: false }).some(t => /Giống người trong ảnh gốc/.test(t)), 'thiếu ảnh thì báo');
+  assert.ok(!P.problems(c, { hasPhoto: true }).some(t => /Giống người trong ảnh gốc/.test(t)));
+  assert.ok(P.problems({ ...c, lang: 'en' }, { hasPhoto: false }).some(t => /Same person as in the photo/.test(t)));
+  // Có tự mô tả thì không cần ảnh.
+  assert.ok(!P.problems(P.options({ who: 'photo', place: 'x', personDesc: 'a young woman with fair skin' }), { hasPhoto: false }).some(t => /ảnh gốc/.test(t)));
+  const jobs = P.buildJobs(c, { storyId: 'S', photo: 'C:\\a.jpg', accounts: 1 });
+  assert.match(jobs[0].prompt, /same single person who appears in the attached reference photo/);
+  assert.ok(P.screenConfig(c).length === 0, 'mô tả theo ảnh không bị coi là tên người nổi tiếng');
+});
