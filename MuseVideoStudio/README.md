@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.7.7
+- **Không vẽ nhân vật chính trị theo chức danh nữa.** Muse chặn cảnh có «Tổng thống … tuyên bố từ chức» (báo «dịch vụ video từ chối clip này ở bước kiểm tra nội dung … nhân vật chính trị có thật») dù prompt đã bỏ tên, vì chức danh gắn với một nước hay một mốc thời gian là chỉ ra đúng một người thật. Quy tắc 9 trong lệnh gửi Muse (chế độ Câu chuyện) nay dặn: cảnh có tổng thống, thủ tướng, chủ tịch nước, vua… thì không vẽ người đó và không dùng chức danh đó trong prompt, thay bằng bàn làm việc trống, tập hồ sơ, micro trên bục, đài phát thanh, lá cờ, đám đông nhìn từ phía sau; nhân vật chuẩn phản ứng bằng nét mặt.
+- **Cảnh báo trước khi gửi**: cảnh có chức danh chính trị trong prompt hiện dòng ⚠ nói rõ lý do và cách sửa (không cảnh báo nếu cảnh là bàn / ghế trống). Dòng cảnh báo vũ khí của 1.7.3 cũng đã có bản tiếng Anh.
+- **Nút «✎ Sửa prompt» ngay cạnh nhãn trạng thái trên mọi thẻ cảnh chưa xong** (kể cả «Đang xử lý»): mở ô sửa ngay trên thẻ. Cảnh chờ chạy: «Lưu» (lần chạy tới gửi prompt mới). Cảnh lỗi / bị gián đoạn: «Lưu» hoặc «Lưu và gửi lại ngay» (về hàng chờ, bấm Tiếp tục để chạy). Cảnh đang chạy: «Lưu và gửi lại ngay» dừng cảnh trong Muse rồi gửi lại đúng prompt mới. Bản prompt đã khóa cũng được đổi theo (ảnh tham chiếu giữ nguyên) và dấu vết gửi prompt cũ bị bỏ, nên «Tìm / tải video đã tạo» không còn tìm theo prompt cũ.
+- Cảnh báo ⚠ và quy tắc dặn Muse chỉ áp dụng cho cảnh mới tạo; cảnh đã bị chặn nằm sẵn trong hàng đợi thì dùng nút «Sửa prompt» ở trên (hoặc «Tải video lên»). Chưa thử với Muse thật; chức danh/tên khác Muse vẫn có thể chặn.
+
 ## Update 1.7.6
 - **Thêm truyện mới thì dọn tác vụ của truyện cũ.** Khi bạn bấm thêm câu chuyện mới vào hàng đợi, các truyện cũ **đã tạo xong hết clip VÀ đã xuất MP4 thành công** được bỏ khỏi danh sách (file clip đã tải vẫn còn trong thư mục, chỉ bỏ dòng trong hàng đợi). Truyện cũ xong clip mà chưa xuất MP4 hoặc còn cảnh dở **được giữ lại** (xóa là mất khả năng ghép trong app), và có thông báo nói rõ truyện nào được giữ.
 - **Ô «Truyện» tự chuyển sang truyện vừa thêm**, nên nút «Xuất MP4» và dòng trạng thái luôn nói về truyện bạn vừa dán, không còn nằm ở truyện cũ.

@@ -683,6 +683,22 @@ app.whenReady().then(async () => {
       }
       notify();return snapshot();
     },
+    editPrompt: async data => {
+      const id=String(data?.id||''),prompt=String(data?.prompt??''),resend=data?.resend===true;
+      if(stopping||merging||packaging)throw Error('Chờ xử lý hiện tại hoàn tất.');
+      const job=queue.jobs.find(j=>j.id===id);
+      if(!job)throw Error('Không tìm thấy cảnh này.');
+      if(job.status==='running'){
+        if(!resend)throw Error('Cảnh đang chạy. Chọn «Lưu và gửi lại ngay» để dừng rồi gửi prompt mới.');
+        if(job.kind==='video')invalidateOutputs();
+        await queue.cancelJob(id,'again',remoteStopJob(job),prompt);
+      }else{
+        const browser=browsers.get(Number(job.account)-1);
+        await queue.editPrompt(id,prompt);
+        if(resend&&['failed','interrupted'].includes(job.status)){if(job.kind==='video')invalidateOutputs();await queue.retry(id);browser?.releasePage?.(id);}
+      }
+      return snapshot();
+    },
     retry: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); const target=queue.jobs.find(j=>j.id===id),browser=browsers.get(Number(target?.account)-1);if(target?.kind==='video')invalidateOutputs(); await queue.retry(id);browser?.releasePage?.(id); return snapshot(); },
     remove: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); const removed=queue.jobs.find(j=>j.id===id);if(removed?.kind==='video')invalidateOutputs(); await queue.remove(id);browsers.get(Number(removed?.account)-1)?.releasePage?.(id);if(removed?.trackerId)void dom(browsers.get(Number(removed.account)-1),endTracking,{id:removed.trackerId}).catch(()=>{}); return snapshot(); },
     browser: async index => { await openMuse(Number(index ?? 0)); return true; },

@@ -1,4 +1,4 @@
-const { randomUUID } = require('node:crypto');
+const { randomUUID, createHash } = require('node:crypto');
 function stoppedError(){return Object.assign(Error('Đã dừng trong tool. Đang kiểm tra trạng thái dừng trên Muse; bấm Tiếp tục để xử lý cảnh đang dở.'),{name:'AbortError'});}
 function abortable(promise,signal){
   if(signal.aborted){Promise.resolve(promise).catch(()=>{});return Promise.reject(stoppedError());}
@@ -17,6 +17,18 @@ function resetRunFields(job, stage='pending') {
   job.account=undefined;
   return job;
 }
+const PROMPT_MAX=20000;
+function checkPrompt(value){
+  const text=String(value??'').trim();
+  if(!text)throw Error('Prompt không được để trống.');
+  if(text.length>PROMPT_MAX)throw Error('Prompt quá dài (tối đa '+PROMPT_MAX+' ký tự).');
+  return text;
+}
+// Đổi prompt của một cảnh: cập nhật cả bản đã khóa (ảnh tham chiếu giữ nguyên), nếu không lần chạy sau vẫn gửi lại prompt cũ.
+function applyPrompt(job,text){
+  job.prompt=text;
+  if(job.lockedInput)job.lockedInput={...job.lockedInput,prompt:text,promptHash:createHash('sha256').update(text).digest('hex')};
+}
 class Queue {
   constructor({jobs=[],save,run,notify=()=>{},concurrency=1}){
     this.jobs=jobs.map((j,index)=>({...j,kind:kindOf(j.kind),order:Number.isSafeInteger(j.order)&&j.order>0?j.order:index+1,status:j.status==='running'?'interrupted':j.status}));
@@ -28,6 +40,21 @@ class Queue {
     const batchKind=kindOf(items[0]?.kind),nextOrder=Math.max(0,...this.jobs.filter(j=>j.kind===batchKind).map(j=>j.order||0));
     this.jobs.push(...items.map((j,index)=>({order:nextOrder+index+1,id:randomUUID(),kind:kindOf(j.kind),storyId:typeof j.storyId==='string'?j.storyId.replace(/[^\w-]/g,'').slice(0,60):'',prompt:j.prompt.trim(),source:typeof j.source==='string'?j.source:'',phase:j.phase==='image'||j.phase==='clip'?j.phase:'',dependsOn:j.dependsOn==='image'?'image':'',title:typeof j.title==='string'?j.title:'',number:Number.isInteger(j.number)?j.number:null,voiceover:typeof j.voiceover==='string'?j.voiceover:'',durationSeconds:Number.isFinite(j.durationSeconds)&&j.durationSeconds>0?j.durationSeconds:null,image:j.image||j.references?.[0]||'',references:Array.isArray(j.references)?[...j.references]:j.image?[j.image]:[],status:'pending',stage:'pending',stageMessage:'',progress:null,downloadProgress:null,submissionProtocol:null,submissionReceipt:null,acknowledgedAt:null,confirmedResponseAt:null,submittedAt:null,mayHaveSubmitted:false,submissionProfileKey:null,submissionSessionId:null,resultReadyAt:null,downloadStartedAt:null,downloadCompletedAt:null,startedAt:null,finishedAt:null,error:'',output:'',createdAt:Date.now()})));
     await this.publish();
+  }
+  // Sửa prompt của cảnh chưa chạy / lỗi / bị gián đoạn. Cảnh đang chạy thì sửa qua cancelJob(…,'again',…,prompt) để dừng rồi gửi lại.
+  async editPrompt(id,prompt){
+    const job=this.jobs.find(j=>j.id===id);
+    if(!job)throw Error('Không tìm thấy cảnh này.');
+    if(job.status==='completed')throw Error('Cảnh đã xong. Dùng «Tạo lại» nếu muốn làm lại.');
+    if(job.status==='running')throw Error('Cảnh đang chạy. Chọn «Lưu và gửi lại ngay» để dừng rồi gửi prompt mới.');
+    const text=checkPrompt(prompt);
+    if(text===job.prompt)return false;
+    applyPrompt(job,text);
+    // Prompt cũ có thể đã gửi tới Muse: bản mới không khớp tin nhắn cũ nên bỏ dấu vết gửi, lần chạy sau gửi bản mới.
+    if(job.mayHaveSubmitted||job.submittedAt||job.resultReadyAt){const status=job.status;delete job.resumeMode;resetRunFields(job,status);job.status=status;}
+    if(['failed','interrupted'].includes(job.status)){job.error='Đã sửa prompt. Bấm «Gửi lại prompt» để chạy lại.';job.stageMessage=job.error;}
+    await this.publish();
+    return true;
   }
   async retry(id){const j=this.jobs.find(x=>x.id===id);if(!j||!['failed','interrupted'].includes(j.status))throw Error('Chỉ chạy lại tác vụ lỗi hoặc bị gián đoạn.');delete j.resumeMode;resetRunFields(j);j.status='pending';await this.publish();}
   async remove(id){if(this.jobs.find(j=>j.id===id)?.status==='running')throw Error('Dừng tác vụ trước khi xóa.');this.jobs=this.jobs.filter(j=>j.id!==id);await this.publish();}
@@ -81,11 +108,12 @@ class Queue {
   //                 khi đã tránh hết mọi tài khoản đang chạy thì bỏ qua danh sách này (thử lại từ đầu).
   //   mode 'skip' : bỏ lượt chờ, cảnh thành «bị gián đoạn» (vẫn lấy lại video đã tạo được / gửi lại sau); các cảnh khác chạy tiếp.
   // hold: Promise (vd lệnh bấm Dừng trong Muse) phải xong trước khi trả chỗ cho cảnh kế tiếp. Xong khi cảnh đã rời trạng thái «đang chạy».
-  async cancelJob(id,mode='skip',hold=null){
+  async cancelJob(id,mode='skip',hold=null,prompt=null){
     const job=this.jobs.find(j=>j.id===id),controller=this.controllers.get(id);
     if(!job||job.status!=='running'||!controller)throw Error('Cảnh này không còn đang chạy.');
     if(this.cancels.has(id))return;
-    this.cancels.set(id,{mode:mode==='again'||mode==='other'?mode:'skip',hold:hold||Promise.resolve()});
+    const next=prompt===null||prompt===undefined?null:checkPrompt(prompt);
+    this.cancels.set(id,{mode:mode==='again'||mode==='other'?mode:'skip',hold:hold||Promise.resolve(),prompt:next});
     controller.abort();
     while(this.controllers.has(id))await new Promise(r=>setTimeout(r,20));
   }
@@ -114,6 +142,7 @@ class Queue {
         if(cancel.mode==='again'||cancel.mode==='other'){
           const from=Number(job.account)||0;
           delete job.resumeMode;delete job.late;resetRunFields(job);job.status='pending';
+          if(cancel.prompt)applyPrompt(job,cancel.prompt);
           if(cancel.mode==='other'&&from)job.avoidAccounts=[...new Set([...(job.avoidAccounts||[]),from])];
         }
         else{job.status='interrupted';job.stage='interrupted';job.error='Đã dừng cảnh này. Bấm «Tìm / tải video đã tạo» để lấy kết quả nếu Muse đã làm xong, hoặc «Gửi lại prompt».';job.stageMessage=job.error;}

@@ -1470,4 +1470,14 @@ test('Muse từ chối người thật và cảnh cầm/bắn súng: câu lệnh
   assert.equal(warn('Bàn tay đặt một chiếc tách cà phê, hơi nước bay lên, cầm thìa khuấy.').length, 0, 'cầm nhưng không có vũ khí');
   assert.equal(warn('Thanh kiếm gỗ trong tủ kính bảo tàng; người cầm đèn đi qua.').length, 0, 'không coi kiếm là súng; «đèn» không phải vũ khí');
   assert.equal(warn('Cây đàn guitar trên giá; người cầm đàn lên.').length, 0, '«gun» không khớp giữa từ khác (guitar)');
+  // Nhân vật chính trị theo chức danh (ca thực tế: «Tổng thống VNCH … tuyên bố từ chức» bị Muse chặn dù không có tên).
+  assert.match(text, /KHÔNG vẽ người đó và KHÔNG dùng chức danh đó/);
+  assert.match(text, /bàn làm việc trống/);
+  const pol = prompt => sp.lintScenes([scene(prompt)], { seconds: 10 })[0].filter(w => /chức vụ chính trị/.test(w));
+  assert.equal(pol('Vị Tổng thống Việt Nam Cộng hòa, vest tối màu, ngồi tại bàn làm việc, tuyên bố từ chức với vẻ mặt trầm trọng.').length, 1);
+  assert.equal(pol('The prime minister signs a document at a long table.').length, 1);
+  assert.equal(pol('A king stands on the balcony and waves.').length, 1);
+  assert.equal(pol('Bàn làm việc trống, tập hồ sơ và cây bút trên mặt bàn; Bạn đứng nhìn nghiêm túc. Chiếc ghế của tổng thống để trống không.').length, 0, 'cảnh bàn/ghế trống: không cảnh báo');
+  assert.equal(pol('Một người thợ đứng trước bản đồ, chỉ tay vào các dấu địa danh.').length, 0);
+  assert.equal(pol('Con kingfisher đậu trên cành; presidential-style flag.').length, 0, 'king/president nằm trong từ khác không khớp');
 });

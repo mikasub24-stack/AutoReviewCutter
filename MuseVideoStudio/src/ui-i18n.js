@@ -257,6 +257,8 @@ Sửa lời theo kịch bản gốc|Fix narration to match the original script
 ⚠ Prompt quá ngắn, dễ ra hình sai. Mô tả rõ ai, ở đâu, làm gì, nét mặt.|⚠ Prompt too short; the picture may come out wrong. Say who, where, what they do and their expression.
 ⚠ Prompt chưa chia mốc thời gian («0–3 giây: …») nên chuyển động dễ đứng yên hoặc lệch lời đọc.|⚠ The prompt has no time marks ("0–3 seconds: …"), so the motion may stay still or drift from the narration.
 ⚠ Prompt thiếu câu «no speech» — nhân vật có thể bị nói.|⚠ The prompt lacks the “no speech” line — characters may talk.
+⚠ Prompt có cảnh người cầm / ngắm / bắn súng hoặc đạn: Muse thường từ chối («blocked by policy») và mỗi lần thử đều tốn lượt. Nên thay bằng bản vẽ kỹ thuật, sơ đồ so sánh hoặc người dẫn chuyện giới thiệu bằng lời.|⚠ The prompt shows someone holding, aiming or firing a gun or ammunition: Muse usually refuses (“blocked by policy”) and every attempt costs a credit. Use a technical drawing, a side-by-side diagram or a narrator explaining it instead.
+⚠ Prompt có người giữ chức vụ chính trị (tổng thống, thủ tướng, vua…): chức danh gắn với một nước hay mốc thời gian là chỉ đích danh một người thật, Muse thường từ chối («blocked by policy») dù không ghi tên, và mỗi lần thử đều tốn lượt. Nên bỏ người đó khỏi hình: dùng bàn làm việc trống, tập hồ sơ, micro trên bục, đài phát thanh, lá cờ hoặc đám đông nhìn từ phía sau, để nhân vật chuẩn phản ứng bằng nét mặt.|⚠ The prompt shows a political office holder (president, prime minister, king…): a title tied to a country or a date points at one real person, so Muse usually refuses (“blocked by policy”) even without a name, and every attempt costs a credit. Leave that person out of the picture: use an empty desk, a folder of papers, a microphone on a podium, an old radio, a flag or a crowd seen from behind, and let the reference character react with their face.
 ⚠ Có lời thoại trong ngoặc kép — nhân vật sẽ không nói, chỉ thể hiện bằng cử chỉ và nét mặt.|⚠ Quoted dialogue found — characters will not speak; it is shown through gestures and expressions.
 Đang đọc thông tin các cảnh…|Reading scene information…
 Giọng Windows có sẵn, chạy offline. Chất lượng tiếng Việt tùy giọng bạn đã cài.|Built-in Windows voices run offline. Vietnamese quality depends on the voices you installed.
@@ -475,6 +477,22 @@ Tạo lại cảnh này; giữ video cũ.|Regenerate this scene; keep the previo
 Dừng cảnh này|Stop this scene
 Tạo lại ngay|Restart now
 Thử TK khác|Try another account
+Bấm dừng cảnh này trong Muse rồi gửi lại với prompt mới ngay? Nếu Muse đang tạo dở thì phần đó bị bỏ.|Stop this scene in Muse and resend it with the new prompt now? Anything Muse is still generating for it is discarded.
+Gửi lại prompt mới? Nếu prompt cũ đã tạo xong trong Muse thì có thể ra video trùng.|Resend the new prompt? If the old prompt already finished in Muse, you may get a duplicate video.
+✎ Sửa prompt|✎ Edit prompt
+Sửa prompt của cảnh này, rồi chỉ lưu hoặc lưu và gửi lại.|Edit this scene's prompt, then just save it or save and resend.
+Lưu|Save
+Lưu và gửi lại ngay|Save and resend now
+Hủy|Cancel
+Prompt gửi Muse|Prompt sent to Muse
+Cảnh đang chạy với prompt cũ. Lưu prompt mới sẽ dừng cảnh trong Muse rồi gửi lại ngay.|The scene is running with the old prompt. Saving a new one stops it in Muse and resends it right away.
+Cảnh chưa chạy: lưu thì lần chạy tới gửi prompt mới.|The scene has not run yet: if you save, the next run sends the new prompt.
+Sửa xong lưu để giữ, hoặc lưu và gửi lại (cảnh về hàng chờ, bấm Tiếp tục để chạy).|When you finish editing, save to keep it, or save and resend (the scene goes back to the queue; press Continue to run it).
+Prompt không được để trống.|The prompt cannot be empty.
+Đã sửa prompt, cảnh sẽ được gửi lại ngay.|Prompt updated; the scene will be resent right away.
+Đã sửa prompt. Cảnh đã về hàng chờ: bấm Tiếp tục để chạy.|Prompt updated. The scene is back in the queue: press Continue to run it.
+Đã lưu prompt mới. Cảnh sẽ gửi bản này khi chạy.|New prompt saved. The scene will send this version when it runs.
+Đã sửa prompt. Bấm «Gửi lại prompt» để chạy lại.|Prompt updated. Press “Resubmit prompt” to run it again.
 Tải video lên|Upload video
 Tự thêm video cho cảnh này (đã tạo ở nơi khác): chọn file MP4 / WebM, tool đặt tên theo số cảnh và coi cảnh là đã xong.|Add a video for this scene yourself (made elsewhere): pick an MP4 / WebM file; the tool names it by scene number and marks the scene done.
 Cảnh này đang chờ Muse. Chọn video sẽ dừng cảnh ở Muse và dùng video bạn chọn thay thế. Tiếp tục?|This scene is waiting on Muse. Choosing a video stops it in Muse and uses your file instead. Continue?

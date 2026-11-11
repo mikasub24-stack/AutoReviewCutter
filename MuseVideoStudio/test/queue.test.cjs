@@ -387,6 +387,37 @@ test('removeFinishedStories: chỉ bỏ truyện đã xong hết, giữ truyện
   assert.deepEqual(q.jobs.map(j => j.prompt).sort(), ['b1', 'b2', 'c1', 'solo'], 'chỉ bỏ cảnh kể chuyện của truyện đã xong');
   assert.equal(await q.removeFinishedStories([]), 0);
 });
+test('Sửa prompt: cảnh chờ / lỗi đổi prompt và bản đã khóa, bỏ dấu vết gửi cũ; cảnh đang chạy sửa qua «gửi lại ngay»; cảnh xong và prompt rỗng bị từ chối', async () => {
+  const sent = []; let first = true;
+  const q = new Queue({ ...base, concurrency: 1, run: async (j, slot, signal) => {
+    sent.push((j.lockedInput || j).prompt);
+    if (first) { first = false; return new Promise((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(Error('x'), { name: 'AbortError' })))); }
+    return 'ok.mp4';
+  } });
+  await q.add([{ prompt: 'cũ', kind: 'story', number: 1 }, { prompt: 'khác', kind: 'story', number: 2 }, { prompt: 'xong', kind: 'story', number: 3 }]);
+  const [a, b, c] = q.jobs;
+  // chờ chạy: đổi prompt, cắt khoảng trắng; giống bản cũ thì không làm gì
+  assert.equal(await q.editPrompt(b.id, '  mới  '), true); assert.equal(b.prompt, 'mới'); assert.equal(await q.editPrompt(b.id, 'mới'), false);
+  await assert.rejects(() => q.editPrompt(b.id, '   '), /không được để trống/);
+  await assert.rejects(() => q.editPrompt(b.id, 'x'.repeat(20001)), /quá dài/);
+  await assert.rejects(() => q.editPrompt('khong-co', 'x'), /Không tìm thấy/);
+  // lỗi đã từng gửi + đã khóa: prompt, bản khóa đổi cùng nhau (ảnh tham chiếu giữ), dấu vết gửi cũ bị bỏ, vẫn «lỗi» chờ bấm Gửi lại
+  Object.assign(b, { status: 'failed', stage: 'failed', error: 'blocked', mayHaveSubmitted: true, submittedAt: 'x', resumeMode: 'recover', lockedInput: { prompt: 'mới', promptHash: 'h', references: [{ path: 'r.png', sha256: 's', name: 'r.png' }], lockedAt: 't' } });
+  assert.equal(await q.editPrompt(b.id, 'an toàn'), true);
+  assert.equal(b.prompt, 'an toàn'); assert.equal(b.lockedInput.prompt, 'an toàn'); assert.notEqual(b.lockedInput.promptHash, 'h'); assert.deepEqual(b.lockedInput.references.map(r => r.path), ['r.png']);
+  assert.equal(b.mayHaveSubmitted, false); assert.equal(b.submittedAt, null); assert.equal(b.resumeMode, undefined); assert.equal(b.status, 'failed'); assert.match(b.error, /Đã sửa prompt/);
+  await q.retry(b.id); assert.equal(b.status, 'pending');
+  c.status = 'completed'; await assert.rejects(() => q.editPrompt(c.id, 'x'), /đã xong/); c.status = 'pending';
+  // đang chạy: sửa trực tiếp bị từ chối; qua cancelJob(…,'again',…,prompt) thì dừng rồi gửi lại ĐÚNG prompt mới (kể cả bản đã khóa)
+  const running = q.start(); await new Promise(r => setTimeout(r, 20));
+  assert.equal(a.status, 'running'); await assert.rejects(() => q.editPrompt(a.id, 'x'), /đang chạy/);
+  a.lockedInput = { prompt: 'cũ', promptHash: 'h', references: [], lockedAt: 't' };
+  await q.cancelJob(a.id, 'again', null, '  sửa khi chạy  ');
+  await running;
+  assert.equal(a.prompt, 'sửa khi chạy'); assert.equal(a.lockedInput.prompt, 'sửa khi chạy');
+  assert.equal(sent[0], 'cũ'); assert.equal(sent.at(-1) !== 'cũ', true); assert.ok(sent.includes('sửa khi chạy'), 'lần gửi lại dùng prompt mới: ' + sent);
+  assert.equal(a.status, 'completed');
+});
 test('Dừng / Tạo lại riêng cảnh: đợi lệnh dừng trong Muse xong rồi mới trả chỗ cho lượt gửi sau', async () => {
   const order = []; let first = true;
   const q = new Queue({ ...base, concurrency: 1, run: async (j, slot, signal) => {

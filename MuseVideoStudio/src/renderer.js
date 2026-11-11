@@ -107,7 +107,16 @@ function makeCard(id){
   const activity=el('progress','activityBar');activity.removeAttribute('value');activity.setAttribute('aria-label','Đang xử lý, chưa có phần trăm từ Muse');stage.append(activity);
   const fileLine=el('p','fileLine');
   const error=el('p','error'),actions=el('div','cardActions');
+  const head=el('div','cardHead'),editBtn=el('button','miniBtn','✎ Sửa prompt');editBtn.type='button';editBtn.setAttribute('aria-expanded','false');
+  editBtn.title='Sửa prompt của cảnh này, rồi chỉ lưu hoặc lưu và gửi lại.';head.append(badge,editBtn);
   const row={card,preview,media,number,mediaLabel,body,badge,title,prompt,meta,stage,stageName,stageMessage,observed,progress,progressText,elapsed,source,sourceBody,error,actions,job:null,mediaKey:null,steps,activity,fileLine};
+  Object.assign(row,{head,editBtn,editor:null});
+  row.editBtn.onclick=()=>{
+    if(!row.editor)buildEditor(row);
+    else if(!row.editor.hidden){closeEditor(row);return;}
+    row.editArea.value=row.job?.lockedInput?.prompt||row.job?.prompt||'';row.editor.hidden=false;row.editBtn.setAttribute('aria-expanded','true');
+    updateEditor(row,row.job);row.editArea.focus();
+  };
   function action(label,fn){const button=el('button','secondary',label);button.onclick=fn;actions.append(button);return button;}
   row.reveal=action('Mở vị trí video',()=>call('reveal',row.job.id));
   row.recover=action('Tìm / tải video đã tạo',async()=>render(await call('retryDownload',row.job.id)));
@@ -126,7 +135,38 @@ function makeCard(id){
   row.otherBtn.title='Dừng chờ ở tài khoản này và gửi cảnh sang tài khoản khác (khi tài khoản hết lượt tạo video).';
   const previewActions=el('div','previewActions');previewActions.append(row.cancelBtn,row.restartBtn,row.otherBtn,row.upload);preview.append(previewActions);
   row.edit=action('Đưa về sửa',async()=>{const result=await call('remove',row.job.id);if(result){drafts.push({...row.job});$('editorPanel').open=true;renderDrafts();render(result);$('editorPanel').scrollIntoView({block:'nearest'});}});
-  body.append(badge,title,meta,steps,stage,fileLine,disclosure,source,error,actions);card.append(preview,body);return row;
+  body.append(head,title,meta,steps,stage,fileLine,disclosure,source,error,actions);card.append(preview,body);return row;
+}
+// Ô «Sửa prompt»: chỉ dựng khi bấm lần đầu (hàng trăm thẻ không phải mang thêm hàng trăm ô nhập).
+function closeEditor(row){if(row.editor)row.editor.hidden=true;row.editBtn.setAttribute('aria-expanded','false');}
+function buildEditor(row){
+  const editor=el('div','promptEditor'),editArea=el('textarea'),editHint=el('p','editHint'),editBar=el('div','editBar');
+  editArea.rows=9;editArea.spellcheck=false;editArea.setAttribute('aria-label','Prompt gửi Muse');
+  const editSave=el('button','secondary','Lưu'),editSend=el('button','secondary','Lưu và gửi lại ngay'),editCancel=el('button','secondary','Hủy');
+  for(const b of [editSave,editSend,editCancel])b.type='button';
+  editBar.append(editSave,editSend,editCancel);editor.append(editArea,editHint,editBar);editor.hidden=true;
+  Object.assign(row,{editor,editArea,editHint,editSave,editSend,editCancel});
+  row.head.after(editor);
+  editCancel.onclick=()=>closeEditor(row);
+  const submit=async resend=>{
+    const prompt=editArea.value.trim();
+    if(!prompt){toast('Prompt không được để trống.');return;}
+    const running=row.job.status==='running';
+    if(resend&&running&&!confirm('Bấm dừng cảnh này trong Muse rồi gửi lại với prompt mới ngay? Nếu Muse đang tạo dở thì phần đó bị bỏ.'))return;
+    if(resend&&!running&&!confirm('Gửi lại prompt mới? Nếu prompt cũ đã tạo xong trong Muse thì có thể ra video trùng.'))return;
+    const result=await call('editPrompt',{id:row.job.id,prompt,resend});
+    if(result){closeEditor(row);render(result);toast(resend?(running?'Đã sửa prompt, cảnh sẽ được gửi lại ngay.':'Đã sửa prompt. Cảnh đã về hàng chờ: bấm Tiếp tục để chạy.'):'Đã lưu prompt mới. Cảnh sẽ gửi bản này khi chạy.');}
+  };
+  editSave.onclick=()=>submit(false);editSend.onclick=()=>submit(true);
+}
+// Đang chạy chỉ có «Lưu và gửi lại ngay»; chờ chạy chỉ cần «Lưu»; lỗi / bị gián đoạn có cả hai; cảnh đã xong thì không sửa.
+function updateEditor(row,job){
+  const done=job.status==='completed',running=job.status==='running',busy=Boolean(state.stopping||state.merging||state.packaging);
+  row.editBtn.hidden=done;row.editBtn.disabled=busy;
+  if(!row.editor)return;
+  if(done)closeEditor(row);
+  row.editSave.hidden=running;row.editSend.hidden=job.status==='pending';row.editSend.disabled=row.editSave.disabled=busy;
+  text(row.editHint,running?'Cảnh đang chạy với prompt cũ. Lưu prompt mới sẽ dừng cảnh trong Muse rồi gửi lại ngay.':job.status==='pending'?'Cảnh chưa chạy: lưu thì lần chạy tới gửi prompt mới.':'Sửa xong lưu để giữ, hoặc lưu và gửi lại (cảnh về hàng chờ, bấm Tiếp tục để chạy).');
 }
 function updateMedia(row,job){
   const photo=isPhotoJob(job),output=localFileUrl(job.output||job.previousOutput),image=localFileUrl(job.lockedInput?.references?.[0]?.path||job.image||job.references?.[0]);
@@ -148,7 +188,7 @@ function updateMedia(row,job){
   }else row.media.append(el('span','glyph','▷'));
 }
 function updateCard(row,job,index){
-  row.job=job;row.card.dataset.status=job.status;updateMedia(row,job);
+  row.job=job;row.card.dataset.status=job.status;updateMedia(row,job);updateEditor(row,job);
   const displayNumber=Number.isInteger(job.number)&&job.number>0?job.number:job.order||index+1;
   text(row.number,'#'+displayNumber);text(row.title,job.title||`Prompt ${displayNumber}`);row.card.setAttribute('aria-label',`${job.title||'Prompt '+displayNumber} · ${labels[job.status]||job.status}`);
   row.badge.className='badge '+job.status;text(row.badge,labels[job.status]||job.status);text(row.prompt,job.lockedInput?.prompt||job.prompt);

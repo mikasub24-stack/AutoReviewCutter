@@ -63,6 +63,44 @@ const root=path.resolve(__dirname,'../src');
     // cảnh đã bị dừng (interrupted) -> hai nút biến mất, hiện «Gửi lại prompt»
     await page.evaluate(()=>{window.s.stopping=false;window.s.active=false;Object.assign(window.s.jobs[0],{status:'interrupted',stage:'interrupted',error:'Đã dừng cảnh này.'});window.push();});
     assert.equal(await btn('stuck',/^Dừng cảnh này$/).isVisible(),false);assert.equal(await page.locator('[data-job-id=stuck] .cardActions button').filter({hasText:/^Gửi lại prompt$/}).isVisible(),true);
+    // «Sửa prompt» ngay cạnh nhãn trạng thái: mọi cảnh chưa xong có nút; cảnh xong thì không.
+    const edit=id=>page.locator(`[data-job-id=${id}] .cardHead .miniBtn`), panel=id=>page.locator(`[data-job-id=${id}] .promptEditor`);
+    const pbtn=(id,label)=>panel(id).locator('button').filter({hasText:label});
+    const editCalls=()=>page.evaluate(()=>window.calls.filter(c=>c.name==='editPrompt').map(c=>c.data));
+    for(const id of ['stuck','busy','next'])assert.equal(await edit(id).isVisible(),true,id+' có nút Sửa prompt');
+    assert.equal(await edit('done').isVisible(),false,'cảnh đã xong không sửa prompt');
+    assert.equal(await page.locator('[data-job-id=next] .cardHead .badge').isVisible(),true,'nút nằm cùng hàng với nhãn trạng thái');
+    // Cảnh chưa chạy: chỉ «Lưu» (và Hủy), ô hiện prompt hiện tại.
+    await edit('next').click();
+    assert.equal(await panel('next').locator('textarea').inputValue(),'p4');
+    assert.equal(await pbtn('next',/^Lưu$/).isVisible(),true);assert.equal(await pbtn('next',/^Lưu và gửi lại ngay$/).isVisible(),false);assert.equal(await pbtn('next',/^Hủy$/).isVisible(),true);
+    await panel('next').locator('textarea').fill('  p4 mới  ');
+    await page.evaluate(()=>window.push());   // cập nhật trạng thái đang gõ dở: không bị ghi đè
+    assert.equal(await panel('next').locator('textarea').inputValue(),'  p4 mới  ');
+    await pbtn('next',/^Lưu$/).click();
+    assert.deepEqual(await editCalls(),[{id:'next',prompt:'p4 mới',resend:false}]);
+    assert.equal(await panel('next').isVisible(),false,'lưu xong thì đóng ô sửa');
+    // Hủy không gửi gì; prompt rỗng bị từ chối ngay trong giao diện.
+    await edit('next').click();await panel('next').locator('textarea').fill('   ');await pbtn('next',/^Lưu$/).click();
+    assert.equal((await editCalls()).length,1);assert.match(await page.locator('#toast').textContent(),/Prompt không được để trống/);
+    await pbtn('next',/^Hủy$/).click();assert.equal(await panel('next').isVisible(),false);assert.equal((await editCalls()).length,1);
+    // Cảnh đang chạy: chỉ «Lưu và gửi lại ngay», hỏi xác nhận; từ chối thì không gửi lệnh.
+    await edit('busy').click();
+    assert.equal(await pbtn('busy',/^Lưu$/).isVisible(),false);assert.equal(await pbtn('busy',/^Lưu và gửi lại ngay$/).isVisible(),true);
+    await panel('busy').locator('textarea').fill('p2 an toàn');
+    if(process.env.MUSE_EDIT_SHOT)await page.locator('#jobs').screenshot({path:process.env.MUSE_EDIT_SHOT});
+    accept=false;await pbtn('busy',/^Lưu và gửi lại ngay$/).click();assert.equal((await editCalls()).length,1,'từ chối xác nhận thì chưa gửi');
+    accept=true;await pbtn('busy',/^Lưu và gửi lại ngay$/).click();
+    assert.deepEqual((await editCalls()).at(-1),{id:'busy',prompt:'p2 an toàn',resend:true});
+    // Cảnh bị gián đoạn: cả «Lưu» và «Lưu và gửi lại ngay».
+    await edit('stuck').click();
+    assert.equal(await pbtn('stuck',/^Lưu$/).isVisible(),true);assert.equal(await pbtn('stuck',/^Lưu và gửi lại ngay$/).isVisible(),true);
+    await panel('stuck').locator('textarea').fill('p1 sửa');await pbtn('stuck',/^Lưu và gửi lại ngay$/).click();
+    assert.deepEqual((await editCalls()).at(-1),{id:'stuck',prompt:'p1 sửa',resend:true});
+    // Cảnh vừa xong khi đang sửa: ô sửa tự đóng, nút biến mất.
+    await edit('next').click();assert.equal(await panel('next').isVisible(),true);
+    await page.evaluate(()=>{Object.assign(window.s.jobs[3],{status:'completed',stage:'completed',output:'C:/Videos/004.mp4'});window.push();});
+    assert.equal(await panel('next').isVisible(),false);assert.equal(await edit('next').isVisible(),false);
     assert.deepEqual(errors,[]);
     await page.screenshot({path:process.env.MUSE_UI_SCREENSHOT||path.join(require('node:os').tmpdir(),'muse-card-cancel.png')});
     console.log('PASS: card-cancel smoke (Dừng cảnh này / Tạo lại ngay chỉ hiện trên cảnh đang chạy, đúng IPC, khóa khi đang dừng cả hàng đợi)');
