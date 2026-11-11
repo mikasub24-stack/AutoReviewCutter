@@ -231,3 +231,61 @@ test('tên video: người dùng đặt tên thì dùng tên đó cho video và 
   assert.equal(P.options({ name: 'x'.repeat(200) }).name.length, 80);
   assert.equal(P.options({ name: 'a\nb\tc' }).name, 'a b c');
 });
+
+const { Queue } = require('../src/queue.cjs');
+test('chạy song song theo đoạn: số đoạn theo số tài khoản, đầu mỗi đoạn từ ảnh mốc, ảnh mốc làm từ ảnh gốc', () => {
+  const c = P.options({ theme: 'house_full', minutes: 45 });                    // 270 cảnh
+  assert.deepEqual(P.segmentsOf(c, 1), [0]);
+  assert.equal(P.segmentsOf(c, 4).length, 4);
+  assert.equal(P.segmentsOf(c, 10).length, 10);
+  assert.equal(P.segmentsOf(c, 99).length, 10, 'tối đa 10');
+  assert.equal(P.segmentsOf(P.options({ theme: 'house_full', minutes: 45, parallel: 3 }), 10).length, 3, 'chọn tay 3 đoạn');
+  assert.equal(P.segmentsOf(P.options({ theme: 'house_full', minutes: 45, parallel: 1 }), 10).length, 1, 'chọn 1 chuỗi');
+  assert.equal(P.segmentsOf(P.options({ theme: 'house_full', minutes: 1 }), 10).length, 1, 'video ngắn không chia');
+  assert.equal(P.segmentsOf(P.options({ theme: 'house_full', minutes: 2 }), 10).length, 2, 'mỗi đoạn có ít nhất ' + P.MIN_SEGMENT + ' cảnh');
+  const starts = P.segmentsOf(c, 4);
+  assert.deepEqual(P.seamsOf(c, 4), starts.slice(1));
+  const jobs = P.buildJobs(c, { storyId: 's', photo: '', accounts: 4 });
+  const clips = jobs.filter(j => j.phase === 'clip'), images = jobs.filter(j => j.phase === 'image');
+  assert.equal(clips.length, 270);
+  assert.deepEqual(images.map(j => j.number), [1, 2, 3, 4], 'ảnh gốc + 3 ảnh mốc');
+  starts.slice(1).forEach((idx, k) => {
+    assert.deepEqual(clips[idx].needs, [{ phase: 'image', number: k + 2 }]);
+    assert.deepEqual(clips[idx].refList, [{ phase: 'image', number: k + 2 }]);
+    assert.doesNotMatch(clips[idx].prompt, /continues directly from the previous clip/);
+  });
+  assert.deepEqual(clips[1].needs, [{ phase: 'clip', number: 1 }], 'trong một đoạn vẫn nối bằng khung cuối');
+  for (const key of images.slice(1)) {
+    assert.deepEqual(key.refList, [{ phase: 'image', number: 1 }]);
+    assert.match(key.prompt, /^Edit the attached photo\./);
+    assert.match(key.prompt, /Currently in progress/);
+  }
+  assert.ok(images[3].prompt.includes('already finished') && images[3].prompt.length > images[1].prompt.length, 'mốc càng sau càng nhiều việc đã xong');
+  const withPhoto = P.buildJobs(c, { storyId: 's', photo: 'C:\\a.jpg', accounts: 3 });
+  assert.deepEqual(withPhoto.filter(j => j.phase === 'image').map(j => [j.number, j.needs, j.refList]), [[2, [], [{ file: 'C:\\a.jpg' }]], [3, [], [{ file: 'C:\\a.jpg' }]]]);
+  assert.ok(P.buildJobs(c, { storyId: 's', accounts: 1 }).every(j => j.phase === 'clip' || j.number === 1), 'một tài khoản: không có ảnh mốc');
+  assert.ok(P.buildJobs(c, { storyId: 's', accounts: 4 }).length <= 740);
+});
+
+test('các đoạn chạy thật sự song song trên nhiều tài khoản, mỗi đoạn vẫn nối tiếp bằng khung cuối', async () => {
+  const c = P.options({ theme: 'cabin', minutes: 3 });                           // 23 cảnh → 3 đoạn
+  const jobs = P.buildJobs(c, { storyId: 'S', photo: '', accounts: 3 });
+  let running = 0, max = 0; const refs = {};
+  const q = new Queue({ save: async () => {}, concurrency: 3, accounts: 3, gateWaitMs: 2, run: async (j, slot) => {
+    j.account = slot + 1; running++; max = Math.max(max, running);
+    refs[j.phase + j.number] = [...j.references];
+    await new Promise(r => setTimeout(r, 3)); running--;
+    if (j.phase === 'clip') j.lastFrame = `/f/${j.number}.png`;
+    return j.phase === 'image' ? `/a/${j.number}.png` : `/v/${j.number}.mp4`;
+  } });
+  await q.add(jobs);
+  await q.start('restore');
+  assert.ok(q.jobs.every(j => j.status === 'completed'), q.jobs.filter(j => j.status !== 'completed').length + ' việc chưa xong');
+  assert.ok(max >= 2, 'có ít nhất 2 cảnh chạy cùng lúc: ' + max);
+  const starts = P.segmentsOf(c, 3);
+  assert.deepEqual(refs['clip1'], ['/a/1.png']);
+  assert.deepEqual(refs['clip' + (starts[1] + 1)], ['/a/2.png'], 'đầu đoạn 2 dùng ảnh mốc 2');
+  assert.deepEqual(refs['clip' + (starts[2] + 1)], ['/a/3.png']);
+  assert.deepEqual(refs['clip2'], ['/f/1.png'], 'trong đoạn dùng khung cuối cảnh trước');
+  assert.deepEqual(refs['clip' + (starts[1] + 2)], ['/f/' + (starts[1] + 1) + '.png']);
+});

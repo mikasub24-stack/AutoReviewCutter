@@ -77,6 +77,24 @@ test('dựng nhiều clip chia thành nhiều đoạn rồi ghép, đủ thời 
   await fs.rm(dir, { recursive: true, force: true });
 });
 
+test('chỗ nối giữa các đoạn song song: mờ ra rồi vào, chỗ nối thường thì cắt cứng không mờ', opts, async () => {
+  const { dir, clip } = await workspace();
+  const base = [clip('1.mp4', 'smptebars'), clip('2.mp4', 'smptebars')];
+  const clips = Array.from({ length: 6 }, (_, i) => base[i % 2]);
+  const out = await R.assembleRestore({ clips, dir: path.join(dir, 'out'), name: 'Nối', aspect: '16:9', seams: [2, 4, 0, 6, 99, 'x'] });
+  const info = probe(out);
+  const expect = 6 - 3 / 24;   // chỉ 3 chỗ nối thường (1, 3, 5) bỏ khung trùng; 2 chỗ nối đoạn (2, 4) giữ nguyên
+  assert.ok(Math.abs(Number(info.format.duration) - expect) < 0.3, `dài ${info.format.duration}, cần ${expect}`);
+  const luma = t => { const r = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-ss', String(t), '-i', out, '-frames:v', '1', '-vf', 'scale=1:1,format=gray', '-f', 'rawvideo', '-']); assert.equal(r.status, 0, String(r.stderr)); return r.stdout[0]; };
+  const seg = 1 + (1 - 1 / 24);                      // đoạn 1 gồm 2 clip, đã bỏ một khung trùng
+  assert.ok(luma(seg - 0.04) < 40, 'cuối đoạn phải gần đen: ' + luma(seg - 0.04));
+  assert.ok(luma(seg + 0.04) < 40, 'đầu đoạn kế phải gần đen: ' + luma(seg + 0.04));
+  assert.ok(luma(seg + 0.6) > 80, 'giữa đoạn phải sáng: ' + luma(seg + 0.6));
+  assert.ok(luma(0.99) > 80, 'chỗ nối thường (giữa đoạn) không được mờ: ' + luma(0.99));
+  assert.deepEqual((await fs.readdir(path.join(dir, 'out'))).filter(n => n.startsWith('.')), []);
+  await fs.rm(dir, { recursive: true, force: true });
+});
+
 test('thiếu clip hoặc danh sách rỗng thì báo lỗi rõ', opts, async () => {
   await assert.rejects(R.assembleRestore({ clips: [], dir: os.tmpdir() }), /Chưa có clip/);
   await assert.rejects(R.assembleRestore({ clips: ['/không/có/tệp.mp4'], dir: os.tmpdir() }), /Không thấy tệp clip/);

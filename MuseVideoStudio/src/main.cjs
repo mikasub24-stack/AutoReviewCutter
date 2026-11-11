@@ -336,7 +336,8 @@ async function saveImages(muse,job,signal,count) {
 function transientDOM(error){return error?.code==='MUSE_DOM_TIMEOUT'||/Execution context was destroyed|context.*destroyed|Target closed|navigation|not respond|chưa phản hồi/i.test(error?.message||'');}
 async function runJob(job,worker,signal,{recover=false}={}) {
   const pinned=recover||Boolean(job.resumeMode);
-  const pickNext=()=>{for(let tries=0;tries<settings.accountCount;tries++){const next=nextAccount++%settings.accountCount;if(!(job.avoidAccounts||[]).includes(next+1))return next;}return nextAccount++%settings.accountCount;};
+  const rest=job.kind==='restore'?queue.exhaustedAccounts():[];   // tài khoản đang nghỉ vì hết hạn mức thì bỏ qua (nếu còn tài khoản khác)
+  const pickNext=()=>{for(let tries=0;tries<settings.accountCount;tries++){const next=nextAccount++%settings.accountCount;if(!(job.avoidAccounts||[]).includes(next+1)&&!rest.includes(next+1))return next;}return nextAccount++%settings.accountCount;};
   const slot=pinned&&job.account?Number(job.account)-1:settings.dispatchMode==='parallel'?worker:pickNext();
   validAccount(slot);
   const muse=browsers.get(slot),check=()=>{if(signal.aborted)throw stoppedError();},step=p=>abortable(p,signal);
@@ -497,7 +498,7 @@ async function remoteStopJob(job){
 async function stopAll(){
   if(stopping){while(stopping)await delay(50);return snapshot();}
   storyAnalyzer?.cancel();
-  stopping=true;lastStopAt=Date.now();runEpoch++;starting=false;probeController?.abort();queue.pause();
+  stopping=true;lastStopAt=Date.now();clearTimeout(quotaTimer);quotaTimer=null;runEpoch++;starting=false;probeController?.abort();queue.pause();
   const probes=[...browserTests.values()].filter(t=>testing&&t.mayHaveSubmitted&&t.status!=='ready').map(t=>({id:t.id,trackerId:t.id,account:t.index+1,mayHaveSubmitted:true}));
   const jobs=[...queue.jobs.filter(j=>!probes.some(t=>t.account===j.account)&&(j.status==='running'||(['failed','interrupted'].includes(j.status)&&j.mayHaveSubmitted&&!['confirmed','ui-stopped'].includes(j.remoteStop?.state)))),...probes];notify();
   const requests=jobs.map(remoteStopJob);
@@ -568,7 +569,7 @@ async function buildRestoreStory(storyId){
   restoreState={busy:true,progress:'Chuẩn bị dựng video…',error:'',storyId};notify();
   try{
     await licenseManager.requireLongTerm();
-    const file=await assembleRestore({clips:clips.map(j=>j.output),dir:restoreFolder(settings.output,storyId),name:meta.name||storyId,ffmpeg:settings.ffmpeg,aspect:meta.aspect,music:meta.music,onProgress:t=>{restoreState.progress=t;notify();}});
+    const file=await assembleRestore({clips:clips.map(j=>j.output),dir:restoreFolder(settings.output,storyId),name:meta.name||storyId,ffmpeg:settings.ffmpeg,aspect:meta.aspect,music:meta.music,seams:meta.seams,onProgress:t=>{restoreState.progress=t;notify();}});
     Object.assign(meta,{output:file,builtAt:Date.now(),clipSig:clips.map(j=>j.output).join('|')});
     restoreState={busy:false,progress:'Video đã dựng xong',error:'',storyId};
   }catch(e){restoreState={busy:false,progress:'',error:e.message,storyId};}
@@ -588,6 +589,19 @@ async function buildRestoreStories({auto=false}={}){
 // Không thử lại lỗi giấy phép / thiếu FFmpeg (thử lại cũng vô ích), và không đụng việc người dùng đã bấm Dừng (cảnh «bị gián đoạn», không phải «lỗi»).
 const RESTORE_RETRIES=3,RESTORE_RETRY_WAIT=90000;
 let restoreRetrying=false,lastStopAt=0;
+// Mọi tài khoản đều hết hạn mức: hàng đợi tạm dừng; hẹn giờ tự chạy lại khi tài khoản đầu tiên hết nghỉ (không cần ai bấm). Bấm Dừng thì hủy hẹn.
+let quotaTimer=null;
+function restoreQuotaResume(){
+  if(quotaTimer||flushingQuit||!queue.paused||!queue.allExhausted())return;
+  if(!queue.jobs.some(j=>j.kind==='restore'&&j.status==='pending'))return;
+  const wait=Math.max(5000,queue.nextExhaustedAt()-Date.now()+5000),t0=Date.now();
+  quotaTimer=setTimeout(async()=>{
+    quotaTimer=null;
+    if(flushingQuit||lastStopAt>=t0||queue.active||starting)return;
+    try{await handlers.start({kind:'restore',auto:true});}catch{/* lần dừng kế tiếp sẽ hẹn lại */}
+  },wait);
+  notify();
+}
 async function restoreAutoRetry({retry,start}){
   if(restoreRetrying||stopping||flushingQuit||queue.active||starting||merging||packaging)return;
   const job=queue.jobs.find(j=>j.kind==='restore'&&j.status==='failed'&&(j.autoRetries||0)<RESTORE_RETRIES&&!/gói Năm|Vĩnh viễn|FFmpeg|ffprobe|key/i.test(j.error||''));
@@ -604,6 +618,8 @@ async function restoreAutoRetry({retry,start}){
       :`Cảnh lỗi: tự thử lại lần ${job.autoRetries}/${RESTORE_RETRIES} sau ${RESTORE_RETRY_WAIT/1000} giây · ${why}`;notify();
     await delay(RESTORE_RETRY_WAIT);
     if(stopping||flushingQuit||queue.active||starting||job.status!=='failed'||lastStopAt>=t0)return;
+    const failedOn=Number(job.account)||0;   // thử lại ở tài khoản khác nếu có
+    if(failedOn&&settings.accountCount>1)job.avoidAccounts=[...new Set([...(job.avoidAccounts||[]),failedOn])];
     await retry(job.id);
     await start();
   }catch(e){job.stageMessage='Tự thử lại không được: '+e.message;}
@@ -640,7 +656,7 @@ app.whenReady().then(async () => {
   if (stored.configVersion !== 2) { settings.autoMerge = false; settings.autoPackage = false; }
   mergedOutput = stored.mergedOutput || ''; mergeError = stored.mergeError || '';
   editPackageDir = stored.editPackageDir || ''; packageError = stored.packageError || '';
-  queue = new Queue({ jobs: stored.jobs || [], save, run: runJob, notify });
+  queue = new Queue({ jobs: stored.jobs || [], save, run: runJob, notify, accounts: () => settings.accountCount });
   voiceService=createVoiceService({dataDir:app.getPath('userData'),getFfmpeg:()=>settings.ffmpeg,notify});await voiceService.load();voiceService.refreshCatalog().catch(()=>{});
   storyService=createStoryService({getSettings:()=>settings,getJobs:()=>queue.jobs,voice:voiceService,ensureAllowed:()=>licenseManager.ensureAllowed(),notify,userDataDir:app.getPath('userData')});
   storyAnalyzer=createStoryAnalyzer({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.ensureAllowed()});
@@ -836,6 +852,7 @@ app.whenReady().then(async () => {
         const unavailable=queue.jobs.find(j=>j.kind===kind&&j.account>settings.accountCount&&(['failed','interrupted'].includes(j.status)||j.resumeMode));
         if(unavailable)throw Error('Cảnh đang dở gắn với tài khoản '+unavailable.account+'. Chọn đủ tài khoản trước khi Tiếp tục.');
         queue.prepareResume(kind);
+        if(!data?.auto)queue.exhausted.clear();   // người dùng bấm chạy tay: thử lại mọi tài khoản, kể cả tài khoản đang nghỉ
         queue.concurrency=settings.dispatchMode==='parallel'?settings.accountCount:1;
         queue.start(kind).then(async()=>{
           const videos=queue.jobs.filter(j=>j.kind==='video');
@@ -843,7 +860,7 @@ app.whenReady().then(async () => {
             if(settings.autoMerge) await mergeProject();else if(settings.autoPackage) await packageProject();
           }
           if(kind==='restore' && !queue.paused && !flushingQuit) await buildRestoreStories({auto:true});
-          if(kind==='restore' && queue.paused && !flushingQuit) void restoreAutoRetry({retry:id=>handlers.retry(id),start:()=>handlers.start({kind:'restore'})});
+          if(kind==='restore' && queue.paused && !flushingQuit){ void restoreAutoRetry({retry:id=>handlers.retry(id),start:()=>handlers.start({kind:'restore',auto:true})}); restoreQuotaResume(); }
         }).catch(e=>dialog.showErrorBox(ui('Lỗi xử lý hàng đợi','Queue processing error'),e.message)).finally(notify);
         return snapshot();
       } catch(e){startError=e.message;throw e;} finally {if(epoch===runEpoch)starting=false;notify();}
@@ -877,7 +894,7 @@ app.whenReady().then(async () => {
         music=path.join(folder,'nhac-nen'+path.extname(meta.music).toLowerCase());await fs.copyFile(meta.music,music);
       }
       const all=settings.restoreStories||(settings.restoreStories={});
-      all[storyId]={name:String(meta.name||storyId).slice(0,120),aspect:['16:9','9:16'].includes(meta.aspect)?meta.aspect:'16:9',music,auto:meta.auto!==false,theme:String(meta.theme||'').slice(0,40),createdAt:Date.now()};
+      all[storyId]={name:String(meta.name||storyId).slice(0,120),aspect:['16:9','9:16'].includes(meta.aspect)?meta.aspect:'16:9',music,seams:Array.isArray(meta.seams)?meta.seams.map(Number).filter(n=>Number.isInteger(n)&&n>0&&n<1000).slice(0,20):[],auto:meta.auto!==false,theme:String(meta.theme||'').slice(0,40),createdAt:Date.now()};
       for(const id of Object.keys(all).slice(0,Math.max(0,Object.keys(all).length-40)))delete all[id];
       await queue.add(jobs);
       await save();notify();

@@ -521,3 +521,56 @@ test('restore: tab khác không chạy việc của restore; applyReferences kh�
   await q3.add([{ kind: 'restore', storyId: 'Z', phase: 'clip', number: 1, prompt: 'p', needs: [{ phase: 'hack', number: 1 }, { phase: 'clip', number: 'x' }, null, { phase: 'clip', number: 2 }], refList: [{ file: '' }, { phase: 'clip', number: 2, part: 'zzz' }, { evil: 1 }] }]);
   assert.deepEqual(q3.jobs[0].needs, [{ phase: 'clip', number: 2 }]); assert.deepEqual(q3.jobs[0].refList, [{ phase: 'clip', number: 2 }]);
 });
+
+// ---- Tab «Dọn nhà · Sinh tồn»: tài khoản hết hạn mức thì cảnh tự chuyển sang tài khoản khác ----
+const solo = (storyId, n = 3) => Array.from({ length: n }, (_, k) => ({ kind: 'restore', storyId, phase: 'clip', number: k + 1, prompt: `${storyId}-${k + 1}`, needs: k ? [{ phase: 'clip', number: k }] : [], refList: k ? [{ phase: 'clip', number: k, part: 'lastFrame' }] : [{ file: '/p.png' }] }));
+test('restore: tài khoản 1 báo hết hạn mức → cảnh chuyển sang tài khoản khác, tài khoản 1 nghỉ, hàng đợi không dừng', async () => {
+  const used = [];
+  let limited = false;
+  const q = new Queue({ ...base, concurrency: 2, accounts: 2, gateWaitMs: 5, run: async (j, slot) => {
+    j.account = slot + 1; used.push([j.prompt, slot + 1]);
+    await new Promise(r => setTimeout(r, 10));
+    if (slot === 0 && !limited) { limited = true; throw Error('You have reached your daily limit for video generation.'); }
+    j.lastFrame = `/f/${j.prompt}.png`; return `/v/${j.prompt}.mp4`;
+  } });
+  await q.add([...solo('A'), ...solo('B')]);
+  await q.start('restore');
+  assert.ok(q.jobs.every(j => j.status === 'completed'), q.jobs.map(j => j.status).join());
+  assert.equal(q.paused, false, 'không tạm dừng khi còn tài khoản khác');
+  const failedJob = q.jobs.find(j => j.quotaMoves);
+  assert.ok(failedJob && failedJob.quotaMoves === 1);
+  assert.deepEqual(failedJob.avoidAccounts === undefined ? [] : failedJob.avoidAccounts, [], 'xong thì bỏ danh sách tránh');
+  assert.equal(q.isExhausted(1), true, 'tài khoản 1 đang nghỉ');
+  const after = used.slice(used.findIndex(([, a], i) => a === 1 && i >= 0) + 1);
+  assert.ok(after.every(([, a]) => a === 2), 'sau khi hết hạn mức chỉ tài khoản 2 chạy: ' + JSON.stringify(used));
+});
+test('restore: mọi tài khoản hết hạn mức → tạm dừng, cảnh vẫn «đang chờ», có giờ hết nghỉ; bấm chạy tay thì thử lại', async () => {
+  let blocked = true; const used = [];
+  const q = new Queue({ ...base, concurrency: 2, accounts: 2, gateWaitMs: 5, run: async (j, slot) => {
+    j.account = slot + 1; used.push(slot + 1);
+    await new Promise(r => setTimeout(r, 5));
+    if (blocked) throw Error('Hết hạn mức tạo video hôm nay, quay lại vào ngày mai.');
+    j.lastFrame = '/f.png'; return '/v/' + j.prompt + '.mp4';
+  } });
+  await q.add([...solo('A', 2), ...solo('B', 2)]);
+  await q.start('restore');
+  assert.equal(q.paused, true);
+  assert.ok(q.allExhausted());
+  assert.ok(q.jobs.filter(j => j.status === 'pending').length >= 2 && !q.jobs.some(j => j.status === 'failed'), q.jobs.map(j => j.status).join());
+  assert.ok(q.nextExhaustedAt() > Date.now() + 3600 * 1000);
+  assert.ok(q.jobs.some(j => /Mọi tài khoản đã hết hạn mức/.test(j.stageMessage)), 'có dòng báo mọi tài khoản đã hết hạn mức');
+  blocked = false; q.exhausted.clear();   // người dùng bấm chạy tay
+  await q.start('restore');
+  assert.ok(q.jobs.every(j => j.status === 'completed'));
+});
+test('restore: lỗi thường (không phải hết hạn mức) vẫn dừng hàng đợi như cũ; tab khác không bao giờ tự chuyển tài khoản', async () => {
+  const q = new Queue({ ...base, concurrency: 2, accounts: 2, run: async j => { j.account = 1; throw Error('Mạng bị ngắt.'); } });
+  await q.add(solo('A', 1));
+  await q.start('restore');
+  assert.equal(q.jobs[0].status, 'failed'); assert.equal(q.paused, true); assert.equal(q.exhausted.size, 0);
+  const v = new Queue({ ...base, concurrency: 2, accounts: 2, run: async j => { j.account = 1; throw Error('Daily limit reached'); } });
+  await v.add([{ kind: 'video', prompt: 'v1' }]);
+  await v.start('video');
+  assert.equal(v.jobs[0].status, 'failed', 'tab Video giữ hành vi cũ');
+  assert.equal(v.exhausted.size, 0);
+});

@@ -32,6 +32,9 @@ function resetRunFields(job, stage='pending') {
   return job;
 }
 const PROMPT_MAX=20000;
+// Muse báo tài khoản hết lượt / hạn mức tạo video (chưa có chữ chính xác của Muse nên nhận theo nhiều cách nói).
+const QUOTA=/hết (lượt|hạn mức)|hạn mức|đã đạt giới hạn|vượt (quá )?giới hạn|đã dùng hết|daily (limit|quota)|usage limit|generation limit|limit (has been )?reached|reached (your|the|today'?s?)\b.{0,40}\blimit|quota|out of (credits|generations)|no (credits|generations) (left|remaining)|too many (requests|videos|generations)|rate limit|try again (tomorrow|later)|come back (tomorrow|later)|quay lại (sau|vào ngày mai)/i;
+const QUOTA_REST_MS=3*3600*1000,QUOTA_MAX_MOVES=40;
 function checkPrompt(value){
   const text=String(value??'').trim();
   if(!text)throw Error('Prompt không được để trống.');
@@ -44,10 +47,17 @@ function applyPrompt(job,text){
   if(job.lockedInput)job.lockedInput={...job.lockedInput,prompt:text,promptHash:createHash('sha256').update(text).digest('hex')};
 }
 class Queue {
-  constructor({jobs=[],save,run,notify=()=>{},concurrency=1}){
+  constructor({jobs=[],save,run,notify=()=>{},concurrency=1,accounts=null,gateWaitMs}){
     this.jobs=jobs.map((j,index)=>({...j,kind:kindOf(j.kind),order:Number.isSafeInteger(j.order)&&j.order>0?j.order:index+1,status:j.status==='running'?'interrupted':j.status}));
     this.save=save;this.run=run;this.notify=notify;this.active=false;this.paused=true;this.kind=null;this.concurrency=concurrency;this.writes=Promise.resolve();this.controllers=new Map();this.cancels=new Map();this.runningPromise=null;
+    this.accounts=accounts;this.exhausted=new Map();if(gateWaitMs!==undefined)this.gateWaitMs=gateWaitMs;
   }
+  // Tab «Dọn nhà · Sinh tồn»: tài khoản báo hết hạn mức tạo video thì nghỉ một lúc, cảnh đó tự chuyển sang tài khoản khác (không dừng hàng đợi, không bắt bấm tay).
+  accountTotal(){return Math.max(1,Number(typeof this.accounts==='function'?this.accounts():this.accounts)||this.concurrency||1);}
+  exhaustedAccounts(){const now=Date.now();for(const [a,t] of this.exhausted)if(t<=now)this.exhausted.delete(a);return [...this.exhausted.keys()];}
+  isExhausted(account){return this.exhaustedAccounts().includes(Number(account));}
+  allExhausted(){return this.exhaustedAccounts().length>=this.accountTotal();}
+  nextExhaustedAt(){return Math.min(...this.exhausted.values());}
   async publish(){const p=this.writes.then(()=>this.save(this.jobs));this.writes=p.catch(()=>{});await p;this.notify(this.jobs);}
   async add(items){
     if(!Array.isArray(items)||!items.length||items.some(j=>typeof j.prompt!=='string'||!j.prompt.trim()))throw Error('Mỗi tác vụ cần một prompt.');
@@ -181,6 +191,15 @@ class Queue {
           if(cancel.mode==='other'&&from)job.avoidAccounts=[...new Set([...(job.avoidAccounts||[]),from])];
         }
         else{job.status='interrupted';job.stage='interrupted';job.error='Đã dừng cảnh này. Bấm «Tìm / tải video đã tạo» để lấy kết quả nếu Muse đã làm xong, hoặc «Gửi lại prompt».';job.stageMessage=job.error;}
+      }else if(job.kind==='restore'&&Number(job.account)>0&&!controller.signal.aborted&&error?.name!=='AbortError'&&QUOTA.test(error?.message||'')&&(job.quotaMoves||0)<QUOTA_MAX_MOVES){
+        // Tài khoản hết hạn mức: nghỉ tài khoản đó, đưa cảnh về «đang chờ» để tài khoản khác nhận. Hết mọi tài khoản thì tạm dừng (main tự chạy lại khi có tài khoản hết nghỉ).
+        const from=Number(job.account),why=error.message;
+        this.exhausted.set(from,Date.now()+QUOTA_REST_MS);
+        job.quotaMoves=(job.quotaMoves||0)+1;
+        delete job.resumeMode;delete job.late;resetRunFields(job);job.status='pending';
+        job.avoidAccounts=[...new Set([...(job.avoidAccounts||[]),from])];
+        if(this.allExhausted()){this.paused=true;job.stageMessage=`Mọi tài khoản đã hết hạn mức tạo video: tự chạy lại khi có tài khoản dùng được · ${why}`;}
+        else job.stageMessage=`Tài khoản ${from} hết hạn mức tạo video: tự chuyển cảnh này sang tài khoản khác · ${why}`;
       }else{
         job.status=controller.signal.aborted||error?.name==='AbortError'?'interrupted':'failed';
         job.stage=job.status;job.error=error?.message||(isPhoto(job)?'Không xử lý được tác vụ ảnh.':'Không xử lý được tác vụ video.');job.stageMessage=job.error;this.paused=true;
@@ -212,9 +231,10 @@ class Queue {
     this.runningPromise=(async()=>{
       const worker=async slot=>{
         while(!this.paused){
-          let job=null,waiting=false;
+          let job=null,waiting=false,resting=false;
           for(const x of this.jobs){
             if(x.status!=='pending'||(this.kind&&x.kind!==this.kind)||!(!x.resumeMode||this.concurrency===1||x.account===slot+1||!x.account)||this.avoids(x,slot))continue;
+            if(x.kind==='restore'&&this.concurrency>1&&this.isExhausted(slot+1)&&!this.allExhausted()){resting=true;continue;}
             const gate=this.gate(x);
             if(gate==='ready'){job=x;break;}
             if(gate==='wait')waiting=true;
@@ -222,7 +242,7 @@ class Queue {
           // Worker rảnh không thoát khi tài khoản khác còn đang chạy cảnh: cảnh đó có thể bị chuyển sang tài khoản này («Thử tài khoản khác»).
           if(!job){
             const busy=this.concurrency>1&&this.jobs.some(x=>x.status==='running'&&(!this.kind||x.kind===this.kind));
-            if((waiting||busy)&&!this.paused){await new Promise(r=>setTimeout(r,this.gateWaitMs??300));continue;}
+            if((waiting||busy||(resting&&busy))&&!this.paused){await new Promise(r=>setTimeout(r,this.gateWaitMs??300));continue;}
             break;
           }
           this.attachImage(job);
@@ -263,4 +283,4 @@ class Queue {
     return this.runningPromise;
   }
 }
-module.exports={Queue,stoppedError,abortable};
+module.exports={Queue,stoppedError,abortable,QUOTA};

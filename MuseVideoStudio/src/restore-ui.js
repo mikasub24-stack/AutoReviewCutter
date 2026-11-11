@@ -20,6 +20,14 @@
     const minNow = min.value || String(saved.minutes || 2), secNow = secs.value || String(saved.seconds || 8);
     min.replaceChildren(...P.MINUTES.map(m => { const o = document.createElement('option'); o.value = String(m); o.textContent = lang() === 'vi' ? `${m} phút` : `${m} min`; return o; }));
     secs.replaceChildren(...P.SECONDS.map(n => { const o = document.createElement('option'); o.value = String(n); o.textContent = lang() === 'vi' ? `${n} giây` : `${n} s`; return o; }));
+    const par = $('restoreParallel'), parNow = par.value || String(saved.parallel || 'auto');
+    par.replaceChildren(...['auto', 1, 2, 3, 4, 5, 6, 8, 10].map(v => {
+      const o = document.createElement('option'); o.value = String(v);
+      o.textContent = v === 'auto' ? tr('Tự động: dùng hết các tài khoản đã cài', 'Automatic: use all the accounts you set up')
+        : v === 1 ? tr('1 chuỗi (đồng nhất nhất, chậm)', '1 chain (most consistent, slow)') : tr(`${v} đoạn cùng lúc`, `${v} parts at once`);
+      return o;
+    }));
+    par.value = [...par.options].some(o => o.value === parNow) ? parNow : 'auto';
     min.value = P.MINUTES.includes(Number(minNow)) ? minNow : '2';
     secs.value = P.SECONDS.includes(Number(secNow)) ? secNow : '8';
   }
@@ -27,14 +35,14 @@
   // ---- cấu hình đang chọn
   function config() {
     return P.options({
-      theme, name: $('restoreName').value, minutes: $('restoreMinutes').value, seconds: $('restoreSecs').value, aspect: $('restoreAspect').value, camera: $('restoreCamera').value, place: $('restorePlace').value,
+      theme, name: $('restoreName').value, parallel: $('restoreParallel').value, minutes: $('restoreMinutes').value, seconds: $('restoreSecs').value, aspect: $('restoreAspect').value, camera: $('restoreCamera').value, place: $('restorePlace').value,
       person: $('restorePerson').checked, personDesc: $('restorePersonDesc').value, light: $('restoreLight').value, anchor: $('restoreAnchor').checked, faceless: $('restoreFaceless').checked,
       customSteps: $('restoreCustom').value, lang: lang()
     });
   }
   function remember() {
     Object.assign(saved, {
-      theme, minutes: Number($('restoreMinutes').value), seconds: Number($('restoreSecs').value), aspect: $('restoreAspect').value, camera: $('restoreCamera').value, place: $('restorePlace').value,
+      theme, parallel: $('restoreParallel').value, minutes: Number($('restoreMinutes').value), seconds: Number($('restoreSecs').value), aspect: $('restoreAspect').value, camera: $('restoreCamera').value, place: $('restorePlace').value,
       person: $('restorePerson').checked, personDesc: $('restorePersonDesc').value, light: $('restoreLight').value, anchor: $('restoreAnchor').checked, faceless: $('restoreFaceless').checked,
       custom: $('restoreCustom').value, auto: $('restoreAuto').checked
     });
@@ -65,6 +73,8 @@
     if (t.forceVaried) { camera.value = 'varied'; camera.disabled = true; } else { camera.disabled = false; camera.value = saved.camera === 'fixed' ? 'fixed' : 'varied'; }
     $('restoreCustomLabel').hidden = t.id !== 'custom';
   }
+  // Số tài khoản chạy song song thật sự (chế độ «Lần lượt» chỉ dùng 1).
+  const accountsNow = () => { const st = (typeof state !== 'undefined' && state && state.settings) || {}; return st.dispatchMode === 'parallel' ? Math.max(1, Number(st.accountCount) || 1) : 1; };
   function renderCount() {
     const secs = $('restoreSecs'), long = Number($('restoreMinutes').value) >= P.LONG_MINUTES;
     // Từ 20 phút ép 10 giây; đổi về số phút ngắn hơn thì trả lại số giây người dùng đã chọn.
@@ -77,6 +87,10 @@
     if (long) text += ' ' + tr('Từ 20 phút tool dùng cảnh 10 giây. Video rất dài có thể chạy nhiều giờ; tool tự thử lại cảnh lỗi nhưng hình có thể lệch dần, nên thử 1–3 phút trước.', 'From 20 minutes the tool uses 10-second scenes. A very long video can run for hours; the tool retries failed scenes by itself, but the picture can drift, so try 1–3 minutes first.');
     if (Number($('restoreMinutes').value) >= P.VERY_LONG_MINUTES) text += ' ' + tr(`⚠ ${n} cảnh nối tiếp là rất nhiều: có thể chạy cả ngày hoặc nhiều ngày, tốn khoảng ${Math.ceil(n * 12 / 1024 * 10) / 10} GB ổ đĩa (tạm tính 12 MB mỗi cảnh) và nhiều lượt Muse. Hình càng về sau càng dễ lệch; nên thử 1–3 phút trước, hoặc làm nhiều video ngắn rồi ghép.`, `⚠ ${n} chained scenes is a lot: it can run for a day or several days, uses about ${Math.ceil(n * 12 / 1024 * 10) / 10} GB of disk (roughly 12 MB per scene) and many Muse credits. The picture drifts more and more; try 1–3 minutes first, or make several short videos and join them.`);
     else if (n > 30) text += ' ' + tr('Video dài: càng nhiều cảnh nối tiếp thì hình càng dễ lệch dần, nên thử 1–3 phút trước.', 'Long video: the more chained scenes, the more the picture can drift; try 1–3 minutes first.');
+    const segs = P.segmentsOf(c, accountsNow()).length;
+    if (segs > 1) text += ' ' + tr(`Chạy song song ${segs} đoạn trên ${segs} tài khoản (mỗi đoạn khoảng ${Math.ceil(n / segs)} cảnh nối tiếp), nhanh hơn khoảng ${segs} lần. Chỗ nối giữa các đoạn dựng từ ảnh mốc Muse tạo nên nhà và người ở chỗ nối có thể hơi khác một chút (tool làm mờ nhẹ chỗ nối). Chọn «1 chuỗi» nếu cần đồng nhất tuyệt đối.`,
+      `Runs ${segs} parts in parallel on ${segs} accounts (about ${Math.ceil(n / segs)} chained scenes each), roughly ${segs}× faster. The joins between parts are built from key images made by Muse, so the house and the person can look slightly different at a join (the tool fades the join). Choose “1 chain” if you need perfect consistency.`);
+    else if (accountsNow() > 1 && n >= P.MIN_SEGMENT * 2) text += ' ' + tr('Đang chạy 1 chuỗi nên chỉ dùng 1 tài khoản mỗi lần: rất chậm với video dài.', 'Running a single chain, so only one account is used at a time: very slow for long videos.');
     const names = P.screenConfig(c);
     if (names.length) text += ' ' + (P.problems(c, { hasPhoto: Boolean(photo) }).pop() || '');
     $('restoreCount').textContent = text;
@@ -106,10 +120,11 @@
     const problems = P.problems(c, { hasPhoto: Boolean(photo) });
     if (problems.length) { toast(problems[0]); return; }
     remember();
-    const jobs = P.buildJobs(c, { storyId: 'x', photo });
+    const accounts = accountsNow();
+    const jobs = P.buildJobs(c, { storyId: 'x', photo, accounts });
     $('restoreCreate').disabled = true;
     try {
-      const result = await call('restoreCreate', { jobs, idBase: P.storyIdBase(c), meta: { name: P.videoTitle(c), aspect: c.aspect, music, auto: $('restoreAuto').checked, theme } });
+      const result = await call('restoreCreate', { jobs, idBase: P.storyIdBase(c), meta: { name: P.videoTitle(c), aspect: c.aspect, music, seams: P.seamsOf(c, accounts), auto: $('restoreAuto').checked, theme } });
       if (result) {
         toast(result.startError
           ? tr('Đã thêm các cảnh nhưng chưa chạy được: ', 'Scenes added but could not start: ') + result.startError
@@ -155,6 +170,20 @@
       else if (allClips) text.textContent = tr('Đã đủ cảnh. Bấm «Dựng video» để dựng.', 'All scenes are ready. Click “Build video”.');
       else text.textContent = tr('Chờ chạy. Bấm «Chạy hàng đợi» ở dưới.', 'Waiting. Click “Run queue” below.');
       const actions = document.createElement('div'); actions.className = 'restoreRunActions';
+      const busy = Boolean(s.active || s.starting), unfinished = list.some(j => ['pending', 'interrupted', 'failed'].includes(j.status));
+      if (busy) {
+        const stop = document.createElement('button'); stop.type = 'button'; stop.className = 'secondary';
+        stop.textContent = tr('Dừng', 'Stop'); stop.disabled = Boolean(s.stopping);
+        stop.onclick = async () => { const r = await call('stop'); if (r) { runsKey = ''; render(r); } };
+        actions.append(stop);
+      } else if (unfinished && !meta.output) {
+        const go = document.createElement('button'); go.type = 'button'; go.className = 'primary';
+        const started = list.some(j => j.startedAt || ['interrupted', 'failed', 'completed'].includes(j.status));
+        go.textContent = started ? tr('Tạo tiếp', 'Continue') : tr('Chạy', 'Run');
+        go.disabled = Boolean(s.stopping || s.merging || s.packaging || info.busy);
+        go.onclick = async () => { const r = await call('start', { kind: 'restore' }); if (r) { runsKey = ''; render(r); } };
+        actions.append(go);
+      }
       if (allClips) {
         const build = document.createElement('button'); build.type = 'button'; build.className = 'secondary';
         build.textContent = meta.output ? tr('Dựng lại video', 'Rebuild video') : tr('Dựng video', 'Build video');
@@ -209,7 +238,7 @@
   shownLang = lang();
   renderThemes(); syncTheme(); renderPhoto(); renderMusic(); renderCount();
 
-  for (const id of ['restoreMinutes', 'restoreSecs', 'restoreAspect', 'restoreCamera', 'restorePerson', 'restoreFaceless', 'restoreAnchor', 'restoreAuto']) $(id).onchange = () => { remember(); renderCount(); };
+  for (const id of ['restoreMinutes', 'restoreParallel', 'restoreSecs', 'restoreAspect', 'restoreCamera', 'restorePerson', 'restoreFaceless', 'restoreAnchor', 'restoreAuto']) $(id).onchange = () => { remember(); renderCount(); };
   for (const id of ['restorePlace', 'restorePersonDesc', 'restoreLight', 'restoreCustom']) $(id).oninput = () => { remember(); renderCount(); };
   $('restorePhoto').onclick = async () => { const list = await call('images', { multiple: false }); if (list && list[0]) { photo = list[0]; renderPhoto(); } };
   $('restorePhotoClear').onclick = () => { photo = ''; renderPhoto(); };

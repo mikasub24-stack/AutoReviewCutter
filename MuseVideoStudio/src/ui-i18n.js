@@ -734,6 +734,7 @@ Cố định một góc (giống nhau nhất)|One fixed angle (most consistent)
 Không lộ mặt (quay từ sau lưng hoặc ở xa: Muse ít từ chối hơn, người ít bị lệch giữa các cảnh)|Hide the face (filmed from behind or far away: Muse refuses less, and the person drifts less between scenes)
 Tên video (không bắt buộc; để trống thì lấy tên chủ đề)|Video name (optional; leave empty to use the topic name)
 Chưa có video hoàn chỉnh để lưu.|There is no finished video to save yet.
+Chạy song song|Run in parallel
 `.trim().split('\n').map(line=>line.split('|')));
   const norm=s=>String(s).replace(/\s+/g,' ').trim();
   let language='en';try{language=localStorage.getItem('museStudio.language')==='vi'?'vi':'en';}catch{}

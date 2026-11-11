@@ -17,7 +17,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.addInitScript(() => {
       localStorage.setItem('museStudio.language', localStorage.getItem('testLang') || 'vi');
       const s = {
-        version: '1.7.8', active: false, paused: true, jobs: [],
+        version: '1.7.9', active: false, paused: true, jobs: [],
         license: { status: 'active', plan: 'short', longTerm: false, device: 'TESTDEVICE', expiresAt: Date.now() + 86400000 * 30, message: 'Đã kích hoạt key.' },
         story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: false, clone: false }, platform: 'win32', edgeVoices: [], clones: [] } },
         restore: { busy: false, progress: '', error: '', storyId: '', stories: {} },
@@ -88,6 +88,20 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.match(long, /720 cảnh nối tiếp là rất nhiều/);
     assert.match(long, /GB ổ đĩa/);
 
+    // Chạy song song: ô chọn mặc định «Tự động»; một tài khoản thì 1 chuỗi, nhiều tài khoản (chế độ song song) thì chia đoạn.
+    assert.deepEqual(await page.$$eval('#restoreParallel option', els => els.map(e => e.value)), ['auto', '1', '2', '3', '4', '5', '6', '8', '10']);
+    assert.equal(await page.locator('#restoreParallel').inputValue(), 'auto');
+    await page.selectOption('#restoreMinutes', '30');
+    assert.doesNotMatch(await page.locator('#restoreCount').textContent(), /Chạy song song/);
+    await page.evaluate(() => { window.s.settings.dispatchMode = 'parallel'; window.s.settings.accountCount = 3; window.push(); });
+    await page.waitForFunction(() => /Chạy song song 3 đoạn trên 3 tài khoản/.test(document.getElementById('restoreCount').textContent));
+    await page.selectOption('#restoreParallel', '1');
+    assert.match(await page.locator('#restoreCount').textContent(), /Đang chạy 1 chuỗi/);
+    await page.selectOption('#restoreParallel', 'auto');
+    await page.evaluate(() => { window.s.settings.dispatchMode = 'sequential'; window.s.settings.accountCount = 1; window.push(); });
+    await page.waitForFunction(() => !/Chạy song song/.test(document.getElementById('restoreCount').textContent));
+    await page.selectOption('#restoreMinutes', '120');
+
     // Chủ đề sinh tồn: người luôn có, không tắt được; chủ đề khác cho cố định góc quay.
     await page.click('#restoreTheme [data-theme="cabin"]');
     assert.equal(await page.locator('#restorePerson').isChecked(), true);
@@ -130,6 +144,24 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.match(create.data.jobs[0].prompt, /aspect ratio 9:16/);
     assert.match(create.data.jobs[3].prompt, /căn nhà gạch hai tầng/);
 
+    // Nút chung như tab Truyện: «Chạy hàng đợi / Tiếp tục» và «Dừng» vẫn có ở tab này, gửi kind=restore.
+    await page.evaluate(() => window.push());
+    assert.equal(await page.locator('#start').isVisible(), true);
+    assert.equal(await page.locator('#pause').isVisible(), true);
+    await page.click('#start');
+    await page.waitForFunction(() => window.calls.some(c => c.name === 'start'));
+    assert.equal((await calls('start')).at(-1).data.kind, 'restore');
+    await page.evaluate(() => { window.s.active = true; window.s.paused = false; window.push(); });
+    await page.waitForSelector('#restoreRuns button:has-text("Dừng")');
+    await page.click('#restoreRuns button:has-text("Dừng")');
+    await page.waitForFunction(() => window.calls.some(c => c.name === 'stop'));
+    await page.evaluate(() => { window.s.active = false; window.s.paused = true; window.s.jobs[0].status = 'failed'; window.s.jobs[0].startedAt = new Date().toISOString(); window.push(); });
+    await page.waitForSelector('#restoreRuns button:has-text("Tạo tiếp")');
+    await page.click('#restoreRuns button:has-text("Tạo tiếp")');
+    await page.waitForFunction(() => window.calls.filter(c => c.name === 'start').length >= 2);
+    assert.equal((await calls('start')).at(-1).data.kind, 'restore');
+    await page.evaluate(() => { window.s.jobs[0].status = 'pending'; window.push(); });
+
     // Thẻ chạy: tiến độ, nút dựng video khi đủ cảnh.
     await page.evaluate(() => { for (const j of window.s.jobs) { j.status = 'completed'; j.output = 'C:\\Videos\\DonNha\\Don-nha-1\\' + j.number + '.mp4'; } window.push(); });
     await page.waitForSelector('#restoreRuns .restoreRun');
@@ -147,6 +179,21 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.click('#restoreRuns button:has-text("Dựng video")');
     await page.waitForFunction(() => window.calls.some(c => c.name === 'restoreBuild'));
     assert.equal((await calls('restoreBuild'))[0].data.storyId, 'Don-nha-1');
+
+    // Tạo khi có 3 tài khoản chạy song song: chia đoạn, có ảnh mốc, meta.seams đúng, mọi cảnh gắn cùng sổ cảnh.
+    await page.evaluate(() => { window.s.jobs.length = 0; window.s.settings.dispatchMode = 'parallel'; window.s.settings.accountCount = 3; window.push(); });
+    await page.selectOption('#restoreMinutes', '10');
+    await page.waitForFunction(() => /Chạy song song 3 đoạn/.test(document.getElementById('restoreCount').textContent));
+    await page.click('#restoreCreate');
+    await page.waitForFunction(() => window.calls.filter(c => c.name === 'restoreCreate').length >= 2);
+    const par = (await calls('restoreCreate')).at(-1).data;
+    assert.equal(par.meta.seams.length, 2, 'ba đoạn thì có hai chỗ nối');
+    assert.equal(par.jobs.filter(j => j.phase === 'image').length, 2, 'hai ảnh mốc cho hai đoạn sau (ảnh gốc có sẵn nên không tạo ảnh nền)');
+    assert.equal(par.jobs.filter(j => j.phase === 'clip').length, 75);
+    assert.ok(par.jobs.every(j => j.kind === 'restore'));
+    const firstOfSegment = par.jobs.find(j => j.phase === 'clip' && j.number === par.meta.seams[0] + 1);
+    assert.ok(firstOfSegment.needs.some(n => n.phase === 'image'), 'đầu đoạn 2 chờ ảnh mốc, không chờ khung cuối của clip trước');
+    assert.ok(!firstOfSegment.needs.some(n => n.phase === 'clip'));
 
     // Tiếng Anh: chữ động đổi theo ngôn ngữ.
     await page.evaluate(() => { localStorage.setItem('testLang', 'en'); });

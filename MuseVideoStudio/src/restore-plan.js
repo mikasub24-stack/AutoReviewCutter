@@ -9,6 +9,8 @@
   const MINUTES = [1, 2, 3, 5, 8, 10, 15, 20, 30, 40, 45, 50, 60, 90, 120];
   const LONG_MINUTES = 20;                              // từ mức này tool dùng cảnh 10 giây (tối đa của Muse) để bớt số cảnh nối tiếp
   const VERY_LONG_MINUTES = 30;                          // từ mức này chuỗi dài hàng trăm cảnh: cảnh báo thời gian và dung lượng
+  const MAX_PARALLEL = 10;                              // tối đa 10 tài khoản / trình duyệt
+  const MIN_SEGMENT = 6;                                // mỗi đoạn chạy song song có ít nhất 6 cảnh (ngắn hơn thì chỉ thêm chỗ nối, không nhanh thêm)
   const MAX_CLIPS = 720;                                // 120 phút ÷ 10 giây
   const SECONDS = [5, 6, 8, 10];
   const MAX_SECONDS = 10;
@@ -260,6 +262,7 @@
       lang: input.lang === 'en' ? 'en' : 'vi',
       light: clean(input.light, 200) || DEFAULT_LIGHT,
       anchor: Boolean(input.anchor),
+      parallel: input.parallel === 'auto' || input.parallel == null || input.parallel === '' ? 0 : Math.max(1, Math.min(MAX_PARALLEL, Math.round(Number(input.parallel)) || 1)),   // 0 = tự động theo số tài khoản
       camera: !theme.forceVaried && input.camera === 'fixed' ? 'fixed' : 'varied',   // nhà đi từ ngoài vào trong thì không thể cố định một góc      // xen kẽ cảnh xa / vừa / gần (như video làm nhà thật) hoặc một góc cố định
       faceless: Boolean(input.faceless),                 // mặc định CÓ mặt (như video mẫu); bật «không lộ mặt» thì Muse ít từ chối hơn và người ít bị lệch
       customSteps: custom
@@ -436,25 +439,74 @@
     return kept + '\n' + line;
   }
 
+  // Chia video thành các đoạn chạy SONG SONG (mỗi đoạn một chuỗi nối tiếp trên một tài khoản). Trả về chỉ số cảnh (từ 0) bắt đầu mỗi đoạn.
+  // accounts = số tài khoản đang chạy song song; parallel = 0 (tự động) thì dùng hết số tài khoản.
+  function segmentsOf(config, accounts = 1) {
+    const n = clipCount(config), want = config.parallel || Math.max(1, Math.min(MAX_PARALLEL, Number(accounts) || 1));
+    const count = Math.max(1, Math.min(want, MAX_PARALLEL, Math.floor(n / MIN_SEGMENT)));
+    return Array.from({ length: count }, (_, i) => Math.round(i * n / count));
+  }
+  const seamsOf = (config, accounts = 1) => segmentsOf(config, accounts).slice(1);
+
+  // Danh sách việc đầy đủ của chủ đề (để tả «đã xong những gì» cho ảnh mốc).
+  function fullSteps(config) {
+    const theme = themeOf(config.theme);
+    if (theme.id === 'custom') return config.customSteps.map(t => ({ en: t }));
+    return theme.steps.map(st => ({ en: st[1] }));
+  }
+  // Ảnh MỐC đầu mỗi đoạn song song: chỉnh từ ảnh gốc, giữ nguyên nhà / người / góc nhìn, chỉ đổi tiến độ công việc tới đúng chỗ đoạn này bắt đầu.
+  function keyframePrompt(config, step, clipIndex, total) {
+    const list = fullSteps(config), custom = themeOf(config.theme).id === 'custom' && !list.length;
+    let progress;
+    if (custom) progress = `the whole project is about ${Math.round(100 * clipIndex / total)}% complete, with clearly visible progress compared to the original photo`;
+    else {
+      const done = list.slice(0, step.step - 1).map(x => x.en), now = list[step.step - 1].en, pct = Math.round(100 * (step.part - 1) / step.parts);
+      progress = `${done.length ? `already finished: ${done.join('; ')}. ` : ''}Currently in progress: ${now}${pct ? ` (about ${pct}% of this step is done)` : ' (just starting)'}`;
+    }
+    return [
+      'Edit the attached photo. Keep exactly the same place, the same building or object, the same viewpoint and framing, the same light and the same person (same face, hair, body and clothes) as in the attached photo.',
+      `Change only the state of the work so that the picture shows this moment: ${progress}.`,
+      'Everything that is not mentioned keeps exactly the same shape, size, position and color as in the attached photo.',
+      IMG_RATIO[config.aspect],
+      'Wide shot that shows the whole place clearly.',
+      LOCKED,
+      SAFE_PEOPLE_IMAGE,
+      'Sharp, crisp, high-detail photograph look, natural colors and real textures; not animation, not a painting, not CGI.',
+      'No text, lettering, numbers, logos, watermarks or captions in the image.'
+    ].join('\n');
+  }
+
   // Việc đưa vào hàng đợi. Cảnh 1 làm từ ảnh gốc (ảnh người dùng chọn, hoặc ảnh Muse tạo trước); cảnh k>1 làm từ KHUNG CUỐI THẬT của cảnh k-1 (tool tự cắt bằng FFmpeg).
-  function buildJobs(config, { storyId, photo = '' } = {}) {
+  function buildJobs(config, { storyId, photo = '', accounts = 1 } = {}) {
     const steps = stepsOf(config), total = steps.length, jobs = [];
+    const starts = segmentsOf(config, accounts), startSet = new Set(starts.slice(1));
+    const source = photo ? { file: photo } : { phase: 'image', number: 1 };
     const base = photo ? null : { kind: 'restore', storyId, phase: 'image', number: 1, title: config.lang === 'en' ? 'Original photo' : 'Ảnh gốc', prompt: baseImagePrompt(config), references: [] };
     if (base) jobs.push(base);
     steps.forEach((step, i) => {
       const number = i + 1;
-      const needs = number === 1 ? (photo ? [] : [{ phase: 'image', number: 1 }]) : [{ phase: 'clip', number: number - 1 }];
-      const refList = number === 1 ? [photo ? { file: photo } : { phase: 'image', number: 1 }] : [{ phase: 'clip', number: number - 1, part: 'lastFrame' }];
-      if (config.anchor && number > 1) {
+      let needs, refList;
+      if (number === 1) { needs = photo ? [] : [{ phase: 'image', number: 1 }]; refList = [{ ...source }]; }
+      else if (startSet.has(i)) { const k = starts.indexOf(i) + 1; needs = [{ phase: 'image', number: k }]; refList = [{ phase: 'image', number: k }]; }   // đầu đoạn mới: từ ảnh mốc
+      else { needs = [{ phase: 'clip', number: number - 1 }]; refList = [{ phase: 'clip', number: number - 1, part: 'lastFrame' }]; }
+      if (config.anchor && number > 1 && !startSet.has(i)) {
         // Neo ảnh gốc (thử nghiệm): đính kèm thêm ảnh gốc làm mốc kiến trúc/người.
-        refList.push(photo ? { file: photo } : { phase: 'image', number: 1 });
+        refList.push({ ...source });
         if (!photo) needs.push({ phase: 'image', number: 1 });
       }
-      let prompt = clipPrompt(config, step, number, total, { first: number === 1 });
-      if (config.anchor && number > 1) prompt += '\nThe second attached image is only a reference of the ORIGINAL place and person: keep the architecture, the viewpoint and the person\'s face and clothes consistent with it, but the video itself must start from the FIRST attached image and show the progress already made.';
+      let prompt = clipPrompt(config, step, number, total, { first: number === 1 || startSet.has(i) });
+      if (config.anchor && number > 1 && !startSet.has(i)) prompt += '\nThe second attached image is only a reference of the ORIGINAL place and person: keep the architecture, the viewpoint and the person\'s face and clothes consistent with it, but the video itself must start from the FIRST attached image and show the progress already made.';
       jobs.push({
         kind: 'restore', storyId, phase: 'clip', number, title: step.title, prompt, durationSeconds: config.seconds,
         references: [], needs, refList
+      });
+    });
+    // Ảnh mốc (nằm sau các cảnh trong hàng đợi để đoạn đầu được ưu tiên): mỗi đoạn song song từ đoạn thứ 2 có một ảnh mốc làm từ ảnh gốc.
+    starts.slice(1).forEach((clipIndex, k) => {
+      jobs.push({
+        kind: 'restore', storyId, phase: 'image', number: k + 2, title: (config.lang === 'en' ? 'Part start ' : 'Mốc đoạn ') + (k + 2),
+        prompt: keyframePrompt(config, steps[clipIndex], clipIndex, total), references: [],
+        needs: photo ? [] : [{ phase: 'image', number: 1 }], refList: [{ ...source }]
       });
     });
     return jobs;
@@ -464,5 +516,5 @@
   function storyIdBase(config) { return slug(config.name) || slug(themeOf(config.theme).label) || 'DonNha'; }
   function videoTitle(config) { return config.name || text(config.theme, config.lang).label; }
 
-  return { ASPECTS, MINUTES, LONG_MINUTES, VERY_LONG_MINUTES, SECONDS, MAX_CLIPS, clipCount, THEMES, EN, text, themeOf, options, stepsOf, sceneBible, baseImagePrompt, clipPrompt, problems, screenText, screenConfig, isPolicyError, safeRetryPrompt, buildJobs, storyIdBase, videoTitle, SURVIVOR, WORKER, DEFAULT_LIGHT };
+  return { ASPECTS, MINUTES, LONG_MINUTES, VERY_LONG_MINUTES, SECONDS, MAX_CLIPS, clipCount, THEMES, EN, text, themeOf, options, stepsOf, sceneBible, baseImagePrompt, clipPrompt, segmentsOf, seamsOf, keyframePrompt, MAX_PARALLEL, MIN_SEGMENT, problems, screenText, screenConfig, isPolicyError, safeRetryPrompt, buildJobs, storyIdBase, videoTitle, SURVIVOR, WORKER, DEFAULT_LIGHT };
 });
