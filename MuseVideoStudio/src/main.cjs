@@ -898,6 +898,16 @@ app.whenReady().then(async () => {
       await buildRestoreStory(String(data.storyId));
       return snapshot();
     },
+    // «Lưu video…»: hộp «Lưu như…» để chọn nơi lưu và đặt tên cho bản sao MP4 hoàn chỉnh.
+    restoreSave: async data => {
+      const out=settings.restoreStories?.[String(data?.storyId||'')]?.output;
+      if(!out||!await fs.stat(out).then(s=>s.isFile(),()=>false))throw Error(ui('Chưa có video hoàn chỉnh để lưu.','There is no finished video to save yet.'));
+      const picked=await dialog.showSaveDialog(main,{title:ui('Lưu video về','Save video'),defaultPath:path.join(app.getPath('downloads'),path.basename(out)),filters:[{name:'MP4',extensions:['mp4']}]});
+      if(picked.canceled||!picked.filePath)return false;
+      const dest=/\.mp4$/i.test(picked.filePath)?picked.filePath:picked.filePath+'.mp4';
+      if(path.resolve(dest).toLowerCase()!==path.resolve(out).toLowerCase())await fs.copyFile(out,dest);
+      shell.showItemInFolder(dest);return{file:dest};
+    },
     restoreReveal: async data => { const out=settings.restoreStories?.[String(data?.storyId||'')]?.output;if(out)shell.showItemInFolder(out);return true; },
     chooseMusic: async () => { const r=await dialog.showOpenDialog(main,{properties:['openFile'],filters:[{name:ui('Nhạc nền','Background music'),extensions:['mp3','wav','m4a','aac','ogg','flac']}]});return r.canceled?'':r.filePaths[0]; },
     merge: async () => { await mergeProject(); return snapshot(); },

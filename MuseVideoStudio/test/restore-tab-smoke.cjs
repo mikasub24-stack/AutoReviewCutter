@@ -113,6 +113,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
 
     // Tạo cảnh: đúng 15 cảnh, cảnh 1 từ ảnh, cảnh sau lấy khung cuối cảnh trước, meta đúng.
     await page.selectOption('#restoreAspect', '9:16');
+    await page.fill('#restoreName', 'Nhà ma thành biệt thự');
     await page.click('#restoreCreate');
     await page.waitForFunction(() => window.calls.some(c => c.name === 'restoreCreate'));
     const [create] = await calls('restoreCreate');
@@ -121,6 +122,9 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.deepEqual(create.data.jobs[0].refList, [{ file: 'C:\\Refs\\nha.jpg' }]);
     assert.deepEqual(create.data.jobs[1].refList, [{ phase: 'clip', number: 1, part: 'lastFrame' }]);
     assert.equal(create.data.meta.aspect, '9:16');
+    assert.equal(create.data.meta.name, 'Nhà ma thành biệt thự');
+    assert.match(create.data.idBase, /^Nha-ma-thanh-biet-thu/);
+    assert.equal(await page.locator('#restoreName').inputValue(), '', 'ô tên được xóa sau khi tạo');
     assert.equal(create.data.meta.music, 'C:\\Music\\nen.mp3');
     assert.equal(create.data.meta.auto, true);
     assert.match(create.data.jobs[0].prompt, /aspect ratio 9:16/);
@@ -131,6 +135,15 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.waitForSelector('#restoreRuns .restoreRun');
     assert.match(await page.locator('#restoreRuns .restoreRun').first().textContent(), /15\/15 cảnh/);
     assert.match(await page.locator('#restoreRuns').textContent(), /Dựng video/);
+    // Sau khi dựng xong: nút «Lưu video…» mở hộp lưu (IPC restoreSave) và báo nơi đã lưu.
+    await page.evaluate(() => { window.s.restore.stories['Don-nha-1'].output = 'C:\\Videos\\DonNha\\Don-nha-1\\Nha ma.mp4'; window.push(); });
+    await page.waitForSelector('#restoreRuns button:has-text("Lưu video…")');
+    await page.evaluate(() => { const original = window.studio.invoke; window.studio.invoke = async (n, d) => n === 'restoreSave' ? (window.calls.push({ name: n, data: d }), { file: 'D:\\Video của tôi\\Nhà mới.mp4' }) : original(n, d); });
+    await page.click('#restoreRuns button:has-text("Lưu video…")');
+    await page.waitForFunction(() => window.calls.some(c => c.name === 'restoreSave'));
+    assert.equal((await calls('restoreSave'))[0].data.storyId, 'Don-nha-1');
+    await page.waitForFunction(() => /Nhà mới\.mp4/.test(document.body.textContent));
+    await page.evaluate(() => { delete window.s.restore.stories['Don-nha-1'].output; window.push(); });
     await page.click('#restoreRuns button:has-text("Dựng video")');
     await page.waitForFunction(() => window.calls.some(c => c.name === 'restoreBuild'));
     assert.equal((await calls('restoreBuild'))[0].data.storyId, 'Don-nha-1');

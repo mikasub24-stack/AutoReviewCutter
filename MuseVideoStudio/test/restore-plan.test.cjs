@@ -218,3 +218,16 @@ test('«cả ngôi nhà»: toàn cảnh rậm rạp → dọn ngoài → vào nh
   assert.match(P.clipPrompt(c, steps[5], 6, steps.length), /\(done by the person in the scene\)/);
   assert.doesNotMatch(P.baseImagePrompt(c), /nobody around/);
 });
+
+test('tên video: người dùng đặt tên thì dùng tên đó cho video và thư mục, để trống thì lấy tên chủ đề', () => {
+  const named = P.options({ theme: 'house_full', name: '  Nhà ma thành biệt thự  ' });
+  assert.equal(named.name, 'Nhà ma thành biệt thự');
+  assert.equal(P.videoTitle(named), 'Nhà ma thành biệt thự');
+  assert.equal(P.storyIdBase(named), 'Nha-ma-thanh-biet-thu');
+  const plain = P.options({ theme: 'house_full' });
+  assert.equal(plain.name, '');
+  assert.match(P.videoTitle(plain), /Dọn nhà bỏ hoang/);
+  assert.match(P.storyIdBase(plain), /^Don-nha-bo-hoang/);
+  assert.equal(P.options({ name: 'x'.repeat(200) }).name.length, 80);
+  assert.equal(P.options({ name: 'a\nb\tc' }).name, 'a b c');
+});

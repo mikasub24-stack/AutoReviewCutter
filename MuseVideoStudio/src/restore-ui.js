@@ -27,7 +27,7 @@
   // ---- cấu hình đang chọn
   function config() {
     return P.options({
-      theme, minutes: $('restoreMinutes').value, seconds: $('restoreSecs').value, aspect: $('restoreAspect').value, camera: $('restoreCamera').value, place: $('restorePlace').value,
+      theme, name: $('restoreName').value, minutes: $('restoreMinutes').value, seconds: $('restoreSecs').value, aspect: $('restoreAspect').value, camera: $('restoreCamera').value, place: $('restorePlace').value,
       person: $('restorePerson').checked, personDesc: $('restorePersonDesc').value, light: $('restoreLight').value, anchor: $('restoreAnchor').checked, faceless: $('restoreFaceless').checked,
       customSteps: $('restoreCustom').value, lang: lang()
     });
@@ -115,6 +115,7 @@
           ? tr('Đã thêm các cảnh nhưng chưa chạy được: ', 'Scenes added but could not start: ') + result.startError
           : $('restoreAuto').checked ? tr(`Đã thêm ${jobs.filter(j => j.phase === 'clip').length} cảnh và bắt đầu chạy. Video sẽ tự dựng khi xong.`, `Added ${jobs.filter(j => j.phase === 'clip').length} scenes and started. The video builds itself when done.`)
             : tr('Đã thêm các cảnh. Bấm «Chạy hàng đợi» để bắt đầu.', 'Scenes added. Click “Run queue” to start.'));
+        $('restoreName').value = '';
         const fresh = await call('state'); if (fresh) render(fresh);
       }
     } finally { $('restoreCreate').disabled = false; }
@@ -162,7 +163,11 @@
         actions.append(build);
       }
       if (meta.output) {
-        const open = document.createElement('button'); open.type = 'button'; open.className = 'primary';
+        const saveBtn = document.createElement('button'); saveBtn.type = 'button'; saveBtn.className = 'primary';
+        saveBtn.textContent = tr('Lưu video…', 'Save video…');
+        saveBtn.onclick = async () => { const r = await call('restoreSave', { storyId: id }); if (r && r.file) toast(tr('Đã lưu video: ', 'Video saved: ') + r.file); };
+        actions.append(saveBtn);
+        const open = document.createElement('button'); open.type = 'button'; open.className = 'secondary';
         open.textContent = tr('Mở video', 'Show video'); open.onclick = () => call('restoreReveal', { storyId: id });
         actions.append(open);
       }

@@ -252,6 +252,7 @@
     const custom = String(input.customSteps == null ? '' : input.customSteps).split(/\r?\n/).map(s => clean(s, 200)).filter(Boolean).slice(0, MAX_CUSTOM);
     return {
       theme: theme.id,
+      name: clean(input.name, 80),
       place: clean(input.place, 300),
       minutes, seconds: minutes >= LONG_MINUTES ? MAX_SECONDS : Math.min(MAX_SECONDS, seconds),
       aspect: ASPECTS.includes(input.aspect) ? input.aspect : '16:9',
@@ -460,8 +461,8 @@
   }
 
   const slug = text => String(text || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
-  function storyIdBase(config) { return slug(themeOf(config.theme).label) || 'DonNha'; }
-  function videoTitle(config) { return text(config.theme, config.lang).label; }
+  function storyIdBase(config) { return slug(config.name) || slug(themeOf(config.theme).label) || 'DonNha'; }
+  function videoTitle(config) { return config.name || text(config.theme, config.lang).label; }
 
   return { ASPECTS, MINUTES, LONG_MINUTES, VERY_LONG_MINUTES, SECONDS, MAX_CLIPS, clipCount, THEMES, EN, text, themeOf, options, stepsOf, sceneBible, baseImagePrompt, clipPrompt, problems, screenText, screenConfig, isPolicyError, safeRetryPrompt, buildJobs, storyIdBase, videoTitle, SURVIVOR, WORKER, DEFAULT_LIGHT };
 });
