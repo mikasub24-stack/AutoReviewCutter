@@ -44,6 +44,14 @@ jobs:
           New-Item -ItemType Directory -Force WanLocalStudio/runtime | Out-Null
           $encoder = python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
           Copy-Item $encoder WanLocalStudio/runtime/ffmpeg.exe
+          $sevenZip = (Get-Command 7z.exe).Source
+          $sevenRoot = Split-Path $sevenZip
+          Copy-Item $sevenZip WanLocalStudio/runtime/7z.exe
+          Copy-Item (Join-Path $sevenRoot '7z.dll') WanLocalStudio/runtime/7z.dll
+          New-Item -ItemType Directory -Force WanLocalStudio/runtime/licenses | Out-Null
+          Copy-Item (Join-Path $sevenRoot 'License.txt') WanLocalStudio/runtime/licenses/7-Zip-License.txt
+          Copy-Item WanLocalStudio/vendor/7zip-COPYING.txt WanLocalStudio/runtime/licenses/7-Zip-LGPL.txt
+          if (Test-Path (Join-Path $sevenRoot 'copying.txt')) { Copy-Item (Join-Path $sevenRoot 'copying.txt') WanLocalStudio/runtime/licenses/7-Zip-copying.txt }
           & WanLocalStudio/runtime/ffmpeg.exe -version 2>&1 | Out-File WanLocalStudio/runtime/FFMPEG-BUILD.txt -Encoding utf8
           python WanLocalStudio/build_assets.py
           if ($LASTEXITCODE) { throw 'Build assets failed' }
@@ -66,17 +74,17 @@ jobs:
           & 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe' WanLocalStudio/installer.iss
           if ($LASTEXITCODE) { throw 'Installer failed' }
           $install = Join-Path $env:RUNNER_TEMP 'WanLocal-installed'
-          $p = Start-Process dist-wan/WanLocalStudio-0.1.0-Setup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
+          $p = Start-Process dist-wan/WanLocalStudio-0.2.0-Setup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
           if ($p.ExitCode) { throw 'Installation failed' }
           $p = Start-Process "$install/WanLocalStudio.exe" -ArgumentList '--smoke-test' -Wait -PassThru
           if ($p.ExitCode) { throw 'Installed GUI smoke failed' }
           & ./VocalStudio/scripts/scan-windows.ps1 -RuntimeDirectory WanLocalStudio/build/WanLocalStudio -PackageDirectory dist-wan
-          & git archive '--format=zip' '--output=dist-wan/WanLocalStudio-0.1.0-Source.zip' HEAD WanLocalStudio .github/workflows/wan-local-studio-windows.yml VocalStudio/scripts/scan-windows.ps1
+          & git archive '--format=zip' '--output=dist-wan/WanLocalStudio-0.2.0-Source.zip' HEAD WanLocalStudio .github/workflows/wan-local-studio-windows.yml VocalStudio/scripts/scan-windows.ps1
           if ($LASTEXITCODE) { throw 'Source archive failed' }
           Get-FileHash dist-wan/* -Algorithm SHA256 | Format-List | Out-File $env:GITHUB_STEP_SUMMARY -Append
           'Tests use simulated ComfyUI responses and real FFmpeg. GPU inference and identity consistency are NOT verified by this build.' | Out-File $env:GITHUB_STEP_SUMMARY -Append
       - uses: actions/upload-artifact@v4
         with:
-          name: WanLocalStudio-0.1.0-Installer
+          name: WanLocalStudio-0.2.0-Installer
           path: dist-wan/*
           if-no-files-found: error

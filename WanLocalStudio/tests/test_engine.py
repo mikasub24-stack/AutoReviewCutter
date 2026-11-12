@@ -41,7 +41,7 @@ class EngineTests(unittest.TestCase):
             data=engine.plan(engine.TOPICS[0],minutes)
             self.assertGreaterEqual(len(data['scenes'])*(engine.FRAMES-1)+1,data['frames'])
             self.assertIn(engine.STORIES[engine.TOPICS[0]]['setting'],data['scenes'][-1]['prompt'])
-        self.assertEqual(len(engine.plan(engine.TOPICS[0],1)['scenes']),12)
+        self.assertEqual(len(engine.plan(engine.TOPICS[0],1)['scenes']),13)
         for bad in ('nan','inf','-1','0','16'):
             with self.assertRaises(ValueError):engine.plan(engine.TOPICS[0],bad)
 
@@ -63,6 +63,23 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(linked['clip']['inputs']['device'],'cpu')
         self.assertEqual(linked['decode']['class_type'],'VAEDecodeTiled')
         self.assertEqual(linked['save']['class_type'],'SaveImage')
+
+    def test_character_reference_is_reused_across_new_video_projects(self):
+        with tempfile.TemporaryDirectory() as td:
+            profile=Path(td)/'character';client=FakeComfy()
+            def encode(command,cancelled,log):Path(command[-1]).write_bytes(b'encoded video')
+            with patch.object(engine,'ffmpeg',return_value='fixture'),patch.object(engine,'run_command',side_effect=encode):
+                first=engine.new_project(td,engine.TOPICS[0],.1,profile)
+                engine.generate(first,client,threading.Event(),lambda _:None)
+                original=(profile/'reference.png').read_bytes()
+                second=engine.new_project(td,engine.TOPICS[1],.1,profile)
+                self.assertEqual((second/'nhan-vat-goc.png').read_bytes(),original)
+                engine.generate(second,client,threading.Event(),lambda _:None)
+                self.assertEqual(client.sent[2]['prompt']['reference']['inputs']['image'],'reference.png')
+            self.assertEqual((profile/'reference.png').read_bytes(),original)
+            for topic in engine.TOPICS:
+                for scene in engine.plan(topic,.1)['scenes']:
+                    self.assertIn('24 years old',scene['prompt']);self.assertIn('thin-strap athletic crop top',scene['prompt'])
 
     def test_journal_reference_chain_and_resume_do_not_duplicate_render(self):
         with tempfile.TemporaryDirectory() as td:
@@ -110,13 +127,16 @@ class EngineTests(unittest.TestCase):
             project=engine.new_project(td,engine.TOPICS[0],.1)
             image=Path(td)/'frame.png'
             subprocess.run([encoder,'-y','-f','lavfi','-i','color=c=green:s=832x480','-frames:v','1',str(image)],check=True,capture_output=True)
+            other=Path(td)/'other.png'
+            subprocess.run([encoder,'-y','-f','lavfi','-i','color=c=blue:s=832x480','-frames:v','1',str(other)],check=True,capture_output=True)
             class Frames(FakeComfy):
-                def download(self,description,path):shutil.copy2(image,path)
+                def download(self,description,path):shutil.copy2(image if len(self.sent)==1 else other,path)
             with patch.object(engine,'ffmpeg',return_value=encoder):
                 result=engine.generate(project,Frames(),threading.Event(),lambda _:None)
             decoded=subprocess.run([encoder,'-i',str(result),'-map','0:v:0','-f','framemd5','-'],check=True,capture_output=True,text=True)
             lines=[x for x in decoded.stdout.splitlines() if x and not x.startswith('#')]
             self.assertEqual(len(lines),144)
+            self.assertGreater(len(set(line.split(',')[-1].strip() for line in lines)),2)
             self.assertGreater(result.stat().st_size,1000)
 
 

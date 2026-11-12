@@ -1,39 +1,43 @@
-# Wan Local Studio 0.1.0
+# Wan Local Studio 0.2.0
 
-App Windows tiếng Việt điều khiển Wan qua ComfyUI đã cài trên máy. Chọn **Dọn nhà bỏ hoang** hoặc **Sinh tồn trong rừng**, nhập số phút và bấm **Tạo video tự động**. Không cần API cloud, Claude, tài khoản TTS hay nhập ảnh từng cảnh.
+App Windows tiếng Việt cho RTX 3060 12GB / RAM 32GB. Màn hình gọn: chọn **Dọn nhà bỏ hoang** hoặc **Sinh tồn trong rừng**, nhập số phút và bấm **Tạo video**. Nút **Cài & tải bộ Wan** cho phép chuẩn bị dữ liệu trước; bấm Tạo khi chưa có bộ chạy cũng tự thực hiện bước chuẩn bị.
 
-## Chuẩn bị lần đầu
+## Cài và dùng
 
-1. ComfyUI phải chạy trên máy, mặc định `http://127.0.0.1:8188`. App không cài lại, nâng cấp hay tự khởi động ComfyUI. Đổi cổng ở Cài đặt nếu bạn đã dùng cổng khác.
-2. Có đủ bộ Wan 2.2 TI2V 5B chính thức:
-   - `models/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors` (~9,31 GB)
-   - `models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors` (~6,27 GB)
-   - `models/vae/wan2.2_vae.safetensors` (~1,31 GB)
-   - Hướng dẫn và link tải chính thức: https://docs.comfy.org/tutorials/video/wan/wan2_2
-3. Nếu ComfyUI chưa có node `Wan22ImageToVideoLatent`, cập nhật ComfyUI theo hướng dẫn chính thức. Nếu hết VRAM, mở ComfyUI với `--lowvram` thay vì mở thêm một server khác. App không tự sửa file khởi động của bạn.
-4. Cài Setup của app. Mở app, thử **0,1 phút = 6 giây** trước. Video nằm trong `Videos/WanLocalStudio` của tài khoản Windows; có thể đổi ở Cài đặt. Bộ cài không chứa model gần 17 GB; model bạn đã có được dùng lại.
+1. Cài Setup, mở app. Không cần cài Python, ComfyUI hay giải nén model bằng tay.
+2. Lần đầu tải gần 20 GB, cần khoảng 40 GB ổ trống. Muốn dùng ổ D/E: **Cài đặt → Ổ lưu model** trước khi tải. Dữ liệu mặc định trong `%LOCALAPPDATA%/WanLocalStudioData`. Dữ liệu tải qua HTTPS từ nhà phát hành, có kiểm tra SHA-256, tải dở được giữ để tiếp tục.
+3. Chọn chủ đề, thử **0,1 phút = 6 giây** rồi bấm Tạo. Video dài trên 3060 có thể mất nhiều giờ; chưa có đo tốc độ inference trên máy thật.
+4. App tự mở ComfyUI riêng ở cổng 8189, kiểm tra CUDA và chạy Wan. Nếu ComfyUI có sẵn ở địa chỉ cấu hình và đủ model thì dùng lại, không sửa bản cài đó. Nếu chưa có thì tải bản portable NVIDIA CUDA 12.6 chính thức, Python và thư viện có sẵn trong gói đó. Không thay Python hệ thống hoặc cài driver NVIDIA tự động. Driver NVIDIA trên máy vẫn phải tương thích CUDA 12.6.
+5. Video hoàn tất có nút **Xem video**, **Lưu như…**, **Thư mục**. **Tiếp tục dự án** dùng lại các cảnh đã lưu nếu bị ngắt.
 
-## Tự động làm gì?
+## Nhân vật qua các video
 
-- Kế hoạch cảnh có sẵn theo tiến trình công việc cho hai chủ đề. Đây là kịch bản theo mẫu, không phải LLM tự sáng tác mọi chủ đề tùy ý. Mỗi dự án lưu prompt tiếng Anh, seed và toàn bộ workflow để kiểm tra được.
-- Cảnh đầu tạo từ chữ. Tool tự giữ khung đầu làm tham chiếu gốc và lấy khung cuối mỗi cảnh làm ảnh đầu vào cảnh kế tiếp. Giữ cố định mô tả nhân vật, trang phục, kiến trúc/địa điểm.
-- Render lần lượt 121 khung hình/cảnh, 832×480, 24 fps, 20 bước UniPC. Encoder văn bản trên CPU, VAE giải mã theo ô để giảm VRAM. Đây là cấu hình khởi đầu cho 3060 12GB / RAM 32GB, chưa có đo đạc inference trên máy đó.
-- ComfyUI trả PNG theo thứ tự. FFmpeg kèm app mã hóa cảnh, bỏ khung tham chiếu trùng ở các cảnh nối rồi ghép MP4 H.264 đúng số khung tương ứng thời lượng yêu cầu.
-- Lưu tiến độ và SHA-256 của từng cảnh/tham chiếu. Mở lại thư mục dự án để tiếp tục; cảnh hoàn tất còn nguyên không gửi render lại. Khóa dự án ngăn hai cửa sổ cùng gửi tác vụ.
-- Mất kết nối sau khi gửi: app tìm lại tác vụ bằng mã yêu cầu trong queue/history, không tự gửi POST lần hai. Nếu ComfyUI đã khởi động lại và mất history, người dùng kiểm tra queue rồi dùng **Tạo lại cảnh lỗi**.
-- **Tạm dừng** chỉ xóa tác vụ đang chờ thuộc dự án này. Cảnh đang chạy có thể tiếp tục trong ComfyUI; app không gọi `/interrupt` toàn cục làm dừng workflow khác. Mở lại dự án để nhận kết quả.
-- Nhạc nền của bạn là tùy chọn trong Cài đặt. Không có giọng đọc, nhạc AI hay âm thanh hành động tự sinh. Không tự kéo giãn/lặp clip để giả đủ số phút.
+Mặc định: một phụ nữ châu Á trưởng thành 24 tuổi, da sáng, khuôn mặt oval, mắt nâu, tóc đen buộc cao, áo thể thao hai dây crop top màu đen ôm dáng, quần legging đen, giày trắng. Cả hai chủ đề dùng cùng nhân vật và bộ đồ. Đây là phong cách chân thực, không dùng tên/người thật cụ thể.
 
-## Giới hạn quan trọng
+Ảnh đầu cảnh mở đầu của video đầu được lưu thành ảnh nhân vật gốc trong `%LOCALAPPDATA%/WanLocalStudio/character`, tách khỏi ổ model. Các video mới tự sao chép ảnh đó vào dự án và dùng làm đầu vào cảnh mở; trong mỗi video, khung cuối cảnh trước tiếp tục làm đầu vào cảnh sau. Seed, prompt và workflow cũng được lưu. **Xem nhân vật gốc** nằm trong Cài đặt.
 
-Wan có thể làm lệch mặt, tay, vật dụng, cấu trúc hoặc tiến độ công việc dù được giữ ảnh tham chiếu. Nối khung cuối có thể tích lũy sai lệch; đây không phải khóa nhận dạng hay hệ thống kiểm duyệt hình ảnh tự động. Cảnh dài có thể lặp hành động vì kế hoạch theo mẫu. Chưa bảo đảm chất lượng như quay thật hoặc render thành công trong 12 GB VRAM trên mọi phiên bản ComfyUI/model; cần thử cảnh ngắn trên máy thật.
+Đây là giữ tham chiếu ảnh bằng Wan TI2V, không phải adapter khóa khuôn mặt. Không có phép kiểm tra tự động xác nhận “đẹp” hoặc đúng danh tính. Khuôn mặt, tay, dụng cụ, bối cảnh vẫn có thể lệch theo góc nhìn/chuyển động; nối nhiều cảnh có thể tích lũy sai lệch. Chưa thể bảo đảm giống tuyệt đối qua mọi cảnh/video. Cảnh mở được dùng lại để giữ nhân vật; các video cùng chủ đề dùng kế hoạch theo mẫu, không phải LLM sáng tác vô hạn.
 
-Chưa có phép thử inference GPU tại môi trường build. Kiểm tra tự động dùng dữ liệu giả để kiểm tra API, lưu/tiếp tục, tham chiếu và dùng FFmpeg thật để kiểm tra số khung MP4; không lấy video thử tổng hợp làm bằng chứng chất lượng Wan. Không có GPU cloud miễn phí được kèm app.
+## Tự dựng và GPU
 
-Model và ComfyUI được tải riêng từ nhà phát hành. App chỉ nhận địa chỉ loopback trên máy; không gửi ảnh/video tới dịch vụ cloud. ComfyUI và extension bạn cài có hoạt động mạng riêng nằm ngoài app này.
+- Wan 2.2 TI2V 5B tạo lần lượt 121 khung/cảnh, 832×480, 24 fps, 16 bước UniPC cho dự án mới. Encoder văn bản trên CPU, VAE giải mã theo ô, ComfyUI chạy `--lowvram`. Chưa xác nhận inference thành công/VRAM cụ thể trên 3060 thật.
+- Kiểm tra NVENC bằng một lần encode thật trước khi chọn `h264_nvenc`; nếu driver/binary không dùng được thì báo chuyển sang CPU. Wan vẫn dùng CUDA. Không giả báo mã hóa GPU chỉ vì FFmpeg có tên encoder.
+- Mỗi cảnh kiểm tra đủ khung, mã hóa MP4. Tự bỏ khung tham chiếu lặp, cắt đầu/cuối và tạo chuyển cảnh hòa trộn 0,25 giây. Số cảnh tính bù phần chuyển cảnh để MP4 cuối đủ thời lượng. Chỉ xử lý hai clip một lúc để tránh tải tất cả clip vào RAM.
+- Nhạc của người dùng là tùy chọn, tự hạ âm lượng và fade đầu/cuối. Wan không tự sinh tiếng động/giọng đọc. Không tự lặp hoặc kéo giãn clip để giả đủ thời lượng.
+- Không có bộ kiểm duyệt ngữ nghĩa xác nhận mọi hành động đúng. Chuyển cảnh giúp bớt giật, không sửa được lỗi người/vật do model sinh.
 
-## Mã nguồn và build
+## Dữ liệu và tiếp tục
 
-`python -m unittest discover -s WanLocalStudio/tests -v`
+Bộ portable được ghim ở ComfyUI v0.45.0 NVIDIA cu126, đối chiếu SHA-256 công bố trong GitHub Releases. Model tải từ Comfy-Org trên Hugging Face; đọc Git LFS metadata lấy SHA-256/kích thước và ghim revision khi có header commit, chỉ sử dụng sau khi hash đúng. Gồm UNET `wan2.2_ti2v_5B_fp16.safetensors`, encoder `umt5_xxl_fp8_e4m3fn_scaled.safetensors`, VAE `wan2.2_vae.safetensors`. Bản Setup nhỏ không nhúng gần 20 GB dữ liệu này.
 
-Windows build chạy trong `.github/workflows/wan-local-studio-windows.yml`: khóa phiên bản/hash phụ thuộc, test logic và FFmpeg, mở GUI nguồn/đóng gói/đã cài, đóng Setup và quét Defender. App chưa có chữ ký số nhà phát hành; kết quả Defender không xác nhận Chrome/Cốc Cốc sẽ chấp nhận file tải về.
+Tải lỗi giữ file `.part`, bấm lại để tiếp tục. Nếu máy chủ không hỗ trợ Range, tải lại file đó thay vì nối sai dữ liệu. Hết ổ hoặc sai checksum sẽ dừng với lỗi rõ ràng, chưa chạy file sai. Gói giải nén ở vùng dữ liệu riêng của tool, không cài Python/Git/ComfyUI vào hệ thống. Bản ComfyUI được tool mở có thể tiếp tục chạy sau khi đóng app để giữ tiến trình/history.
+
+Dự án lưu prompt, request ID, cảnh và SHA-256, khung tham chiếu. Mất kết nối sau POST: tìm tác vụ cũ trong queue/history, không tự gửi trùng. ComfyUI khởi động lại làm mất queue/history thì cần kiểm tra rồi dùng **Tạo lại cảnh lỗi**. Tạm dừng không gọi `/interrupt` toàn cục; cảnh đang chạy có thể tiếp tục để nhận kết quả sau.
+
+ComfyUI giữ các PNG đã tạo trong thư mục output riêng; app giữ MP4/tham chiếu và xóa PNG tải tạm sau mã hóa. Video dài có thể dùng thêm nhiều GB ở output của ComfyUI. Không tự xóa PNG trên server vì còn cần để tiếp tục tác vụ.
+
+## Phạm vi kiểm tra
+
+Test dùng server HTTP giả lập để kiểm tra tải tiếp/hash, API ComfyUI, tham chiếu giữa cảnh và giữa dự án; dùng FFmpeg thật kiểm tra chuyển cảnh và đủ số khung MP4. Windows CI thử trình giải nén kèm app bằng gói portable nhỏ giả lập, mở GUI nguồn/đóng gói/đã cài và quét Defender.
+
+Môi trường build không có GPU 3060 và không thực hiện tải toàn bộ 20 GB hoặc inference Wan. Hugging Face bị chặn bởi mạng môi trường phát triển nên chưa kiểm chứng luồng tải thật ở đây; app phải tải trên kết nối của máy người dùng. Các test mô phỏng không chứng minh tải/model/GPU thực tế đã thành công. App chưa ký số nhà phát hành; Defender không bảo đảm Chrome/Cốc Cốc chấp nhận file tải.

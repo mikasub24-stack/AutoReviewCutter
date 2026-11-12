@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 import uuid
 
-VERSION = '0.1.0'
+VERSION = '0.2.0'
 ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
 FPS = 24
 FRAMES = 121
@@ -26,12 +26,16 @@ MODELS = {
 }
 GUIDE = 'https://docs.comfy.org/tutorials/video/wan/wan2_2'
 TOPICS = ('Dọn nhà bỏ hoang', 'Sinh tồn trong rừng')
+CHARACTER = ('One attractive adult East Asian woman, exactly 24 years old, fair skin, oval face, brown eyes, '
+             'long straight black hair in a high ponytail. She wears the same fitted black thin-strap athletic crop top, '
+             'high-waisted black gym leggings and white trainers in every shot. Natural realistic face and skin texture. '
+             'Preserve her identity, facial features, hair and outfit from the reference image.')
 NEGATIVE = ('cartoon, anime, CGI, illustration, low quality, blurry, text, watermark, '
             'extra fingers, deformed hands, duplicate people, changing clothes, '
             'changing architecture, teleportation, magical transformations, flicker')
 STORIES = {
     TOPICS[0]: {
-        'setting': 'A single abandoned small one-story brick cottage, red tiled roof, two front windows, green wooden door, overgrown garden. One adult woman, dark tied-back hair, beige work shirt, blue work trousers, yellow work gloves. Same woman, clothing, cottage layout and daylight throughout.',
+        'setting': CHARACTER + ' A single abandoned small one-story brick cottage, red tiled roof, two front windows, green wooden door, overgrown garden beside a pine forest. Same woman, cottage layout and daylight throughout.',
         'opening': 'Establishing view of the cottage before cleaning, accumulated leaves and rubbish, the worker surveys the front entrance.',
         'stages': [
             ['The worker picks up loose litter by hand near the doorway.', 'She puts the collected rubbish into a black bag.'],
@@ -43,7 +47,7 @@ STORIES = {
         'ending': 'A steady final view of the same cottage after the gradual cleanup, clean doorway and steps, the worker rests beside her tools. No instant renovation or changes to the building.',
     },
     TOPICS[1]: {
-        'setting': 'One adult man with short dark hair, olive green outdoor shirt, brown trousers, sturdy boots. A single forest campsite beside one large mossy boulder, tall pine trees, dry forest floor, soft daylight. Same man, clothing, boulder and campsite throughout.',
+        'setting': CHARACTER + ' A single forest campsite beside one large mossy boulder near a small cottage with a green door, tall pine trees, dry forest floor, soft daylight. Same woman, clothing, boulder and campsite throughout.',
         'opening': 'Establishing view of the campsite, the hiker sets down his brown backpack beside the mossy boulder and surveys the ground.',
         'stages': [
             ['He picks small fallen branches off the ground near the boulder.', 'He sorts the collected branches into a neat pile.'],
@@ -55,6 +59,15 @@ STORIES = {
         'ending': 'A quiet final view of the completed simple forest camp at the same mossy boulder, the man resting beside the shelter, gentle smoke rising from the small campfire.',
     },
 }
+for _story in STORIES.values():
+    # Both genres share the same reusable opening and character; no new actor.
+    _story['opening'] = ('The same woman stands by a green wooden gate at the edge of a pine forest, '
+                         'with a small brick cottage behind her. Her face is clearly visible. '
+                         'She looks around, then prepares to begin work. Natural full-body documentary shot.')
+    _story['ending'] = _story['ending'].replace('the man', 'the woman')
+    _story['stages'] = [[action.replace('He ', 'She ')
+                        .replace('his ', 'her ').replace(' he ', ' she ') for action in stage]
+                       for stage in _story['stages']]
 
 
 class Cancelled(Exception): pass
@@ -81,7 +94,8 @@ def plan(topic, minutes):
         raise ValueError('Nhập thời lượng từ 0,1 đến 15 phút.')
     total = round(minutes * 60 * FPS)
     # Each continuation shares its first frame with the previous last frame.
-    count = max(1, math.ceil((total - 1) / (FRAMES - 1)))
+    transition = 6
+    count = 1 + math.ceil(max(0, total - FRAMES) / (FRAMES - 1 - transition))
     story = STORIES[topic]
     scenes = []
     for i in range(count):
@@ -98,16 +112,21 @@ def plan(topic, minutes):
         scenes.append({'index': i + 1, 'prompt': prompt, 'seed': secrets.randbits(48)})
     return {'version': VERSION, 'topic': topic, 'minutes': minutes, 'frames': total,
             'fps': FPS, 'width': 832, 'height': 480, 'scene_frames': FRAMES,
-            'scenes': scenes, 'reference_policy': 'previous_last_frame',
+            'scenes': scenes, 'reference_policy': 'persistent_character_and_previous_last_frame',
+            'character': CHARACTER, 'transition_frames': transition, 'steps': 16,
             'notice': 'Wan tạo hình không có âm thanh. Giữ tham chiếu không bảo đảm nhận dạng tuyệt đối.'}
 
 
-def new_project(parent, topic, minutes):
+def new_project(parent, topic, minutes, profile_dir=None):
     data = plan(topic, minutes)
     folder = Path(parent) / ('Wan-' + time.strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:6])
     folder.mkdir(parents=True)
     data['id'] = uuid.uuid4().hex
     data['server'] = ''
+    if profile_dir:
+        data['profile_dir'] = str(Path(profile_dir))
+        reference = Path(profile_dir) / 'reference.png'
+        if reference.is_file(): shutil.copy2(reference, folder / 'nhan-vat-goc.png')
     atomic_json(folder / 'project.json', data)
     return folder
 
@@ -126,8 +145,8 @@ def run_command(command, cancelled, log):
                                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         try:
             while process.poll() is None:
-                if cancelled.wait(.15): raise Cancelled('Đã dừng bước ghép video.')
-            if process.returncode: raise RuntimeError('FFmpeg chưa hoàn tất. Xem log: ' + str(log))
+                if cancelled.wait(.15): raise Cancelled('Đã tạm dừng bước đang chạy; dữ liệu đã tải vẫn được giữ.')
+            if process.returncode: raise RuntimeError('Bước xử lý chưa hoàn tất. Xem log: ' + str(log))
         finally:
             if process.poll() is None:
                 process.terminate()
@@ -231,7 +250,7 @@ class Comfy:
         target = Path(destination); temp = target.with_suffix('.part'); temp.write_bytes(data); temp.replace(target)
 
 
-def graph(scene, models, reference=None, prefix='WanLocal'):
+def graph(scene, models, reference=None, prefix='WanLocal', steps=20):
     def node(kind, **inputs): return {'class_type': kind, 'inputs': inputs}
     workflow = {
         'unet': node('UNETLoader', unet_name=models['unet_name'], weight_dtype='default'),
@@ -242,7 +261,7 @@ def graph(scene, models, reference=None, prefix='WanLocal'):
         'negative': node('CLIPTextEncode', clip=['clip', 0], text=NEGATIVE),
         'latent': node('Wan22ImageToVideoLatent', vae=['vae', 0], width=832, height=480, length=FRAMES, batch_size=1),
         'sampler': node('KSampler', model=['sampling', 0], positive=['positive', 0], negative=['negative', 0],
-                        latent_image=['latent', 0], seed=scene['seed'], steps=20, cfg=5.0,
+                        latent_image=['latent', 0], seed=scene['seed'], steps=steps, cfg=5.0,
                         sampler_name='uni_pc', scheduler='simple', denoise=1.0),
         'decode': node('VAEDecodeTiled', samples=['sampler', 0], vae=['vae', 0], tile_size=256,
                        overlap=64, temporal_size=16, temporal_overlap=4),
@@ -265,14 +284,72 @@ def valid_artifact(project, scene):
             and digest(output) == scene['output_sha256'] and digest(last) == scene.get('reference_sha256'))
 
 
+_encoders = {}
+
+
+def encoder_options(executable):
+    if executable not in _encoders:
+        try:
+            probe = subprocess.run([executable, '-v', 'error', '-f', 'lavfi', '-i', 'color=s=64x64:r=24',
+                                    '-frames:v', '1', '-c:v', 'h264_nvenc', '-f', 'null', '-'],
+                                   capture_output=True, timeout=12,
+                                   creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+            available = probe.returncode == 0
+        except (OSError, subprocess.TimeoutExpired): available = False
+        _encoders[executable] = (['-c:v', 'h264_nvenc', '-preset', 'p4', '-cq', '20', '-b:v', '0'] if available
+                                else ['-c:v', 'libx264', '-preset', 'fast', '-crf', '18'])
+    return list(_encoders[executable])
+
+
+def edit_sequence(project, data, executable, codec, cancelled, notify):
+    """Small bounded-memory transitions; never open every clip at once."""
+    overlap = int(data.get('transition_frames', 0))
+    files = [project / f'canh-{scene["index"]:04}.mp4' for scene in data['scenes']]
+    listing = project / 'clips.txt'
+    if not overlap or len(files) == 1:
+        listing.write_text(''.join(f"file '{p.name}'\n" for p in files), encoding='utf-8')
+        return listing
+    parts = project / 'edit'; parts.mkdir(exist_ok=True)
+    entries = []
+    for i, source in enumerate(files):
+        length = FRAMES if i == 0 else FRAMES - 1
+        start = overlap if i else 0
+        end = length - overlap if i < len(files)-1 else length
+        body = parts / f'body-{i:04}.mp4'
+        notify(f'Tự dựng cảnh {i+1}/{len(files)} · Cắt nhịp và nối chuyển cảnh')
+        run_command([executable, '-y', '-i', str(source), '-vf',
+                     f'trim=start_frame={start}:end_frame={end},setpts=PTS-STARTPTS',
+                     '-an', *codec, '-pix_fmt', 'yuv420p', str(body)], cancelled, project / 'ffmpeg.log')
+        entries.append(f"file 'edit/{body.name}'\n")
+        if i == len(files)-1: continue
+        blend = parts / f'blend-{i:04}.mp4'
+        weight = f'min(1,T*{FPS}/{overlap-1})'
+        expression = f'A*(1-{weight})+B*{weight}'
+        graph = (f'[0:v]trim=start_frame={length-overlap}:end_frame={length},setpts=PTS-STARTPTS[a];'
+                 f'[1:v]trim=start_frame=0:end_frame={overlap},setpts=PTS-STARTPTS[b];'
+                 f"[a][b]blend=all_expr='{expression}'[out]")
+        run_command([executable, '-y', '-i', str(source), '-i', str(files[i+1]), '-filter_complex', graph,
+                     '-map', '[out]', '-frames:v', str(overlap), '-an', *codec, '-pix_fmt', 'yuv420p', str(blend)],
+                    cancelled, project / 'ffmpeg.log')
+        entries.append(f"file 'edit/{blend.name}'\n")
+    listing.write_text(''.join(entries), encoding='utf-8')
+    return listing
+
+
 def _generate(project, client, cancelled, notify):
     project = Path(project)
     data = json.loads((project / 'project.json').read_text(encoding='utf-8'))
-    if data.get('version') != VERSION: raise ValueError('Phiên bản dự án chưa được hỗ trợ.')
-    if data.get('server') and data['server'] != client.url:
+    if data.get('version') not in ('0.1.0', VERSION): raise ValueError('Phiên bản dự án chưa được hỗ trợ.')
+    if (data.get('server') and data['server'] != client.url
+            and any(scene.get('prompt_id') or scene.get('request_marker') for scene in data['scenes'] if not valid_artifact(project, scene))):
         raise ValueError('Dự án đang gắn với ComfyUI ở ' + data['server'] + '. Dùng cùng địa chỉ để nhận tác vụ cũ.')
     ffmpeg_path = ffmpeg()
     models = client.preflight()
+    codec = encoder_options(ffmpeg_path)
+    notify('Mã hóa MP4: ' + ('GPU NVIDIA NVENC' if 'h264_nvenc' in codec else 'CPU (NVENC chưa dùng được; Wan vẫn dùng GPU)'))
+    profile = Path(data['profile_dir']) if data.get('profile_dir') else None
+    if profile and not (project / 'nhan-vat-goc.png').exists() and (profile / 'reference.png').is_file():
+        shutil.copy2(profile / 'reference.png', project / 'nhan-vat-goc.png')
     data['server'] = client.url
     save = lambda: atomic_json(project / 'project.json', data)
     save()
@@ -297,7 +374,10 @@ def _generate(project, client, cancelled, notify):
                     reference_path = project / f'tham-chieu-{position:04}.png'
                     reference = client.upload(reference_path)
                     scene['input_reference_sha256'] = digest(reference_path)
-                workflow = graph(scene, models, reference, f'WanLocal/{data["id"]}/scene-{position + 1}')
+                elif (project / 'nhan-vat-goc.png').is_file():
+                    reference = client.upload(project / 'nhan-vat-goc.png')
+                    scene['character_reference_sha256'] = digest(project / 'nhan-vat-goc.png')
+                workflow = graph(scene, models, reference, f'WanLocal/{data["id"]}/scene-{position + 1}', data.get('steps', 20))
                 atomic_json(project / f'workflow-{position + 1:04}.json', workflow)
                 scene['request_marker'] = uuid.uuid4().hex
                 save()  # Durable intent before a non-idempotent POST.
@@ -329,21 +409,31 @@ def _generate(project, client, cancelled, notify):
         # Subsequent first frames are duplicates of the previous reference.
         start = 1 if position else 0
         command = [ffmpeg_path, '-y', '-framerate', str(FPS), '-start_number', str(start), '-i', str(folder / '%04d.png'),
-                   '-frames:v', str(FRAMES - start), '-c:v', 'libx264', '-preset', 'fast', '-crf', '19',
+                   '-frames:v', str(FRAMES - start), *codec,
                    '-pix_fmt', 'yuv420p', '-an', str(temporary)]
         run_command(command, cancelled, project / 'ffmpeg.log')
         temporary.replace(output)
         scene['output_sha256'] = digest(output); scene['reference_sha256'] = digest(last); save()
+        if position == 0 and profile and not (profile / 'reference.png').exists():
+            profile.mkdir(parents=True, exist_ok=True)
+            temporary_reference = profile / 'reference.tmp'
+            shutil.copy2(project / 'tham-chieu-goc.png', temporary_reference)
+            temporary_reference.replace(profile / 'reference.png')
+            atomic_json(profile / 'profile.json', {'description': data.get('character', CHARACTER),
+                        'sha256': digest(profile / 'reference.png'), 'source_project': str(project),
+                        'identity_guaranteed': False})
+            shutil.copy2(profile / 'reference.png', project / 'nhan-vat-goc.png')
+            notify('Đã lưu nhân vật gốc; video sau tự dùng lại ảnh này.')
         shutil.rmtree(folder)
         notify(f'Đã lưu cảnh {position + 1}/{len(data["scenes"])} và tham chiếu tự động.')
-    listing = project / 'clips.txt'
-    listing.write_text(''.join(f"file 'canh-{scene['index']:04}.mp4'\n" for scene in data['scenes']), encoding='utf-8')
+    listing = edit_sequence(project, data, ffmpeg_path, codec, cancelled, notify)
     final = project / 'video-hoan-tat.mp4'; temp = project / 'video-hoan-tat.partial.mp4'
     command = [ffmpeg_path, '-y', '-f', 'concat', '-safe', '1', '-i', str(listing)]
     music = project / 'nhac-nen.audio'
-    if music.is_file(): command += ['-stream_loop', '-1', '-i', str(music), '-map', '0:v:0', '-map', '1:a:0', '-af', 'volume=0.25', '-c:a', 'aac']
+    duration = data['frames'] / FPS
+    if music.is_file(): command += ['-stream_loop', '-1', '-i', str(music), '-map', '0:v:0', '-map', '1:a:0', '-af', f'volume=0.25,afade=t=in:d=0.5,afade=t=out:st={max(0,duration-1)}:d=1', '-c:a', 'aac']
     else: command += ['-an']
-    command += ['-frames:v', str(data['frames']), '-c:v', 'libx264', '-preset', 'fast', '-crf', '19', '-pix_fmt', 'yuv420p']
+    command += ['-frames:v', str(data['frames']), *codec, '-pix_fmt', 'yuv420p']
     if music.is_file(): command += ['-t', str(data['frames'] / FPS), '-shortest']
     command += ['-movflags', '+faststart', str(temp)]
     notify('Đang ghép video cuối theo thời lượng đã chọn…')
