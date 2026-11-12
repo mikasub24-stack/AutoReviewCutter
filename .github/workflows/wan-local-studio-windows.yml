@@ -109,7 +109,7 @@ jobs:
 
           Hiện tiến độ thật theo prompt_id: nạp model, mã hóa chữ, sampling step/max và giải mã. Nút Kiểm tra GPU / log hiển thị số đo NVIDIA, log lưu và xuất chẩn đoán. Không khẳng định tác vụ treo chỉ từ thời gian chờ.
 
-          Đóng app cũ. Nếu còn tác vụ cũ, dùng Xóa dự án đang tạo chọn thư mục cũ và xác nhận dừng/xóa trước, rồi Tạo video mới để áp dụng cấu hình. Backend riêng chỉ được khởi động lại khi rỗng queue và đúng process của bộ cài này. Model đã tải được dùng lại.
+          Đóng app cũ. Nếu còn tác vụ cũ, dùng Xóa dự án đang tạo chọn thư mục cũ và xác nhận dừng/xóa trước, rồi Tạo video mới để áp dụng cấu hình. Backend riêng chỉ được khởi động lại khi rỗng queue và đúng process của bộ cài này. Khi người dùng xác nhận Xóa dự án và tác vụ CPU không nhận ngắt, tool có thể đóng backend riêng sau khi xác minh tất cả tác vụ còn lại thuộc đúng dự án đó; không đóng backend có dự án khác. Model đã tải được dùng lại.
 
           Chưa benchmark inference trên RTX 3060 12GB; vẫn có thể chậm, thiếu VRAM hoặc biến dạng. Tencent công bố 14GB tối thiểu cho bản gốc. Đây là sửa cấu hình/tiến độ, không phải cam kết tốc độ hay chất lượng.
 

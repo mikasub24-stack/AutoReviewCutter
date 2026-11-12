@@ -302,7 +302,7 @@ class App(ctk.CTk):
             if not (Path(folder)/'project.json').is_file():
                 messagebox.showerror('Chưa đúng dự án','Chọn đúng thư mục có project.json.');return
             self.project=Path(folder)
-        if not messagebox.askyesno('Xóa toàn bộ dự án này?',f'Xóa các cảnh, video và dữ liệu tạo dở trong:\n{self.project}\n\nDừng các tác vụ của dự án này. Không thể hoàn tác. Model dùng chung được giữ.'):
+        if not messagebox.askyesno('Xóa toàn bộ dự án này?',f'Xóa các cảnh, video và dữ liệu tạo dở trong:\n{self.project}\n\nDừng các tác vụ của dự án này; có thể đóng backend riêng nếu tác vụ bị kẹt và không có dự án khác chạy. Không thể hoàn tác. Model dùng chung được giữ.'):
             return
         self.delete_button.configure(state='disabled')
         if self.busy:

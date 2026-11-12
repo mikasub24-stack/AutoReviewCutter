@@ -71,6 +71,43 @@ class BackendControlTests(unittest.TestCase):
                 self.assertTrue(control.ensure_launch_profile(folder,folder,self.client(),lambda _:None))
                 stop.assert_not_called()
 
+    def test_delete_fallback_stops_backend_only_when_all_jobs_belong_to_project(self):
+        with tempfile.TemporaryDirectory() as td:
+            folder=Path(td);client=self.client(True);record=self.record(folder)
+            with patch.object(control,'processes',return_value=[record]),patch.object(control,'stop_verified') as stop:
+                self.assertTrue(control.stop_project_backend(folder,client,{'active','finished'},lambda _:None))
+                stop.assert_called_once_with(record)
+                self.assertEqual(client.calls,['/queue','/queue'])
+
+    def test_delete_fallback_does_not_stop_for_other_jobs_external_servers_or_unknown_owner(self):
+        with tempfile.TemporaryDirectory() as td:
+            folder=Path(td)
+            cases=[(self.client(True),{'another'},[self.record(folder)]),
+                   (self.client(True,url='http://127.0.0.1:8188'),{'active'},[self.record(folder)]),
+                   (self.client(True),{'active'},[self.record(Path('/other'))]),
+                   (self.client(True),set(),[self.record(folder)])]
+            for client,ids,records in cases:
+                with self.subTest(url=client.url,ids=ids),patch.object(control,'processes',return_value=records),patch.object(control,'stop_verified') as stop:
+                    with self.assertRaises(RuntimeError):control.stop_project_backend(folder,client,ids,lambda _:None)
+                    stop.assert_not_called()
+
+    def test_delete_fallback_rechecks_queue_and_refuses_a_new_unrelated_job(self):
+        with tempfile.TemporaryDirectory() as td:
+            folder=Path(td);client=self.client(True)
+            def request(route):
+                client.calls.append(route)
+                ids=['mine'] if len(client.calls)==1 else ['mine','another-project']
+                return {'queue_running':[[i,pid,{},{}] for i,pid in enumerate(ids)],'queue_pending':[]}
+            client.request=request
+            with patch.object(control,'processes',return_value=[self.record(folder)]),patch.object(control,'stop_verified') as stop:
+                with self.assertRaises(RuntimeError):control.stop_project_backend(folder,client,{'mine'},lambda _:None)
+                stop.assert_not_called()
+
+    def test_delete_fallback_leaves_idle_backend_running(self):
+        with patch.object(control,'processes') as listing,patch.object(control,'stop_verified') as stop:
+            self.assertFalse(control.stop_project_backend('/unused',self.client(),{'mine'},lambda _:None))
+            listing.assert_not_called();stop.assert_not_called()
+
     def test_process_handle_stops_only_the_owned_test_child(self):
         if control.os.name!='nt' and not hasattr(control.os,'pidfd_open'):
             self.skipTest('Process handle not supported on this platform')

@@ -33,7 +33,7 @@ Nút Kiểm tra GPU / log đọc nvidia-smi thực (nếu có), hiện VRAM/mứ
 
 ## Xóa dự án đang tạo
 
-Nút **Xóa dự án đang tạo** yêu cầu xác nhận đúng thư mục rồi dừng worker, xóa hàng đợi và gửi `/interrupt` có `prompt_id` cụ thể, không gọi ngắt toàn bộ ComfyUI. Chỉ khi các tác vụ đó đã dừng mới xóa file. Khi chưa mở dự án, nút cho chọn thư mục có project.json, gồm cả dự án Wan cũ để bỏ đi; dự án Wan không được tiếp tục sinh.
+Nút **Xóa dự án đang tạo** yêu cầu xác nhận đúng thư mục rồi dừng worker, xóa hàng đợi và gửi `/interrupt` có `prompt_id` cụ thể, không gọi ngắt toàn bộ ComfyUI. Chỉ khi các tác vụ đó đã dừng mới xóa file. Nếu CPU cũ không nhận ngắt sau 20 giây, thao tác xóa được người dùng xác nhận có thể đóng đúng backend riêng khi tất cả tác vụ còn lại đều thuộc dự án này, xác minh lại PID/process handle và queue hai lần; có tác vụ khác thì từ chối đóng. Khi chưa mở dự án, nút cho chọn thư mục có project.json, gồm cả dự án Wan cũ để bỏ đi; dự án Wan không được tiếp tục sinh.
 
 Xóa clip, file tạm, tham chiếu và project.json trong dự án; với ComfyUI do tool quản lý còn xóa output theo đúng project ID, input đã ghi nhận và lịch sử tác vụ đó. Ảnh hồ sơ do chính dự án bị xóa tạo ra cũng được bỏ nếu hash và nguồn khớp, để lần sau tạo mặt mới. Không xóa model Hunyuan đã tải, dự án khác hoặc ảnh hồ sơ từ nguồn khác. Không thể hoàn tác. File đã Lưu như ở ngoài dự án không bị xóa.
 

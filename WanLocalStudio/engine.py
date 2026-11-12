@@ -18,6 +18,7 @@ import urllib.request
 import uuid
 import hunyuan
 import portrait
+import backend_control
 from progress import ProgressMonitor
 
 VERSION = '0.3.2'
@@ -509,6 +510,7 @@ def delete_project(project, client, notify, managed_comfy=None):
     if not isinstance(data.get('scenes'),list) or not isinstance(data.get('id'),str) or len(data['id'])!=32 or any(c not in '0123456789abcdef' for c in data['id']) or data.get('topic') not in TOPICS:
         raise ValueError('Không phải dự án do tool tạo.')
     with project_lock(project):
+        backend_stopped=False
         ids=set()
         for scene in data['scenes']+[data.get('portrait_request',{})]:
             pid=scene.get('prompt_id')
@@ -518,12 +520,16 @@ def delete_project(project, client, notify, managed_comfy=None):
             notify('Đang dừng tác vụ và xóa hàng đợi của dự án…')
             client.request('/queue',{'delete':sorted(ids)})
             for pid in ids:client.request('/interrupt',{'prompt_id':pid})
-            deadline=time.monotonic()+90
+            deadline=time.monotonic()+20
             while True:
                 queue=client.request('/queue')
                 active=queue.get('queue_running',[])+queue.get('queue_pending',[])
                 if not any(item[1] in ids for item in active):break
-                if time.monotonic()>deadline:raise RuntimeError('Tác vụ chưa dừng; chưa xóa dữ liệu. Bấm xóa lại khi GPU đã dừng.')
+                if time.monotonic()>deadline:
+                    if managed_comfy:
+                        backend_stopped=backend_control.stop_project_backend(Path(managed_comfy).parent,client,ids,notify)
+                        if backend_stopped:break
+                    raise RuntimeError('Tác vụ chưa dừng; chưa xóa dữ liệu. Backend có tác vụ khác hoặc không do tool quản lý nên không được đóng.')
                 time.sleep(.5)
         # Exact managed output prefix, not user-selected arbitrary filesystem paths.
         if managed_comfy and data.get('id'):
@@ -543,7 +549,7 @@ def delete_project(project, client, notify, managed_comfy=None):
             reference=profile/'reference.png'
             if saved.get('source_project')==str(project) and reference.is_file() and digest(reference)==saved.get('sha256'):
                 reference.unlink();(profile/'profile.json').unlink()
-        if ids:client.request('/history',{'delete':sorted(ids)})
+        if ids and not backend_stopped:client.request('/history',{'delete':sorted(ids)})
         for child in project.iterdir():
             if child.name in ('.render.lock','project.json'):continue
             if child.is_dir() and not child.is_symlink():shutil.rmtree(child)

@@ -156,3 +156,43 @@ def ensure_launch_profile(folder, root, client, notify):
     stop_verified(record)
     (Path(root)/'backend-launch.json').unlink(missing_ok=True)
     return False
+
+
+def _project_queue_ids(client):
+    queue=client.request('/queue')
+    if not isinstance(queue,dict) or not all(isinstance(queue.get(key),list) for key in ('queue_running','queue_pending')):
+        raise RuntimeError('Không xác minh được hàng đợi; chưa dừng backend.')
+    ids=set()
+    for item in queue['queue_running']+queue['queue_pending']:
+        if not isinstance(item,(list,tuple)) or len(item)<2 or not isinstance(item[1],str):
+            raise RuntimeError('Hàng đợi không hợp lệ; chưa dừng backend.')
+        ids.add(item[1])
+    return ids
+
+
+def stop_project_backend(folder, client, prompt_ids, notify):
+    """Explicit project-delete fallback when cooperative node interruption stalls.
+
+    Never used for normal pause/startup. All active/pending jobs must belong to
+    the selected project, and the process must be the exact managed installation.
+    False means the project already has no queued/running work; True means stopped.
+    """
+    if client.url.rstrip('/')!=MANAGED_URL:
+        raise RuntimeError('Không tự đóng ComfyUI ngoài bộ chạy riêng của tool.')
+    expected=set(prompt_ids)
+    if not expected or any(not isinstance(pid,str) or not pid for pid in expected):
+        raise RuntimeError('Không có mã tác vụ của dự án để xác minh; chưa dừng backend.')
+    active=_project_queue_ids(client)
+    if not active:return False
+    if not active.issubset(expected):
+        raise RuntimeError('ComfyUI có tác vụ của dự án khác; không đóng backend hoặc xóa dữ liệu.')
+    candidates=[record for record in processes() if owned_process(record,folder)]
+    if len(candidates)!=1:
+        raise RuntimeError('Không xác định được đúng tiến trình backend riêng; chưa xóa dữ liệu.')
+    active=_project_queue_ids(client)
+    if not active:return False
+    if not active.issubset(expected):
+        raise RuntimeError('Hàng đợi vừa có tác vụ khác; không đóng backend hoặc xóa dữ liệu.')
+    notify('Node cũ chưa nhận lệnh dừng. Đang đóng đúng backend riêng chỉ chạy dự án này…')
+    stop_verified(candidates[0])
+    return True

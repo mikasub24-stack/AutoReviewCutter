@@ -39,6 +39,25 @@ class CleanupTests(unittest.TestCase):
             self.assertNotIn(('/interrupt',{}),calls)
             self.assertIn(('/queue',{'delete':['mine']}),calls)
 
+    def test_explicit_delete_can_stop_only_owned_stuck_backend_after_interrupt(self):
+        with tempfile.TemporaryDirectory() as td:
+            project=engine.new_project(td,engine.TOPICS[0],.1)
+            data=json.loads((project/'project.json').read_text());data['portrait_request']={'prompt_id':'stuck'}
+            engine.atomic_json(project/'project.json',data)
+            calls=[]
+            class Client:
+                url=bootstrap.MANAGED_URL
+                def request(self,route,value=None):
+                    calls.append((route,value))
+                    if route=='/queue' and value is None:return {'queue_running':[[0,'stuck',{},{}]],'queue_pending':[]}
+                    return {}
+            managed=Path(td)/'portable/ComfyUI'
+            with patch.object(engine.time,'monotonic',side_effect=[0,21]),patch.object(engine.backend_control,'stop_project_backend',return_value=True) as stop:
+                engine.delete_project(project,Client(),lambda _:None,managed)
+            self.assertFalse(project.exists());self.assertEqual(stop.call_args.args[0],managed.parent)
+            self.assertEqual(stop.call_args.args[2],{'stuck'})
+            self.assertFalse(any(route=='/history' for route,_ in calls))
+
     def test_locked_project_is_not_deleted(self):
         with tempfile.TemporaryDirectory() as td:
             project=engine.new_project(td,engine.TOPICS[0],.1)
