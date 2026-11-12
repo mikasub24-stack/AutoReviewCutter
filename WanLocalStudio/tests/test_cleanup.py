@@ -58,6 +58,18 @@ class CleanupTests(unittest.TestCase):
             self.assertEqual(stop.call_args.args[2],{'stuck'})
             self.assertFalse(any(route=='/history' for route,_ in calls))
 
+    def test_recovered_queue_id_is_stopped_even_when_manifest_lost_post_response(self):
+        with tempfile.TemporaryDirectory() as td:
+            project=engine.new_project(td,engine.TOPICS[0],.1);calls=[]
+            class Client:
+                def request(self,route,value=None):
+                    calls.append((route,value))
+                    return {'queue_running':[],'queue_pending':[]} if route=='/queue' else {}
+            engine.delete_project(project,Client(),lambda _:None,extra_prompt_ids=['recovered-id'])
+            self.assertFalse(project.exists())
+            self.assertIn(('/interrupt',{'prompt_id':'recovered-id'}),calls)
+            self.assertIn(('/queue',{'delete':['recovered-id']}),calls)
+
     def test_locked_project_is_not_deleted(self):
         with tempfile.TemporaryDirectory() as td:
             project=engine.new_project(td,engine.TOPICS[0],.1)

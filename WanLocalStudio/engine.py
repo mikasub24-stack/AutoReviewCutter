@@ -21,7 +21,7 @@ import portrait
 import backend_control
 from progress import ProgressMonitor
 
-VERSION = '0.3.2'
+VERSION = '0.3.3'
 ROOT = (Path(sys.executable).resolve().parent if '__compiled__' in globals()
         else Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)))
 FPS = 24
@@ -501,7 +501,7 @@ def generate(project, client, cancelled, notify):
             if monitor:monitor.close();client.progress_monitor=None
 
 
-def delete_project(project, client, notify, managed_comfy=None):
+def delete_project(project, client, notify, managed_comfy=None, extra_prompt_ids=()):
     """Explicit user deletion. Target only this project's jobs/files, never clear a queue."""
     project=Path(project)
     if project.is_symlink():raise ValueError('Không xóa thư mục liên kết.')
@@ -511,7 +511,8 @@ def delete_project(project, client, notify, managed_comfy=None):
         raise ValueError('Không phải dự án do tool tạo.')
     with project_lock(project):
         backend_stopped=False
-        ids=set()
+        ids=set(extra_prompt_ids)
+        if any(not isinstance(pid,str) or not pid for pid in ids):raise ValueError('Mã tác vụ khôi phục không hợp lệ.')
         for scene in data['scenes']+[data.get('portrait_request',{})]:
             pid=scene.get('prompt_id')
             if not pid and scene.get('request_marker'):pid=client.find_request(scene['request_marker'])

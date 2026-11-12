@@ -1,4 +1,4 @@
-#define Version "0.3.2"
+#define Version "0.3.3"
 [Setup]
 AppId={{AB8D6D18-541F-437B-86DA-9183FD483629}
 AppName=Hunyuan Local Studio

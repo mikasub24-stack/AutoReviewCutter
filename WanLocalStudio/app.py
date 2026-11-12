@@ -16,6 +16,7 @@ import engine
 import bootstrap
 import hunyuan
 import diagnostics
+import project_recovery
 
 
 def settings_path():
@@ -33,7 +34,7 @@ def load_settings():
 
 
 class App(ctk.CTk):
-    def __init__(self):
+    def __init__(self, auto_recover=True):
         ctk.set_appearance_mode('dark')
         super().__init__()
         self.title('Hunyuan Local Studio '+engine.VERSION+' · HunyuanVideo 1.5')
@@ -43,6 +44,9 @@ class App(ctk.CTk):
         saved = load_settings()
         self.events = queue.Queue(); self.cancel = threading.Event(); self.busy = False
         self.project = None; self.result = None; self.music = None; self.delete_requested=False; self.previews={}; self.preview_clip=None
+        self.remembered_project=saved.get('active_project');self.session_revision=0
+        self.project_choices={};self.choice_deletes=False
+        self.project_roots_saved=saved.get('project_roots',[]) if isinstance(saved.get('project_roots',[]),list) else []
         self.topic = tk.StringVar(value=saved.get('topic', engine.TOPICS[0]))
         self.minutes = tk.StringVar(value=saved.get('minutes', '0.1'))
         self.url = tk.StringVar(value=saved.get('url', 'http://127.0.0.1:8188'))
@@ -60,6 +64,9 @@ class App(ctk.CTk):
         ctk.CTkEntry(form,textvariable=self.minutes,height=30,width=100,font=('Segoe UI',13)).grid(row=1,column=1,padx=(0,12),pady=(2,8))
         self.count = tk.StringVar()
         ctk.CTkLabel(form,textvariable=self.count,wraplength=640,justify='left',text_color='#a9c3d6',font=('Segoe UI',11)).grid(row=2,column=0,columnspan=2,sticky='w',padx=12,pady=(0,8))
+        self.project_status=tk.StringVar(value='Đang nhận diện dự án đang tạo…' if auto_recover else 'Chưa có dự án đang tạo')
+        ctk.CTkLabel(panel,textvariable=self.project_status,wraplength=670,justify='left',font=('Segoe UI',11),text_color='#a9c3d6').pack(anchor='w',pady=2)
+        self.project_choice=ctk.CTkComboBox(panel,values=['Chọn dự án trong tool'],state='readonly',command=self.choose_project,width=440,height=26)
         self.character = tk.StringVar(value='Nhân vật: nữ châu Á 24 tuổi • áo gym hai dây crop top, legging • tự lưu ảnh gốc')
         ctk.CTkLabel(panel,textvariable=self.character,wraplength=670,justify='left',font=('Segoe UI',11),text_color='#a9c3d6').pack(anchor='w',pady=(4,6))
         row=ctk.CTkFrame(panel,fg_color='transparent');row.pack(fill='x',pady=5)
@@ -104,6 +111,7 @@ class App(ctk.CTk):
         self.controls=[self.create_button,self.install_button,self.resume_button,self.check_button,self.music_button,self.folder_button,self.asset_button,self.reset_button]
         self.minutes.trace_add('write',self.update_count);self.update_count()
         self.after(150,self.poll);self.protocol('WM_DELETE_WINDOW',self.close)
+        if auto_recover:self.after(200,self.recover_active)
 
     def toggle_log(self):
         if self.log.winfo_manager():self.log.pack_forget()
@@ -139,7 +147,9 @@ class App(ctk.CTk):
 
     def save_settings(self):
         path=settings_path();path.parent.mkdir(parents=True,exist_ok=True)
-        engine.atomic_json(path,{'url':self.url.get(),'folder':str(self.parent),'topic':self.topic.get(),'minutes':self.minutes.get(),'asset_root':str(self.asset_root)})
+        roots=list(dict.fromkeys([str(self.parent),*self.project_roots_saved]))[-20:]
+        engine.atomic_json(path,{'url':self.url.get(),'folder':str(self.parent),'topic':self.topic.get(),'minutes':self.minutes.get(),'asset_root':str(self.asset_root),
+                                'active_project':str(self.project or self.remembered_project) if self.project or self.remembered_project else None,'project_roots':roots})
 
     def toggle_settings(self):
         if self.options.winfo_manager(): self.options.pack_forget()
@@ -186,16 +196,19 @@ class App(ctk.CTk):
             client=engine.Comfy(self.url.get(),hunyuan.BACKEND);self.save_settings()
             topic=self.topic.get();minutes=self.minutes.get().replace(',','.');music=self.music;parent=self.parent;root=self.asset_root;preferred=client.url;profile=settings_path().parent/'character'
         except Exception as e:messagebox.showerror('Chưa bắt đầu được',str(e));return
-        self.project=None
+        self.session_revision+=1
+        self.project_choices={};self.choice_deletes=False;self.project_choice.pack_forget()
+        self.project_status.set('Đang chuẩn bị dự án mới…')
         self.previews.clear();self.preview_clip=None;self.scene_play.configure(state='disabled');self.preview_image.configure(image=self.preview_blank,text='Đang chuẩn bị cảnh mới…');self.preview_status.configure(text='Chưa có cảnh hoàn tất');self.scene_choice.configure(values=['Chưa có cảnh']);self.scene_choice.set('Chưa có cảnh')
         self.status.set('Đang kiểm tra và chuẩn bị HunyuanVideo 1.5…')
         def work():
             ready=bootstrap.ensure_ready(root,preferred,self.cancel,self.notify,hunyuan.BACKEND,not (profile/'reference.png').is_file())
             self.events.put(('backend',ready.url));parent.mkdir(parents=True,exist_ok=True)
-            self.project=engine.new_project(parent,topic,minutes,profile,hunyuan.BACKEND,portrait_first=True)
-            if music:shutil.copy2(music,self.project/'nhac-nen.audio')
-            self.notify('Đã lưu dự án: '+str(self.project))
-            return engine.generate(self.project,ready,self.cancel,self.notify)
+            project=engine.new_project(parent,topic,minutes,profile,hunyuan.BACKEND,portrait_first=True)
+            self.events.put(('project',project))
+            if music:shutil.copy2(music,project/'nhac-nen.audio')
+            self.notify('Đã lưu dự án: '+str(project))
+            return engine.generate(project,ready,self.cancel,self.notify)
         self.start(work)
 
     def resume(self):
@@ -205,7 +218,7 @@ class App(ctk.CTk):
         if not (Path(folder)/'project.json').is_file():messagebox.showerror('Chưa đúng dự án','Chọn thư mục dự án có project.json.');return
         try:client=engine.Comfy(self.url.get(),hunyuan.BACKEND)
         except ValueError as e:messagebox.showerror('Địa chỉ ComfyUI',str(e));return
-        self.project=Path(folder);self.save_settings();root=self.asset_root
+        self.session_revision+=1;self.set_project(Path(folder));root=self.asset_root
         data=json.loads((self.project/'project.json').read_text(encoding='utf-8'));preferred=data.get('server') or client.url
         if data.get('backend')!=hunyuan.BACKEND:
             messagebox.showinfo('Chỉ dùng Hunyuan','Không tiếp tục dự án Wan. Bấm Tạo video để làm mới, hoặc Xóa dự án đang tạo để bỏ dự án này.');return
@@ -230,6 +243,14 @@ class App(ctk.CTk):
         try:
             while True:
                 kind,value=self.events.get_nowait()
+                if kind=='project':
+                    self.session_revision+=1;self.set_project(value);continue
+                if kind=='recovered':
+                    revision,candidates=value
+                    if revision!=self.session_revision or self.busy:continue
+                    self.show_recovered(candidates);continue
+                if kind=='delete_choices':
+                    self.show_project_choices(value,True);continue
                 if kind=='diagnostic':
                     report,path=value
                     self.log.pack(fill='x',pady=6)
@@ -247,6 +268,8 @@ class App(ctk.CTk):
                     key='Ảnh nhân vật mới';self.previews[key]=dict(value,clip=None)
                     self.scene_choice.configure(values=list(self.previews));self.scene_choice.set(key);self.select_preview(key);continue
                 if kind=='cleared':
+                    self.project=None;self.remembered_project=None;self.session_revision+=1
+                    self.project_choices={};self.project_choice.pack_forget();self.project_status.set('Đã xóa sạch dự án đang tạo');self.save_settings()
                     self.previews.clear();self.preview_clip=None;self.scene_play.configure(state='disabled');self.preview_image.configure(image=self.preview_blank,text='Đã xóa dự án');self.preview_status.configure(text='Chưa có cảnh hoàn tất');self.scene_choice.configure(values=['Chưa có cảnh']);self.scene_choice.set('Chưa có cảnh');continue
                 if kind=='preview':
                     key=f'Cảnh {value["scene"]:03}'
@@ -269,6 +292,7 @@ class App(ctk.CTk):
                     self.result=value;self.status.set('Video đã xuất: '+str(value))
                     self.play_button.configure(state='normal');self.copy_button.configure(state='normal');self.progress.set(1)
                 self.log.insert('end',self.status.get()+'\n');self.log.see('end')
+                if kind=='error':self.recover_active()
         except queue.Empty:pass
         self.after(150,self.poll)
 
@@ -293,31 +317,89 @@ class App(ctk.CTk):
             if os.name=='nt':os.startfile(str(self.preview_clip))
             else:webbrowser.open(self.preview_clip.as_uri())
 
+    def known_project_roots(self):
+        roots=[self.parent,Path.home()/'Videos/HunyuanLocalStudio',Path.home()/'Videos/WanLocalStudio']
+        roots.extend(Path(x) for x in self.project_roots_saved if isinstance(x,str) and x)
+        legacy=settings_path().parent.parent/'WanLocalStudio/settings.json'
+        try:
+            if legacy.stat().st_size<1024*1024:
+                data=json.loads(legacy.read_text(encoding='utf-8'))
+                if isinstance(data,dict) and isinstance(data.get('folder'),str):roots.append(Path(data['folder']))
+        except (OSError,ValueError):pass
+        return list(dict.fromkeys(roots))
+
+    def find_active_projects(self, roots, remembered, preferred):
+        queues=[]
+        for url in dict.fromkeys((preferred,bootstrap.MANAGED_URL)):
+            try:queues.append((url,engine.Comfy(url).request('/queue')))
+            except (RuntimeError,ValueError):pass
+        return project_recovery.discover(roots,remembered,queues)
+
+    def set_project(self,path):
+        self.project=Path(path);self.remembered_project=str(self.project)
+        self.project_roots_saved=list(dict.fromkeys([*self.project_roots_saved,str(self.project.parent)]))[-20:]
+        self.project_status.set('Dự án đang chọn: '+self.project.name)
+        self.save_settings()
+
+    def recover_active(self):
+        if self.busy:return
+        revision=self.session_revision;roots=self.known_project_roots()
+        remembered=self.project or self.remembered_project;preferred=self.url.get()
+        def work():
+            candidates=self.find_active_projects(roots,remembered,preferred)
+            self.events.put(('recovered',(revision,candidates)))
+        threading.Thread(target=work,daemon=True).start()
+
+    def show_recovered(self,candidates):
+        if not candidates:
+            self.project_status.set('Chưa có dự án đang tạo được nhận diện');return
+        selected=next((x for x in candidates if self.project and x['path'].resolve()==self.project.resolve()),None)
+        running=[x for x in candidates if x['running']]
+        selected=selected or (candidates[0] if len(candidates)==1 else running[0] if len(running)==1 else None)
+        if selected:self.set_project(selected['path'])
+        if len(candidates)>1:self.show_project_choices(candidates,False)
+        else:self.project_choice.pack_forget()
+
+    def show_project_choices(self,candidates,deleting):
+        self.choice_deletes=deleting
+        self.project_choices={f'{i+1}. {x["topic"]} · {x["path"].name}':x for i,x in enumerate(candidates)}
+        self.project_choice.configure(values=list(self.project_choices));self.project_choice.set('Chọn dự án trong tool')
+        self.project_choice.pack(fill='x',pady=4)
+        self.project_status.set('Có nhiều dự án đang tạo; chọn ngay trong danh sách này.')
+
+    def choose_project(self,label):
+        candidate=self.project_choices.get(label)
+        if not candidate or self.busy:return
+        self.session_revision+=1;self.set_project(candidate['path'])
+        if self.choice_deletes:self.perform_delete(candidate)
+
     def delete_current(self):
-        if self.busy and not self.project:
-            self.cancel.set();self.status.set('Đang dừng chuẩn bị; chưa có cảnh hay dự án để xóa.');return
-        if not self.project:
-            folder=filedialog.askdirectory(title='Chọn dự án tạo dở cần xóa (có project.json)')
-            if not folder:return
-            if not (Path(folder)/'project.json').is_file():
-                messagebox.showerror('Chưa đúng dự án','Chọn đúng thư mục có project.json.');return
-            self.project=Path(folder)
-        if not messagebox.askyesno('Xóa toàn bộ dự án này?',f'Xóa các cảnh, video và dữ liệu tạo dở trong:\n{self.project}\n\nDừng các tác vụ của dự án này; có thể đóng backend riêng nếu tác vụ bị kẹt và không có dự án khác chạy. Không thể hoàn tác. Model dùng chung được giữ.'):
-            return
+        self.session_revision+=1
         self.delete_button.configure(state='disabled')
         if self.busy:
-            self.delete_requested=True;self.cancel.set();self.status.set('Đang dừng trước khi xóa…')
+            self.delete_requested=True;self.cancel.set()
+            self.status.set('Đang dừng thao tác hiện tại, rồi tự nhận diện và xóa dự án…')
         else:self.perform_delete()
 
-    def perform_delete(self):
+    def perform_delete(self,candidate=None):
         self.delete_button.configure(state='disabled')
-        project=self.project
+        roots=self.known_project_roots();remembered=self.project or self.remembered_project
+        preferred=self.url.get();asset_root=self.asset_root
+        self.status.set('Đang tự tìm dự án đang tạo để dừng và xóa…')
         def work():
-            data=json.loads((project/'project.json').read_text(encoding='utf-8'))
-            client=engine.Comfy(data.get('server') or self.url.get())
-            managed=bootstrap.layout(self.asset_root)/'ComfyUI' if client.url==bootstrap.MANAGED_URL else None
-            result=engine.delete_project(project,client,self.notify,managed)
-            self.project=None;self.result=None
+            candidates=[candidate] if candidate else self.find_active_projects(roots,remembered,preferred)
+            if not candidates:return 'Không có dự án đang tạo để xóa. Không cần chọn thư mục.'
+            selected=next((x for x in candidates if remembered and x['path'].resolve()==Path(remembered).resolve()),None)
+            running=[x for x in candidates if x['running']]
+            selected=selected or (candidates[0] if len(candidates)==1 else running[0] if len(running)==1 else None)
+            if selected is None:
+                self.events.put(('delete_choices',candidates))
+                return 'Chọn dự án cần xóa ngay trong danh sách của tool.'
+            project=selected['path']
+            self.events.put(('project',project))
+            client=engine.Comfy(selected['server'] or preferred)
+            managed=bootstrap.layout(asset_root)/'ComfyUI' if client.url==bootstrap.MANAGED_URL else None
+            result=engine.delete_project(project,client,self.notify,managed,extra_prompt_ids=selected['prompt_ids'])
             self.events.put(('cleared',None))
             return result
         self.start(work)
@@ -344,6 +426,9 @@ class App(ctk.CTk):
 
 def smoke_test():
     import tempfile
+    def destroy_test_window(window):
+        for task in window.tk.call('after','info'):window.tk.call('after','cancel',task)
+        window.destroy()
     if os.name == 'nt':
         import subprocess
         for name, option in [('ffmpeg.exe','-version'),('7z.exe','-h')]:
@@ -356,7 +441,7 @@ def smoke_test():
         with_settings=Path(td)/'settings.json'
         global settings_path
         settings_path=lambda:with_settings
-        app=App();app.update();app.minutes.set('1');app.update()
+        app=App(auto_recover=False);app.update();app.minutes.set('1');app.update()
         assert '13 cảnh' in app.count.get()
         app.save_settings();assert load_settings()['minutes']=='1'
         from PIL import Image
@@ -375,7 +460,61 @@ def smoke_test():
             ImageGrab.grab(bbox=(app.winfo_rootx(),app.winfo_rooty(),app.winfo_rootx()+app.winfo_width(),app.winfo_rooty()+app.winfo_height())).save(os.environ['WAN_UI_PREVIEW'])
         app.toggle_settings();app.update()
         assert app.options.winfo_manager()
-        app.destroy()
+        # Upgrade regression: blocked preparation has no newly created project.
+        # Find the older live task by client_id and delete it without any file picker.
+        import time
+        from unittest.mock import patch
+        root=Path(td)/'videos';root.mkdir()
+        project=engine.new_project(root,engine.TOPICS[0],.1)
+        other=engine.new_project(root,engine.TOPICS[1],.1)
+        data=json.loads((project/'project.json').read_text(encoding='utf-8'))
+        data['server']=bootstrap.MANAGED_URL;engine.atomic_json(project/'project.json',data)
+        other_data=json.loads((other/'project.json').read_text(encoding='utf-8'))
+        other_data['server']=bootstrap.MANAGED_URL;engine.atomic_json(other/'project.json',other_data)
+        state={'running':[[0,'lost-own-id',{}, {'client_id':data['id']}]],
+               'pending':[[1,'other-id',{}, {'client_id':other_data['id']}]]}
+        requests=[]
+        def api(route,value=None,**kwargs):
+            requests.append((route,value))
+            if route=='/queue':
+                if value:
+                    state['pending']=[task for task in state['pending'] if task[1] not in value.get('delete',[])]
+                    return {}
+                return {'queue_running':state['running'],'queue_pending':state['pending']}
+            if route=='/interrupt':
+                state['running']=[task for task in state['running'] if task[1]!=value.get('prompt_id')];return {}
+            if route=='/history':return {}
+            raise AssertionError(route)
+        def pump_until(predicate):
+            deadline=time.monotonic()+6
+            while not predicate() and time.monotonic()<deadline:
+                app.update();time.sleep(.01)
+            assert predicate(),'Timed out waiting for app worker'
+        app.parent=root;app.asset_root=Path(td)/'assets';app.url.set(bootstrap.MANAGED_URL)
+        app.project=None;app.remembered_project=None;app.project_roots_saved=[]
+        with patch.object(engine.Comfy,'request',side_effect=api),patch.object(bootstrap,'ensure_ready',side_effect=RuntimeError('ComfyUI còn tác vụ')),\
+             patch.object(filedialog,'askdirectory',side_effect=AssertionError('Delete must not browse folders')),\
+             patch.object(messagebox,'askyesno',side_effect=AssertionError('Delete is one explicit action')):
+            app.create()
+            pump_until(lambda:not app.busy and app.project==project)
+            assert load_settings()['active_project']==str(project)
+            app.delete_current()
+            pump_until(lambda:not app.busy and not project.exists())
+            assert app.project is None and load_settings()['active_project'] is None
+            assert other.is_dir() and state['pending'][0][1]=='other-id'
+            assert ('/interrupt',{'prompt_id':'lost-own-id'}) in requests
+            app.events.put(('recovered',(-1,[{'path':project}])));app.poll();app.update()
+            assert app.project is None
+            destroy_test_window(app)
+            # A fresh window must find another older queued project even when
+            # settings from 0.3.2 have no active_project field at all.
+            saved=load_settings();saved.pop('active_project',None);engine.atomic_json(with_settings,saved)
+            app=App(auto_recover=True);app.update()
+            pump_until(lambda:app.project==other)
+            app.delete_current()
+            pump_until(lambda:not app.busy and not other.exists())
+            assert state['pending']==[]
+        destroy_test_window(app)
 
 
 if __name__=='__main__':

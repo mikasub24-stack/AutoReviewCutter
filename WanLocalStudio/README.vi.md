@@ -1,6 +1,14 @@
-# Hunyuan Local Studio 0.3.2
+# Hunyuan Local Studio 0.3.3
 
 App Windows tiếng Việt: chọn chủ đề, nhập số phút, bấm Tạo video. Bản này chỉ dùng **HunyuanVideo 1.5**, không tải/chạy hoặc tiếp tục dự án Wan. Hồ sơ nhân vật mới trong `%LOCALAPPDATA%/HunyuanLocalStudio/character`, không nhập ảnh mờ hoặc cảnh Wan cũ. Khi chuẩn bị bộ chạy mới, ảnh/profile nhân vật Wan cũ do app lưu cũng được bỏ. Thư mục nguồn/tên exe nội bộ giữ để cập nhật từ bộ cài cũ; tên hiển thị và Setup là Hunyuan Local Studio.
+
+## 0.3.3: xóa dự án đang tạo, không tìm thư mục
+
+App lưu dự án đang làm ngay khi tạo/mở và tự nhận lại sau khi mở lại cửa sổ. Với dữ liệu 0.3.2 chưa có đường dẫn đã nhớ, app đối chiếu queue ComfyUI với project ID, request marker, prompt ID hoặc output prefix trong các thư mục dự án đã biết (gồm thư mục Hunyuan/Wan cũ và ổ tùy chỉnh đã lưu). Không quét toàn bộ máy, không tự chọn thư mục mới nhất.
+
+Bấm **Xóa dự án đang tạo** là thao tác xóa trực tiếp dự án được nhận diện, không bật hộp chọn thư mục hoặc hộp xác nhận nữa. App tự dừng worker/tác vụ rồi dọn dữ liệu; model Hunyuan đã tải được giữ. Không thể hoàn tác. Nếu có nhiều dự án không xác định được đích duy nhất thì chọn trong danh sách ngay trong tool, không phải duyệt ổ đĩa. Dự án đang chọn còn dở được ưu tiên để tránh xóa nhầm việc đang chạy ở cửa sổ khác.
+
+Kiểm tra GUI mô phỏng đúng lỗi nâng cấp: backend còn job cũ, chuẩn bị tạo mới thất bại trước khi có dự án mới, tool tự nhận lại job và xóa bằng một nút. Kiểm tra cả mở lại cửa sổ với cấu hình 0.3.2 không có active_project và tác vụ có client_id nhưng manifest mất prompt_id. Không thay cấu hình 720p/GPU của 0.3.2.
 
 ## 0.3.2: giảm tải bước đầu, giữ 720p
 
@@ -12,11 +20,11 @@ Tiến độ lấy từ WebSocket của ComfyUI theo đúng prompt_id: nạp mod
 
 Nút Kiểm tra GPU / log đọc nvidia-smi thực (nếu có), hiện VRAM/mức dùng GPU và log lưu có thời gian sửa; xuất chan-doan-gpu.json. Một mẫu GPU 0% hoặc thiếu nvidia-smi không đủ chứng minh tác vụ bị lỗi. Log có thể từ phiên trước, được ghi rõ và che các dòng có dấu hiệu token.
 
-**Cập nhật:** backend cũ ép CPU vẫn có thể sống sau khi đóng cửa sổ. Bản mới chỉ khởi động lại đúng tiến trình Python/main.py trong bộ riêng ở 127.0.0.1:8189 khi hàng đợi rỗng, xác minh process handle và thông tin tạo process để tránh PID tái sử dụng. Không ngắt server/tác vụ khác. Nếu còn job cũ, dùng Xóa dự án đang tạo để chọn và bỏ dự án đó trước; chỉ đóng app cũ chưa chắc dừng ComfyUI.
+**Cập nhật:** backend cũ ép CPU vẫn có thể sống sau khi đóng cửa sổ. Bản mới chỉ khởi động lại đúng tiến trình Python/main.py trong bộ riêng ở 127.0.0.1:8189 khi hàng đợi rỗng, xác minh process handle và thông tin tạo process để tránh PID tái sử dụng. Không ngắt server/tác vụ khác. Nếu còn job cũ, bấm Xóa dự án đang tạo để tool tự nhận và bỏ dự án đó trước; chỉ đóng app cũ chưa chắc dừng ComfyUI.
 
 ## Cài và tạo mới
 
-1. Đóng app cũ, cài Setup. Nếu app cũ còn render, dùng nút Xóa dự án đang tạo để chọn và dừng dự án đó trước.
+1. Đóng app cũ, cài Setup. Nếu app cũ còn render, bấm Xóa dự án đang tạo để tool tự nhận và dừng dự án đó trước.
 2. Cài đặt → Ổ lưu model nếu cần chọn ổ nhiều chỗ. App tính dung lượng tải từ Git LFS metadata, kiểm tra ổ trống, tải tiếp khi ngắt và xác minh SHA-256. Không cần tự cài Python, ComfyUI hoặc tải trọng số bằng tay.
 3. **Cài & tải model** hoặc bấm Tạo video đều tự chuẩn bị bộ chạy. Tool bỏ đúng ba file trọng số Wan cũ của tool trong thư mục managed; không xóa model tùy ý của người dùng. Model Hunyuan hoàn toàn riêng. Nếu còn tác vụ ComfyUI thì không dọn trọng số đang dùng.
 4. Thử **0,1 phút = 6 giây** trước. Nhập được 0,1–60 phút nhưng video dài có thể mất rất nhiều giờ. Chưa đo tốc độ trên 3060.
@@ -33,7 +41,7 @@ Nút Kiểm tra GPU / log đọc nvidia-smi thực (nếu có), hiện VRAM/mứ
 
 ## Xóa dự án đang tạo
 
-Nút **Xóa dự án đang tạo** yêu cầu xác nhận đúng thư mục rồi dừng worker, xóa hàng đợi và gửi `/interrupt` có `prompt_id` cụ thể, không gọi ngắt toàn bộ ComfyUI. Chỉ khi các tác vụ đó đã dừng mới xóa file. Nếu CPU cũ không nhận ngắt sau 20 giây, thao tác xóa được người dùng xác nhận có thể đóng đúng backend riêng khi tất cả tác vụ còn lại đều thuộc dự án này, xác minh lại PID/process handle và queue hai lần; có tác vụ khác thì từ chối đóng. Khi chưa mở dự án, nút cho chọn thư mục có project.json, gồm cả dự án Wan cũ để bỏ đi; dự án Wan không được tiếp tục sinh.
+Nút **Xóa dự án đang tạo** tự nhận đúng dự án rồi dừng worker, xóa hàng đợi và gửi `/interrupt` có `prompt_id` cụ thể, không gọi ngắt toàn bộ ComfyUI. Chỉ khi các tác vụ đó đã dừng mới xóa file. Nếu CPU cũ không nhận ngắt sau 20 giây, thao tác bấm nút xóa có thể đóng đúng backend riêng khi tất cả tác vụ còn lại đều thuộc dự án này, xác minh lại PID/process handle và queue hai lần; có tác vụ khác thì từ chối đóng. Khi chưa mở dự án, nút tự tìm qua hàng đợi và thư mục đã biết, gồm cả dự án Wan cũ để bỏ đi; dự án Wan không được tiếp tục sinh.
 
 Xóa clip, file tạm, tham chiếu và project.json trong dự án; với ComfyUI do tool quản lý còn xóa output theo đúng project ID, input đã ghi nhận và lịch sử tác vụ đó. Ảnh hồ sơ do chính dự án bị xóa tạo ra cũng được bỏ nếu hash và nguồn khớp, để lần sau tạo mặt mới. Không xóa model Hunyuan đã tải, dự án khác hoặc ảnh hồ sơ từ nguồn khác. Không thể hoàn tác. File đã Lưu như ở ngoài dự án không bị xóa.
 
