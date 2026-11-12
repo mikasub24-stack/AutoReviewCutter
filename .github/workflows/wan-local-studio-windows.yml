@@ -44,7 +44,9 @@ jobs:
           New-Item -ItemType Directory -Force WanLocalStudio/runtime | Out-Null
           $encoder = python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
           Copy-Item $encoder WanLocalStudio/runtime/ffmpeg.exe
-          $sevenZip = (Get-Command 7z.exe).Source
+          $sevenCandidates = @((Join-Path $env:ProgramFiles '7-Zip/7z.exe'), (Get-Command 7z.exe).Source)
+          $sevenZip = $sevenCandidates | Where-Object { (Test-Path $_) -and (Test-Path (Join-Path (Split-Path $_) '7z.dll')) } | Select-Object -First 1
+          if (!$sevenZip) { throw 'Cannot locate a complete 7-Zip installation (not the Chocolatey shim)' }
           $sevenRoot = Split-Path $sevenZip
           Copy-Item $sevenZip WanLocalStudio/runtime/7z.exe
           Copy-Item (Join-Path $sevenRoot '7z.dll') WanLocalStudio/runtime/7z.dll
