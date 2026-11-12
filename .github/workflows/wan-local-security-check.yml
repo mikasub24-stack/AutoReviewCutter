@@ -1,0 +1,66 @@
+name: Recheck exact Wan Local Studio 0.2.0 download
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/vst3-discovery]
+    paths: ['.github/workflows/wan-local-security-check.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  scan:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - name: Retrieve the exact delivered artifact without rebuilding
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '13906889379'
+          run-id: '43136967896'
+          github-token: ${{ github.token }}
+          path: original
+          merge-multiple: true
+      - name: Verify original bytes and scan without executing installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force reports | Out-Null
+          $report = [ordered]@{ status='not-scanned'; sourceRun='43136967896'; sourceArtifact='13906889379'; file='WanLocalStudio-0.2.0-Setup.exe'; sha256=$null; previousSha256=$null; size=$null; signature=$null; signer=$null; engine=$null; signatures=$null; threats=@(); error=$null; executed=$false; browserVerdict='not-verified'; checkedUtc=(Get-Date).ToUniversalTime().ToString('o') }
+          try {
+            $root = (Resolve-Path original).Path
+            $file = Join-Path $root $report.file
+            $old = Get-Content (Join-Path $root 'DefenderReport.json') -Raw | ConvertFrom-Json
+            $previous = @($old.installer | Where-Object { $_.file -eq $report.file })
+            if ($previous.Count -ne 1) { throw 'Original scan manifest does not identify exactly one installer' }
+            $report.previousSha256 = $previous[0].sha256
+            $report.sha256 = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            $report.size = (Get-Item $file).Length
+            if ($report.sha256 -ne $report.previousSha256) { throw 'Installer differs from the original shipped scan manifest. No verdict.' }
+            $signature = Get-AuthenticodeSignature $file
+            $report.signature = $signature.Status.ToString()
+            if ($signature.SignerCertificate) { $report.signer = $signature.SignerCertificate.Subject }
+            $state = Get-MpComputerStatus
+            if (!$state.AMServiceEnabled) { Start-Service WinDefend; $state = Get-MpComputerStatus }
+            if (!$state.AntivirusEnabled -or !$state.AMServiceEnabled) { throw 'Defender unavailable' }
+            try { Update-MpSignature } catch { $report['updateWarning'] = $_.Exception.Message }
+            $state = Get-MpComputerStatus
+            if ($state.AntivirusSignatureAge -gt 2) { throw 'Defender signatures stale' }
+            $report.engine = $state.AMEngineVersion; $report.signatures = $state.AntivirusSignatureVersion
+            Start-MpScan -ScanType CustomScan -ScanPath $root
+            $found = @(Get-MpThreatDetection | Where-Object { @($_.Resources | Where-Object { $_ -like "*$root*" }).Count -gt 0 })
+            $report.threats = @($found | ForEach-Object { [ordered]@{ id=$_.ThreatID; resources=@($_.Resources) } })
+            if ($found.Count) { $report.status='detected'; throw 'Defender detected a threat in the exact delivered package' }
+            $report.status='no-detections'
+          } catch { $report.error=$_.Exception.Message; if ($report.status -ne 'detected') { $report.status='scan-failed' } }
+          $json = $report | ConvertTo-Json -Depth 8
+          $json | Set-Content reports/ExactDownloadRecheck.json -Encoding utf8
+          $json | Out-File $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          $detail = $json.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+          Write-Host "::notice title=Exact Wan installer recheck::$detail"
+          if ($report.status -ne 'no-detections') { exit 1 }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: WanLocalStudio-0.2.0-Exact-Download-Recheck
+          path: reports/
+          if-no-files-found: warn
