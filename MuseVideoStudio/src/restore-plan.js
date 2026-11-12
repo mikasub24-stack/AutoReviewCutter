@@ -565,7 +565,7 @@
   const MIN_REMAIN = 4;                                  // mỗi nửa sau khi chia còn ít nhất 4 cảnh chưa làm
   function resegment(jobs, want) {
     const clips = (jobs || []).filter(j => j.phase === 'clip' && Number.isInteger(j.number)).sort((a, b) => a.number - b.number);
-    const images = (jobs || []).filter(j => j.phase === 'image');
+    const images = (jobs || []).filter(j => j.phase === 'image' && j.number < THUMB_NUMBER);
     want = Math.min(MAX_PARALLEL, Math.floor(Number(want) || 1));
     if (want < 2 || clips.length < MIN_REMAIN * 2) return null;
     const parsed = clips.map(c => STEP_RE.exec(String(c.prompt || '')));
@@ -624,9 +624,26 @@
     return result;
   }
 
+  // ---- Ảnh thumbnail 16:9 của video (làm xong video mới tạo): Muse vẽ từ ảnh «trước» (ảnh gốc) và ảnh «sau» (khung cuối video).
+  const THUMB_NUMBER = 900;                              // số của việc ảnh thumbnail trong hàng đợi (các ảnh mốc đánh số nhỏ hơn)
+  function thumbnailPrompt({ title = '', lang = 'vi' } = {}) {
+    const en = lang === 'en', label = en ? ['BEFORE', 'AFTER'] : ['TRƯỚC', 'SAU'];
+    const text = String(title || '').replace(/[\r\n"]+/g, ' ').trim().slice(0, 60);
+    return [
+      'Create a YouTube thumbnail: a horizontal 16:9 widescreen image (1920x1080).',
+      'The FIRST attached photo shows the place BEFORE, in its original neglected state. The SECOND attached photo shows the very same place AFTER all the work is finished.',
+      'Make a bold before-and-after thumbnail of this exact place: the left half shows the BEFORE state from the first photo, the right half shows the AFTER state from the second photo, divided by one clean diagonal line. Keep the same place, the same building or object and the same viewpoint in both halves.',
+      'Make it eye-catching: vivid saturated colors, strong contrast, clean bright light, sharp, crisp, high-detail photographic look. The AFTER side is clearly brighter and more beautiful than the BEFORE side.',
+      text ? `Add big bold title text at the top or bottom: white letters with a thick black outline, with exactly these words and nothing else: "${text}".` : '',
+      `Add two small labels: "${label[0]}" on the left half and "${label[1]}" on the right half.`,
+      'No other text, no numbers, no logos, no watermarks.',
+      SAFE_PEOPLE_IMAGE
+    ].filter(Boolean).join('\n');
+  }
+
   const slug = text => String(text || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
   function storyIdBase(config) { return slug(config.name) || slug(themeOf(config.theme).label) || 'DonNha'; }
   function videoTitle(config) { return config.name || text(config.theme, config.lang).label; }
 
-  return { ASPECTS, MINUTES, LONG_MINUTES, VERY_LONG_MINUTES, SECONDS, MAX_CLIPS, clipCount, THEMES, EN, text, themeOf, options, stepsOf, sceneBible, baseImagePrompt, clipPrompt, segmentsOf, resegment, seamsOf, keyframePrompt, PROVIDERS, MAX_CLIPS_FLOW, MAX_PARALLEL, MIN_SEGMENT, problems, screenText, screenConfig, isPolicyError, safeRetryPrompt, buildJobs, storyIdBase, videoTitle, SURVIVOR, WORKER, SURVIVOR_F, WORKER_F, PHOTO_PERSON, WHO, personFor, DEFAULT_LIGHT };
+  return { ASPECTS, MINUTES, LONG_MINUTES, VERY_LONG_MINUTES, SECONDS, MAX_CLIPS, clipCount, THEMES, EN, text, themeOf, options, stepsOf, sceneBible, baseImagePrompt, clipPrompt, segmentsOf, resegment, seamsOf, keyframePrompt, THUMB_NUMBER, thumbnailPrompt, PROVIDERS, MAX_CLIPS_FLOW, MAX_PARALLEL, MIN_SEGMENT, problems, screenText, screenConfig, isPolicyError, safeRetryPrompt, buildJobs, storyIdBase, videoTitle, SURVIVOR, WORKER, SURVIVOR_F, WORKER_F, PHOTO_PERSON, WHO, personFor, DEFAULT_LIGHT };
 });

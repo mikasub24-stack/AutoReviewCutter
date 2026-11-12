@@ -57,6 +57,35 @@ test('dựng ít clip: một video dọc 1080×1920 có hình và tiếng im l�
   await fs.rm(dir, { recursive: true, force: true });
 });
 
+const meanVolume = file => { const r = spawnSync('ffmpeg', ['-hide_banner', '-nostdin', '-i', file, '-af', 'volumedetect', '-vn', '-f', 'null', '-']); const m = /mean_volume: (-?[0-9.]+) dB/.exec(String(r.stderr)); return m ? Number(m[1]) : -91; };
+const windowVolume = (file, from, to) => { const r = spawnSync('ffmpeg', ['-hide_banner', '-nostdin', '-ss', String(from), '-t', String(to - from), '-i', file, '-af', 'volumedetect', '-vn', '-f', 'null', '-']); const m = /mean_volume: (-?[0-9.]+) dB/.exec(String(r.stderr)); return m ? Number(m[1]) : -91; };
+
+test('giữ tiếng động gốc của clip; clip không có tiếng thì im lặng đúng chỗ, độ dài vẫn khớp', opts, async () => {
+  const { dir, clip } = await workspace();
+  const loud = name => { const f = path.join(dir, name); ff('-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=24', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=44100', '-t', '1', '-pix_fmt', 'yuv420p', '-c:a', 'aac', f); return f; };
+  const clips = [loud('a.mp4'), clip('b.mp4', 'smptebars'), loud('c.mp4')];   // clip giữa không có tiếng
+  const out = await R.assembleRestore({ clips, dir: path.join(dir, 'out'), name: 'Co tieng' });
+  const info = probe(out);
+  assert.ok(info.streams.some(s => s.codec_type === 'audio'), 'có luồng âm thanh');
+  assert.ok(Math.abs(Number(info.format.duration) - (3 - 2 / 24)) < 0.25, 'dài ' + info.format.duration);
+  assert.ok(meanVolume(out) > -35, 'tiếng gốc phải nghe được: ' + meanVolume(out));
+  assert.ok(windowVolume(out, 0.15, 0.85) > -30, 'đoạn đầu có tiếng');
+  assert.ok(windowVolume(out, 1.15, 1.8) < -60, 'đoạn giữa (clip không tiếng) im lặng: ' + windowVolume(out, 1.15, 1.8));
+  assert.ok(windowVolume(out, 2.1, 2.6) > -30, 'đoạn cuối có tiếng');
+  await fs.rm(dir, { recursive: true, force: true });
+});
+
+test('nhạc nền trộn nhỏ bên dưới, vẫn nghe tiếng động gốc', opts, async () => {
+  const { dir } = await workspace();
+  const f = path.join(dir, 'a.mp4'); ff('-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=24', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=44100', '-t', '2', '-pix_fmt', 'yuv420p', '-c:a', 'aac', f);
+  const music = path.join(dir, 'nhac.mp3'); ff('-f', 'lavfi', '-i', 'sine=frequency=880:sample_rate=44100', '-t', '1', music);
+  const plain = await R.assembleRestore({ clips: [f], dir: path.join(dir, 'o1'), name: 'khong nhac' });
+  const mixed = await R.assembleRestore({ clips: [f], dir: path.join(dir, 'o2'), name: 'co nhac', music });
+  assert.ok(meanVolume(mixed) > -40, 'vẫn nghe: ' + meanVolume(mixed));
+  assert.ok(Math.abs(meanVolume(mixed) - meanVolume(plain)) < 8, 'nhạc không át tiếng gốc: ' + meanVolume(mixed) + ' vs ' + meanVolume(plain));
+  await fs.rm(dir, { recursive: true, force: true });
+});
+
 test('dựng nhiều clip chia thành nhiều đoạn rồi ghép, đủ thời lượng, dùng nhạc nền', opts, async () => {
   const { dir, clip } = await workspace();
   const base = [clip('1.mp4', 'testsrc2'), clip('2.mp4', 'smptebars')];
@@ -66,7 +95,8 @@ test('dựng nhiều clip chia thành nhiều đoạn rồi ghép, đủ thời 
   ff('-f', 'lavfi', '-i', 'sine=frequency=440:duration=2', '-c:a', 'libmp3lame', music);
   const steps = [];
   const out = await R.assembleRestore({ clips, dir: path.join(dir, 'out'), name: 'Dài', aspect: '16:9', music, onProgress: t => steps.push(t) });
-  assert.ok(steps.some(t => /đoạn 3\/3/.test(t)), steps.join(' | '));
+  assert.equal(steps.filter(t => /^Đang xử lý cảnh \d+\/\d+/.test(t)).length, count, 'mỗi clip xử lý riêng bằng một lượt FFmpeg (không mở hàng chục clip cùng lúc: hết RAM)');
+  assert.ok(steps.some(t => new RegExp('cảnh ' + count + '/' + count).test(t)), steps.join(' | '));
   const info = probe(out);
   const expect = count - (count - 1) / 24;   // mỗi chỗ nối bỏ một khung trùng
   assert.ok(Math.abs(Number(info.format.duration) - expect) < 0.5, `dài ${info.format.duration}, cần ${expect}`);

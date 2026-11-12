@@ -142,6 +142,15 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.8.4
+- **Ô rảnh tự «xoay vòng» sang chỗ còn việc:** khi một đoạn đã làm xong mà đoạn khác còn dài (ví dụ chuỗi cuối còn 25 cảnh nối tiếp, 4 ô còn lại ngồi chờ), cứ mỗi 15 giây tool kiểm tra và **chia nốt phần còn lại của đoạn dài** cho các ô rảnh (thêm một ảnh mốc đầu đoạn mới, cập nhật chỗ nối khi dựng). Chỉ chia khi đoạn còn từ 8 cảnh chưa làm trở lên; còn ít hơn thì không chia vì làm ảnh mốc mất thời gian ngang với việc tiết kiệm được và dễ lệch hình. Tối đa 10 ô.
+- Giới hạn vật lý: trong một đoạn mỗi cảnh phải đợi khung cuối của cảnh trước, nên mấy cảnh cuối cùng của một đoạn vẫn chạy lần lượt.
+- **Sửa lỗi dựng video «ffmpeg thất bại … x264 malloc failed»:** trước đây FFmpeg mở nhiều clip 1080p cùng lúc nên hết RAM. Giờ mỗi clip được xử lý riêng rồi ghép (không mã hóa lại), dùng ít RAM dù video 2 giờ. Clip đã tải vẫn nguyên, chỉ cần bấm «Dựng lại video».
+- **Khi dựng video, tool tự đóng hết cửa sổ / tab trình duyệt** (Muse, Chrome/Edge do tool mở, Flow) để nhường RAM; chạy tiếp thì tự mở lại, đăng nhập vẫn được giữ.
+- **Giữ tiếng động gốc của từng clip** (tiếng chổi, nước, bước chân…) trong video cuối; clip nào không có tiếng thì thay bằng im lặng đúng độ dài để không lệch. Nhạc nền (nếu chọn) được trộn nhỏ bên dưới, không át tiếng gốc. (Chỉ tab Kể chuyện mới tắt tiếng clip vì dùng giọng đọc.)
+- **Video dựng xong:** hiện thông báo, cuộn tới video và có khung xem thử ngay trong ô.
+- **Nút «Tạo thumbnail 16:9»** (hiện khi video đã dựng xong): tool gửi prompt cho Muse vẽ ảnh thumbnail «trước / sau» từ ảnh gốc và khung cuối của video, kèm tên video. Xong thì hiện ảnh và nút **«Lưu thumbnail…»** (hộp «Lưu như…») để lưu về máy; «Tạo lại thumbnail» để vẽ bản khác. Chữ tiếng Việt do Muse vẽ có thể sai dấu, bấm tạo lại nếu chưa ưng.
+
 ## Update 1.8.3
 - **Góc quay theo đúng kiểu video làm nhà thật:** máy **đứng yên hoàn toàn** trong mỗi cảnh quay (không lia, zoom, đẩy vào, không cận mặt). **Cảnh ngoài trời: cảnh rộng quay từ xa**; **cảnh trong nhà: giữ một góc cố định** đặt sao cho thấy rõ cả người và việc đang làm. **Đổi góc là một cú cắt sạch, thấy rõ** (vào nhà, ra ngoài, hoặc sang chỗ khác trong phòng), không có chuyển động máy «đi tìm» việc.
 - **Người làm có cảm xúc và sức lực:** việc nặng (cắt cỏ, kéo rác, đào, cưa, khiêng) thì gồng người, thở mạnh, mồ hôi chảy, áo ướt, dừng một chút lau mặt lấy hơi; càng về cuối càng mệt và đẫm mồ hôi; việc nhẹ (trang trí, bật đèn) thì bình tĩnh, cuối cùng mệt nhưng mãn nguyện. Biểu cảm thể hiện bằng nét mặt và dáng người trong khung vừa / xa, không quay cận mặt. Chế độ «không lộ mặt» chỉ thể hiện bằng dáng người. Ảnh mốc đầu mỗi đoạn song song cũng vẽ người ra mồ hôi theo tiến độ.

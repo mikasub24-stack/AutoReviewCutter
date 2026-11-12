@@ -407,3 +407,7 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .restoreRunText.warn { color: #e0b9ad; }
 .restoreRunActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .restoreRunActions button { padding: 8px 12px; font-size: 11px; }
+
+.restoreVideo { display: block; width: 100%; max-width: 560px; max-height: 320px; margin-top: 10px; border-radius: 8px; background: #000; }
+.restoreThumb { margin-top: 10px; }
+.restoreThumb img { display: block; width: 100%; max-width: 420px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); background: #000; }

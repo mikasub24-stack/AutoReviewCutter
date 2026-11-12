@@ -630,3 +630,40 @@ test('video tạo lúc 3 tài khoản, giờ chạy 5 trình duyệt: chia lại
     assert.ok(at(dep) < 0 || at(dep) < at(j), `cảnh ${j.number} chạy sau việc nó cần`);
   }
 });
+
+test('xoay vòng ô rảnh: đoạn khác đã xong mà một chuỗi còn dài thì chia nốt phần còn lại cho các ô rảnh, vẫn đúng thứ tự nối', async () => {
+  const P = require('../src/restore-plan.js');
+  const cfg = P.options({ theme: 'house_full', minutes: 15, seconds: 8 });
+  let running = 0, max = 0; const order = [];
+  const q = new Queue({ ...base, concurrency: 5, accounts: 5, gateWaitMs: 2, run: async (j, slot) => {
+    j.account = slot + 1; running++; max = Math.max(max, running);
+    await new Promise(r => setTimeout(r, 4));
+    running--; order.push(j);
+    if (j.phase === 'clip') j.lastFrame = `/f/${j.number}.png`;
+    return j.phase === 'image' ? `/i/${j.number}.png` : `/v/${j.number}.mp4`;
+  } });
+  await q.add(P.buildJobs(cfg, { storyId: 'S', photo: '/p.jpg', accounts: 2 }));   // 2 đoạn: #1–#57 và #58–#113
+  const clips = q.jobs.filter(j => j.phase === 'clip');
+  q.jobs.filter(j => j.phase === 'image').forEach(j => Object.assign(j, { status: 'completed', output: `/i/${j.number}.png` }));
+  clips.slice(0, 20).concat(clips.slice(57)).forEach(j => Object.assign(j, { status: 'completed', output: `/v/${j.number}.mp4`, lastFrame: `/f/${j.number}.png` }));   // đoạn 2 xong hết, đoạn 1 còn 37 cảnh nối tiếp
+  let splits = 0;
+  const rebalancer = setInterval(async () => {
+    if (!q.active || q.paused) return;
+    const list = q.jobs.filter(j => j.storyId === 'S');
+    const plan = P.resegment(list, 5);
+    if (!plan) return;
+    for (const ch of plan.changes) Object.assign(q.jobs.find(j => j.id === ch.id), { needs: ch.needs, refList: ch.refList, prompt: ch.prompt });
+    splits += plan.images.length;
+    await q.add(plan.images);
+  }, 3);
+  await q.start('restore');
+  clearInterval(rebalancer);
+  assert.ok(q.jobs.every(j => j.status === 'completed'), 'xong hết');
+  assert.ok(splits >= 2, 'đã chia nốt phần còn lại: ' + splits);
+  assert.ok(max >= 3, 'có ít nhất 3 ô cùng làm: ' + max);
+  const at = j => order.indexOf(j);
+  for (const j of q.jobs.filter(x => x.phase === 'clip' && at(x) >= 0)) {
+    const need = j.needs[0], dep = q.jobs.find(d => d.phase === need.phase && d.number === need.number);
+    assert.ok(at(dep) < 0 || at(dep) < at(j), `cảnh ${j.number} chạy sau việc nó cần`);
+  }
+});

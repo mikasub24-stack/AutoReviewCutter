@@ -17,7 +17,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.addInitScript(() => {
       localStorage.setItem('museStudio.language', localStorage.getItem('testLang') || 'vi');
       const s = {
-        version: '1.8.3', active: false, paused: true, jobs: [],
+        version: '1.8.4', active: false, paused: true, jobs: [],
         license: { status: 'active', plan: 'short', longTerm: false, device: 'TESTDEVICE', expiresAt: Date.now() + 86400000 * 30, message: 'Đã kích hoạt key.' },
         story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: false, clone: false }, platform: 'win32', edgeVoices: [], clones: [] } },
         restore: { busy: false, progress: '', error: '', storyId: '', stories: {} },
@@ -199,6 +199,23 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.waitForFunction(() => window.calls.some(c => c.name === 'restoreSave'));
     assert.equal((await calls('restoreSave'))[0].data.storyId, 'Don-nha-1');
     await page.waitForFunction(() => /Nhà mới\.mp4/.test(document.body.textContent));
+    // Video xong: có khung xem thử, nút «Tạo thumbnail 16:9» (IPC restoreThumb); thumbnail xong thì hiện ảnh + «Lưu thumbnail…» (IPC restoreThumbSave); việc thumbnail không tính vào số cảnh.
+    assert.equal(await page.locator('#restoreRuns video.restoreVideo').count(), 1, 'khung xem thử video đã dựng');
+    assert.match(await page.locator('#restoreRuns video.restoreVideo').getAttribute('src'), /^file:\/\/\/C:\/Videos\/DonNha\/Don-nha-1\/Nh/);
+    await page.waitForSelector('#restoreRuns button:has-text("Tạo thumbnail 16:9")');
+    await page.evaluate(() => { const original = window.studio.invoke; window.studio.invoke = async (n, d) => { if (n === 'restoreThumb') { window.calls.push({ name: n, data: d }); window.s.jobs.push({ kind: 'restore', storyId: d.storyId, phase: 'image', number: 900, title: 'Thumbnail 16:9', id: 't900', status: 'running', stage: 'waiting', order: 99, prompt: 'x' }); return structuredClone(window.s); } if (n === 'restoreThumbSave') { window.calls.push({ name: n, data: d }); return { file: 'D:\\Ảnh\\bìa.png' }; } return original(n, d); }; });
+    await page.click('#restoreRuns button:has-text("Tạo thumbnail 16:9")');
+    await page.waitForFunction(() => window.calls.some(c => c.name === 'restoreThumb'));
+    assert.equal((await calls('restoreThumb'))[0].data.storyId, 'Don-nha-1');
+    await page.waitForFunction(() => /Đang nhờ Muse vẽ thumbnail/.test(document.getElementById('restoreRuns').textContent));
+    assert.match(await page.locator('#restoreRuns .restoreRun').first().textContent(), /15\/15 cảnh/, 'thumbnail không làm đổi số cảnh');
+    await page.evaluate(() => { const j = window.s.jobs.find(x => x.number === 900); j.status = 'completed'; j.output = 'C:\\Videos\\DonNha\\Don-nha-1\\anh\\900.png'; window.s.active = false; window.push(); });
+    await page.waitForSelector('#restoreRuns .restoreThumb img');
+    await page.click('#restoreRuns button:has-text("Lưu thumbnail…")');
+    await page.waitForFunction(() => window.calls.some(c => c.name === 'restoreThumbSave'));
+    await page.waitForFunction(() => /bìa\.png/.test(document.body.textContent));
+    assert.equal(await page.locator('#restoreRuns button:has-text("Tạo lại thumbnail")').count(), 1);
+    await page.evaluate(() => { window.s.jobs = window.s.jobs.filter(x => x.number !== 900); window.push(); });
     await page.evaluate(() => { delete window.s.restore.stories['Don-nha-1'].output; window.push(); });
     await page.click('#restoreRuns button:has-text("Dựng video")');
     await page.waitForFunction(() => window.calls.some(c => c.name === 'restoreBuild'));

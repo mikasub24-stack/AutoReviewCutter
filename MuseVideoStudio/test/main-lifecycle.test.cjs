@@ -106,7 +106,7 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
       if(name === './browser-discovery.cjs' && browserResolver) return {resolveBrowser:browserResolver};
       return localRequire(name);
     },
-    __dirname: path.dirname(mainPath), Buffer, URL, console, setTimeout:(fn,ms,...args)=>setTimeout(fn,ms===20000?domTimeoutMs:ms,...args), clearTimeout, AbortController
+    __dirname: path.dirname(mainPath), Buffer, URL, console, setTimeout:(fn,ms,...args)=>setTimeout(fn,ms===20000?domTimeoutMs:ms,...args), clearTimeout, setInterval, clearInterval, AbortController
   });
   vm.runInContext(await fs.readFile(mainPath, 'utf8'), context, { filename: mainPath });
   if (ownsLock) await loadedPromise;

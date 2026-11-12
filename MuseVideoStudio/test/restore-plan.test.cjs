@@ -460,3 +460,20 @@ test('resegment: không đụng cảnh đã gửi / đã xong; ảnh gốc của
   const planF = P.resegment(flow, 5);
   assert.ok(planF.images.every(im => im.provider === 'flow' && im.aspect === '16:9'));
 });
+
+test('thumbnail 16:9: prompt nhờ Muse ghép ảnh trước / sau, có tiêu đề; số việc cao hơn mọi ảnh mốc và resegment bỏ qua nó', () => {
+  const vi = P.thumbnailPrompt({ title: 'Dọn nhà bỏ hoang', lang: 'vi' });
+  assert.match(vi, /16:9/); assert.match(vi, /FIRST attached photo[^\n]*BEFORE/); assert.match(vi, /SECOND attached photo[^\n]*AFTER/);
+  assert.match(vi, /"Dọn nhà bỏ hoang"/); assert.match(vi, /"TRƯỚC"/); assert.match(vi, /"SAU"/);
+  assert.match(P.thumbnailPrompt({ title: 'Old house "wow"', lang: 'en' }), /"BEFORE"/);
+  assert.doesNotMatch(P.thumbnailPrompt({ title: 'a "b" c' }), /"a "b" c"/);
+  assert.doesNotMatch(P.thumbnailPrompt({}), /exactly these words/);
+  assert.ok(P.THUMB_NUMBER >= 100);
+  const config = P.options({ theme: 'house_full', minutes: 6, seconds: 8, aspect: '16:9', person: false, parallel: 1, lang: 'vi' });
+  const jobs = P.buildJobs(config, { storyId: 's', photo: 'p.png' }).map((j, i) => ({ ...j, id: 'j' + i, status: 'pending' }));
+  const withThumb = [...jobs, { kind: 'restore', phase: 'image', number: P.THUMB_NUMBER, title: 'Thumbnail 16:9', prompt: 'x', id: 'thumb', status: 'pending' }];
+  const a = P.resegment(jobs, 3), b = P.resegment(withThumb, 3);
+  assert.ok(a && b);
+  assert.deepEqual(b.images.map(j => j.number), a.images.map(j => j.number));
+  assert.ok(b.images.every(j => j.number < P.THUMB_NUMBER));
+});

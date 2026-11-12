@@ -557,7 +557,7 @@ async function remoteStopJob(job){
 async function stopAll(){
   if(stopping){while(stopping)await delay(50);return snapshot();}
   storyAnalyzer?.cancel();
-  stopping=true;lastStopAt=Date.now();clearTimeout(quotaTimer);quotaTimer=null;runEpoch++;starting=false;probeController?.abort();queue.pause();
+  stopping=true;lastStopAt=Date.now();clearTimeout(quotaTimer);quotaTimer=null;clearInterval(rebalanceTimer);rebalanceTimer=null;runEpoch++;starting=false;probeController?.abort();queue.pause();
   const probes=[...browserTests.values()].filter(t=>testing&&t.mayHaveSubmitted&&t.status!=='ready').map(t=>({id:t.id,trackerId:t.id,account:t.index+1,mayHaveSubmitted:true}));
   const jobs=[...queue.jobs.filter(j=>!probes.some(t=>t.account===j.account)&&(j.status==='running'||(['failed','interrupted'].includes(j.status)&&j.mayHaveSubmitted&&!['confirmed','ui-stopped'].includes(j.remoteStop?.state)))),...probes];notify();
   const requests=jobs.map(remoteStopJob);
@@ -620,14 +620,29 @@ async function freeRestoreId(base){
   }
   return `${root}-${Date.now().toString(36)}`;
 }
+// Dựng video chỉ cần FFmpeg: đóng hết cửa sổ / tab trình duyệt (Muse, Chrome/Edge do tool mở, Flow) để nhường RAM. Chạy tiếp thì tool tự mở lại.
+async function closeAllBrowsers(){
+  await Promise.allSettled([...opening.values(),...externalLaunches.values(),flowLaunch].filter(Boolean));
+  const closing=[];
+  for(const [index,browser] of [...browsers.entries()]){
+    if(!browser)continue;
+    try{if(!browser.isDestroyed()){const r=browser.close();if(r&&typeof r.then==='function')closing.push(r.catch(()=>{}));}}catch{}
+    browsers.delete(index);
+  }
+  if(flowBrowser&&!flowBrowser.isClosed()){closing.push(flowBrowser.close().catch(()=>{}));}
+  await Promise.allSettled(closing);
+  flowBrowser=null;notify();
+}
 async function buildRestoreStory(storyId){
   const meta=settings.restoreStories?.[storyId];
   if(!meta)throw Error('Không thấy thông tin video này.');
   const clips=restoreClips(storyId);
   if(!restoreDone(clips))throw Error('Chỉ dựng video khi mọi cảnh đã xong.');
-  restoreState={busy:true,progress:'Chuẩn bị dựng video…',error:'',storyId};notify();
+  restoreState={busy:true,progress:'Đang đóng trình duyệt để nhường RAM…',error:'',storyId};notify();
   try{
     await licenseManager.requireLongTerm();
+    await closeAllBrowsers().catch(()=>{});
+    restoreState.progress='Chuẩn bị dựng video…';notify();
     const file=await assembleRestore({clips:clips.map(j=>j.output),dir:restoreFolder(settings.output,storyId),name:meta.name||storyId,ffmpeg:settings.ffmpeg,aspect:meta.aspect,music:meta.music,seams:meta.seams,onProgress:t=>{restoreState.progress=t;notify();}});
     Object.assign(meta,{output:file,builtAt:Date.now(),clipSig:clips.map(j=>j.output).join('|')});
     restoreState={busy:false,progress:'Video đã dựng xong',error:'',storyId};
@@ -671,7 +686,7 @@ async function buildRestoreStories({auto=false}={}){
 const RESTORE_RETRIES=3,RESTORE_RETRY_WAIT=90000;
 let restoreRetrying=false,lastStopAt=0;
 // Mọi tài khoản đều hết hạn mức: hàng đợi tạm dừng; hẹn giờ tự chạy lại khi tài khoản đầu tiên hết nghỉ (không cần ai bấm). Bấm Dừng thì hủy hẹn.
-let quotaTimer=null;
+let quotaTimer=null,rebalanceTimer=null,rebalancing=false;
 function restoreQuotaResume(){
   if(quotaTimer||flushingQuit||!queue.paused||!queue.allExhausted())return;
   if(!queue.jobs.some(j=>j.kind==='restore'&&j.status==='pending'))return;
@@ -923,9 +938,10 @@ app.whenReady().then(async () => {
         if(epoch!==runEpoch || flushingQuit)return snapshot();
         const pendingRestore=kind==='restore'?queue.jobs.filter(j=>j.kind==='restore'&&j.status!=='completed'):[];
         const flowMode=pendingRestore.some(j=>j.provider==='flow');
+        const thumbOnly=pendingRestore.length>0&&pendingRestore.every(j=>j.phase==='image'&&j.number>=restorePlan.THUMB_NUMBER);   // chỉ còn việc tạo thumbnail: mở 1 trình duyệt là đủ
         if(flowMode&&pendingRestore.some(j=>j.provider!=='flow'))throw Error('Hàng đợi đang có cảnh chạy bằng Flow lẫn cảnh chạy bằng Muse. Chạy xong hoặc xóa một loại trước.');
         if(flowMode){await ensureFlowBrowser();if(epoch!==runEpoch||flushingQuit)return snapshot();}
-        else await Promise.all(Array.from({length:settings.accountCount},async(_,index)=>{
+        else await Promise.all(Array.from({length:thumbOnly?1:settings.accountCount},async(_,index)=>{
           if(epoch!==runEpoch||flushingQuit)return;
           if(opening.has(index))await opening.get(index);
           const browser=browsers.get(index);if(!browser||browser.isDestroyed()||!browser.museStarted)await openMuse(index);
@@ -938,9 +954,21 @@ app.whenReady().then(async () => {
         if(unavailable)throw Error('Cảnh đang dở gắn với tài khoản '+unavailable.account+'. Chọn đủ tài khoản trước khi Tiếp tục.');
         queue.prepareResume(kind);
         if(!data?.auto)queue.exhausted.clear();   // người dùng bấm chạy tay: thử lại mọi tài khoản, kể cả tài khoản đang nghỉ
-        queue.concurrency=flowMode?settings.flowParallel:settings.dispatchMode==='parallel'?settings.accountCount:1;
+        queue.concurrency=flowMode?settings.flowParallel:thumbOnly?1:settings.dispatchMode==='parallel'?settings.accountCount:1;
         if(kind==='restore'&&queue.concurrency>1){try{const n=await resegmentRestore(queue.concurrency);if(n)notify();}catch{}}
+        // Đang chạy mà có ô rảnh (đoạn của ô đó đã xong, đoạn khác còn dài): chia nốt phần còn lại của đoạn dài cho ô rảnh, để các ô «xoay vòng» sang chỗ còn việc.
+        clearInterval(rebalanceTimer);rebalanceTimer=null;
+        if(kind==='restore'&&queue.concurrency>1){
+          const lane=queue.concurrency;
+          rebalanceTimer=setInterval(async()=>{
+            if(!queue.active||queue.paused||rebalancing||flushingQuit)return;
+            if(queue.jobs.filter(j=>j.kind==='restore'&&j.status==='running').length>=lane)return;
+            rebalancing=true;
+            try{const n=await resegmentRestore(lane);if(n)notify();}catch{}finally{rebalancing=false;}
+          },15000);
+        }
         queue.start(kind).then(async()=>{
+          clearInterval(rebalanceTimer);rebalanceTimer=null;
           const videos=queue.jobs.filter(j=>j.kind==='video');
           if(kind==='video' && !queue.paused && videos.length && videos.every(j=>j.status==='completed')) {
             if(settings.autoMerge) await mergeProject();else if(settings.autoPackage) await packageProject();
@@ -1008,6 +1036,38 @@ app.whenReady().then(async () => {
       const picked=await dialog.showSaveDialog(main,{title:ui('Lưu video về','Save video'),defaultPath:path.join(app.getPath('downloads'),path.basename(out)),filters:[{name:'MP4',extensions:['mp4']}]});
       if(picked.canceled||!picked.filePath)return false;
       const dest=/\.mp4$/i.test(picked.filePath)?picked.filePath:picked.filePath+'.mp4';
+      if(path.resolve(dest).toLowerCase()!==path.resolve(out).toLowerCase())await fs.copyFile(out,dest);
+      shell.showItemInFolder(dest);return{file:dest};
+    },
+    // «Tạo thumbnail 16:9»: gửi prompt cho Muse vẽ ảnh thumbnail «trước / sau» từ ảnh gốc và khung cuối của video (việc ảnh số THUMB_NUMBER trong hàng đợi).
+    restoreThumb: async data => {
+      const storyId=String(data?.storyId||''),meta=settings.restoreStories?.[storyId];
+      if(!meta)throw Error(ui('Không thấy video này.','This video was not found.'));
+      if(queue.active||starting||merging||packaging||restoreState.busy)throw Error(ui('Chờ xử lý hiện tại hoàn tất.','Wait for the current work to finish.'));
+      const clips=restoreClips(storyId);
+      if(!restoreDone(clips))throw Error(ui('Chỉ tạo thumbnail khi mọi cảnh đã xong.','Create the thumbnail once every scene is done.'));
+      const exists=async f=>Boolean(f)&&await fs.stat(f).then(x=>x.isFile()&&x.size>0,()=>false);
+      let before=clips[0].references?.[0]||clips[0].refList?.find(r=>r.file)?.file||'';
+      if(!await exists(before)){const base=queue.jobs.find(j=>j.kind==='restore'&&j.storyId===storyId&&j.phase==='image'&&j.number===1);before=base?.output||'';}
+      if(!await exists(before))throw Error(ui('Không thấy ảnh gốc của video này để làm ảnh «trước».','The original photo of this video is missing, so there is no “before” picture.'));
+      const last=clips[clips.length-1];let after=last.lastFrame||'';
+      if(!await exists(after))after=await extractLastFrame({ffmpeg:settings.ffmpeg,clip:last.output,out:path.join(restoreFolder(settings.output,storyId),'thumb-sau.png')});
+      const old=queue.jobs.find(j=>j.kind==='restore'&&j.storyId===storyId&&j.phase==='image'&&j.number===restorePlan.THUMB_NUMBER);
+      if(old)await queue.remove(old.id);
+      await queue.add([{kind:'restore',storyId,phase:'image',number:restorePlan.THUMB_NUMBER,title:'Thumbnail 16:9',prompt:restorePlan.thumbnailPrompt({title:meta.name,lang:settings.language==='en'?'en':'vi'}),references:[before,after],refList:[{file:before},{file:after}],needs:[]}]);
+      await save();notify();
+      await handlers.start({kind:'restore'});
+      return snapshot();
+    },
+    // «Lưu thumbnail…»: hộp «Lưu như…» để chọn nơi lưu bản sao ảnh thumbnail.
+    restoreThumbSave: async data => {
+      const job=queue.jobs.find(j=>j.kind==='restore'&&j.storyId===String(data?.storyId||'')&&j.phase==='image'&&j.number===restorePlan.THUMB_NUMBER);
+      const out=job?.status==='completed'?job.output:'';
+      if(!out||!await fs.stat(out).then(s=>s.isFile(),()=>false))throw Error(ui('Chưa có ảnh thumbnail để lưu.','There is no thumbnail to save yet.'));
+      const ext=path.extname(out).toLowerCase()||'.png',name=(settings.restoreStories?.[job.storyId]?.name||job.storyId).replace(/[\\/:*?"<>|]+/g,' ').trim().slice(0,60)||'thumbnail';
+      const picked=await dialog.showSaveDialog(main,{title:ui('Lưu thumbnail về','Save thumbnail'),defaultPath:path.join(app.getPath('downloads'),name+' - thumbnail'+ext),filters:[{name:ui('Ảnh','Image'),extensions:[ext.slice(1)]}]});
+      if(picked.canceled||!picked.filePath)return false;
+      const dest=path.extname(picked.filePath).toLowerCase()===ext?picked.filePath:picked.filePath+ext;
       if(path.resolve(dest).toLowerCase()!==path.resolve(out).toLowerCase())await fs.copyFile(out,dest);
       shell.showItemInFolder(dest);return{file:dest};
     },

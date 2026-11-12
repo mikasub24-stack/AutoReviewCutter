@@ -47,11 +47,17 @@ async function duration(ffprobe, file) {
   return { seconds, frame: a > 0 && b > 0 ? b / a : 1 / 30 };
 }
 
+// Clip có luồng âm thanh không (Muse / Flow thường có tiếng động kèm theo).
+async function hasAudio(ffprobe, file) {
+  try { return String(await command(ffprobe, ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=codec_type', '-of', 'csv=p=0', file], 60000)).trim().length > 0; }
+  catch { return false; }
+}
+
 const CHUNK = 40;   // số clip mỗi lượt FFmpeg: video 2 giờ có hàng trăm clip, mở hết một lần dễ vượt giới hạn tệp mở của Windows
 
 // Nối các clip theo số cảnh (cắt cứng: cảnh sau bắt đầu đúng bằng khung cuối cảnh trước nên không cần chuyển cảnh), chuẩn hóa khung hình,
-// mờ dần vào / ra, nhạc nền (nếu có; lặp cho đủ và nhỏ dần ở cuối) hoặc âm thanh im lặng. Dựng theo từng đoạn ≤ CHUNK clip (chỉ hình) rồi ghép các đoạn
-// (copy, không mã hóa lại) cùng âm thanh. Trả về đường dẫn video.
+// mờ dần vào / ra, GIỮ TIẾNG ĐỘNG GỐC của từng clip (clip không có tiếng thì thay bằng im lặng cùng độ dài), nhạc nền (nếu có) trộn nhỏ bên dưới.
+// Mỗi clip xử lý riêng (hình + tiếng) rồi ghép các clip (copy, không mã hóa lại). Trả về đường dẫn video.
 async function assembleRestore({ clips, dir, name = 'Video', ffmpeg = 'ffmpeg', aspect = '16:9', music = '', seams = [], onProgress = () => {} }) {
   if (!Array.isArray(clips) || !clips.length) throw Error('Chưa có clip nào để dựng.');
   for (const c of clips) await fs.access(c).catch(() => { throw Error('Không thấy tệp clip: ' + c); });
@@ -59,10 +65,10 @@ async function assembleRestore({ clips, dir, name = 'Video', ffmpeg = 'ffmpeg', 
   const [width, height] = SIZES[aspect] || SIZES['16:9'];
   await fs.mkdir(dir, { recursive: true });
   onProgress('Đang đo thời lượng các clip…');
-  const lengths = [], trimmed = [];
+  const lengths = [], trimmed = [], frames = [];
   const seamSet = new Set((Array.isArray(seams) ? seams : []).map(Number).filter(n => Number.isInteger(n) && n > 0 && n < clips.length));   // đầu mỗi đoạn chạy song song: nối bằng ảnh mốc, không phải khung cuối clip trước
   // Khung ĐẦU của clip sau trùng khung cuối clip trước (nối bằng khung cuối thật): bỏ khung trùng đó ở mọi chỗ nối để không bị khựng một nhịp.
-  for (const [i, c] of clips.entries()) { const d = await duration(t.ffprobe, c), cut = i > 0 && !seamSet.has(i) && d.seconds > d.frame * 2; trimmed.push(cut); lengths.push(cut ? d.seconds - d.frame : d.seconds); }
+  for (const [i, c] of clips.entries()) { const d = await duration(t.ffprobe, c), cut = i > 0 && !seamSet.has(i) && d.seconds > d.frame * 2; trimmed.push(cut); frames.push(d.frame); lengths.push(cut ? d.seconds - d.frame : d.seconds); }
   const total = lengths.reduce((a, b) => a + b, 0);
   const useMusic = Boolean(music) && MUSIC_EXT.has(path.extname(music).toLowerCase()) && await fs.access(music).then(() => true, () => false);
   if (music && !useMusic) onProgress('Không đọc được tệp nhạc nền, dựng không nhạc.');
@@ -72,35 +78,33 @@ async function assembleRestore({ clips, dir, name = 'Video', ffmpeg = 'ffmpeg', 
   const segments = [], files = [];
   const listFile = path.join(dir, `${stamp}.txt`), temp = path.join(dir, `${stamp}.part.mp4`);
   try {
-    // Đoạn dựng: tối đa CHUNK clip và luôn bắt đầu lại ở mỗi chỗ nối của đoạn song song (để mờ ra / vào đúng chỗ đó).
-    const ranges = [];
-    for (let i = 0, start = 0; i <= clips.length; i++) if (i === clips.length || (i > start && (seamSet.has(i) || i - start >= CHUNK))) { ranges.push([start, i]); start = i; }
-    const parts = ranges.length;
-    for (let p = 0; p < parts; p++) {
-      const [from, to] = ranges[p], group = clips.slice(from, to), span = lengths.slice(from, to).reduce((a, b) => a + b, 0);
-      const seg = path.join(dir, `${stamp}-seg-${String(p + 1).padStart(4, '0')}.mp4`);
+    // Mỗi clip được xử lý RIÊNG bằng một lượt FFmpeg (chuẩn hóa khung hình, bỏ khung trùng, mờ vào / ra ở chỗ cần) rồi ghép bằng concat demuxer (không mã hóa lại).
+    // Không mở nhiều clip trong cùng một lượt FFmpeg: bộ lọc concat giữ trong RAM các khung đã giải mã của mọi clip, 20–40 clip 1080p là hết bộ nhớ («malloc failed»).
+    const last = clips.length - 1;
+    for (let i = 0; i < clips.length; i++) {
+      const seg = path.join(dir, `${stamp}-clip-${String(i + 1).padStart(4, '0')}.ts`);
       files.push(seg);
-      onProgress(parts > 1 ? `Đang dựng đoạn ${p + 1}/${parts} (${Math.round(total)} giây tất cả)…` : `Đang dựng ${clips.length} cảnh thành một video (${Math.round(total)} giây)…`);
-      const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y'];
-      for (const c of group) args.push('-i', c);
-      const chain = group.map((_, i) => `[${i}:v:0]${trimmed[from + i] ? 'trim=start_frame=1,setpts=PTS-STARTPTS,' : ''}scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p,setpts=PTS-STARTPTS[v${i}]`);
-      // Chỗ nối giữa hai đoạn song song: mờ ra rồi mờ vào rất nhanh (0,35 giây mỗi bên) để che chỗ nhà / người hơi khác nhau.
-      const seamIn = seamSet.has(from), seamOut = seamSet.has(to);
-      const fades = [p === 0 ? 'fade=t=in:st=0:d=0.6' : seamIn ? 'fade=t=in:st=0:d=0.35' : '',
-        p === parts - 1 ? (total > 4 ? `fade=t=out:st=${Math.max(0, span - 1).toFixed(3)}:d=1` : '') : seamOut ? `fade=t=out:st=${Math.max(0, span - 0.35).toFixed(3)}:d=0.35` : ''].filter(Boolean);
-      const filters = [...chain, `${group.map((_, i) => `[v${i}]`).join('')}concat=n=${group.length}:v=1:a=0[vc]`, `[vc]${fades.length ? fades.join(',') : 'null'}[v]`];
-      args.push('-filter_complex', filters.join(';'), '-map', '[v]', ...encode, '-an', '-movflags', '+faststart', seg);
-      await command(t.ffmpeg, args, 3600000);
+      onProgress(`Đang xử lý cảnh ${i + 1}/${clips.length} (${Math.round(total)} giây tất cả)…`);
+      const len = lengths[i], inD = i === 0 ? 0.6 : seamSet.has(i) ? 0.35 : 0, outD = i === last ? (total > 4 ? 1 : 0) : seamSet.has(i + 1) ? 0.35 : 0;
+      const fadeAt = (kind) => [inD ? `${kind}=t=in:st=0:d=${inD}` : '', outD ? `${kind}=t=out:st=${Math.max(0, len - outD).toFixed(3)}:d=${outD}` : ''].filter(Boolean);
+      const vf = [trimmed[i] ? 'trim=start_frame=1,setpts=PTS-STARTPTS' : '', `scale=${width}:${height}:force_original_aspect_ratio=decrease`, `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`, 'setsar=1', 'fps=30', 'format=yuv420p', 'setpts=PTS-STARTPTS', ...fadeAt('fade')].filter(Boolean).join(',');
+      // Tiếng gốc của clip (tiếng chổi, nước, bước chân…): cắt cùng chỗ với hình, đưa về 48 kHz stereo, đệm im lặng / cắt cho đúng độ dài hình để các đoạn khớp nhau.
+      const withAudio = await hasAudio(t.ffprobe, clips[i]);
+      const af = [...(withAudio && trimmed[i] ? [`atrim=start=${frames[i].toFixed(5)}`, 'asetpts=PTS-STARTPTS'] : []), 'aresample=48000', 'aformat=sample_fmts=fltp:channel_layouts=stereo', 'apad', `atrim=end=${len.toFixed(3)}`, 'asetpts=PTS-STARTPTS', ...fadeAt('afade')].join(',');
+      const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y', '-i', clips[i]];
+      if (!withAudio) args.push('-f', 'lavfi', '-t', len.toFixed(3), '-i', 'anullsrc=r=48000:cl=stereo');
+      args.push('-filter_complex', `[0:v]${vf}[v];[${withAudio ? '0' : '1'}:a]${af}[a]`, '-map', '[v]', '-map', '[a]', ...encode, '-c:a', 'aac', '-ar', '48000', '-ac', '2', '-b:a', '192k', '-t', len.toFixed(3), '-f', 'mpegts', seg);
+      await command(t.ffmpeg, args, 1800000);
       segments.push(path.basename(seg));
     }
     await fs.writeFile(listFile, segments.map(f => `file '${f}'`).join('\n') + '\n');
     onProgress('Đang ghép các đoạn và âm thanh…');
     const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y', '-f', 'concat', '-safe', '0', '-i', listFile];
     if (useMusic) args.push('-stream_loop', '-1', '-i', music);
-    else args.push('-f', 'lavfi', '-t', total.toFixed(3), '-i', 'anullsrc=r=48000:cl=stereo');
+    const orig = '[0:a]aresample=48000:async=1:first_pts=0,aformat=sample_fmts=fltp:channel_layouts=stereo';
     const audio = useMusic
-      ? `[1:a]atrim=0:${total.toFixed(3)},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=1${total > 6 ? `,afade=t=out:st=${(total - 2.5).toFixed(3)}:d=2.5` : ''},volume=0.85[a]`
-      : `[1:a]atrim=0:${total.toFixed(3)},asetpts=PTS-STARTPTS[a]`;
+      ? `${orig}[o];[1:a]atrim=0:${total.toFixed(3)},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=1${total > 6 ? `,afade=t=out:st=${(total - 2.5).toFixed(3)}:d=2.5` : ''},aformat=sample_fmts=fltp:channel_layouts=stereo[m];[o][m]amix=inputs=2:weights=1 0.35:duration=first:dropout_transition=0,volume=1.35,alimiter=limit=0.95[a]`
+      : `${orig}[a]`;
     args.push('-filter_complex', audio, '-map', '0:v:0', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-ar', '48000', '-b:a', '192k', '-t', total.toFixed(3), '-movflags', '+faststart', temp);
     await command(t.ffmpeg, args, 3600000);
     const info = JSON.parse(await command(t.ffprobe, ['-v', 'error', '-show_format', '-show_streams', '-of', 'json', temp], 60000));

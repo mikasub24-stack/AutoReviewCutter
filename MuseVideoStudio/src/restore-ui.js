@@ -13,6 +13,8 @@
   const base = file => String(file || '').split(/[\\/]/).pop();
 
   let theme = P.themeOf(saved.theme).id, photo = '', music = '', shownLang = '', runsKey = '', wasBusy = false, secsForced = false, secsBefore = '8';
+  const isThumb = j => j.phase === 'image' && j.number >= P.THUMB_NUMBER;   // việc tạo ảnh thumbnail 16:9 (không tính vào các cảnh)
+  const builtSeen = new Map(), thumbSeen = new Map();
 
   // ---- ô chọn tĩnh
   function fillSelects() {
@@ -165,22 +167,24 @@
     const info = s.restore || {}, stories = info.stories || {};
     const runs = runsOf(s);
     const key = JSON.stringify([lang(), Boolean(s.active), Boolean(s.starting), info.busy, info.progress, info.error, info.storyId,
-      runs.map(r => [r.id, r.list.map(j => j.status + (j.stage || '')), (stories[r.id] || {}).output || ''])]);
+      runs.map(r => [r.id, r.list.map(j => j.status + (j.stage || '') + (isThumb(j) ? j.output || '' : '')), (stories[r.id] || {}).output || '', (stories[r.id] || {}).builtAt || 0])]);
     if (key === runsKey) return;
     runsKey = key;
     // Phần nhập dài chiếm hết màn hình: khi bắt đầu chạy thì thu gọn lại để thấy ngay tiến độ và hàng đợi (bấm «Tạo video mới» để mở lại).
     const busyNow = Boolean(s.active || s.starting);
     if (busyNow && !wasBusy) $('restoreForm').open = false;
     wasBusy = busyNow;
-    const live = runs.find(r => r.list.some(j => ['pending', 'running', 'interrupted', 'failed'].includes(j.status)));
+    const live = runs.find(r => r.list.some(j => !isThumb(j) && ['pending', 'running', 'interrupted', 'failed'].includes(j.status)));
     const runHint = $('restoreRunHint');
     if (live) {
-      const clips = live.list.filter(j => j.phase === 'clip'), done = clips.filter(j => j.status === 'completed').length;
-      runHint.textContent = tr(`${busyNow ? 'Đang chạy' : 'Tạm dừng'} · ${done}/${clips.length} cảnh · ${Math.round(100 * live.list.filter(j => j.status === 'completed').length / Math.max(1, live.list.length))}%`,
-        `${busyNow ? 'Running' : 'Paused'} · ${done}/${clips.length} scenes · ${Math.round(100 * live.list.filter(j => j.status === 'completed').length / Math.max(1, live.list.length))}%`);
+      const work = live.list.filter(j => !isThumb(j)), clips = work.filter(j => j.phase === 'clip'), done = clips.filter(j => j.status === 'completed').length;
+      const pct = Math.round(100 * work.filter(j => j.status === 'completed').length / Math.max(1, work.length));
+      runHint.textContent = tr(`${busyNow ? 'Đang chạy' : 'Tạm dừng'} · ${done}/${clips.length} cảnh · ${pct}%`, `${busyNow ? 'Running' : 'Paused'} · ${done}/${clips.length} scenes · ${pct}%`);
     }
     runHint.hidden = !live; $('restoreIdleHint').hidden = Boolean(live);
-    $('restoreRuns').replaceChildren(...runs.map(({ id, list }) => {
+    let focusBox = null;
+    $('restoreRuns').replaceChildren(...runs.map(({ id, list: everything }) => {
+      const list = everything.filter(j => !isThumb(j)), thumb = everything.find(isThumb);
       const meta = stories[id] || {}, clips = list.filter(j => j.phase === 'clip'), done = list.filter(j => j.status === 'completed').length;
       const failed = list.some(j => ['failed', 'interrupted'].includes(j.status)), running = list.some(j => j.status === 'running');
       const allClips = clips.length > 0 && clips.every(j => j.status === 'completed');
@@ -200,6 +204,29 @@
       else if (running || s.active || s.starting) text.textContent = list.some(j => j.provider === 'flow') ? tr('Đang tạo các cảnh nối tiếp nhau trên Google Flow…', 'Creating the connected scenes on Google Flow…') : tr('Đang tạo các cảnh nối tiếp nhau trên Muse…', 'Creating the connected scenes on Muse…');
       else if (allClips) text.textContent = tr('Đã đủ cảnh. Bấm «Dựng video» để dựng.', 'All scenes are ready. Click “Build video”.');
       else text.textContent = tr('Chờ chạy. Bấm «Chạy hàng đợi» ở dưới.', 'Waiting. Click “Run queue” below.');
+      // Video xong: báo ngay (hộp thông báo + cuộn tới video) và cho xem thử ngay trong ô này.
+      if (meta.builtAt) {
+        if (builtSeen.has(id) && builtSeen.get(id) !== meta.builtAt) { toast(tr('Video đã dựng xong: ', 'Video is ready: ') + (meta.name || id)); focusBox = box; }
+        builtSeen.set(id, meta.builtAt);
+      } else builtSeen.set(id, 0);
+      const thumbNow = thumb ? thumb.status : '';
+      if (thumbSeen.has(id) && thumbSeen.get(id) !== 'completed' && thumbNow === 'completed') { toast(tr('Thumbnail 16:9 đã xong. Bấm «Lưu thumbnail…» để lưu về máy.', 'The 16:9 thumbnail is ready. Click “Save thumbnail…” to save it.')); focusBox = box; }
+      thumbSeen.set(id, thumbNow);
+      const extra = [];
+      if (meta.output && !building) {
+        const video = document.createElement('video'); video.className = 'restoreVideo'; video.controls = true; video.preload = 'metadata'; video.src = localFileUrl(meta.output);
+        extra.push(video);
+      }
+      if (thumb) {
+        const tbox = document.createElement('div'); tbox.className = 'restoreThumb';
+        const note = document.createElement('p'); note.className = 'restoreRunText';
+        if (thumb.status === 'completed' && thumb.output) {
+          const img = document.createElement('img'); img.alt = tr('Ảnh thumbnail 16:9', '16:9 thumbnail'); img.src = localFileUrl(thumb.output); tbox.append(img);
+          note.textContent = tr('Thumbnail 16:9: ', '16:9 thumbnail: ') + base(thumb.output);
+        } else if (['failed', 'interrupted'].includes(thumb.status)) { note.textContent = tr('Thumbnail lỗi: ', 'Thumbnail failed: ') + (thumb.error || thumb.stageMessage || tr('chưa tạo được', 'could not be created')); note.classList.add('warn'); }
+        else note.textContent = tr('Đang nhờ Muse vẽ thumbnail 16:9 từ ảnh gốc và khung cuối của video…', 'Asking Muse to draw the 16:9 thumbnail from the original photo and the last frame…');
+        tbox.append(note); extra.push(tbox);
+      }
       const actions = document.createElement('div'); actions.className = 'restoreRunActions';
       const busy = Boolean(s.active || s.starting), unfinished = list.some(j => ['pending', 'interrupted', 'failed'].includes(j.status));
       if (busy) {
@@ -230,13 +257,27 @@
         const open = document.createElement('button'); open.type = 'button'; open.className = 'secondary';
         open.textContent = tr('Mở video', 'Show video'); open.onclick = () => call('restoreReveal', { storyId: id });
         actions.append(open);
+        if (!busy && allClips && !(info.busy)) {
+          const make = document.createElement('button'); make.type = 'button'; make.className = thumb && thumb.status === 'completed' ? 'secondary' : 'primary';
+          make.textContent = !thumb ? tr('Tạo thumbnail 16:9', 'Create 16:9 thumbnail') : thumb.status === 'completed' ? tr('Tạo lại thumbnail', 'Redo thumbnail') : ['failed', 'interrupted'].includes(thumb.status) ? tr('Thử lại thumbnail', 'Retry thumbnail') : tr('Tạo thumbnail 16:9', 'Create 16:9 thumbnail');
+          make.disabled = Boolean(s.stopping || s.merging || s.packaging);
+          make.onclick = async () => { const r = await call('restoreThumb', { storyId: id }); if (r) { runsKey = ''; render(r); } };
+          actions.append(make);
+        }
+        if (thumb && thumb.status === 'completed' && thumb.output) {
+          const save = document.createElement('button'); save.type = 'button'; save.className = 'primary';
+          save.textContent = tr('Lưu thumbnail…', 'Save thumbnail…');
+          save.onclick = async () => { const r = await call('restoreThumbSave', { storyId: id }); if (r && r.file) toast(tr('Đã lưu thumbnail: ', 'Thumbnail saved: ') + r.file); };
+          actions.append(save);
+        }
       }
       const folder = document.createElement('button'); folder.type = 'button'; folder.className = 'secondary';
       folder.textContent = tr('Mở thư mục', 'Open folder'); folder.onclick = () => call('openOutput', { kind: 'restore' });
       actions.append(folder);
-      box.append(top, bar, text, actions);
+      box.append(top, bar, text, ...extra, actions);
       return box;
     }));
+    if (focusBox) focusBox.scrollIntoView({ block: 'nearest' });
   }
 
   // ---- khóa theo gói
