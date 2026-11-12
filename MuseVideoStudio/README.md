@@ -146,7 +146,8 @@ Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang 
 
 - **Tab Dọn nhà · Sinh tồn: bớt «lùi trạng thái» giữa các đoạn.** Ảnh mốc đầu mỗi đoạn do Muse vẽ lại từ ảnh gốc nên hay quên việc đã xong (đã sơn rồi mà tường vẫn bong, đã lát sàn mà dây điện vẫn hở, lắp cửa sổ trong căn phòng còn trần trụi). Giờ ảnh mốc dặn rõ trạng thái hiện tại theo các bước đã xong: tường trát phẳng, đã sơn sạch không bong tróc, sàn đã lát mới, cửa mới, dây điện đã giấu và đèn đã bật, bếp đã lắp, nhà đã có nội thất.
 - **Giữ đúng MỘT ngôi nhà:** mọi ảnh mốc được dặn giữ nguyên kiến trúc (cùng số tầng, dáng mái, mặt bằng, vị trí cửa), chỉ đổi tình trạng (sạch hơn, sửa xong, sơn mới), không thành nhà khác.
-- Áp dụng cho video tạo MỚI (video đang chạy dở vẫn dùng ảnh mốc cũ).
+- **Lau mồ hôi lâu lâu mới lau:** trước đây clip nào cũng dặn «dừng lại lau mồ hôi» nên người làm lau liên tục. Giờ chỉ khoảng 1 clip trong 6 mới có một lần lau (không bao giờ ở hai clip liền nhau, không ở clip 1-2); các clip còn lại người làm cứ làm liên tục, mồ hôi chỉ thấy trên mặt và áo.
+- Áp dụng cho video tạo MỚI (video đang chạy dở vẫn dùng ảnh mốc và prompt cũ).
 
 ## Update 1.8.5
 

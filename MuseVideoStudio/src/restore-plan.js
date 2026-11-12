@@ -391,21 +391,26 @@
   // Sức lực và cảm xúc: người làm việc nặng phải thở mạnh, đổ mồ hôi, mệt dần theo thời gian; biểu cảm thể hiện bằng nét mặt và dáng người trong khung vừa / xa, KHÔNG bằng cách quay cận mặt.
   const HEAVY = /\b(cut down|cleared|clears|hauled|carried|carries|carry|pressure-wash\w*|torn out|tear|removed|dig|digs|dug|shovel|throws|sanded|ground off|scrubbed|lifted|lifts|saw|splits|stacks|raises|levels|loaded|chop\w*|drag\w*|wheelbarrow|rak(?:e|ed)|swept|rebuilt|piles|packs|cuts)\b/i;
   const LIGHT = /(curtains|pictures|decorations|lights are switched on|lights the|sits|stands|relaxed|looks brand new|looks showroom|mailbox|door mat|outdoor lamps|garden lights|lush|spotless)/i;
+  // Lau mồ hôi chỉ LÂU LÂU (khoảng 1 clip trong 6, không bao giờ ở clip 1-2); các clip còn lại người làm cứ làm liên tục, mồ hôi chỉ thấy trên mặt và áo.
+  const wipesIn = number => number > 2 && number % 6 === 3;
   function effortLines(config, step, number, total) {
     if (!config.person) return [];
     const heavy = HEAVY.test(step.en || ''), light = !heavy && LIGHT.test(step.en || '');
-    const r = number / Math.max(1, total);
+    const r = number / Math.max(1, total), wipe = wipesIn(number);
+    const rest = wipe
+      ? ' Once, in the middle of the clip, the person pauses for a moment to wipe the sweat from the face with the forearm and catch their breath, then goes straight back to work.'
+      : ' The person keeps working without stopping the whole clip: no wiping the face, no pausing to rest.';
     const work = heavy
-      ? 'This is HARD physical labour: the person strains visibly, muscles tense, jaw clenched, frowning with effort, breathing heavily, sweat running down the forehead and neck, shirt dark with sweat, dirty sweaty hands; once during the clip the person stops for a moment to wipe the sweat from the face with the forearm and catch their breath, then goes on.'
+      ? `This is HARD physical labour: the person strains visibly, muscles tense, jaw clenched, frowning with effort, breathing heavily, sweat running down the forehead and neck, shirt dark with sweat, dirty sweaty hands.${rest}`
       : light
         ? 'The person works calmly and carefully with a relaxed, pleased expression, still a little sweaty and tired from the long work, with a small satisfied smile when the result looks good.'
-        : 'The person works steadily with a focused, serious face, sweat on the forehead, breathing a little heavily, and wipes the forehead once during the clip.';
+        : `The person works steadily with a focused, serious face, sweat on the forehead, breathing a little heavily.${rest}`;
     const tired = r < 0.25 ? 'The job has just started: the person is fresh but already starting to sweat.'
       : r < 0.6 ? 'Several hours into the job: hair damp, shirt dark with sweat, clearly warm and breathing hard between actions.'
-      : r < 0.9 ? 'Many hours into the job: soaked in sweat, dirty and visibly tired, slower breaths, rubbing the sore back or shoulder now and then, but pushing on.'
+      : r < 0.9 ? `Many hours into the job: soaked in sweat, dirty and visibly tired, slower breaths${wipe ? ', rubbing the sore back or shoulder for a moment' : ''}, but pushing on.`
       : 'The job is almost done: exhausted and soaked in sweat but proud, with a tired relieved smile when looking at the result.';
     const how = config.faceless
-      ? 'Show the effort and the tiredness with the body only: heaving breath, sweat-dark back and shirt, slumped shoulders, wiping the neck.'
+      ? `Show the effort and the tiredness with the body only: heaving breath, sweat-dark back and shirt, slumped shoulders${wipe ? ', wiping the neck once' : ''}.`
       : 'Show real human emotion in the face and the body, clearly visible in the medium or wide view (effort, tiredness, relief), and never by moving the camera to the face.';
     return [`Emotion and effort (the person is a real tired human, never a calm robot): ${work} ${tired} ${how}`];
   }

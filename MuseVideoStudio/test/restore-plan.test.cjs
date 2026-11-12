@@ -163,8 +163,18 @@ test('cảm xúc và sức lực: việc nặng thì thở mạnh, đổ mồ h�
   const h = line(c, steps[heavy], heavy + 1);
   assert.match(h, /HARD physical labour/);
   assert.match(h, /sweat/);
-  assert.match(h, /wipe the sweat from the face/);
   assert.match(h, /never by moving the camera to the face/);
+  // lau mồ hôi chỉ lâu lâu: khoảng 1 clip trong 6, không bao giờ ở clip 1-2; clip khác thì làm liên tục
+  const wipes = Array.from({ length: 60 }, (_, i) => i + 1).filter(n => /wipe the sweat from the face/.test(line(c, steps[heavy], n, 60)));
+  assert.deepEqual(wipes.slice(0, 4), [3, 9, 15, 21]);
+  assert.ok(wipes.length >= 8 && wipes.length <= 12, 'khoảng 1/6 số clip: ' + wipes.length);
+  assert.ok(!wipes.some(n => wipes.includes(n + 1)), 'không lau ở hai clip liền nhau');
+  assert.match(line(c, steps[heavy], 4, 60), /keeps working without stopping the whole clip: no wiping the face/);
+  assert.doesNotMatch(line(c, steps[heavy], 4, 60), /wipe the sweat/);
+  assert.match(line(c, steps[heavy], 3, 60), /Once, in the middle of the clip, the person pauses for a moment to wipe the sweat/);
+  assert.doesNotMatch(line(c, steps[heavy], 1, 60), /wipe the sweat/);
+  const plain = steps.find(s => !/levels the ground with a shovel|cuts long straight poles/.test(s.en) && !/stands proudly/.test(s.en));
+  assert.match(line(c, plain, 4, 60) + line(c, plain, 3, 60), /keeps working without stopping|The person works calmly|Once, in the middle/);
   assert.match(line(c, steps[heavy], 2), /just started/);
   assert.match(line(c, steps[heavy], Math.round(total * 0.45)), /Several hours/);
   assert.match(line(c, steps[heavy], Math.round(total * 0.8)), /Many hours/);
