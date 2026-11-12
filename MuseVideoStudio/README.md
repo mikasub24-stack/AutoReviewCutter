@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.8.5
+
+- **Tab Kể chuyện, chế độ «Cây trồng»: cây lớn TỪ TỪ.** Trước đây câu hướng dẫn Muse có sẵn ví dụ cả vòng đời (hạt nứt, mầm nhú, lá, hoa, quả) nên Muse chép cả chuỗi đó vào MỖI clip: cảnh nào cũng nảy mầm rồi ra quả luôn trong vài giây. Giờ mỗi clip chỉ là MỘT bước nhỏ (vài ngày tới một hai tuần: cao thêm vài cm, thêm vài lá, một nụ nở, một quả to thêm), nảy mầm chỉ ở cảnh nảy mầm, hoa chỉ ở cảnh hoa, quả chỉ ở cảnh quả.
+- **Giai đoạn của mỗi cảnh theo vị trí trong bài, không theo điều câu đọc nhắc tới:** câu mở đầu «trồng cà chua đến khi ra quả» vẫn vẽ chậu đất trống hoặc hạt, không vẽ cây đã lớn hay quả, không vẽ loài hoa khác; không cảnh nào nhảy lên giai đoạn sau rồi quay lại.
+- **Lời đọc do Muse viết cho cây trồng** cũng tiến từng bước nhỏ và không nhắc hoa, quả khi cây mới nảy mầm.
+- Chỉ áp dụng cho truyện tạo MỚI: truyện đã tạo thì prompt cũ vẫn giữ, cần tạo lại các cảnh.
+
 ## Update 1.8.4
 - **Ô rảnh tự «xoay vòng» sang chỗ còn việc:** khi một đoạn đã làm xong mà đoạn khác còn dài (ví dụ chuỗi cuối còn 25 cảnh nối tiếp, 4 ô còn lại ngồi chờ), cứ mỗi 15 giây tool kiểm tra và **chia nốt phần còn lại của đoạn dài** cho các ô rảnh (thêm một ảnh mốc đầu đoạn mới, cập nhật chỗ nối khi dựng). Chỉ chia khi đoạn còn từ 8 cảnh chưa làm trở lên; còn ít hơn thì không chia vì làm ảnh mốc mất thời gian ngang với việc tiết kiệm được và dễ lệch hình. Tối đa 10 ô.
 - Giới hạn vật lý: trong một đoạn mỗi cảnh phải đợi khung cuối của cảnh trước, nên mấy cảnh cuối cùng của một đoạn vẫn chạy lần lượt.

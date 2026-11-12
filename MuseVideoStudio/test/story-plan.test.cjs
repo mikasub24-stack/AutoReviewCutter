@@ -1208,8 +1208,12 @@ test('cây trồng: câu lệnh chia cảnh dặn cùng MỘT chậu/chỗ đặ
       assert.match(text, /CÂY TRỒNG – TIME-LAPSE \(quay tua nhanh thời gian\)/);
       assert.match(text, /PHÁT TRIỂN NGAY TRÊN MÀN HÌNH/);
       assert.match(text, /Máy quay CỐ ĐỊNH như đặt trên chân máy/);
-      assert.match(text, /hạt nứt vỏ, mầm trắng nhú khỏi mặt đất/);
-      assert.match(text, /nụ xuất hiện rồi phồng to → hoa nở dần/);
+      assert.match(text, /MỖI clip CHỈ MỘT BƯỚC NHỎ|CHỈ MỘT BƯỚC NHỎ: mỗi clip là MỘT đoạn ngắn trong đời cây/);
+      assert.match(text, /TUYỆT ĐỐI KHÔNG tua cả vòng đời trong một clip/);
+      assert.match(text, /nảy mầm CHỈ xuất hiện ở các bước nảy mầm, ra hoa CHỈ ở các bước ra hoa/);
+      assert.ok(!/hạt nứt vỏ, mầm trắng nhú khỏi mặt đất|nụ xuất hiện rồi phồng to → hoa nở dần/.test(text), 'không còn ví dụ cả vòng đời để Muse chép vào mọi clip');
+      assert.match(text, /GIAI ĐOẠN của mỗi cảnh do VỊ TRÍ của cảnh trong chuỗi thời gian của bài quyết định/);
+      assert.match(text, /không bao giờ vẽ cây hoa hay loài khác/);
       assert.match(text, /LIÊN TỤC giữa các bước: hình thái cây ở CUỐI clip của bước k/);
       assert.ok(!/KHÔNG cho cây lớn lên|cây KHÔNG được lớn lên/.test(text), 'không còn cấm cây lớn lên trong clip');
       assert.ok(!text.includes('CHUYỂN ĐỘNG NHẸ, ỔN ĐỊNH') && !text.includes('mỗi mốc chỉ MỘT chuyển động nhỏ, chậm'), 'cây trồng không dùng luật chuyển động nhẹ (cấm đổi hình dạng)');
@@ -1218,7 +1222,8 @@ test('cây trồng: câu lệnh chia cảnh dặn cùng MỘT chậu/chỗ đặ
       assert.match(text, /«0–3 (?:s|giây) \[(?:line|câu) 5\]: …»/, 'vẫn giữ mốc giờ và thẻ số câu');
     }
     const en = sp.buildMuseInstruction(script, { ...plantBase, tipPrompt: 'en' });
-    assert.match(en, /Time-lapse of a real plant growing: smooth, continuous, clearly visible growth at fast-forward speed/);
+    assert.match(en, /Time-lapse of ONE small step of a real plant growing: smooth, continuous, clearly visible but modest growth at fast-forward speed/);
+    assert.match(en, /never goes through its whole life cycle in this clip/);
     assert.match(en, /Static camera on a tripod, no push-in, no pan, no zoom/);
     assert.ok(!en.includes('Every object keeps exactly the same shape, size and color as in the first frame'), 'câu kết cũ (giữ nguyên kích cỡ) bị bỏ cho cây trồng');
   }
@@ -1227,7 +1232,8 @@ test('cây trồng: câu lệnh chia cảnh dặn cùng MỘT chậu/chỗ đặ
   assert.ok(plain.includes('Every object keeps exactly the same shape, size and color as in the first frame') && !plain.includes('TIME-LAPSE'));
   // prompt mẫu tạo ngay trên máy (chưa qua Muse): cây trồng cũng là time-lapse, máy quay cố định
   const offline = sp.scenePrompt('Hạt đã nảy mầm.', sp.options(plantBase));
-  assert.match(offline, /TIME-LAPSE quay tua nhanh/);
+  assert.match(offline, /TIME-LAPSE quay tua nhanh MỘT bước nhỏ của đời cây/);
+  assert.match(offline, /KHÔNG tua cả vòng đời trong một clip/);
   assert.match(offline, /Máy quay: CỐ ĐỊNH như đặt trên chân máy/);
   assert.ok(!sp.scenePrompt('Hạt đã nảy mầm.', sp.options({ ...plantBase, tipKind: 'tip' })).includes('TIME-LAPSE'), 'mẹo vặt không dính');
   const tip = sp.buildMuseInstruction(script, { ...plantBase, tipKind: 'tip', tipPrompt: 'vi', tipMinutes: 2 });
@@ -1480,4 +1486,12 @@ test('Muse từ chối người thật và cảnh cầm/bắn súng: câu lệnh
   assert.equal(pol('Bàn làm việc trống, tập hồ sơ và cây bút trên mặt bàn; Bạn đứng nhìn nghiêm túc. Chiếc ghế của tổng thống để trống không.').length, 0, 'cảnh bàn/ghế trống: không cảnh báo');
   assert.equal(pol('Một người thợ đứng trước bản đồ, chỉ tay vào các dấu địa danh.').length, 0);
   assert.equal(pol('Con kingfisher đậu trên cành; presidential-style flag.').length, 0, 'king/president nằm trong từ khác không khớp');
+});
+
+test('cây trồng: lời đọc tiến triển TỪ TỪ, mỗi bước chỉ tiến một chút và không nhắc giai đoạn sau', () => {
+  const text = sp.buildTipScriptInstruction({ ...plantBase, tipTitle: 'Trồng cà chua đến khi ra quả' }, { marker: 'ab12cd' });
+  assert.match(text, /TIẾN TRÌNH PHẢI TỪ TỪ: mỗi bước chỉ tiến thêm MỘT chút so với bước trước/);
+  assert.match(text, /KHÔNG nhắc tới giai đoạn sau \(không nói tới hoa hay quả khi cây mới nảy mầm/);
+  const tip = sp.buildTipScriptInstruction({ ...plantBase, tipKind: 'tip', tipTitle: 'Mẹo rửa rau' }, { marker: 'ab12cd' });
+  assert.ok(!tip.includes('TIẾN TRÌNH PHẢI TỪ TỪ'), 'mẹo vặt không dính');
 });
