@@ -1,73 +1,42 @@
-# Hunyuan Local Studio 0.3.0
+# Hunyuan Local Studio 0.3.1
 
-App Windows tiếng Việt cho RTX 3060 12GB / RAM 32GB. Màn hình gọn: chọn **Dọn nhà bỏ hoang** hoặc **Sinh tồn trong rừng**, nhập số phút và bấm **Tạo video**. Nút **Cài & tải model** cho phép chuẩn bị dữ liệu trước; bấm Tạo khi chưa có bộ chạy cũng tự thực hiện bước chuẩn bị.
+App Windows tiếng Việt: chọn chủ đề, nhập số phút, bấm Tạo video. Bản này chỉ dùng **HunyuanVideo 1.5**, không tải/chạy hoặc tiếp tục dự án Wan. Hồ sơ nhân vật mới trong `%LOCALAPPDATA%/HunyuanLocalStudio/character`, không nhập ảnh mờ hoặc cảnh Wan cũ. Khi chuẩn bị bộ chạy mới, ảnh/profile nhân vật Wan cũ do app lưu cũng được bỏ. Thư mục nguồn/tên exe nội bộ giữ để cập nhật từ bộ cài cũ; tên hiển thị và Setup là Hunyuan Local Studio.
 
-## 0.3.0: chuyển dự án mới sang HunyuanVideo 1.5
+## Cài và tạo mới
 
-Dự án mới dùng HunyuanVideo 1.5 720p I2V: sinh trực tiếp 1280×720, 121 khung/cảnh, 24 fps; Euler/simple, CFG 6, shift 7, 50 bước theo công thức ComfyUI chính thức. UNET nạp FP8 e4m3fn, Qwen/ByT5 trên CPU, ComfyUI lowvram/offload. Không dùng model 480p hoặc upscale để gọi là 720p. Đổi tên hiển thị và bộ cài thành Hunyuan Local Studio; giữ mã ứng dụng/thư mục dữ liệu để cập nhật tại chỗ và đọc cấu hình cũ.
+1. Đóng app cũ, cài Setup. Nếu app cũ còn render, dùng nút Xóa dự án đang tạo để chọn và dừng dự án đó trước.
+2. Cài đặt → Ổ lưu model nếu cần chọn ổ nhiều chỗ. App tính dung lượng tải từ Git LFS metadata, kiểm tra ổ trống, tải tiếp khi ngắt và xác minh SHA-256. Không cần tự cài Python, ComfyUI hoặc tải trọng số bằng tay.
+3. **Cài & tải model** hoặc bấm Tạo video đều tự chuẩn bị bộ chạy. Tool bỏ đúng ba file trọng số Wan cũ của tool trong thư mục managed; không xóa model tùy ý của người dùng. Model Hunyuan hoàn toàn riêng. Nếu còn tác vụ ComfyUI thì không dọn trọng số đang dùng.
+4. Thử **0,1 phút = 6 giây** trước. Nhập được 0,1–60 phút nhưng video dài có thể mất rất nhiều giờ. Chưa đo tốc độ trên 3060.
+5. Tạo xong mỗi cảnh: ảnh xem trước hiện trong tool, chọn cảnh đã xong để mở clip ngay. Đây là kết quả cảnh hoàn tất, không phải preview từng bước khử nhiễu. Khi đang sinh cảnh, trạng thái cho biết đang chờ. Ghép xong có **Xem video / Lưu như… / Thư mục**.
 
-**Tencent công bố tối thiểu 14 GB VRAM khi offload. Cấu hình FP8 này chưa được kiểm chứng trên RTX 3060 12 GB.** Có thể chậm hoặc thiếu bộ nhớ; thử 0,1 phút trước khi làm dài. NVENC chỉ tăng tốc mã hóa MP4, không tăng tốc các bước AI. Giữ 50 bước để ưu tiên chi tiết, không giả hứa vừa nhanh vừa hết méo. Chưa có phép đo tốc độ hoặc inference Hunyuan trong môi trường build.
+## Model và chất lượng
 
-Các clip người dùng gửi có nhấp nháy theo nhịp 12 khung, trùng stride của VAE tiled cũ (16/4). Đổi VAE sang temporal_size 4096, temporal_overlap 8 theo khuyến nghị Hunyuan để giữ đủ ngữ cảnh thời gian; vẫn chia ô không gian 512/64 để giảm bộ nhớ. Đây là sửa cấu hình giải mã, không chứng minh hết mọi lỗi tay/mặt/chuyển động. Cấu hình mới cũng dùng khi tiếp tục sinh phần còn thiếu của dự án Wan; các MP4 hoàn tất giữ nguyên.
+- HunyuanVideo 1.5 720p T2V tạo cảnh đầu khi chưa có ảnh nhân vật Hunyuan; I2V tạo các cảnh sau. Tự tải UNET tương ứng, Qwen 2.5 VL FP8, ByT5, VAE và SigCLIP. Setup không nhúng các trọng số lớn.
+- Sinh gốc 1280×720, 121 khung/cảnh, 24 fps. Không upscale 480p. Euler/simple, CFG 6, shift 9 T2V / 7 I2V, 50 bước theo hướng dẫn Tencent/ComfyUI.
+- UNET FP8 e4m3fn, text encoder trên CPU, ComfyUI `--lowvram`, không pinned RAM/async offload. **Tencent công bố tối thiểu 14 GB VRAM với offload. Cấu hình FP8 chưa kiểm chứng trên RTX 3060 12 GB.** Có thể thiếu bộ nhớ hoặc chậm. NVENC chỉ tăng tốc mã hóa MP4; không tăng tốc các bước AI sinh hình.
+- VAE chia ô không gian 512/64, giữ temporal_size 4096 / overlap 8 theo khuyến nghị Hunyuan. Clip Wan người dùng gửi bị nhấp nháy theo nhịp 12 khung, trùng stride giải mã cũ 16/4. Sửa cấu hình này không bảo đảm model hết mọi méo tay/mặt hoặc chi tiết sai.
+- Nhân vật mới mặc định: nữ châu Á trưởng thành 24 tuổi, da sáng, tóc đen buộc cao, áo thể thao hai dây crop top đen ôm dáng, legging đen và giày trắng. Chỉ ảnh gốc mới do Hunyuan tạo được dùng lại cho các video Hunyuan sau; ảnh Wan không được nhập.
+- Khung cuối cảnh trước làm đầu vào VAE để nối cảnh; SigCLIP dùng ảnh gốc để giữ tham chiếu nhân vật. Đây là điều chỉnh so với template dùng cùng ảnh, chưa kiểm chứng chất lượng, không phải adapter khóa khuôn mặt. Vẫn có thể lệch nhân vật/vật dụng và sai hành động.
 
-Cài đè Setup rồi tạo **dự án mới** để chuyển model. Dự án cũ tiếp tục bằng Wan đã lưu, không trộn hai model trong cùng dự án. Không xóa model, ảnh nhân vật hoặc cảnh cũ. App tải thêm model Hunyuan riêng: I2V, Qwen 2.5 VL FP8, ByT5, VAE, SigCLIP. Nếu đã có ảnh nhân vật gốc thì không tải T2V; chưa có ảnh thì tự tải thêm checkpoint T2V 720p để tạo cảnh đầu. Dung lượng cần tải được tính từ Git LFS metadata và hiện trong app, không cố định 20 GB. Chọn ổ đủ trống trước khi tải.
+## Xóa dự án đang tạo
 
-Đầu vào VAE vẫn là khung cuối cảnh trước để nối cảnh. SigCLIP dùng ảnh nhân vật gốc đã lưu nhằm tránh chỉ dựa vào ảnh cuối ngày càng lệch; đây là điều chỉnh so với công thức tham chiếu cùng ảnh của template, chưa được xác minh chất lượng và không phải adapter khóa danh tính. Ảnh gốc có sẵn được giữ nguyên; ảnh gốc mờ sẽ vẫn hạn chế chất lượng.
+Nút **Xóa dự án đang tạo** yêu cầu xác nhận đúng thư mục rồi dừng worker, xóa hàng đợi và gửi `/interrupt` có `prompt_id` cụ thể, không gọi ngắt toàn bộ ComfyUI. Chỉ khi các tác vụ đó đã dừng mới xóa file. Khi chưa mở dự án, nút cho chọn thư mục có project.json, gồm cả dự án Wan cũ để bỏ đi; dự án Wan không được tiếp tục sinh.
 
-## 0.2.3: sửa lỗi OpenBLAS khi khởi động
+Xóa clip, file tạm, tham chiếu và project.json trong dự án; với ComfyUI do tool quản lý còn xóa output theo đúng project ID, input đã ghi nhận và lịch sử tác vụ đó. Ảnh hồ sơ do chính dự án bị xóa tạo ra cũng được bỏ nếu hash và nguồn khớp, để lần sau tạo mặt mới. Không xóa model Hunyuan đã tải, dự án khác hoặc ảnh hồ sơ từ nguồn khác. Không thể hoàn tác. File đã Lưu như ở ngoài dự án không bị xóa.
 
-Backend riêng nhận giới hạn OpenBLAS 1 luồng, OMP/MKL/NumExpr 2 luồng trước khi import thư viện. Tắt pinned memory và async offload bằng hai cờ có trong ComfyUI v0.45.0 để giảm áp lực RAM trên cấu hình 32 GB; không thay biến môi trường toàn hệ thống. Log ghi RAM vật lý/bộ nhớ cấp phát còn trống. Lỗi hiện gọn trong app, log chi tiết vẫn giữ tại thư mục dữ liệu. Nếu vẫn thiếu bộ nhớ, cần kiểm tra RAM/commit đang còn và cấu hình bộ nhớ ảo Windows; app không tự sửa pagefile hoặc đóng ứng dụng khác.
+Với ComfyUI có sẵn ngoài bộ quản lý, app chỉ có API dừng tác vụ/xóa lịch sử và quyền xóa thư mục dự án; không xóa được PNG trong thư mục server không biết đường dẫn. Nếu không kết nối được server chứa tác vụ thì báo lỗi, chưa xóa dự án để tránh tác vụ chạy mồ côi. Đóng cửa sổ cũ trước khi xóa; dự án đang được cửa sổ khác giữ khóa sẽ không bị xóa.
 
-Cho nhập 0,1–60 phút, bao gồm 20 phút. Render tuần tự, nhưng video dài 720p trên 3060 vẫn có thể mất nhiều giờ và tốn nhiều ổ đĩa. Nên thử 0,1 phút trước. Không tải lại model đã được kiểm tra. Giữ toàn bộ tính năng 720p gốc của bản 0.2.2.
+## Dựng và tiếp tục
 
-## 0.2.2: 720p gốc 16:9
+Mã hóa MP4 dùng NVENC nếu probe encode thật thành công, nếu không thì CPU. Chỉ giữ hai clip trong bước chuyển cảnh, bỏ khung đầu lặp, hòa trộn 0,25 giây và ghép đủ thời lượng. Nhạc người dùng là tùy chọn, hạ âm lượng và fade. Model không tự tạo tiếng động/giọng đọc. Kế hoạch cảnh theo mẫu cho hai chủ đề; không có LLM hoặc kiểm tra tự động xác nhận hành động đã đúng.
 
-Dự án mới sinh từng khung ở 1280×736 (lưới Wan chia hết cho 32), cắt 8 pixel trên và 8 pixel dưới để xuất đúng 1280×720, SAR 1:1. Không upscale và không kéo giãn người. Kiểm tra kích thước PNG đầu ra ComfyUI trước khi mã hóa; nếu nhận khung 480p thì dừng, không gắn nhãn 720p. Ảnh tham chiếu gốc và khung cuối vẫn giữ nguyên kích thước sinh.
+Chỉ dự án Hunyuan được tiếp tục, nhận lại cảnh đã xong và hiện preview. Request ID/intent được ghi trước POST, tìm lại tác vụ khi mất mạng, không tự gửi trùng. Tạm dừng giữ dữ liệu; Xóa dự án mới hủy và dọn. ComfyUI giữ PNG output để nhận lại tác vụ khi tiếp tục; video dài cần nhiều ổ trống.
 
-Video/dự án 480p cũ vẫn tiếp tục ở độ phân giải đã lưu, không bị tự nâng thành 720p; tạo dự án mới để sinh 720p. Dùng lại cùng model và hồ sơ nhân vật, không tải lại model. 720p nặng hơn 480p; chưa đo tốc độ/VRAM trên 3060 thật.
+## Bộ chạy và phạm vi kiểm tra
 
-## 0.2.1: bản biên dịch native
+ComfyUI portable v0.45.0 NVIDIA CUDA 12.6, SHA-256 `e7d1be2bd81deec3f46a89e29b8c6826f45c05609f29d6681d7876f687d69d29`. Model từ Comfy-Org trên Hugging Face; chỉ dùng sau khi hash và kích thước khớp LFS metadata. Nếu ComfyUI cấu hình sẵn đủ bộ Hunyuan thì dùng lại; không thay driver, Python hoặc pagefile hệ thống. Dữ liệu mặc định `%LOCALAPPDATA%/WanLocalStudioData` để nhận biết và dọn trọng số cũ; có thể chọn ổ khác. Chỉ kế thừa ổ model từ cấu hình cũ, không kế thừa ảnh hoặc phút tạo.
 
-Thay PyInstaller bằng Nuitka 4.3.5/MSVC ở chế độ standalone; không dùng onefile hoặc UPX. Ghim hash source compiler và các wheel; kiểm tra GUI và các công cụ FFmpeg/7-Zip từ bản đã biên dịch và đã cài. Có link tải Setup trực tiếp trên GitHub Releases, cùng SHA-256, báo cáo Defender và mã nguồn. Giữ nguyên chức năng và đọc lại được dự án 0.1.0/0.2.0.
+Windows CI kiểm tra GUI nguồn/native/đã cài, preview/clear, FFmpeg/7-Zip thực, dựng synthetic MP4 đúng kích thước/thời lượng, download/hash mô phỏng, queue/journal và xóa đúng phạm vi. Build dùng Nuitka/MSVC standalone, không onefile/UPX. Defender scan chặn phát hành nếu có phát hiện. Setup chưa ký số; chưa có xác nhận Chrome/Cốc Cốc chấp nhận.
 
-Thay cách đóng gói chưa chứng minh nguyên nhân cảnh báo bản cũ; bản 0.2.1 chưa ký số nhà phát hành và chưa có xác nhận của Chrome/Cốc Cốc. Không khẳng định cảnh báo đã được gỡ.
-
-## Cài và dùng
-
-1. Cài Setup, mở app. Không cần cài Python, ComfyUI hay giải nén model bằng tay.
-2. App báo dung lượng model còn thiếu và kiểm tra ổ trống trước khi tải. Muốn dùng ổ D/E: **Cài đặt → Ổ lưu model** trước khi tải. Dữ liệu mặc định trong `%LOCALAPPDATA%/WanLocalStudioData`. Dữ liệu tải qua HTTPS từ nhà phát hành, có kiểm tra SHA-256, tải dở được giữ để tiếp tục.
-3. Chọn chủ đề, thử **0,1 phút = 6 giây** rồi bấm Tạo. Video dài trên 3060 có thể mất nhiều giờ; chưa có đo tốc độ inference trên máy thật.
-4. App tự mở ComfyUI riêng ở cổng 8189, kiểm tra CUDA và chạy model của dự án. Nếu ComfyUI có sẵn ở địa chỉ cấu hình và đủ model thì dùng lại, không sửa bản cài đó. Nếu chưa có thì tải bản portable NVIDIA CUDA 12.6 chính thức, Python và thư viện có sẵn trong gói đó. Không thay Python hệ thống hoặc cài driver NVIDIA tự động. Driver NVIDIA trên máy vẫn phải tương thích CUDA 12.6.
-5. Video hoàn tất có nút **Xem video**, **Lưu như…**, **Thư mục**. **Tiếp tục dự án** dùng lại các cảnh đã lưu nếu bị ngắt.
-
-## Nhân vật qua các video
-
-Mặc định: một phụ nữ châu Á trưởng thành 24 tuổi, da sáng, khuôn mặt oval, mắt nâu, tóc đen buộc cao, áo thể thao hai dây crop top màu đen ôm dáng, quần legging đen, giày trắng. Cả hai chủ đề dùng cùng nhân vật và bộ đồ. Đây là phong cách chân thực, không dùng tên/người thật cụ thể.
-
-Ảnh đầu cảnh mở đầu của video đầu được lưu thành ảnh nhân vật gốc trong `%LOCALAPPDATA%/WanLocalStudio/character`, tách khỏi ổ model. Các video mới tự sao chép ảnh đó vào dự án và dùng làm đầu vào cảnh mở; trong mỗi video, khung cuối cảnh trước tiếp tục làm đầu vào cảnh sau. Seed, prompt và workflow cũng được lưu. **Xem nhân vật gốc** nằm trong Cài đặt.
-
-Đây là giữ tham chiếu ảnh (Hunyuan I2V cho dự án mới, Wan TI2V cho dự án cũ), không phải adapter khóa khuôn mặt. Không có phép kiểm tra tự động xác nhận “đẹp” hoặc đúng danh tính. Khuôn mặt, tay, dụng cụ, bối cảnh vẫn có thể lệch theo góc nhìn/chuyển động; nối nhiều cảnh có thể tích lũy sai lệch. Chưa thể bảo đảm giống tuyệt đối qua mọi cảnh/video. Cảnh mở được dùng lại để giữ nhân vật; các video cùng chủ đề dùng kế hoạch theo mẫu, không phải LLM sáng tác vô hạn.
-
-## Tự dựng và GPU
-
-- Dự án Wan cũ dùng Wan 2.2 TI2V 5B, 121 khung/cảnh, kích thước và số bước trong project.json. Hunyuan mới dùng cấu hình 720p/50 bước nêu trên. Encoder văn bản trên CPU, VAE giải mã theo ô, ComfyUI chạy `--lowvram`. Chưa xác nhận inference thành công/VRAM cụ thể trên 3060 thật.
-- Kiểm tra NVENC bằng một lần encode thật trước khi chọn `h264_nvenc`; nếu driver/binary không dùng được thì báo chuyển sang CPU. Model sinh hình vẫn dùng CUDA. Không giả báo mã hóa GPU chỉ vì FFmpeg có tên encoder.
-- Mỗi cảnh kiểm tra đủ khung, mã hóa MP4. Tự bỏ khung tham chiếu lặp, cắt đầu/cuối và tạo chuyển cảnh hòa trộn 0,25 giây. Số cảnh tính bù phần chuyển cảnh để MP4 cuối đủ thời lượng. Chỉ xử lý hai clip một lúc để tránh tải tất cả clip vào RAM.
-- Nhạc của người dùng là tùy chọn, tự hạ âm lượng và fade đầu/cuối. Model không tự sinh tiếng động/giọng đọc. Không tự lặp hoặc kéo giãn clip để giả đủ thời lượng.
-- Không có bộ kiểm duyệt ngữ nghĩa xác nhận mọi hành động đúng. Chuyển cảnh giúp bớt giật, không sửa được lỗi người/vật do model sinh.
-
-## Dữ liệu và tiếp tục
-
-Bộ portable được ghim ở ComfyUI v0.45.0 NVIDIA cu126, đối chiếu SHA-256 công bố trong GitHub Releases. Model tải từ Comfy-Org trên Hugging Face; đọc Git LFS metadata lấy SHA-256/kích thước và ghim revision khi có header commit, chỉ sử dụng sau khi hash đúng. Gồm UNET `wan2.2_ti2v_5B_fp16.safetensors`, encoder `umt5_xxl_fp8_e4m3fn_scaled.safetensors`, VAE `wan2.2_vae.safetensors`. Đây là bộ model cho dự án Wan cũ; dự án mới tải bộ Hunyuan riêng nêu trên. Setup không nhúng các trọng số model.
-
-Tải lỗi giữ file `.part`, bấm lại để tiếp tục. Nếu máy chủ không hỗ trợ Range, tải lại file đó thay vì nối sai dữ liệu. Hết ổ hoặc sai checksum sẽ dừng với lỗi rõ ràng, chưa chạy file sai. Gói giải nén ở vùng dữ liệu riêng của tool, không cài Python/Git/ComfyUI vào hệ thống. Bản ComfyUI được tool mở có thể tiếp tục chạy sau khi đóng app để giữ tiến trình/history.
-
-Dự án lưu prompt, request ID, cảnh và SHA-256, khung tham chiếu. Mất kết nối sau POST: tìm tác vụ cũ trong queue/history, không tự gửi trùng. ComfyUI khởi động lại làm mất queue/history thì cần kiểm tra rồi dùng **Tạo lại cảnh lỗi**. Tạm dừng không gọi `/interrupt` toàn cục; cảnh đang chạy có thể tiếp tục để nhận kết quả sau.
-
-ComfyUI giữ các PNG đã tạo trong thư mục output riêng; app giữ MP4/tham chiếu và xóa PNG tải tạm sau mã hóa. Video dài có thể dùng thêm nhiều GB ở output của ComfyUI. Không tự xóa PNG trên server vì còn cần để tiếp tục tác vụ.
-
-## Phạm vi kiểm tra
-
-Test dùng server HTTP giả lập để kiểm tra tải tiếp/hash, API ComfyUI, tham chiếu giữa cảnh và giữa dự án; dùng FFmpeg thật kiểm tra chuyển cảnh và đủ số khung MP4. Windows CI thử trình giải nén kèm app bằng gói portable nhỏ giả lập, mở GUI nguồn/đóng gói/đã cài và quét Defender.
-
-Môi trường build không có GPU 3060 và không thực hiện tải toàn bộ trọng số hoặc inference GPU Wan/Hunyuan. Hugging Face bị chặn bởi mạng môi trường phát triển nên chưa kiểm chứng luồng tải thật ở đây; app phải tải trên kết nối của máy người dùng. Các test mô phỏng không chứng minh tải/model/GPU thực tế đã thành công. App chưa ký số nhà phát hành; Defender không bảo đảm Chrome/Cốc Cốc chấp nhận file tải.
+Môi trường build không có RTX 3060 và không chạy inference Hunyuan hay tải toàn bộ model. Hugging Face bị chặn trong môi trường phát triển; các bài kiểm tra HTTP dùng dữ liệu mô phỏng. Không dùng chúng để khẳng định chất lượng mặt, tốc độ, VRAM hoặc luồng tải model thật đã được kiểm chứng.

@@ -112,7 +112,7 @@ class BootstrapTests(unittest.TestCase):
             with patch.object(bootstrap,'download',side_effect=download),patch.object(bootstrap,'model_metadata',return_value={'url':'fixture','sha256':'a'*64,'size':1}),patch.object(bootstrap.shutil,'disk_usage',return_value=shutil._ntuple_diskusage(80*1024**3,0,80*1024**3)):
                 folder=bootstrap._install(root,threading.Event(),lambda _:None)
             self.assertTrue(bootstrap.layout_valid(folder))
-            self.assertTrue((folder/'ComfyUI/models/vae/wan2.2_vae.safetensors').is_file())
+            self.assertTrue((folder/'ComfyUI/models/vae/hunyuanvideo15_vae_fp16.safetensors').is_file())
 
 
 if __name__=='__main__':unittest.main()

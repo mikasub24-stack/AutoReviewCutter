@@ -13,6 +13,7 @@ import zlib
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import engine
+import hunyuan
 
 def blank_png(width,height):
     def chunk(kind,data):return struct.pack('>I',len(data))+kind+data+struct.pack('>I',zlib.crc32(kind+data)&0xffffffff)
@@ -23,15 +24,21 @@ PNG = blank_png(engine.WIDTH,engine.HEIGHT)
 
 
 def metadata():
-    info={kind:{'input':{'required':{}}} for kind in ['ModelSamplingSD3','CLIPTextEncode','Wan22ImageToVideoLatent','KSampler','VAEDecodeTiled','SaveImage','LoadImage']}
-    for kind,(field,name) in engine.MODELS.items():info[kind]={'input':{'required':{field:[[name]]}}}
-    return info
+    names=['UNETLoader','DualCLIPLoader','VAELoader','CLIPVisionLoader','CLIPVisionEncode',
+           'HunyuanVideo15ImageToVideo','EmptyHunyuanVideo15Latent','ModelSamplingSD3',
+           'CLIPTextEncode','KSampler','VAEDecodeTiled','SaveImage','LoadImage']
+    data={name:{'input':{'required':{}}} for name in names}
+    data['UNETLoader']['input']['required']['unet_name']=[[hunyuan.I2V,hunyuan.T2V]]
+    data['DualCLIPLoader']['input']['required'].update({'clip_name1':[[hunyuan.QWEN]],'clip_name2':[[hunyuan.BYT5]]})
+    data['VAELoader']['input']['required']['vae_name']=[[hunyuan.VAE]]
+    data['CLIPVisionLoader']['input']['required']['clip_name']=[[hunyuan.VISION]]
+    return data
 
 
 class FakeComfy:
     url='http://127.0.0.1:8188'
     def __init__(self):self.sent=[];self.uploaded=[];self.history={}
-    def preflight(self):return {field:name for field,name in engine.MODELS.values()}
+    def preflight(self):return hunyuan.select_models(metadata(),True)
     def upload(self,path):self.uploaded.append(Path(path).read_bytes());return 'reference.png'
     def request(self,route,data=None):
         if route=='/prompt':
@@ -56,27 +63,27 @@ class EngineTests(unittest.TestCase):
         for url in ['https://127.0.0.1:8188','http://example.com','http://127.0.0.1.evil.test','http://user:secret@localhost:8188']:
             with self.assertRaises(ValueError):engine.Comfy(url)
         client=engine.Comfy()
-        with patch.object(client,'request',return_value=metadata()):self.assertEqual(client.preflight()['vae_name'],'wan2.2_vae.safetensors')
+        with patch.object(client,'request',return_value=metadata()):self.assertEqual(client.preflight()['vae_name'],hunyuan.VAE)
         info=metadata();info['UNETLoader']['input']['required']['unet_name']=[[]]
         with patch.object(client,'request',return_value=info):
-            with self.assertRaisesRegex(RuntimeError,'wan2.2_ti2v_5B'):client.preflight()
+            with self.assertRaisesRegex(RuntimeError,'hunyuanvideo1.5_720p_i2v'):client.preflight()
 
     def test_graph_uses_optional_reference_and_cpu_text_encoder(self):
         scene=engine.plan(engine.TOPICS[0],.1)['scenes'][0];models=FakeComfy().preflight()
         empty=engine.graph(scene,models)
         self.assertNotIn('start_image',empty['latent']['inputs'])
         linked=engine.graph(scene,models,'uploaded.png')
-        self.assertEqual(linked['latent']['inputs']['start_image'],['reference',0])
+        self.assertEqual(linked['condition']['inputs']['start_image'],['reference',0])
         self.assertEqual(linked['clip']['inputs']['device'],'cpu')
         self.assertEqual(linked['decode']['class_type'],'VAEDecodeTiled')
         self.assertEqual(linked['save']['class_type'],'SaveImage')
 
-    def test_720_generation_is_native_and_legacy_projects_keep_their_dimensions(self):
+    def test_720_generation_is_native_without_upscaling(self):
         data=engine.plan(engine.TOPICS[0],.1)
-        self.assertEqual(engine.geometry(data),(1280,736,1280,720))
+        self.assertEqual(engine.geometry(data),(1280,720,1280,720))
         flow=engine.graph(data['scenes'][0],FakeComfy().preflight())
         self.assertEqual(flow['latent']['inputs']['width'],1280)
-        self.assertEqual(flow['latent']['inputs']['height'],736)
+        self.assertEqual(flow['latent']['inputs']['height'],720)
         self.assertEqual(engine.geometry({'width':832,'height':480}),(832,480,832,480))
         with self.assertRaises(ValueError):engine.geometry({'width':832,'height':480,'output_width':1280,'output_height':720})
 
@@ -106,8 +113,8 @@ class EngineTests(unittest.TestCase):
             with patch.object(engine,'ffmpeg',return_value='ffmpeg'),patch.object(engine,'run_command',side_effect=encode):
                 final=engine.generate(project,client,threading.Event(),lambda _:None)
                 self.assertTrue(final.is_file());self.assertEqual(len(client.sent),2)
-                self.assertEqual(client.uploaded,[PNG]);self.assertTrue((project/'tham-chieu-goc.png').is_file())
-                old=json.loads((project/'project.json').read_text(encoding='utf-8'));old['version']='0.2.0'
+                self.assertEqual(client.uploaded,[PNG,PNG]);self.assertTrue((project/'tham-chieu-goc.png').is_file())
+                old=json.loads((project/'project.json').read_text(encoding='utf-8'));old['version']='0.3.0'
                 engine.atomic_json(project/'project.json',old)
                 engine.generate(project,client,threading.Event(),lambda _:None)
                 self.assertEqual(len(client.sent),2)
@@ -144,9 +151,9 @@ class EngineTests(unittest.TestCase):
             # Native-size synthetic frames exercise crop/encoding, not GPU inference.
             project=engine.new_project(td,engine.TOPICS[0],.1)
             image=Path(td)/'frame.png'
-            subprocess.run([encoder,'-y','-f','lavfi','-i','color=c=green:s=1280x736','-frames:v','1',str(image)],check=True,capture_output=True)
+            subprocess.run([encoder,'-y','-f','lavfi','-i','color=c=green:s=1280x720','-frames:v','1',str(image)],check=True,capture_output=True)
             other=Path(td)/'other.png'
-            subprocess.run([encoder,'-y','-f','lavfi','-i','color=c=blue:s=1280x736','-frames:v','1',str(other)],check=True,capture_output=True)
+            subprocess.run([encoder,'-y','-f','lavfi','-i','color=c=blue:s=1280x720','-frames:v','1',str(other)],check=True,capture_output=True)
             class Frames(FakeComfy):
                 def download(self,description,path):shutil.copy2(image if len(self.sent)==1 else other,path)
             with patch.object(engine,'ffmpeg',return_value=encoder):

@@ -18,12 +18,17 @@ import hunyuan
 
 
 def settings_path():
-    return Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'WanLocalStudio/settings.json'
+    return Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'HunyuanLocalStudio/settings.json'
 
 
 def load_settings():
     try: return json.loads(settings_path().read_text(encoding='utf-8'))
-    except (OSError, ValueError): return {}
+    except (OSError, ValueError):
+        try:
+            old=settings_path().parent.parent/'WanLocalStudio/settings.json'
+            previous=json.loads(old.read_text(encoding='utf-8'))
+            return {'asset_root':previous['asset_root']} if previous.get('asset_root') else {}
+        except (OSError,ValueError):return {}
 
 
 class App(ctk.CTk):
@@ -31,16 +36,16 @@ class App(ctk.CTk):
         ctk.set_appearance_mode('dark')
         super().__init__()
         self.title('Hunyuan Local Studio '+engine.VERSION+' · HunyuanVideo 1.5')
-        self.geometry('740x530'); self.minsize(700,500)
+        self.geometry('940x720'); self.minsize(740,600)
         self.configure(fg_color='#0b1220')
         if os.name == 'nt': self.iconbitmap(str(engine.ROOT / 'icon.ico'))
         saved = load_settings()
         self.events = queue.Queue(); self.cancel = threading.Event(); self.busy = False
-        self.project = None; self.result = None; self.music = None
+        self.project = None; self.result = None; self.music = None; self.delete_requested=False; self.previews={}; self.preview_clip=None
         self.topic = tk.StringVar(value=saved.get('topic', engine.TOPICS[0]))
         self.minutes = tk.StringVar(value=saved.get('minutes', '0.1'))
         self.url = tk.StringVar(value=saved.get('url', 'http://127.0.0.1:8188'))
-        self.parent = Path(saved.get('folder', str(Path.home() / 'Videos/WanLocalStudio')))
+        self.parent = Path(saved.get('folder', str(Path.home() / 'Videos/HunyuanLocalStudio')))
         self.asset_root = Path(saved.get('asset_root', str(bootstrap.default_root())))
         panel = ctk.CTkScrollableFrame(self, fg_color='transparent')
         panel.pack(fill='both', expand=True, padx=14, pady=12)
@@ -60,9 +65,19 @@ class App(ctk.CTk):
         self.create_button=ctk.CTkButton(row,text='Tạo video',command=self.create,height=34,width=170,font=('Segoe UI',14,'bold'),fg_color='#29aa90',hover_color='#218b76');self.create_button.pack(side='left',padx=(0,8))
         self.install_button=ctk.CTkButton(row,text='Cài & tải model',command=self.prepare,height=34,width=155);self.install_button.pack(side='left',padx=(0,8))
         self.pause_button=ctk.CTkButton(row,text='Tạm dừng',command=self.cancel.set,height=34,width=105,fg_color='#753b50',state='disabled');self.pause_button.pack(side='right')
+        self.delete_button=ctk.CTkButton(row,text='Xóa dự án đang tạo',command=self.delete_current,height=34,width=145,fg_color='#753b50');self.delete_button.pack(side='right',padx=6)
         self.status=tk.StringVar(value='Bộ Hunyuan cần tải thêm model lớn; chọn ổ đủ chỗ trong Cài đặt. Render 50 bước sẽ chậm hơn. Thử 0,1 phút trước.')
         ctk.CTkLabel(panel,textvariable=self.status,wraplength=670,justify='left',anchor='w',font=('Segoe UI',12)).pack(fill='x',pady=(8,4))
         self.progress=ctk.CTkProgressBar(panel,mode='determinate',progress_color='#5de0c1',height=6);self.progress.pack(fill='x',pady=6);self.progress.set(0)
+        preview=ctk.CTkFrame(panel,fg_color='#152235');preview.pack(fill='x',pady=5)
+        self.preview_image=ctk.CTkLabel(preview,text='Cảnh tạo xong sẽ hiện ngay tại đây',width=440,height=247,text_color='#a9c3d6')
+        self.preview_image.pack(side='left',padx=8,pady=8)
+        from PIL import Image
+        self.preview_blank=ctk.CTkImage(light_image=Image.new('RGB',(440,247),'#152235'),size=(440,247))
+        side=ctk.CTkFrame(preview,fg_color='transparent');side.pack(side='left',fill='both',expand=True,padx=8,pady=8)
+        self.preview_status=ctk.CTkLabel(side,text='Chưa có cảnh hoàn tất',wraplength=170,justify='left');self.preview_status.pack(anchor='w',pady=8)
+        self.scene_choice=ctk.CTkComboBox(side,values=['Chưa có cảnh'],command=self.select_preview,state='readonly',width=155);self.scene_choice.pack(anchor='w',pady=5)
+        self.scene_play=ctk.CTkButton(side,text='Xem clip cảnh này',command=self.play_scene,state='disabled',width=155,height=30);self.scene_play.pack(anchor='w',pady=5)
         results=ctk.CTkFrame(panel,fg_color='transparent');results.pack(fill='x',pady=6)
         self.play_button=ctk.CTkButton(results,text='Xem video',command=self.play,state='disabled',width=110,height=28);self.play_button.pack(side='left',padx=(0,6))
         self.copy_button=ctk.CTkButton(results,text='Lưu như…',command=self.copy,state='disabled',width=110,height=28);self.copy_button.pack(side='left',padx=(0,6))
@@ -146,20 +161,23 @@ class App(ctk.CTk):
             try:self.events.put(('done',fn()))
             except engine.Cancelled as e:self.events.put(('paused',str(e)))
             except Exception as e:
-                if self.project:
+                if self.project and self.project.is_dir():
                     (self.project/'tool-error.log').write_text(traceback.format_exc(),encoding='utf-8')
                 self.events.put(('error',str(e)))
         threading.Thread(target=work,daemon=True).start()
 
-    def notify(self,text):self.events.put(('status',text))
+    def notify(self,text):
+        self.events.put(('preview' if isinstance(text,dict) else 'status',text))
 
     def create(self):
         if self.busy:return
         try:
             engine.plan(self.topic.get(),self.minutes.get().replace(',','.'),hunyuan.BACKEND)
-            client=engine.Comfy(self.url.get());self.save_settings()
+            client=engine.Comfy(self.url.get(),hunyuan.BACKEND);self.save_settings()
             topic=self.topic.get();minutes=self.minutes.get().replace(',','.');music=self.music;parent=self.parent;root=self.asset_root;preferred=client.url;profile=settings_path().parent/'character'
         except Exception as e:messagebox.showerror('Chưa bắt đầu được',str(e));return
+        self.project=None
+        self.previews.clear();self.preview_clip=None;self.scene_play.configure(state='disabled');self.preview_image.configure(image=self.preview_blank,text='Đang chuẩn bị cảnh mới…');self.preview_status.configure(text='Chưa có cảnh hoàn tất');self.scene_choice.configure(values=['Chưa có cảnh']);self.scene_choice.set('Chưa có cảnh')
         self.status.set('Đang kiểm tra và chuẩn bị HunyuanVideo 1.5…')
         def work():
             ready=bootstrap.ensure_ready(root,preferred,self.cancel,self.notify,hunyuan.BACKEND,not (profile/'reference.png').is_file())
@@ -175,12 +193,14 @@ class App(ctk.CTk):
         folder=filedialog.askdirectory(title='Mở thư mục dự án có project.json')
         if not folder:return
         if not (Path(folder)/'project.json').is_file():messagebox.showerror('Chưa đúng dự án','Chọn thư mục dự án có project.json.');return
-        try:client=engine.Comfy(self.url.get())
+        try:client=engine.Comfy(self.url.get(),hunyuan.BACKEND)
         except ValueError as e:messagebox.showerror('Địa chỉ ComfyUI',str(e));return
         self.project=Path(folder);self.save_settings();root=self.asset_root
         data=json.loads((self.project/'project.json').read_text(encoding='utf-8'));preferred=data.get('server') or client.url
+        if data.get('backend')!=hunyuan.BACKEND:
+            messagebox.showinfo('Chỉ dùng Hunyuan','Không tiếp tục dự án Wan. Bấm Tạo video để làm mới, hoặc Xóa dự án đang tạo để bỏ dự án này.');return
         def work():
-            ready=bootstrap.ensure_ready(root,preferred,self.cancel,self.notify,data.get('backend','wan'),not (self.project/'nhan-vat-goc.png').is_file())
+            ready=bootstrap.ensure_ready(root,preferred,self.cancel,self.notify,hunyuan.BACKEND,not (self.project/'nhan-vat-goc.png').is_file())
             self.events.put(('backend',ready.url))
             return engine.generate(self.project,ready,self.cancel,self.notify)
         self.start(work)
@@ -200,6 +220,11 @@ class App(ctk.CTk):
         try:
             while True:
                 kind,value=self.events.get_nowait()
+                if kind=='cleared':
+                    self.previews.clear();self.preview_clip=None;self.scene_play.configure(state='disabled');self.preview_image.configure(image=self.preview_blank,text='Đã xóa dự án');self.preview_status.configure(text='Chưa có cảnh hoàn tất');self.scene_choice.configure(values=['Chưa có cảnh']);self.scene_choice.set('Chưa có cảnh');continue
+                if kind=='preview':
+                    key=f'Cảnh {value["scene"]:03}'
+                    self.previews[key]=value;self.scene_choice.configure(values=list(self.previews));self.scene_choice.set(key);self.select_preview(key);continue
                 if kind=='backend':
                     self.url.set(value);self.save_settings();continue
                 self.status.set(str(value))
@@ -208,15 +233,63 @@ class App(ctk.CTk):
                     if 'đã chờ' not in value and not value.startswith('Đang tải '):
                         self.log.insert('end',value+'\n');self.log.see('end')
                     continue
+                self.delete_button.configure(state='normal')
                 self.busy=False;self.progress.stop();self.progress.configure(mode='determinate');self.progress.set(0)
                 for widget in self.controls:widget.configure(state='normal')
                 self.pause_button.configure(state='disabled')
+                if self.delete_requested:
+                    self.delete_requested=False;self.perform_delete();continue
                 if kind=='done' and isinstance(value,Path):
                     self.result=value;self.status.set('Video đã xuất: '+str(value))
                     self.play_button.configure(state='normal');self.copy_button.configure(state='normal');self.progress.set(1)
                 self.log.insert('end',self.status.get()+'\n');self.log.see('end')
         except queue.Empty:pass
         self.after(150,self.poll)
+
+    def select_preview(self,key):
+        item=self.previews.get(key)
+        if not item:return
+        from PIL import Image,ImageOps
+        with Image.open(item['image']) as original:
+            picture=ImageOps.contain(original.convert('RGB'),(440,247),Image.Resampling.LANCZOS)
+        self.preview_photo=ctk.CTkImage(light_image=picture,dark_image=picture,size=picture.size)
+        self.preview_image.configure(image=self.preview_photo,text='')
+        self.preview_status.configure(text=f'Cảnh {item["scene"]}/{item["total"]} đã xong\nĐã có {len(self.previews)} cảnh để xem')
+        self.preview_clip=Path(item['clip']);self.scene_play.configure(state='normal')
+
+    def play_scene(self):
+        if self.preview_clip and self.preview_clip.is_file():
+            if os.name=='nt':os.startfile(str(self.preview_clip))
+            else:webbrowser.open(self.preview_clip.as_uri())
+
+    def delete_current(self):
+        if self.busy and not self.project:
+            self.cancel.set();self.status.set('Đang dừng chuẩn bị; chưa có cảnh hay dự án để xóa.');return
+        if not self.project:
+            folder=filedialog.askdirectory(title='Chọn dự án tạo dở cần xóa (có project.json)')
+            if not folder:return
+            if not (Path(folder)/'project.json').is_file():
+                messagebox.showerror('Chưa đúng dự án','Chọn đúng thư mục có project.json.');return
+            self.project=Path(folder)
+        if not messagebox.askyesno('Xóa toàn bộ dự án này?',f'Xóa các cảnh, video và dữ liệu tạo dở trong:\n{self.project}\n\nDừng các tác vụ của dự án này. Không thể hoàn tác. Model dùng chung được giữ.'):
+            return
+        self.delete_button.configure(state='disabled')
+        if self.busy:
+            self.delete_requested=True;self.cancel.set();self.status.set('Đang dừng trước khi xóa…')
+        else:self.perform_delete()
+
+    def perform_delete(self):
+        self.delete_button.configure(state='disabled')
+        project=self.project
+        def work():
+            data=json.loads((project/'project.json').read_text(encoding='utf-8'))
+            client=engine.Comfy(data.get('server') or self.url.get())
+            managed=bootstrap.layout(self.asset_root)/'ComfyUI' if client.url==bootstrap.MANAGED_URL else None
+            result=engine.delete_project(project,client,self.notify,managed)
+            self.project=None;self.result=None
+            self.events.put(('cleared',None))
+            return result
+        self.start(work)
 
     def play(self):
         if self.result:
@@ -225,7 +298,7 @@ class App(ctk.CTk):
 
     def copy(self):
         if not self.result:return
-        value=filedialog.asksaveasfilename(defaultextension='.mp4',initialfile='video-wan.mp4',filetypes=[('Video MP4','*.mp4')])
+        value=filedialog.asksaveasfilename(defaultextension='.mp4',initialfile='video-hunyuan.mp4',filetypes=[('Video MP4','*.mp4')])
         if value and Path(value).resolve()!=self.result.resolve():shutil.copy2(self.result,value)
 
     def folder(self):
@@ -255,6 +328,13 @@ def smoke_test():
         app=App();app.update();app.minutes.set('1');app.update()
         assert '13 cảnh' in app.count.get()
         app.save_settings();assert load_settings()['minutes']=='1'
+        from PIL import Image
+        preview=Path(td)/'preview.png';Image.new('RGB',(1280,720),'#256f67').save(preview)
+        app.notify({'scene':1,'total':2,'image':str(preview),'clip':str(Path(td)/'scene.mp4')});app.poll();app.update()
+        assert app.preview_clip==Path(td)/'scene.mp4'
+        assert app.scene_play.cget('state')=='normal'
+        app.events.put(('cleared',None));app.poll();app.update()
+        assert app.scene_play.cget('state')=='disabled'
         if os.environ.get('WAN_UI_PREVIEW'):
             from PIL import ImageGrab
             ImageGrab.grab(bbox=(app.winfo_rootx(),app.winfo_rooty(),app.winfo_rootx()+app.winfo_width(),app.winfo_rooty()+app.winfo_height())).save(os.environ['WAN_UI_PREVIEW'])

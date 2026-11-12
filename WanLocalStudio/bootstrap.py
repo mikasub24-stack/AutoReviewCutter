@@ -17,11 +17,6 @@ COMFY_VERSION = 'v0.45.0'
 COMFY_URL = 'https://github.com/Comfy-Org/ComfyUI/releases/download/v0.45.0/ComfyUI_windows_portable_nvidia_cu126.7z'
 COMFY_SHA = 'e7d1be2bd81deec3f46a89e29b8c6826f45c05609f29d6681d7876f687d69d29'
 MANAGED_URL = 'http://127.0.0.1:8189'
-SOURCES = (
-    ('Comfy-Org/Wan_2.2_ComfyUI_Repackaged', 'diffusion_models', 'wan2.2_ti2v_5B_fp16.safetensors'),
-    ('Comfy-Org/Wan_2.1_ComfyUI_repackaged', 'text_encoders', 'umt5_xxl_fp8_e4m3fn_scaled.safetensors'),
-    ('Comfy-Org/Wan_2.2_ComfyUI_Repackaged', 'vae', 'wan2.2_vae.safetensors'),
-)
 _children = []
 
 
@@ -196,7 +191,7 @@ def layout_valid(folder):
     return (folder / 'python_embeded/python.exe').is_file() and (folder / 'ComfyUI/main.py').is_file()
 
 
-def install(root, cancelled, notify, backend='wan',need_t2v=False):
+def install(root, cancelled, notify, backend=hunyuan.BACKEND,need_t2v=False):
     if os.name != 'nt': raise RuntimeError('Cài tự động này dành cho Windows x64 có NVIDIA.')
     root = Path(root); root.mkdir(parents=True, exist_ok=True)
     # Lock the shared install as well as individual video projects.
@@ -209,7 +204,7 @@ def install(root, cancelled, notify, backend='wan',need_t2v=False):
         finally: lock.seek(0); msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
 
 
-def _install(root, cancelled, notify,backend='wan',need_t2v=False):
+def _install(root, cancelled, notify,backend=hunyuan.BACKEND,need_t2v=False):
     folder = layout(root)
     if not layout_valid(folder):
         if shutil.disk_usage(root).free < 40 * 1024**3:
@@ -230,7 +225,7 @@ def _install(root, cancelled, notify,backend='wan',need_t2v=False):
     cache = root / 'models-manifest.json'
     try: entries = json.loads(cache.read_text(encoding='utf-8'))
     except (OSError, ValueError): entries = {}
-    sources=hunyuan.sources(need_t2v) if backend==hunyuan.BACKEND else SOURCES
+    sources=hunyuan.sources(need_t2v)
     for source in sources:
         repo,directory,name=source[:3]
         check_cancel(cancelled)
@@ -256,7 +251,7 @@ def _install(root, cancelled, notify,backend='wan',need_t2v=False):
     return folder
 
 
-def start_backend(folder, root, cancelled, notify,backend='wan',need_t2v=False):
+def start_backend(folder, root, cancelled, notify,backend=hunyuan.BACKEND,need_t2v=False):
     client = engine.Comfy(MANAGED_URL,backend,need_t2v)
     try: client.preflight(); return client
     except Exception: pass
@@ -294,7 +289,8 @@ def start_backend(folder, root, cancelled, notify,backend='wan',need_t2v=False):
     raise RuntimeError('ComfyUI chưa sẵn sàng sau 4 phút. Log: ' + str(root / 'comfyui.log'))
 
 
-def ensure_ready(root, preferred, cancelled, notify,backend='wan',need_t2v=False):
+def ensure_ready(root, preferred, cancelled, notify,backend=hunyuan.BACKEND,need_t2v=False):
+    remove_wan_models(root,notify)
     client = engine.Comfy(preferred,backend,need_t2v)
     try: client.preflight(); return client
     except Exception: pass
@@ -303,3 +299,25 @@ def ensure_ready(root, preferred, cancelled, notify,backend='wan',need_t2v=False
     except Exception: pass
     folder = install(root, cancelled, notify,backend,need_t2v)
     return start_backend(folder, root, cancelled, notify,backend,need_t2v)
+
+
+def remove_wan_models(root, notify):
+    folder=layout(root)/'ComfyUI/models'
+    old=[folder/'diffusion_models/wan2.2_ti2v_5B_fp16.safetensors',
+         folder/'text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors',
+         folder/'vae/wan2.2_vae.safetensors']
+    profile=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'WanLocalStudio/character'
+    for name in ('reference.png','reference.tmp','profile.json'):
+        path=profile/name
+        if path.is_file() and not path.is_symlink():path.unlink()
+    if not any(path.with_name(path.name+suffix).exists() for path in old for suffix in ('','.part')):return
+    client=engine.Comfy(MANAGED_URL)
+    try: queue=client.request('/queue')
+    except RuntimeError:queue={}
+    if queue.get('queue_running') or queue.get('queue_pending'):
+        raise RuntimeError('Wan cũ còn tác vụ. Dùng Xóa dự án đang tạo, chọn dự án cũ rồi tải Hunyuan lại.')
+    for path in old:
+        if path.is_symlink():continue
+        for suffix in ('','.part','.verified.json','.part.download.json'):
+            path.with_name(path.name+suffix).unlink(missing_ok=True)
+    notify('Đã bỏ các file model Wan cũ của tool. Chỉ dùng Hunyuan.')

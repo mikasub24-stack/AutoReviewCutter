@@ -1,5 +1,6 @@
-"""Local Wan orchestration. No cloud inference and no global Comfy interrupt."""
+"""Local Hunyuan orchestration. No cloud inference and no global Comfy interrupt."""
 from __future__ import annotations
+from contextlib import contextmanager
 import hashlib
 import json
 import math
@@ -17,19 +18,13 @@ import urllib.request
 import uuid
 import hunyuan
 
-VERSION = '0.3.0'
+VERSION = '0.3.1'
 ROOT = (Path(sys.executable).resolve().parent if '__compiled__' in globals()
         else Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)))
 FPS = 24
 FRAMES = 121
-WIDTH, HEIGHT = 1280, 736  # Wan spatial grid is aligned to 32 pixels.
+WIDTH, HEIGHT = 1280, 720
 OUTPUT_WIDTH, OUTPUT_HEIGHT = 1280, 720
-MODELS = {
-    'UNETLoader': ('unet_name', 'wan2.2_ti2v_5B_fp16.safetensors'),
-    'CLIPLoader': ('clip_name', 'umt5_xxl_fp8_e4m3fn_scaled.safetensors'),
-    'VAELoader': ('vae_name', 'wan2.2_vae.safetensors'),
-}
-GUIDE = 'https://docs.comfy.org/tutorials/video/wan/wan2_2'
 TOPICS = ('Dọn nhà bỏ hoang', 'Sinh tồn trong rừng')
 CHARACTER = ('One attractive adult East Asian woman, exactly 24 years old, fair skin, oval face, brown eyes, '
              'long straight black hair in a high ponytail. She wears the same fitted black thin-strap athletic crop top, '
@@ -92,8 +87,8 @@ def digest(path):
     return h.hexdigest()
 
 
-def plan(topic, minutes, backend='wan'):
-    if backend not in ('wan',hunyuan.BACKEND): raise ValueError('Model chưa được hỗ trợ.')
+def plan(topic, minutes, backend=hunyuan.BACKEND):
+    if backend != hunyuan.BACKEND: raise ValueError('Model chưa được hỗ trợ.')
     if topic not in STORIES: raise ValueError('Chọn một chủ đề có trong danh sách.')
     minutes = float(minutes)
     if not math.isfinite(minutes) or not 0.1 <= minutes <= 60:
@@ -117,16 +112,16 @@ def plan(topic, minutes, backend='wan'):
                   'Slow, steady camera. No cuts, no time lapse, no sudden changes, no speech.')
         scenes.append({'index': i + 1, 'prompt': prompt, 'seed': secrets.randbits(48)})
     return {'version': VERSION, 'backend':backend,'topic': topic, 'minutes': minutes, 'frames': total,
-            'fps': FPS, 'width': WIDTH, 'height':720 if backend==hunyuan.BACKEND else HEIGHT, 'scene_frames': FRAMES,
+            'fps': FPS, 'width': WIDTH, 'height':HEIGHT, 'scene_frames': FRAMES,
             'output_width': OUTPUT_WIDTH, 'output_height': OUTPUT_HEIGHT, 'output_policy': 'native_center_crop',
             'scenes': scenes, 'reference_policy': 'persistent_character_and_previous_last_frame',
-            'character': CHARACTER, 'transition_frames': transition, 'steps':50 if backend==hunyuan.BACKEND else 24,
-            'notice': 'Wan tạo hình không có âm thanh. Giữ tham chiếu không bảo đảm nhận dạng tuyệt đối.'}
+            'character': CHARACTER, 'transition_frames': transition, 'steps':50,
+            'notice': 'Hunyuan tạo hình không có âm thanh. Giữ tham chiếu không bảo đảm nhận dạng tuyệt đối.'}
 
 
-def new_project(parent, topic, minutes, profile_dir=None, backend='wan'):
+def new_project(parent, topic, minutes, profile_dir=None, backend=hunyuan.BACKEND):
     data = plan(topic, minutes,backend)
-    folder = Path(parent) / ('Wan-' + time.strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:6])
+    folder = Path(parent) / ('Hunyuan-' + time.strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:6])
     folder.mkdir(parents=True)
     data['id'] = uuid.uuid4().hex
     data['server'] = ''
@@ -162,7 +157,7 @@ def run_command(command, cancelled, log):
 
 
 class Comfy:
-    def __init__(self, url='http://127.0.0.1:8188',backend='wan',need_t2v=False):
+    def __init__(self, url='http://127.0.0.1:8188',backend=hunyuan.BACKEND,need_t2v=False):
         parsed = urllib.parse.urlsplit(url.strip())
         if (parsed.scheme != 'http' or parsed.hostname not in ('localhost', '127.0.0.1', '::1')
                 or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ('', '/')):
@@ -189,23 +184,11 @@ class Comfy:
 
     def preflight(self):
         info = self.request('/object_info')
-        if self.backend==hunyuan.BACKEND:return hunyuan.select_models(info,self.need_t2v)
-        required = ['UNETLoader', 'CLIPLoader', 'VAELoader', 'ModelSamplingSD3', 'CLIPTextEncode',
-                    'Wan22ImageToVideoLatent', 'KSampler', 'VAEDecodeTiled', 'SaveImage', 'LoadImage']
-        missing = [name for name in required if name not in info]
-        if missing: raise RuntimeError('ComfyUI thiếu node: ' + ', '.join(missing) + '. Cập nhật ComfyUI bản chính thức.')
-        selected = {}
-        for node, (field, name) in MODELS.items():
-            choices = info[node]['input']['required'][field][0]
-            match = next((x for x in choices if x.replace('\\', '/').split('/')[-1] == name), None)
-            if not match:
-                raise RuntimeError('Chưa có model ' + name + '. Tải đúng bộ Wan 2.2 TI2V 5B theo Hướng dẫn model; sau đó khởi động lại ComfyUI.')
-            selected[field] = match
-        return selected
+        return hunyuan.select_models(info,self.need_t2v)
 
     def upload(self, path):
         path = Path(path)
-        boundary = 'WanLocal' + uuid.uuid4().hex
+        boundary = 'HunyuanLocal' + uuid.uuid4().hex
         body = (f'--{boundary}\r\nContent-Disposition: form-data; name="image"; filename="reference.png"\r\n'
                 'Content-Type: image/png\r\n\r\n').encode() + path.read_bytes() + f'\r\n--{boundary}--\r\n'.encode()
         result = self.request('/upload/image', body, {'Content-Type': 'multipart/form-data; boundary=' + boundary})
@@ -214,7 +197,7 @@ class Comfy:
     def frames(self, record):
         status = record.get('status', {})
         if status.get('status_str') == 'error':
-            raise RuntimeError('Wan render lỗi: ' + json.dumps(status.get('messages', []), ensure_ascii=False)[-2500:])
+            raise RuntimeError('Hunyuan render lỗi: ' + json.dumps(status.get('messages', []), ensure_ascii=False)[-2500:])
         frames = record.get('outputs', {}).get('save', {}).get('images', [])
         return frames if status.get('completed') else []
 
@@ -223,9 +206,9 @@ class Comfy:
         queue = self.request('/queue')
         for prompt_id, item in history.items():
             prompt = item.get('prompt', [])
-            if len(prompt) > 3 and prompt[3].get('wanlocal_request') == marker: return prompt_id
+            if len(prompt) > 3 and (prompt[3].get('hunyuanlocal_request') or prompt[3].get('wanlocal_request')) == marker: return prompt_id
         for item in queue.get('queue_running', []) + queue.get('queue_pending', []):
-            if len(item) > 3 and item[3].get('wanlocal_request') == marker: return item[1]
+            if len(item) > 3 and (item[3].get('hunyuanlocal_request') or item[3].get('wanlocal_request')) == marker: return item[1]
         return None
 
     def wait(self, prompt_id, cancelled, notify):
@@ -249,7 +232,7 @@ class Comfy:
             all_tasks = queue.get('queue_running', []) + queue.get('queue_pending', [])
             if not record and not any(x[1] == prompt_id for x in all_tasks):
                 raise RuntimeError('Tác vụ không còn trong ComfyUI (có thể đã khởi động lại). Bấm Tạo lại cảnh lỗi để tiếp tục.')
-            notify(f'Wan đang render · đã chờ {int(time.monotonic() - started)} giây; chưa có ước tính thời gian.')
+            notify(f'Hunyuan đang render · đã chờ {int(time.monotonic() - started)} giây; chưa có ước tính thời gian.')
             if cancelled.wait(2): continue
 
     def download(self, description, destination):
@@ -259,27 +242,7 @@ class Comfy:
         target = Path(destination); temp = target.with_suffix('.part'); temp.write_bytes(data); temp.replace(target)
 
 
-def graph(scene, models, reference=None, prefix='WanLocal', steps=20, width=WIDTH, height=HEIGHT):
-    def node(kind, **inputs): return {'class_type': kind, 'inputs': inputs}
-    workflow = {
-        'unet': node('UNETLoader', unet_name=models['unet_name'], weight_dtype='default'),
-        'clip': node('CLIPLoader', clip_name=models['clip_name'], type='wan', device='cpu'),
-        'vae': node('VAELoader', vae_name=models['vae_name']),
-        'sampling': node('ModelSamplingSD3', model=['unet', 0], shift=8.0),
-        'positive': node('CLIPTextEncode', clip=['clip', 0], text=scene['prompt']),
-        'negative': node('CLIPTextEncode', clip=['clip', 0], text=NEGATIVE),
-        'latent': node('Wan22ImageToVideoLatent', vae=['vae', 0], width=width, height=height, length=FRAMES, batch_size=1),
-        'sampler': node('KSampler', model=['sampling', 0], positive=['positive', 0], negative=['negative', 0],
-                        latent_image=['latent', 0], seed=scene['seed'], steps=steps, cfg=5.0,
-                        sampler_name='uni_pc', scheduler='simple', denoise=1.0),
-        'decode': node('VAEDecodeTiled', samples=['sampler', 0], vae=['vae', 0], tile_size=512,
-                       overlap=64, temporal_size=4096, temporal_overlap=8),
-        'save': node('SaveImage', images=['decode', 0], filename_prefix=prefix),
-    }
-    if reference:
-        workflow['reference'] = node('LoadImage', image=reference)
-        workflow['latent']['inputs']['start_image'] = ['reference', 0]
-    return workflow
+graph = hunyuan.graph
 
 
 def valid_artifact(project, scene):
@@ -296,7 +259,7 @@ def valid_artifact(project, scene):
 def geometry(data):
     width, height = int(data.get('width', 832)), int(data.get('height', 480))
     out_width, out_height = int(data.get('output_width', width)), int(data.get('output_height', height))
-    alignment=16 if data.get('backend')==hunyuan.BACKEND else 32
+    alignment=16
     if (width % alignment or height % alignment or min(width, height, out_width, out_height) <= 0
             or out_width > width or out_height > height or out_width % 2 or out_height % 2):
         raise ValueError('Kích thước dự án không hợp lệ; bản này chỉ cắt ảnh gốc, không upscale.')
@@ -365,13 +328,14 @@ def edit_sequence(project, data, executable, codec, cancelled, notify):
 def _generate(project, client, cancelled, notify):
     project = Path(project)
     data = json.loads((project / 'project.json').read_text(encoding='utf-8'))
-    if data.get('version') not in ('0.1.0', '0.2.0', '0.2.1', '0.2.2','0.2.3', VERSION): raise ValueError('Phiên bản dự án chưa được hỗ trợ.')
+    if data.get('backend') != hunyuan.BACKEND:
+        raise ValueError('Bản này chỉ tạo Hunyuan mới. Dự án Wan cũ không được tiếp tục.')
     width, height, out_width, out_height = geometry(data)
     if (data.get('server') and data['server'] != client.url
             and any(scene.get('prompt_id') or scene.get('request_marker') for scene in data['scenes'] if not valid_artifact(project, scene))):
         raise ValueError('Dự án đang gắn với ComfyUI ở ' + data['server'] + '. Dùng cùng địa chỉ để nhận tác vụ cũ.')
     ffmpeg_path = ffmpeg()
-    backend=data.get('backend','wan')
+    backend=hunyuan.BACKEND
     profile = Path(data['profile_dir']) if data.get('profile_dir') else None
     if profile and not (project / 'nhan-vat-goc.png').exists() and (profile / 'reference.png').is_file():
         shutil.copy2(profile / 'reference.png', project / 'nhan-vat-goc.png')
@@ -380,14 +344,21 @@ def _generate(project, client, cancelled, notify):
     codec = encoder_options(ffmpeg_path)
     notify(f'Độ phân giải sinh gốc: {width}×{height} · Xuất {out_width}×{out_height} (không upscale)')
     notify('Mã hóa MP4: ' + ('GPU NVIDIA NVENC' if 'h264_nvenc' in codec else 'CPU (NVENC chưa dùng được; model sinh vẫn dùng GPU)'))
+    def upload_reference(path):
+        name=client.upload(path)
+        data.setdefault('uploaded_inputs',[]).append(name)
+        atomic_json(project/'project.json',data)
+        return name
     identity_reference=None
-    notify('Model: '+('HunyuanVideo 1.5 · 720p · FP8 · 50 bước' if backend==hunyuan.BACKEND else 'Wan 2.2 (dự án cũ)'))
+    notify('Model: HunyuanVideo 1.5 · 720p · FP8 · 50 bước')
     data['server'] = client.url
     save = lambda: atomic_json(project / 'project.json', data)
     save()
     for position, scene in enumerate(data['scenes']):
         if cancelled.is_set(): raise Cancelled('Đã tạm dừng; có thể mở lại dự án để tiếp tục.')
-        if valid_artifact(project, scene): continue
+        if valid_artifact(project, scene):
+            notify({'scene':position+1,'total':len(data['scenes']),'image':str(project/f'tham-chieu-{position+1:04}.png'),'clip':str(project/f'canh-{position+1:04}.mp4')})
+            continue
         if scene.get('output_sha256'):
             # A previously finished file/reference changed: all dependent output
             # must be regenerated against the current reference, not reused.
@@ -404,23 +375,20 @@ def _generate(project, client, cancelled, notify):
                 reference = None
                 if position:
                     reference_path = project / f'tham-chieu-{position:04}.png'
-                    reference = client.upload(reference_path)
+                    reference = upload_reference(reference_path)
                     scene['input_reference_sha256'] = digest(reference_path)
                 elif (project / 'nhan-vat-goc.png').is_file():
-                    reference = client.upload(project / 'nhan-vat-goc.png')
+                    reference = upload_reference(project / 'nhan-vat-goc.png')
                     scene['character_reference_sha256'] = digest(project / 'nhan-vat-goc.png')
-                if backend==hunyuan.BACKEND:
-                    if identity_reference is None and (project/'nhan-vat-goc.png').is_file():
-                        identity_reference=client.upload(project/'nhan-vat-goc.png')
-                    workflow=hunyuan.graph(scene,models,reference,identity_reference,
-                        f'HunyuanLocal/{data["id"]}/scene-{position+1}',data.get('steps',50),width,height)
-                else:
-                    workflow = graph(scene, models, reference, f'WanLocal/{data["id"]}/scene-{position + 1}', data.get('steps', 20), width, height)
+                if identity_reference is None and (project/'nhan-vat-goc.png').is_file():
+                    identity_reference=upload_reference(project/'nhan-vat-goc.png')
+                workflow=hunyuan.graph(scene,models,reference,identity_reference,
+                    f'HunyuanLocal/{data["id"]}/scene-{position+1}',data.get('steps',50),width,height)
                 atomic_json(project / f'workflow-{position + 1:04}.json', workflow)
                 scene['request_marker'] = uuid.uuid4().hex
                 save()  # Durable intent before a non-idempotent POST.
                 result = client.request('/prompt', {'prompt': workflow, 'client_id': data['id'],
-                                         'extra_data': {'wanlocal_request': scene['request_marker']}})
+                                         'extra_data': {'hunyuanlocal_request': scene['request_marker']}})
                 if result.get('error') or result.get('node_errors'):
                     scene.pop('request_marker', None); save()
                     raise RuntimeError('ComfyUI không nhận workflow: ' + json.dumps(result, ensure_ascii=False)[-3000:])
@@ -468,6 +436,7 @@ def _generate(project, client, cancelled, notify):
             shutil.copy2(profile / 'reference.png', project / 'nhan-vat-goc.png')
             notify('Đã lưu nhân vật gốc; video sau tự dùng lại ảnh này.')
         shutil.rmtree(folder)
+        notify({'scene':position+1,'total':len(data['scenes']),'image':str(last),'clip':str(output)})
         notify(f'Đã lưu cảnh {position + 1}/{len(data["scenes"])} và tham chiếu tự động.')
     listing = edit_sequence(project, data, ffmpeg_path, codec, cancelled, notify)
     final = project / 'video-hoan-tat.mp4'; temp = project / 'video-hoan-tat.partial.mp4'
@@ -485,8 +454,9 @@ def _generate(project, client, cancelled, notify):
     return final
 
 
-def generate(project, client, cancelled, notify):
-    """Hold an OS lock across the whole job; released even after a crash."""
+@contextmanager
+def project_lock(project):
+    """Hold an OS lock across generation or cleanup."""
     lock_path = Path(project) / '.render.lock'
     with open(lock_path, 'a+b') as lock:
         lock.seek(0); lock.write(b'0'); lock.flush(); lock.seek(0)
@@ -499,11 +469,69 @@ def generate(project, client, cancelled, notify):
                 fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as e:
             raise RuntimeError('Dự án đang được một cửa sổ khác xử lý. Không gửi trùng tác vụ.') from e
-        try: return _generate(project, client, cancelled, notify)
+        try: yield
         finally:
             lock.seek(0)
             if os.name == 'nt': msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
             else: fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
+def generate(project, client, cancelled, notify):
+    with project_lock(project):
+        return _generate(project,client,cancelled,notify)
+
+
+def delete_project(project, client, notify, managed_comfy=None):
+    """Explicit user deletion. Target only this project's jobs/files, never clear a queue."""
+    project=Path(project)
+    if project.is_symlink():raise ValueError('Không xóa thư mục liên kết.')
+    manifest=project/'project.json'
+    data=json.loads(manifest.read_text(encoding='utf-8'))
+    if not isinstance(data.get('scenes'),list) or not isinstance(data.get('id'),str) or len(data['id'])!=32 or any(c not in '0123456789abcdef' for c in data['id']) or data.get('topic') not in TOPICS:
+        raise ValueError('Không phải dự án do tool tạo.')
+    with project_lock(project):
+        ids=set()
+        for scene in data['scenes']:
+            pid=scene.get('prompt_id')
+            if not pid and scene.get('request_marker'):pid=client.find_request(scene['request_marker'])
+            if pid:ids.add(pid)
+        if ids:
+            notify('Đang dừng tác vụ và xóa hàng đợi của dự án…')
+            client.request('/queue',{'delete':sorted(ids)})
+            for pid in ids:client.request('/interrupt',{'prompt_id':pid})
+            deadline=time.monotonic()+90
+            while True:
+                queue=client.request('/queue')
+                active=queue.get('queue_running',[])+queue.get('queue_pending',[])
+                if not any(item[1] in ids for item in active):break
+                if time.monotonic()>deadline:raise RuntimeError('Tác vụ chưa dừng; chưa xóa dữ liệu. Bấm xóa lại khi GPU đã dừng.')
+                time.sleep(.5)
+        # Exact managed output prefix, not user-selected arbitrary filesystem paths.
+        if managed_comfy and data.get('id'):
+            root=Path(managed_comfy)/'output'
+            for prefix in ('HunyuanLocal','WanLocal'):
+                folder=root/prefix/str(data['id'])
+                if folder.resolve().is_relative_to(root.resolve()) and folder.resolve().parent == (root/prefix).resolve() and not folder.is_symlink() and folder.is_dir():
+                    shutil.rmtree(folder)
+        if managed_comfy:
+            input_root=(Path(managed_comfy)/'input').resolve()
+            for name in data.get('uploaded_inputs',[]):
+                image=input_root/name
+                if image.resolve().is_relative_to(input_root) and not image.is_symlink() and image.is_file():image.unlink()
+        profile=Path(data['profile_dir']) if data.get('profile_dir') else None
+        if profile and (profile/'profile.json').is_file():
+            saved=json.loads((profile/'profile.json').read_text(encoding='utf-8'))
+            reference=profile/'reference.png'
+            if saved.get('source_project')==str(project) and reference.is_file() and digest(reference)==saved.get('sha256'):
+                reference.unlink();(profile/'profile.json').unlink()
+        if ids:client.request('/history',{'delete':sorted(ids)})
+        for child in project.iterdir():
+            if child.name=='.render.lock':continue
+            if child.is_dir() and not child.is_symlink():shutil.rmtree(child)
+            else:child.unlink()
+    (project/'.render.lock').unlink(missing_ok=True)
+    project.rmdir()
+    return 'Đã xóa dự án, các cảnh và dữ liệu tạo dở. Model dùng chung được giữ.'
 
 
 def reset_failed_scene(project):
