@@ -14,6 +14,7 @@ import webbrowser
 import customtkinter as ctk
 import engine
 import bootstrap
+import hunyuan
 
 
 def settings_path():
@@ -29,7 +30,7 @@ class App(ctk.CTk):
     def __init__(self):
         ctk.set_appearance_mode('dark')
         super().__init__()
-        self.title('Wan Local Studio '+engine.VERSION+' · Tạo video trên máy của bạn')
+        self.title('Wan Local Studio '+engine.VERSION+' · HunyuanVideo 1.5')
         self.geometry('740x530'); self.minsize(700,500)
         self.configure(fg_color='#0b1220')
         if os.name == 'nt': self.iconbitmap(str(engine.ROOT / 'icon.ico'))
@@ -43,8 +44,8 @@ class App(ctk.CTk):
         self.asset_root = Path(saved.get('asset_root', str(bootstrap.default_root())))
         panel = ctk.CTkScrollableFrame(self, fg_color='transparent')
         panel.pack(fill='both', expand=True, padx=14, pady=12)
-        ctk.CTkLabel(panel,text='WAN LOCAL STUDIO',font=('Segoe UI',22,'bold'),text_color='#5de0c1').pack(anchor='w')
-        ctk.CTkLabel(panel,text='Tự tải bộ Wan • Giữ nhân vật • Tự dựng & xuất MP4',font=('Segoe UI',12)).pack(anchor='w',pady=(0,10))
+        ctk.CTkLabel(panel,text='VIDEO LOCAL · HUNYUAN 1.5',font=('Segoe UI',22,'bold'),text_color='#5de0c1').pack(anchor='w')
+        ctk.CTkLabel(panel,text='Hunyuan 1.5 FP8 • 720p gốc • Tự dựng & xuất MP4',font=('Segoe UI',12)).pack(anchor='w',pady=(0,10))
         form = ctk.CTkFrame(panel,fg_color='#152235',corner_radius=10);form.pack(fill='x',pady=4)
         form.grid_columnconfigure(0,weight=1)
         ctk.CTkLabel(form,text='Chủ đề',font=('Segoe UI',12)).grid(row=0,column=0,sticky='w',padx=12,pady=(8,0))
@@ -57,9 +58,9 @@ class App(ctk.CTk):
         ctk.CTkLabel(panel,textvariable=self.character,wraplength=670,justify='left',font=('Segoe UI',11),text_color='#a9c3d6').pack(anchor='w',pady=(4,6))
         row=ctk.CTkFrame(panel,fg_color='transparent');row.pack(fill='x',pady=5)
         self.create_button=ctk.CTkButton(row,text='Tạo video',command=self.create,height=34,width=170,font=('Segoe UI',14,'bold'),fg_color='#29aa90',hover_color='#218b76');self.create_button.pack(side='left',padx=(0,8))
-        self.install_button=ctk.CTkButton(row,text='Cài & tải bộ Wan',command=self.prepare,height=34,width=155);self.install_button.pack(side='left',padx=(0,8))
+        self.install_button=ctk.CTkButton(row,text='Cài & tải model',command=self.prepare,height=34,width=155);self.install_button.pack(side='left',padx=(0,8))
         self.pause_button=ctk.CTkButton(row,text='Tạm dừng',command=self.cancel.set,height=34,width=105,fg_color='#753b50',state='disabled');self.pause_button.pack(side='right')
-        self.status=tk.StringVar(value='Lần đầu tool tự tải gần 20 GB dữ liệu. Cần khoảng 40 GB ổ trống; có thể đổi ổ trong Cài đặt. Thử 0,1 phút trước.')
+        self.status=tk.StringVar(value='Bộ Hunyuan cần tải thêm model lớn; chọn ổ đủ chỗ trong Cài đặt. Render 50 bước sẽ chậm hơn. Thử 0,1 phút trước.')
         ctk.CTkLabel(panel,textvariable=self.status,wraplength=670,justify='left',anchor='w',font=('Segoe UI',12)).pack(fill='x',pady=(8,4))
         self.progress=ctk.CTkProgressBar(panel,mode='determinate',progress_color='#5de0c1',height=6);self.progress.pack(fill='x',pady=6);self.progress.set(0)
         results=ctk.CTkFrame(panel,fg_color='transparent');results.pack(fill='x',pady=6)
@@ -82,7 +83,7 @@ class App(ctk.CTk):
         line2=ctk.CTkFrame(self.options,fg_color='transparent');line2.pack(fill='x',padx=10,pady=4)
         self.reset_button=ctk.CTkButton(line2,text='Tạo lại cảnh lỗi',command=self.reset,width=130,height=26);self.reset_button.pack(side='left',padx=(0,6))
         ctk.CTkButton(line2,text='Xem nhân vật gốc',command=self.show_character,width=140,height=26).pack(side='left')
-        ctk.CTkLabel(self.options,text='3060 12GB / RAM 32GB • 720p gốc 16:9 • Wan dùng GPU, mã hóa thử NVENC.\nẢnh gốc được dùng lại qua các video; vẫn có thể lệch chi tiết. Wan không tự tạo tiếng động.',wraplength=640,justify='left',font=('Segoe UI',11),text_color='#a9c3d6').pack(anchor='w',padx=10,pady=8)
+        ctk.CTkLabel(self.options,text='Hunyuan 1.5 FP8/offload • 720p gốc • 50 bước • Chưa kiểm chứng trên 3060 12GB.\nẢnh gốc được dùng lại qua các video; vẫn có thể lệch chi tiết. Model không tự tạo tiếng động.',wraplength=640,justify='left',font=('Segoe UI',11),text_color='#a9c3d6').pack(anchor='w',padx=10,pady=8)
         self.controls=[self.create_button,self.install_button,self.resume_button,self.check_button,self.music_button,self.folder_button,self.asset_button,self.reset_button]
         self.minutes.trace_add('write',self.update_count);self.update_count()
         self.after(150,self.poll);self.protocol('WM_DELETE_WINDOW',self.close)
@@ -92,7 +93,7 @@ class App(ctk.CTk):
         else:self.log.pack(fill='x',pady=6)
 
     def choose_assets(self):
-        value=filedialog.askdirectory(title='Chọn ổ/thư mục lưu bộ ComfyUI và model (cần khoảng 40 GB trống)')
+        value=filedialog.askdirectory(title='Chọn ổ/thư mục lưu bộ ComfyUI và model (tool sẽ tính dung lượng cần tải)')
         if value:
             self.asset_root=Path(value)/'WanLocalStudioData';self.save_settings()
             self.status.set('Dữ liệu model: '+str(self.asset_root))
@@ -105,17 +106,17 @@ class App(ctk.CTk):
         else:messagebox.showinfo('Nhân vật','Tool sẽ tự tạo và lưu nhân vật khi render cảnh đầu tiên.')
 
     def prepare(self):
-        root=self.asset_root;preferred=self.url.get()
+        root=self.asset_root;preferred=self.url.get();need_t2v=not (settings_path().parent/'character/reference.png').is_file()
         self.save_settings()
         def work():
-            client=bootstrap.ensure_ready(root,preferred,self.cancel,self.notify)
+            client=bootstrap.ensure_ready(root,preferred,self.cancel,self.notify,hunyuan.BACKEND,need_t2v)
             self.events.put(('backend',client.url))
             return 'Đã sẵn sàng. Chọn chủ đề và số phút rồi bấm Tạo video.'
         self.start(work)
 
     def update_count(self,*_):
         try:
-            data=engine.plan(self.topic.get(),self.minutes.get().replace(',','.'))
+            data=engine.plan(self.topic.get(),self.minutes.get().replace(',','.'),hunyuan.BACKEND)
             self.count.set(f'{len(data["scenes"])} cảnh · {data["frames"]/24:g} giây · 720p gốc 16:9 · Tự tham chiếu và dựng MP4.')
         except (ValueError,TypeError): self.count.set('Nhập số từ 0,1 đến 60. Ví dụ 0,1 = 6 giây; 1 = 60 giây.')
 
@@ -155,15 +156,15 @@ class App(ctk.CTk):
     def create(self):
         if self.busy:return
         try:
-            engine.plan(self.topic.get(),self.minutes.get().replace(',','.'))
+            engine.plan(self.topic.get(),self.minutes.get().replace(',','.'),hunyuan.BACKEND)
             client=engine.Comfy(self.url.get());self.save_settings()
             topic=self.topic.get();minutes=self.minutes.get().replace(',','.');music=self.music;parent=self.parent;root=self.asset_root;preferred=client.url;profile=settings_path().parent/'character'
         except Exception as e:messagebox.showerror('Chưa bắt đầu được',str(e));return
-        self.status.set('Đang kiểm tra ComfyUI và model Wan…')
+        self.status.set('Đang kiểm tra và chuẩn bị HunyuanVideo 1.5…')
         def work():
-            ready=bootstrap.ensure_ready(root,preferred,self.cancel,self.notify)
+            ready=bootstrap.ensure_ready(root,preferred,self.cancel,self.notify,hunyuan.BACKEND,not (profile/'reference.png').is_file())
             self.events.put(('backend',ready.url));parent.mkdir(parents=True,exist_ok=True)
-            self.project=engine.new_project(parent,topic,minutes,profile)
+            self.project=engine.new_project(parent,topic,minutes,profile,hunyuan.BACKEND)
             if music:shutil.copy2(music,self.project/'nhac-nen.audio')
             self.notify('Đã lưu dự án: '+str(self.project))
             return engine.generate(self.project,ready,self.cancel,self.notify)
@@ -179,7 +180,7 @@ class App(ctk.CTk):
         self.project=Path(folder);self.save_settings();root=self.asset_root
         data=json.loads((self.project/'project.json').read_text(encoding='utf-8'));preferred=data.get('server') or client.url
         def work():
-            ready=bootstrap.ensure_ready(root,preferred,self.cancel,self.notify)
+            ready=bootstrap.ensure_ready(root,preferred,self.cancel,self.notify,data.get('backend','wan'),not (self.project/'nhan-vat-goc.png').is_file())
             self.events.put(('backend',ready.url))
             return engine.generate(self.project,ready,self.cancel,self.notify)
         self.start(work)
@@ -191,9 +192,9 @@ class App(ctk.CTk):
             client=engine.Comfy(self.url.get());self.start(lambda:engine.generate(self.project,client,self.cancel,self.notify))
 
     def check(self):
-        try:client=engine.Comfy(self.url.get());self.save_settings()
+        try:client=engine.Comfy(self.url.get(),hunyuan.BACKEND,not (settings_path().parent/'character/reference.png').is_file());self.save_settings()
         except ValueError as e:messagebox.showerror('Địa chỉ ComfyUI',str(e));return
-        self.start(lambda:('Đã nhận đủ bộ Wan 2.2 TI2V 5B. Model: '+str(client.preflight())))
+        self.start(lambda:('Đã nhận đủ bộ HunyuanVideo 1.5. Model: '+str(client.preflight())))
 
     def poll(self):
         try:

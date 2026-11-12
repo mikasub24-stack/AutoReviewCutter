@@ -11,6 +11,7 @@ import time
 import urllib.error
 import urllib.request
 import engine
+import hunyuan
 
 COMFY_VERSION = 'v0.45.0'
 COMFY_URL = 'https://github.com/Comfy-Org/ComfyUI/releases/download/v0.45.0/ComfyUI_windows_portable_nvidia_cu126.7z'
@@ -89,8 +90,8 @@ def parse_pointer(text):
     return digest[1], int(size[1])
 
 
-def model_metadata(repo, directory, name):
-    path = f'split_files/{directory}/{name}'
+def model_metadata(repo, directory, name, remote_path=None):
+    path = remote_path or f'split_files/{directory}/{name}'
     request = urllib.request.Request(f'https://huggingface.co/{repo}/raw/main/{path}', headers={'User-Agent': 'WanLocalStudio/0.2'})
     with urllib.request.urlopen(request, timeout=25) as response:
         text = response.read(4096).decode('utf-8')
@@ -195,7 +196,7 @@ def layout_valid(folder):
     return (folder / 'python_embeded/python.exe').is_file() and (folder / 'ComfyUI/main.py').is_file()
 
 
-def install(root, cancelled, notify):
+def install(root, cancelled, notify, backend='wan',need_t2v=False):
     if os.name != 'nt': raise RuntimeError('Cài tự động này dành cho Windows x64 có NVIDIA.')
     root = Path(root); root.mkdir(parents=True, exist_ok=True)
     # Lock the shared install as well as individual video projects.
@@ -204,11 +205,11 @@ def install(root, cancelled, notify):
         lock.write(b'0'); lock.flush(); lock.seek(0)
         try: msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
         except OSError as e: raise RuntimeError('Một cửa sổ khác đang cài/tải bộ Wan. Chờ cửa sổ đó hoàn tất.') from e
-        try: return _install(root, cancelled, notify)
+        try: return _install(root, cancelled, notify,backend,need_t2v)
         finally: lock.seek(0); msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
 
 
-def _install(root, cancelled, notify):
+def _install(root, cancelled, notify,backend='wan',need_t2v=False):
     folder = layout(root)
     if not layout_valid(folder):
         if shutil.disk_usage(root).free < 40 * 1024**3:
@@ -229,20 +230,34 @@ def _install(root, cancelled, notify):
     cache = root / 'models-manifest.json'
     try: entries = json.loads(cache.read_text(encoding='utf-8'))
     except (OSError, ValueError): entries = {}
-    for repo, directory, name in SOURCES:
+    sources=hunyuan.sources(need_t2v) if backend==hunyuan.BACKEND else SOURCES
+    for source in sources:
+        repo,directory,name=source[:3]
         check_cancel(cancelled)
         if name not in entries:
             notify('Lấy thông tin model chính thức: ' + name)
-            entries[name] = model_metadata(repo, directory, name)
+            entries[name] = model_metadata(repo,directory,name,*source[3:])
             engine.atomic_json(cache, entries)
+    remaining=0
+    for source in sources:
+        _,directory,name=source[:3];item=entries[name]
+        target=folder/'ComfyUI/models'/directory/name
+        if not receipt_valid(target,item):
+            part=target.with_suffix(target.suffix+'.part')
+            remaining+=max(0,item['size']-(part.stat().st_size if part.is_file() else 0))
+    notify(f'Dữ liệu model còn tải khoảng {remaining/1024**3:.1f} GB.')
+    if shutil.disk_usage(root).free < remaining+4*1024**3:
+        raise RuntimeError(f'Cần thêm khoảng {remaining/1024**3+4:.1f} GB trống để tải bộ model. Chọn ổ nhiều chỗ hơn trong Cài đặt.')
+    for source in sources:
+        _,directory,name=source[:3]
         item = entries[name]
         download(item['url'], folder / 'ComfyUI/models' / directory / name,
                  item['sha256'], item['size'], cancelled, notify)
     return folder
 
 
-def start_backend(folder, root, cancelled, notify):
-    client = engine.Comfy(MANAGED_URL)
+def start_backend(folder, root, cancelled, notify,backend='wan',need_t2v=False):
+    client = engine.Comfy(MANAGED_URL,backend,need_t2v)
     try: client.preflight(); return client
     except Exception: pass
     folder = Path(folder); root = Path(root)
@@ -279,12 +294,12 @@ def start_backend(folder, root, cancelled, notify):
     raise RuntimeError('ComfyUI chưa sẵn sàng sau 4 phút. Log: ' + str(root / 'comfyui.log'))
 
 
-def ensure_ready(root, preferred, cancelled, notify):
-    client = engine.Comfy(preferred)
+def ensure_ready(root, preferred, cancelled, notify,backend='wan',need_t2v=False):
+    client = engine.Comfy(preferred,backend,need_t2v)
     try: client.preflight(); return client
     except Exception: pass
     try:
-        managed = engine.Comfy(MANAGED_URL); managed.preflight(); return managed
+        managed = engine.Comfy(MANAGED_URL,backend,need_t2v); managed.preflight(); return managed
     except Exception: pass
-    folder = install(root, cancelled, notify)
-    return start_backend(folder, root, cancelled, notify)
+    folder = install(root, cancelled, notify,backend,need_t2v)
+    return start_backend(folder, root, cancelled, notify,backend,need_t2v)
