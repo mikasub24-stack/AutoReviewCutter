@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.8.3
+- **Góc quay theo đúng kiểu video làm nhà thật:** máy **đứng yên hoàn toàn** trong mỗi cảnh quay (không lia, zoom, đẩy vào, không cận mặt). **Cảnh ngoài trời: cảnh rộng quay từ xa**; **cảnh trong nhà: giữ một góc cố định** đặt sao cho thấy rõ cả người và việc đang làm. **Đổi góc là một cú cắt sạch, thấy rõ** (vào nhà, ra ngoài, hoặc sang chỗ khác trong phòng), không có chuyển động máy «đi tìm» việc.
+- **Người làm có cảm xúc và sức lực:** việc nặng (cắt cỏ, kéo rác, đào, cưa, khiêng) thì gồng người, thở mạnh, mồ hôi chảy, áo ướt, dừng một chút lau mặt lấy hơi; càng về cuối càng mệt và đẫm mồ hôi; việc nhẹ (trang trí, bật đèn) thì bình tĩnh, cuối cùng mệt nhưng mãn nguyện. Biểu cảm thể hiện bằng nét mặt và dáng người trong khung vừa / xa, không quay cận mặt. Chế độ «không lộ mặt» chỉ thể hiện bằng dáng người. Ảnh mốc đầu mỗi đoạn song song cũng vẽ người ra mồ hôi theo tiến độ.
+- Video đã tạo dở giữ prompt cũ; chỉ video tạo mới dùng cách này.
+- **Giao diện tab Dọn nhà gọn hơn:** các ô chọn (độ dài, chạy song song, tạo bằng, người trong video) nằm chung một hàng thay vì mỗi ô một hàng dài; khi bắt đầu chạy, phần «Tạo video mới» tự thu gọn để thấy ngay tiến độ và hàng đợi (bấm tiêu đề «Tạo video mới» để mở lại), tiến độ hiện luôn trên thanh tiêu đề của khung.
+
 ## Update 1.8.2
 - **Máy quay ổn định như video làm nhà thật, không còn «kiểu AI»:** bỏ hẳn lệnh đẩy máy vào, lùi ra và **cận mặt** giữa mỗi clip. Chế độ «Ổn định» (mặc định) giữ nguyên khung của khung hình đầu suốt clip, chỉ chỉnh khung **một lần, chậm** ở đầu bước mới khi chỗ làm đổi sang khu vực khác, và luôn đóng khung vào công việc và đôi tay, không bao giờ vào mặt. Muốn y hệt một góc cố định cả video thì chọn «Cố định một góc». Video đã tạo dở giữ nguyên prompt cũ; chỉ video tạo mới dùng cách quay này.
 

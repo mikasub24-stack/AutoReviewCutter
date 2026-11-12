@@ -729,7 +729,7 @@ Không đọc được ảnh gốc (hoặc ảnh lớn hơn 60 MB).|Cannot read 
 Không đọc được tệp nhạc nền.|Cannot read the music file.
 Chờ xử lý đầu ra xong trước khi thêm cảnh.|Wait for the output to finish before adding scenes.
 Góc quay|Camera
-Ổn định, chỉ chỉnh khung khi đổi chỗ làm (khuyên dùng)|Steady, reframes only when the work moves (recommended)
+Ngoài xa · trong cố định (khuyên dùng)|Wide outside · fixed inside (recommended)
 Cố định một góc (giống nhau nhất)|One fixed angle (most consistent)
 Không lộ mặt (quay từ sau lưng hoặc ở xa: Muse ít từ chối hơn, người ít bị lệch giữa các cảnh)|Hide the face (filmed from behind or far away: Muse refuses less, and the person drifts less between scenes)
 Tên video (không bắt buộc; để trống thì lấy tên chủ đề)|Video name (optional; leave empty to use the topic name)
@@ -739,6 +739,7 @@ Người trong video|Person in the video
 Nữ trẻ, da trắng, xinh|Young woman, fair skin, pretty
 Nam|Man
 Giống người trong ảnh gốc|Same person as in the photo
+Tạo video mới|Create a new video
 Tạo video bằng|Create the video with
 Đường dẫn dự án Flow|Flow project address
 Mô hình Veo|Veo model

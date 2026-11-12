@@ -54,7 +54,7 @@
         ['Phát quang cỏ dại', 'the tall weeds, vines and bushes around the house are cut down and cleared away until the walls and the ground are visible'],
         ['Dọn rác ngoài sân', 'junk, trash and fallen branches in the yard are collected and hauled away, and the yard is raked clean'],
         ['Rửa tường ngoài', 'the dirty outer walls and the front door area are pressure-washed, the moss, dirt and stains wash away'],
-        ['Vào nhà', 'the person opens the front door and walks in; the camera follows inside and shows the dusty, dirty interior with cobwebs, trash and broken furniture'],
+        ['Vào nhà', 'the person opens the front door and walks in; then the view changes with a clean cut to a fixed angle inside that shows the dusty, dirty interior with cobwebs, trash and broken furniture'],
         ['Dọn rác trong nhà', 'inside the house the big trash, broken furniture and debris are carried out and loaded into bags and a wheelbarrow'],
         ['Quét bụi, mạng nhện', 'inside the house the dust, cobwebs and loose dirt are swept and vacuumed away'],
         ['Rửa sàn, tường trong', 'inside the house the walls and the floor are scrubbed clean, the dirty stains fade away'],
@@ -69,7 +69,7 @@
         ['Lắp bếp, vòi nước, tủ', 'a kitchen counter, a sink with a tap, shelves and cabinets are installed and fixed in place'],
         ['Đặt nội thất, trang trí', 'furniture is carried in and placed: a sofa, a table, chairs and a rug, then curtains, plants and pictures are added'],
         ['Sơn ngoài, sân vườn', 'the person goes outside and the outer walls are painted fresh, the fence is rebuilt, a path is laid and fresh lawn and flowers are planted'],
-        ['Hoàn thiện như nhà mới', 'the camera shows the whole house from outside, now repaired, freshly painted, with a tidy garden and warm lights glowing inside through the windows, looking brand new, while the person stands by the gate and looks at the finished house']
+        ['Hoàn thiện như nhà mới', 'a wide shot from far outside shows the whole house, now repaired, freshly painted, with a tidy garden and warm lights glowing inside through the windows, looking brand new, while the person stands by the gate and looks at the finished house']
       ]
     },
     {
@@ -330,7 +330,7 @@
       `SCENE (identical in every clip): ${placeOf(config)}.`,
       config.camera === 'fixed'
         ? 'Camera: one fixed camera on a tripod, same position, same height, same angle and same lens in every clip; no zoom, no pan, no tilt, no cuts, no camera shake.'
-        : 'Camera: a steady, mostly static real camera on a tripod like a time-lapse cleanup video; it only reframes slowly, once, when the work moves to a new area; never a push-in, never a zoom, never a face close-up, no orbiting, no handheld wobble, no shaking, no jump cuts; the place, the lighting and the lens look stay identical.',
+        : 'Camera: a still, tripod-mounted real camera like a time-lapse cleanup video: a WIDE, distant shot outside and ONE fixed angle inside that shows the action clearly; the camera never moves during a shot, and a change of angle is always a clean, clearly visible cut, never a pan or a zoom; never a push-in, never a face close-up, no handheld wobble, no shaking; the place, the lighting and the lens look stay identical.',
       `Light: ${config.light}.`,
       'Look: real-life footage filmed with a camera, photorealistic, natural colors, real textures and real materials; not animation, not cartoon, not CGI, not a painting, not an illustration.',
       'Quality: sharp, crisp, high-detail, clean and stable image; no blur, no flicker, no distortion, and no morphing of the building, the objects or the person.',
@@ -361,17 +361,52 @@
     ].filter(Boolean).join('\n');
   }
 
-  // Máy quay ỔN ĐỊNH như video làm nhà thật (máy dựng chân / time-lapse): không đẩy vào mặt, không zoom, không lia qua lại trong clip.
-  // Chỉ chỉnh khung MỘT lần, chậm và êm, ở đầu bước mới nếu chỗ làm đổi sang khu vực khác; các phần còn lại của bước giữ nguyên khung của khung hình đầu.
+  // Máy quay ĐỨNG YÊN như video làm nhà thật (máy dựng chân / time-lapse): ngoài trời thì CẢNH RỘNG quay từ xa; trong nhà thì GIỮ MỘT GÓC CỐ ĐỊNH để thấy rõ hành động.
+  // Máy không bao giờ chuyển động trong một cảnh quay (không zoom, lia, đẩy vào, cận mặt). Đổi góc (vào nhà, ra ngoài, sang chỗ làm khác trong phòng) là một cú CẮT sạch, thấy rõ.
+  function placesOf(config) {                            // 'out' | 'in' cho từng bước (số bước bắt đầu từ 1)
+    const theme = themeOf(config.theme);
+    if (theme.id === 'house_in') return () => 'in';
+    if (theme.id === 'house_full') {
+      const states = []; let now = 'out';
+      theme.steps.forEach((st, i) => { if (/walks in\b/.test(st[1])) now = 'in'; else if (/goes outside|from far outside|from outside/.test(st[1])) now = 'out'; states[i + 1] = now; });
+      return n => states[n] || 'out';
+    }
+    if (theme.id === 'custom') { const list = config.customSteps || []; return n => /\b(inside|indoor|in the room|kitchen|bathroom|bedroom|living room|interior)\b/i.test(list[n - 1] || '') ? 'in' : 'out'; }
+    return () => 'out';
+  }
+  const SHOT_OUT = 'a WIDE, distant shot filmed from far away that shows the whole place and the person at work in it; the person is small in the frame but every action is readable';
+  const SHOT_IN = 'ONE fixed angle chosen so the whole action is clearly visible: the person and the work area are both fully in frame, a medium-wide view, never an extreme close-up';
+  const HOLD = 'The camera never moves during a shot: no zoom, no push-in, no pull-out, no pan, no tilt, no orbit, no searching or sweeping movement, no camera move toward the person\'s face, and never a face close-up.';
   function shotLines(config, step, number, total) {
     if (config.camera === 'fixed') return [];
-    const view = config.person
-      ? 'a MEDIUM or WIDE view of the person at work with the whole work area around, framed on the work and the hands, never on the face'
-      : 'a MEDIUM or WIDE view of the whole work area';
-    const hold = 'The camera is completely still for the rest of the clip: no zoom, no push-in, no pan, no tilt, no orbit, no camera move toward the person\'s face, and never a face close-up.';
-    if (number === 1) return [`SHOT: keep exactly the framing of the attached frame (same position, angle and distance). ${hold}`];
-    if (step.part <= 1) return [`SHOT: start from the attached frame. If the work moved to a new area, the camera reframes ONCE, slowly and steadily, in the first two seconds to ${view}; otherwise it stays exactly as it is. ${hold}`];
-    return [`SHOT: keep exactly the framing of the attached frame (same position, angle and distance). ${hold}`];
+    const where = placesOf(config), here = where(step.step), before = step.step > 1 ? where(step.step - 1) : here;
+    const view = here === 'in' ? SHOT_IN : SHOT_OUT;
+    if (number === 1) return [`SHOT: keep exactly the framing of the attached frame (${view}). ${HOLD}`];
+    if (step.part <= 1 && here !== before) return [`SHOT: a clean, clearly visible cut in the first second to the new camera angle: ${view}. After the cut the camera is completely still, locked on a tripod, for the rest of the clip. ${HOLD}`];
+    if (step.part <= 1 && here === 'in') return [`SHOT: keep the angle of the attached frame (${view}). If this work happens in a different part of the room than in the attached frame, make ONE clear, clean cut in the first second to a new fixed angle that shows this work fully, then the camera is completely still for the rest of the clip. ${HOLD}`];
+    return [`SHOT: the camera is completely still, locked on a tripod, keeping exactly the framing of the attached frame (same position, angle and distance) for the whole clip. ${HOLD}`];
+  }
+
+  // Sức lực và cảm xúc: người làm việc nặng phải thở mạnh, đổ mồ hôi, mệt dần theo thời gian; biểu cảm thể hiện bằng nét mặt và dáng người trong khung vừa / xa, KHÔNG bằng cách quay cận mặt.
+  const HEAVY = /\b(cut down|cleared|clears|hauled|carried|carries|carry|pressure-wash\w*|torn out|tear|removed|dig|digs|dug|shovel|throws|sanded|ground off|scrubbed|lifted|lifts|saw|splits|stacks|raises|levels|loaded|chop\w*|drag\w*|wheelbarrow|rak(?:e|ed)|swept|rebuilt|piles|packs|cuts)\b/i;
+  const LIGHT = /(curtains|pictures|decorations|lights are switched on|lights the|sits|stands|relaxed|looks brand new|looks showroom|mailbox|door mat|outdoor lamps|garden lights|lush|spotless)/i;
+  function effortLines(config, step, number, total) {
+    if (!config.person) return [];
+    const heavy = HEAVY.test(step.en || ''), light = !heavy && LIGHT.test(step.en || '');
+    const r = number / Math.max(1, total);
+    const work = heavy
+      ? 'This is HARD physical labour: the person strains visibly, muscles tense, jaw clenched, frowning with effort, breathing heavily, sweat running down the forehead and neck, shirt dark with sweat, dirty sweaty hands; once during the clip the person stops for a moment to wipe the sweat from the face with the forearm and catch their breath, then goes on.'
+      : light
+        ? 'The person works calmly and carefully with a relaxed, pleased expression, still a little sweaty and tired from the long work, with a small satisfied smile when the result looks good.'
+        : 'The person works steadily with a focused, serious face, sweat on the forehead, breathing a little heavily, and wipes the forehead once during the clip.';
+    const tired = r < 0.25 ? 'The job has just started: the person is fresh but already starting to sweat.'
+      : r < 0.6 ? 'Several hours into the job: hair damp, shirt dark with sweat, clearly warm and breathing hard between actions.'
+      : r < 0.9 ? 'Many hours into the job: soaked in sweat, dirty and visibly tired, slower breaths, rubbing the sore back or shoulder now and then, but pushing on.'
+      : 'The job is almost done: exhausted and soaked in sweat but proud, with a tired relieved smile when looking at the result.';
+    const how = config.faceless
+      ? 'Show the effort and the tiredness with the body only: heaving breath, sweat-dark back and shirt, slumped shoulders, wiping the neck.'
+      : 'Show real human emotion in the face and the body, clearly visible in the medium or wide view (effort, tiredness, relief), and never by moving the camera to the face.';
+    return [`Emotion and effort (the person is a real tired human, never a calm robot): ${work} ${tired} ${how}`];
   }
 
   function clipPrompt(config, step, number, total, { first = false } = {}) {
@@ -385,6 +420,7 @@
         : `Show this work being done FAST in one smooth continuous action with rapid, clearly visible progress. By the end of the clip this step is clearly finished and the scene is ready for the next step.${last ? ' End with the finished result calm and still for the last second.' : ''}`,
       ...shotLines(config, step, number, total),
       sceneBible(config),
+      ...effortLines(config, step, number, total),
       'Pace: fast and energetic, as in a sped-up video; quick hands, quick steps, fast tool movements and rapid progress. Never slow motion, never slow or calm movement.',
       'Realism: it must look like a real person really doing this job. Natural human movement, real weight and real physics. Every change in the scene is made visibly by the person with their own hands and real tools; nothing ever changes by itself, by magic or by a cut.',
       'Continuity: the attached image shows the exact current state. Keep the same place, the same viewpoint, the same lighting and everything already done exactly as in the image. Do not add, remove, move or change anything except what this step does. Do not cut to another scene.',
@@ -473,7 +509,7 @@
     }
     return [
       'Edit the attached photo. Keep exactly the same place, the same building or object, the same viewpoint and framing, the same light and the same person (same face, hair, body and clothes) as in the attached photo.',
-      config.person ? `The person in the picture is ${config.personDesc}, ${config.faceless ? 'seen from behind or from far away' : 'seen clearly'}, working in the scene.` : '',
+      config.person ? `The person in the picture is ${config.personDesc}, ${config.faceless ? 'seen from behind or from far away' : 'seen clearly'}, working in the scene, ${clipIndex / total < 0.25 ? 'fresh with a little sweat' : clipIndex / total < 0.6 ? 'sweaty, hair damp, shirt dark with sweat' : 'soaked in sweat, dirty and visibly tired'}.` : '',
       `Change only the state of the work so that the picture shows this moment: ${progress}.`,
       'Everything that is not mentioned keeps exactly the same shape, size, position and color as in the attached photo.',
       IMG_RATIO[config.aspect],

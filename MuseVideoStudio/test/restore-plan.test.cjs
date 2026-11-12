@@ -123,30 +123,62 @@ test('không lộ mặt: bỏ yêu cầu mặt, thêm lệnh quay từ sau lưng
   assert.match(P.baseImagePrompt(c), /seen from behind/);
 });
 
-test('góc quay: ổn định như video thật, không bao giờ cận mặt / zoom / đẩy vào; chỉnh khung một lần ở đầu bước mới; cố định thì không có dòng SHOT', () => {
-  const c = P.options({ theme: 'cabin', minutes: 20 });   // 120 cảnh → mỗi việc nhiều phần
-  const steps = P.stepsOf(c);
-  const prompts = steps.map((s, i) => P.clipPrompt(c, s, i + 1, steps.length));
-  const shot = i => prompts[i].split('\n').find(l => l.startsWith('SHOT:'));
-  for (const [i, s] of steps.entries()) {
-    const line = shot(i);
+test('góc quay: máy luôn đứng yên, không cận mặt / zoom / lia; ngoài trời cảnh rộng xa, trong nhà một góc cố định, đổi góc là cú cắt rõ; cố định thì không có dòng SHOT', () => {
+  const shotOf = (c, st, n, t) => P.clipPrompt(c, st, n, t).split('\n').find(l => l.startsWith('SHOT:'));
+  const cabin = P.options({ theme: 'cabin', minutes: 20 }), cs = P.stepsOf(cabin);
+  for (const [i, st] of cs.entries()) {
+    const line = shotOf(cabin, st, i + 1, cs.length);
     assert.ok(line, 'cảnh ' + (i + 1) + ' có dòng SHOT');
-    assert.match(line, /The camera is completely still/);
+    assert.match(line, /never moves during a shot: no zoom, no push-in, no pull-out, no pan, no tilt, no orbit/);
     assert.match(line, /never a face close-up/);
-    assert.doesNotMatch(prompts[i], /CLOSE-UP|face and shoulders|push-in and pull-out|moves smoothly in to/, 'không còn lệnh cận mặt / đẩy vào / lùi ra');
-    if (i === 0 || s.part > 1) assert.match(line, /keep exactly the framing of the attached frame/);
-    else assert.match(line, /reframes ONCE/);
+    if (i > 0) assert.match(line, /completely still/);
+    assert.doesNotMatch(P.clipPrompt(cabin, st, i + 1, cs.length), /CLOSE-UP|face and shoulders|push-in and pull-out|moves smoothly in to|reframes ONCE|camera follows/);
   }
-  assert.match(prompts[0], /steady, mostly static real camera on a tripod/);
-  assert.ok(steps.some(s => s.part > 1), 'có bước nhiều phần để kiểm tra phần giữa');
-  const hidden = P.options({ theme: 'cabin', minutes: 20, faceless: true }), hs = P.stepsOf(hidden);
-  assert.ok(hs.every((s, i) => !/face and shoulders|CLOSE-UP/.test(P.clipPrompt(hidden, s, i + 1, hs.length))));
+  assert.match(shotOf(cabin, cs[0], 1, cs.length), /WIDE, distant shot filmed from far away/, 'ngoài trời: cảnh rộng quay xa');
+  // Nhà đầy đủ: ngoài → vào nhà (cắt sang góc trong nhà) → ... → ra ngoài (cắt về cảnh rộng)
+  const house = P.options({ theme: 'house_full', minutes: 20 }), hs = P.stepsOf(house);
+  const at = n => hs.findIndex(s => s.step === n && s.part <= 1);
+  const line = n => shotOf(house, hs[at(n)], at(n) + 1, hs.length);
+  assert.match(line(2), /completely still, locked on a tripod/);
+  assert.match(line(2), /keeping exactly the framing/, 'ngoài trời giữa chừng: giữ khung rộng, không đổi');
+  assert.match(line(5), /clean, clearly visible cut in the first second to the new camera angle: ONE fixed angle/, 'vào nhà: cắt sang một góc cố định trong nhà');
+  assert.match(line(6), /ONE clear, clean cut in the first second to a new fixed angle/, 'trong nhà: sang chỗ khác trong phòng thì cắt một lần');
+  assert.match(line(19), /clean, clearly visible cut in the first second to the new camera angle: a WIDE, distant shot/, 'ra ngoài: cắt về cảnh rộng');
+  assert.match(line(20), /keeping exactly the framing/);
+  assert.doesNotMatch(P.clipPrompt(house, hs[at(5)], at(5) + 1, hs.length), /camera follows/);
+  const inside = P.options({ theme: 'house_in', minutes: 5 }), is = P.stepsOf(inside);
+  assert.match(shotOf(inside, is[0], 1, is.length), /ONE fixed angle chosen so the whole action is clearly visible/);
   const fixed = P.options({ theme: 'cabin', minutes: 2, camera: 'fixed' });
   const prompt = P.clipPrompt(fixed, P.stepsOf(fixed)[0], 1, 15, { first: true });
   assert.doesNotMatch(prompt, /SHOT:/);
   assert.match(prompt, /one fixed camera on a tripod/);
 });
 
+test('cảm xúc và sức lực: việc nặng thì thở mạnh, đổ mồ hôi, lau mặt; càng về cuối càng mệt; không lộ mặt thì chỉ dùng dáng người; không có người thì không có dòng này', () => {
+  const c = P.options({ theme: 'cabin', minutes: 5 }), steps = P.stepsOf(c), total = steps.length;
+  const line = (cfg, st, n, t = total) => (P.clipPrompt(cfg, st, n, t).split('\n').find(l => l.startsWith('Emotion and effort')) || '');
+  const heavy = steps.findIndex(s => /levels the ground with a shovel|cuts long straight poles/.test(s.en));
+  assert.ok(heavy >= 0);
+  const h = line(c, steps[heavy], heavy + 1);
+  assert.match(h, /HARD physical labour/);
+  assert.match(h, /sweat/);
+  assert.match(h, /wipe the sweat from the face/);
+  assert.match(h, /never by moving the camera to the face/);
+  assert.match(line(c, steps[heavy], 2), /just started/);
+  assert.match(line(c, steps[heavy], Math.round(total * 0.45)), /Several hours/);
+  assert.match(line(c, steps[heavy], Math.round(total * 0.8)), /Many hours/);
+  assert.match(line(c, steps[heavy], total), /almost done: exhausted/);
+  const calm = P.stepsOf(P.options({ theme: 'cabin', minutes: 5 })).find(s => /stands proudly/.test(s.en));
+  assert.match(line(c, calm, total), /relaxed, pleased expression/);
+  const faceless = P.options({ theme: 'cabin', minutes: 5, faceless: true });
+  assert.match(line(faceless, steps[heavy], 3), /with the body only/);
+  const noPerson = P.options({ theme: 'car', minutes: 5, person: false }), ns = P.stepsOf(noPerson);
+  assert.equal(line(noPerson, ns[0], 1), '', 'không có người thì không có dòng cảm xúc');
+  const withPerson = P.options({ theme: 'house_full', minutes: 5 });
+  const wp = P.stepsOf(withPerson);
+  assert.ok(withPerson.person, 'nhà có người làm');
+  assert.match(P.keyframePrompt(withPerson, wp[10], 10, wp.length), /sweaty, hair damp|soaked in sweat|fresh with a little sweat/);
+});
 
 test('chặn người nổi tiếng và nhân vật khi gõ chữ, không chặn chữ thường dùng', () => {
   for (const bad of ['poster of Donald Trump on the wall', 'Phòng khách giống ca sĩ Sơn Tùng', 'a Spider-Man toy', 'Elon Musk standing', 'Pikachu doll', 'Bác Hồ', 'looks like a famous actor', 'tổng thống']) {

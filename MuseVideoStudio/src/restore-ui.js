@@ -12,7 +12,7 @@
   const tr = (vi, en) => (lang() === 'vi' ? vi : en);
   const base = file => String(file || '').split(/[\\/]/).pop();
 
-  let theme = P.themeOf(saved.theme).id, photo = '', music = '', shownLang = '', runsKey = '', secsForced = false, secsBefore = '8';
+  let theme = P.themeOf(saved.theme).id, photo = '', music = '', shownLang = '', runsKey = '', wasBusy = false, secsForced = false, secsBefore = '8';
 
   // ---- ô chọn tĩnh
   function fillSelects() {
@@ -168,6 +168,18 @@
       runs.map(r => [r.id, r.list.map(j => j.status + (j.stage || '')), (stories[r.id] || {}).output || ''])]);
     if (key === runsKey) return;
     runsKey = key;
+    // Phần nhập dài chiếm hết màn hình: khi bắt đầu chạy thì thu gọn lại để thấy ngay tiến độ và hàng đợi (bấm «Tạo video mới» để mở lại).
+    const busyNow = Boolean(s.active || s.starting);
+    if (busyNow && !wasBusy) $('restoreForm').open = false;
+    wasBusy = busyNow;
+    const live = runs.find(r => r.list.some(j => ['pending', 'running', 'interrupted', 'failed'].includes(j.status)));
+    const runHint = $('restoreRunHint');
+    if (live) {
+      const clips = live.list.filter(j => j.phase === 'clip'), done = clips.filter(j => j.status === 'completed').length;
+      runHint.textContent = tr(`${busyNow ? 'Đang chạy' : 'Tạm dừng'} · ${done}/${clips.length} cảnh · ${Math.round(100 * live.list.filter(j => j.status === 'completed').length / Math.max(1, live.list.length))}%`,
+        `${busyNow ? 'Running' : 'Paused'} · ${done}/${clips.length} scenes · ${Math.round(100 * live.list.filter(j => j.status === 'completed').length / Math.max(1, live.list.length))}%`);
+    }
+    runHint.hidden = !live; $('restoreIdleHint').hidden = Boolean(live);
     $('restoreRuns').replaceChildren(...runs.map(({ id, list }) => {
       const meta = stories[id] || {}, clips = list.filter(j => j.phase === 'clip'), done = list.filter(j => j.status === 'completed').length;
       const failed = list.some(j => ['failed', 'interrupted'].includes(j.status)), running = list.some(j => j.status === 'running');

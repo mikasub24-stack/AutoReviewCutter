@@ -287,7 +287,11 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .imagePrefixControl input { display: block; width: 100%; margin-top: 4px; }
 
 /* Tab «Kể chuyện» */
-.storyOptions { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 14px; margin: 12px 0; align-items: end; }
+  .restoreFormBox > summary { cursor: pointer; font-size: 12px; font-weight: 600; color: #cbd7e9; padding: 4px 0 8px; }
+.storyOptions { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px 14px; margin: 10px 0; align-items: end; }
+#restoreFlowBox #flowHint { grid-column: 1 / -1; }
+#restoreFlowBox #flowProject { min-width: 0; }
+#restoreFlowBox > label:first-child { grid-column: span 2; }
 .storyOptions label { margin: 0; font-size: 11px; color: #a9bad1; }
 .storyOptions input[type=color] { height: 38px; padding: 3px 4px; cursor: pointer; }
 .storyOptions .sliderLabel { display: block; }

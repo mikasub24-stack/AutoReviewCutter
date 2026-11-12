@@ -17,7 +17,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.addInitScript(() => {
       localStorage.setItem('museStudio.language', localStorage.getItem('testLang') || 'vi');
       const s = {
-        version: '1.8.2', active: false, paused: true, jobs: [],
+        version: '1.8.3', active: false, paused: true, jobs: [],
         license: { status: 'active', plan: 'short', longTerm: false, device: 'TESTDEVICE', expiresAt: Date.now() + 86400000 * 30, message: 'Đã kích hoạt key.' },
         story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: false, clone: false }, platform: 'win32', edgeVoices: [], clones: [] } },
         restore: { busy: false, progress: '', error: '', storyId: '', stories: {} },
@@ -175,6 +175,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.equal((await calls('start')).at(-1).data.kind, 'restore');
     await page.evaluate(() => { window.s.active = true; window.s.paused = false; window.push(); });
     await page.waitForSelector('#restoreRuns button:has-text("Dừng")');
+    assert.equal(await page.locator('#restoreForm').evaluate(e => e.open), false, 'bắt đầu chạy thì khung nhập tự thu gọn, nút Dừng ở phần tiến độ vẫn thấy');
     await page.click('#restoreRuns button:has-text("Dừng")');
     await page.waitForFunction(() => window.calls.some(c => c.name === 'stop'));
     await page.evaluate(() => { window.s.active = false; window.s.paused = true; window.s.jobs[0].status = 'failed'; window.s.jobs[0].startedAt = new Date().toISOString(); window.push(); });
@@ -183,6 +184,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.waitForFunction(() => window.calls.filter(c => c.name === 'start').length >= 2);
     assert.equal((await calls('start')).at(-1).data.kind, 'restore');
     await page.evaluate(() => { window.s.jobs[0].status = 'pending'; window.push(); });
+    await page.evaluate(() => { document.getElementById('restoreForm').open = true; });
 
     // Thẻ chạy: tiến độ, nút dựng video khi đủ cảnh.
     await page.evaluate(() => { for (const j of window.s.jobs) { j.status = 'completed'; j.output = 'C:\\Videos\\DonNha\\Don-nha-1\\' + j.number + '.mp4'; } window.push(); });
@@ -263,6 +265,31 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.equal(await page.locator('#restoreSecs').isDisabled(), false, 'về Muse thì mở lại ô giây');
     await page.selectOption('#restoreAspect', '16:9');
     await page.selectOption('#restoreMinutes', '10');
+
+    // Bố cục gọn: các ô chọn nằm cùng hàng (không mỗi ô một hàng dài), và khung nhập tự thu gọn khi bắt đầu chạy.
+    const box = id => page.locator(id).evaluate(e => { const r = e.closest('label').getBoundingClientRect(); return { y: Math.round(r.top), w: Math.round(r.width) }; });
+    const [bMin, bProv, bWho] = [await box('#restoreMinutes'), await box('#restoreProvider'), await box('#restoreWho')];
+    assert.ok(Math.abs(bMin.y - bProv.y) <= 4 && Math.abs(bMin.y - bWho.y) <= 4, 'độ dài, nhà cung cấp, người trong video cùng một hàng: ' + JSON.stringify([bMin, bProv, bWho]));
+    assert.ok(bProv.w < 420 && bWho.w < 420, 'ô chọn không kéo dài hết chiều ngang');
+    assert.equal(await page.locator('#restoreForm').evaluate(e => e.open), true, 'chưa chạy thì khung nhập mở');
+    await page.evaluate(() => { window.s.jobs.length = 0; window.s.active = false; window.push(); });
+    await page.waitForFunction(() => document.getElementById('restoreRunHint').hidden === true);
+    assert.equal(await page.locator('#restoreRunHint').isVisible(), false);
+    if (process.env.SHOT) { await page.locator('#restorePanel').scrollIntoViewIfNeeded(); await page.screenshot({ path: process.env.SHOT + '-form.png' }); }
+    await page.evaluate(() => {
+      window.s.active = true;
+      window.s.jobs = [1, 2, 3, 4].map(n => ({ id: 'z' + n, kind: 'restore', storyId: 'Z1', phase: 'clip', number: n, title: 'c' + n, prompt: 'p', status: n < 3 ? 'completed' : n === 3 ? 'running' : 'pending', stage: 'pending' }));
+      window.s.settings.restoreStories = { Z1: {} }; window.s.restore.stories = { Z1: { name: 'Thử' } };
+      window.push();
+    });
+    await page.waitForFunction(() => document.getElementById('restoreForm').open === false);
+    assert.equal(await page.locator('#restoreRuns').isVisible(), true, 'phần tiến độ vẫn hiện khi thu gọn khung nhập');
+    assert.match(await page.locator('#restoreRunHint').textContent(), /Đang chạy · 2\/4 cảnh · 50%/);
+    assert.equal(await page.locator('#restoreIdleHint').isVisible(), false);
+    await page.evaluate(() => { window.s.active = false; window.s.jobs = []; window.s.restore.stories = {}; window.push(); });
+    if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT + '-running.png' });
+    await page.waitForFunction(() => document.getElementById('restoreRunHint').hidden === true);
+    await page.evaluate(() => { document.getElementById('restoreForm').open = true; });
 
     // Tiếng Anh: chữ động đổi theo ngôn ngữ.
     await page.evaluate(() => { localStorage.setItem('testLang', 'en'); });
