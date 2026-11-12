@@ -35,14 +35,14 @@
   // ---- cấu hình đang chọn
   function config() {
     return P.options({
-      theme, name: $('restoreName').value, parallel: $('restoreParallel').value, minutes: $('restoreMinutes').value, seconds: $('restoreSecs').value, aspect: $('restoreAspect').value, camera: $('restoreCamera').value, place: $('restorePlace').value,
+      theme, name: $('restoreName').value, provider: $('restoreProvider').value, parallel: $('restoreParallel').value, minutes: $('restoreMinutes').value, seconds: $('restoreSecs').value, aspect: $('restoreAspect').value, camera: $('restoreCamera').value, place: $('restorePlace').value,
       person: $('restorePerson').checked, who: $('restoreWho').value, personDesc: $('restorePersonDesc').value, light: $('restoreLight').value, anchor: $('restoreAnchor').checked, faceless: $('restoreFaceless').checked,
       customSteps: $('restoreCustom').value, lang: lang()
     });
   }
   function remember() {
     Object.assign(saved, {
-      theme, parallel: $('restoreParallel').value, minutes: Number($('restoreMinutes').value), seconds: Number($('restoreSecs').value), aspect: $('restoreAspect').value, camera: $('restoreCamera').value, place: $('restorePlace').value,
+      theme, provider: $('restoreProvider').value, parallel: $('restoreParallel').value, minutes: Number($('restoreMinutes').value), seconds: Number(secsForced ? secsBefore : $('restoreSecs').value), aspect: $('restoreAspect').value, camera: $('restoreCamera').value, place: $('restorePlace').value,
       person: $('restorePerson').checked, who: $('restoreWho').value, personDesc: $('restorePersonDesc').value, light: $('restoreLight').value, anchor: $('restoreAnchor').checked, faceless: $('restoreFaceless').checked,
       custom: $('restoreCustom').value, auto: $('restoreAuto').checked
     });
@@ -75,23 +75,35 @@
     $('restoreCustomLabel').hidden = t.id !== 'custom';
   }
   // Số tài khoản chạy song song thật sự (chế độ «Lần lượt» chỉ dùng 1).
-  const accountsNow = () => { const st = (typeof state !== 'undefined' && state && state.settings) || {}; return st.dispatchMode === 'parallel' ? Math.max(1, Number(st.accountCount) || 1) : 1; };
+  const settingsNow = () => (typeof state !== 'undefined' && state && state.settings) || {};
+  const isFlow = () => $('restoreProvider').value === 'flow';
+  const accountsNow = () => {
+    const st = settingsNow();
+    if (isFlow()) return Math.max(1, Math.min(6, Number($('flowParallel').value) || Number(st.flowParallel) || 3));
+    return st.dispatchMode === 'parallel' ? Math.max(1, Number(st.accountCount) || 1) : 1;
+  };
   function renderCount() {
-    const secs = $('restoreSecs'), long = Number($('restoreMinutes').value) >= P.LONG_MINUTES;
-    // Từ 20 phút ép 10 giây; đổi về số phút ngắn hơn thì trả lại số giây người dùng đã chọn.
-    if (long) { if (!secsForced) { secsBefore = secs.value; secsForced = true; } secs.value = '10'; }
+    const flow = isFlow(), secs = $('restoreSecs'), long = !flow && Number($('restoreMinutes').value) >= P.LONG_MINUTES;
+    // Từ 20 phút ép 10 giây (Flow luôn 8 giây); đổi lại thì trả về số giây người dùng đã chọn.
+    const forced = flow ? '8' : long ? '10' : '';
+    if (forced) { if (!secsForced) { secsBefore = secs.value; secsForced = true; } secs.value = forced; }
     else if (secsForced) { secs.value = secsBefore; secsForced = false; }
-    secs.disabled = long;
+    secs.disabled = Boolean(forced);
+    $('restoreFlowBox').hidden = !flow;
     const c = config(), n = P.clipCount(c), total = n * c.seconds, mins = (total / 60).toFixed(total % 60 ? 1 : 0);
-    let text = tr(`${n} cảnh × ${c.seconds} giây ≈ ${mins} phút. Các cảnh chạy lần lượt vì mỗi cảnh nối tiếp cảnh trước; thời gian tạo phụ thuộc Muse.`,
-      `${n} scenes × ${c.seconds} s ≈ ${mins} min. Scenes run one after another because each one continues from the previous; the time depends on Muse.`);
+    const credit = { lite: 5, fast: 10, quality: 100 }[$('flowModel').value] || 5;
+    let text = flow
+      ? tr(`${n} clip × 8 giây ≈ ${mins} phút, khoảng ${n * credit} tín dụng Flow (${credit} tín dụng mỗi clip, chưa tính ảnh mốc). Mỗi clip bắt đầu đúng từ khung hình cuối của clip trước. Chạy ${accountsNow()} clip cùng lúc trên một tài khoản Google.`,
+        `${n} clips × 8 s ≈ ${mins} min, about ${n * credit} Flow credits (${credit} per clip, key images not counted). Each clip starts exactly from the last frame of the previous one. Runs ${accountsNow()} clips at once on one Google account.`)
+      : tr(`${n} cảnh × ${c.seconds} giây ≈ ${mins} phút. Các cảnh chạy lần lượt vì mỗi cảnh nối tiếp cảnh trước; thời gian tạo phụ thuộc Muse.`,
+        `${n} scenes × ${c.seconds} s ≈ ${mins} min. Scenes run one after another because each one continues from the previous; the time depends on Muse.`);
     if (long) text += ' ' + tr('Từ 20 phút tool dùng cảnh 10 giây. Video rất dài có thể chạy nhiều giờ; tool tự thử lại cảnh lỗi nhưng hình có thể lệch dần, nên thử 1–3 phút trước.', 'From 20 minutes the tool uses 10-second scenes. A very long video can run for hours; the tool retries failed scenes by itself, but the picture can drift, so try 1–3 minutes first.');
-    if (Number($('restoreMinutes').value) >= P.VERY_LONG_MINUTES) text += ' ' + tr(`⚠ ${n} cảnh nối tiếp là rất nhiều: có thể chạy cả ngày hoặc nhiều ngày, tốn khoảng ${Math.ceil(n * 12 / 1024 * 10) / 10} GB ổ đĩa (tạm tính 12 MB mỗi cảnh) và nhiều lượt Muse. Hình càng về sau càng dễ lệch; nên thử 1–3 phút trước, hoặc làm nhiều video ngắn rồi ghép.`, `⚠ ${n} chained scenes is a lot: it can run for a day or several days, uses about ${Math.ceil(n * 12 / 1024 * 10) / 10} GB of disk (roughly 12 MB per scene) and many Muse credits. The picture drifts more and more; try 1–3 minutes first, or make several short videos and join them.`);
+    if (Number($('restoreMinutes').value) >= P.VERY_LONG_MINUTES) text += ' ' + tr(`⚠ ${n} cảnh nối tiếp là rất nhiều: có thể chạy cả ngày hoặc nhiều ngày, tốn khoảng ${Math.ceil(n * 12 / 1024 * 10) / 10} GB ổ đĩa (tạm tính 12 MB mỗi cảnh) và nhiều lượt tạo. Hình càng về sau càng dễ lệch; nên thử 1–3 phút trước, hoặc làm nhiều video ngắn rồi ghép.`, `⚠ ${n} chained scenes is a lot: it can run for a day or several days, uses about ${Math.ceil(n * 12 / 1024 * 10) / 10} GB of disk (roughly 12 MB per scene) and many generation credits. The picture drifts more and more; try 1–3 minutes first, or make several short videos and join them.`);
     else if (n > 30) text += ' ' + tr('Video dài: càng nhiều cảnh nối tiếp thì hình càng dễ lệch dần, nên thử 1–3 phút trước.', 'Long video: the more chained scenes, the more the picture can drift; try 1–3 minutes first.');
     const segs = P.segmentsOf(c, accountsNow()).length;
-    if (segs > 1) text += ' ' + tr(`Chạy song song ${segs} đoạn trên ${segs} tài khoản (mỗi đoạn khoảng ${Math.ceil(n / segs)} cảnh nối tiếp), nhanh hơn khoảng ${segs} lần. Chỗ nối giữa các đoạn dựng từ ảnh mốc Muse tạo nên nhà và người ở chỗ nối có thể hơi khác một chút (tool làm mờ nhẹ chỗ nối). Chọn «1 chuỗi» nếu cần đồng nhất tuyệt đối.`,
-      `Runs ${segs} parts in parallel on ${segs} accounts (about ${Math.ceil(n / segs)} chained scenes each), roughly ${segs}× faster. The joins between parts are built from key images made by Muse, so the house and the person can look slightly different at a join (the tool fades the join). Choose “1 chain” if you need perfect consistency.`);
-    else if (accountsNow() > 1 && n >= P.MIN_SEGMENT * 2) text += ' ' + tr('Đang chạy 1 chuỗi nên chỉ dùng 1 tài khoản mỗi lần: rất chậm với video dài.', 'Running a single chain, so only one account is used at a time: very slow for long videos.');
+    if (segs > 1) text += ' ' + tr(`Chạy song song ${segs} đoạn trên ${segs} ${flow ? 'luồng Flow' : 'tài khoản'} (mỗi đoạn khoảng ${Math.ceil(n / segs)} cảnh nối tiếp), nhanh hơn khoảng ${segs} lần. Chỗ nối giữa các đoạn dựng từ ảnh mốc ${flow ? 'Flow' : 'Muse'} tạo nên nhà và người ở chỗ nối có thể hơi khác một chút (tool làm mờ nhẹ chỗ nối). Chọn «1 chuỗi» nếu cần đồng nhất tuyệt đối.`,
+      `Runs ${segs} parts in parallel on ${segs} ${flow ? 'Flow lanes' : 'accounts'} (about ${Math.ceil(n / segs)} chained scenes each), roughly ${segs}× faster. The joins between parts are built from key images made by ${flow ? 'Flow' : 'Muse'}, so the house and the person can look slightly different at a join (the tool fades the join). Choose “1 chain” if you need perfect consistency.`);
+    else if (!flow && accountsNow() > 1 && n >= P.MIN_SEGMENT * 2) text += ' ' + tr('Đang chạy 1 chuỗi nên chỉ dùng 1 tài khoản mỗi lần: rất chậm với video dài.', 'Running a single chain, so only one account is used at a time: very slow for long videos.');
     const names = P.screenConfig(c);
     if (names.length) text += ' ' + (P.problems(c, { hasPhoto: Boolean(photo) }).pop() || '');
     $('restoreCount').textContent = text;
@@ -103,7 +115,7 @@
 
   // ---- ảnh gốc, nhạc nền
   function renderPhoto() {
-    $('restorePhotoName').textContent = photo ? base(photo) : tr('Chưa chọn. Muse sẽ tạo ảnh gốc từ mô tả bên dưới.', 'None chosen. Muse will create the first image from the description below.');
+    $('restorePhotoName').textContent = photo ? base(photo) : tr(`Chưa chọn. ${isFlow() ? 'Flow' : 'Muse'} sẽ tạo ảnh gốc từ mô tả bên dưới.`, `None chosen. ${isFlow() ? 'Flow' : 'Muse'} will create the first image from the description below.`);
     $('restorePhotoClear').hidden = !photo;
     const img = $('restorePhotoPreview');
     if (photo && typeof localFileUrl === 'function') { img.src = localFileUrl(photo); img.hidden = false; } else { img.removeAttribute('src'); img.hidden = true; }
@@ -122,12 +134,16 @@
     const c = config();
     const problems = P.problems(c, { hasPhoto: Boolean(photo) });
     if (problems.length) { toast(problems[0]); return; }
+    if (c.provider === 'flow') {
+      if (!FLOW_URL_RE.test($('flowProject').value.trim())) { toast(tr('Dán đường dẫn dự án Flow vào ô «Đường dẫn dự án Flow» trước (tạo một dự án trống trong Flow rồi copy địa chỉ).', 'Paste your Flow project address first (create an empty project in Flow and copy its address).')); $('flowProject').focus(); return; }
+      if (!(await saveFlow())) return;
+    }
     remember();
     const accounts = accountsNow();
     const jobs = P.buildJobs(c, { storyId: 'x', photo, accounts });
     $('restoreCreate').disabled = true;
     try {
-      const result = await call('restoreCreate', { jobs, idBase: P.storyIdBase(c), meta: { name: P.videoTitle(c), aspect: c.aspect, music, seams: P.seamsOf(c, accounts), auto: $('restoreAuto').checked, theme } });
+      const result = await call('restoreCreate', { jobs, idBase: P.storyIdBase(c), meta: { name: P.videoTitle(c), provider: c.provider, aspect: c.aspect, music, seams: P.seamsOf(c, accounts), auto: $('restoreAuto').checked, theme } });
       if (result) {
         toast(result.startError
           ? tr('Đã thêm các cảnh nhưng chưa chạy được: ', 'Scenes added but could not start: ') + result.startError
@@ -169,7 +185,7 @@
       else if (builtErr) { text.textContent = tr('Dựng video lỗi: ', 'Video build failed: ') + info.error; text.classList.add('warn'); }
       else if (meta.output) text.textContent = tr('Video hoàn chỉnh: ', 'Finished video: ') + base(meta.output);
       else if (failed) { text.textContent = tr('Có cảnh dở hoặc lỗi. Sửa rồi bấm «Tiếp tục hàng đợi»: các cảnh sau chỉ chạy khi cảnh trước đã xong.', 'A scene is unfinished or failed. Fix it and click “Continue queue”: later scenes only run after the earlier ones are done.'); text.classList.add('warn'); }
-      else if (running || s.active || s.starting) text.textContent = tr('Đang tạo các cảnh nối tiếp nhau trên Muse…', 'Creating the connected scenes on Muse…');
+      else if (running || s.active || s.starting) text.textContent = list.some(j => j.provider === 'flow') ? tr('Đang tạo các cảnh nối tiếp nhau trên Google Flow…', 'Creating the connected scenes on Google Flow…') : tr('Đang tạo các cảnh nối tiếp nhau trên Muse…', 'Creating the connected scenes on Muse…');
       else if (allClips) text.textContent = tr('Đã đủ cảnh. Bấm «Dựng video» để dựng.', 'All scenes are ready. Click “Build video”.');
       else text.textContent = tr('Chờ chạy. Bấm «Chạy hàng đợi» ở dưới.', 'Waiting. Click “Run queue” below.');
       const actions = document.createElement('div'); actions.className = 'restoreRunActions';
@@ -218,13 +234,45 @@
     $('restoreLockText').textContent = tr('Bản dùng thử và gói 30 ngày không dùng được tab này. Nâng cấp lên gói Năm hoặc Vĩnh viễn rồi nhập key mới.', 'The trial and the 30-day plan cannot use this tab. Upgrade to the Year or Lifetime plan and enter the new key.');
   }
 
+  function syncFlowFields(s) {
+    const st = s.settings || {};
+    if (document.activeElement !== $('flowProject') && !flowTimer) $('flowProject').value = st.flowProjectUrl || '';
+    if (document.activeElement !== $('flowModel')) $('flowModel').value = ['lite', 'fast', 'quality'].includes(st.flowModel) ? st.flowModel : 'lite';
+    if (document.activeElement !== $('flowParallel')) $('flowParallel').value = String(st.flowParallel || 3);
+  }
+
   function render(s) {
     if (!s) return;
     if (shownLang !== lang()) { shownLang = lang(); fillSelects(); renderThemes(); syncTheme(); renderPhoto(); renderMusic(); runsKey = ''; }
     renderLock(s);
+    syncFlowFields(s);
     renderCount();
     renderRuns(s);
+    renderFlowHint(s);
   }
+
+  // ---- Google Flow: lưu cài đặt, trạng thái cửa sổ Flow
+  const FLOW_URL_RE = /^https:\/\/flow\.google\.com\/(?:[a-z-]+\/)?project\/[\w-]+/i;
+  function renderFlowHint(s) {
+    const open = Boolean(s && s.flow && s.flow.open);
+    const url = $('flowProject').value.trim();
+    let text;
+    if (!url) text = tr('Bước 1: mở Flow, tạo một dự án trống, copy đường dẫn trên thanh địa chỉ rồi dán vào ô trên.', 'Step 1: open Flow, create an empty project, copy its address and paste it above.');
+    else if (!FLOW_URL_RE.test(url)) text = tr('Đường dẫn phải dạng https://flow.google.com/project/…', 'The address must look like https://flow.google.com/project/…');
+    else if (!open) text = tr('Bước 2: bấm «Mở Flow để đăng nhập Google» (chỉ cần đăng nhập một lần), rồi quay lại đây bấm «Tạo và chạy tự động». Nên thử 1–2 cảnh trước.', 'Step 2: click “Open Flow to sign in to Google” (once only), then come back and press “Create and run automatically”. Try 1–2 scenes first.');
+    else text = tr('Cửa sổ Flow đang mở. Đừng đóng cửa sổ đó khi đang chạy; dùng máy bình thường được.', 'The Flow window is open. Do not close it while running; you can keep using the computer.');
+    $('flowHint').textContent = text;
+    $('flowOpen').disabled = !FLOW_URL_RE.test(url) || Boolean(s && s.flow && s.flow.opening);
+  }
+  let flowTimer = 0;
+  const flowForm = () => ({ flowProjectUrl: $('flowProject').value.trim(), flowModel: $('flowModel').value, flowParallel: Number($('flowParallel').value) });
+  async function saveFlow() {
+    const data = flowForm();
+    if (data.flowProjectUrl && !FLOW_URL_RE.test(data.flowProjectUrl)) { renderFlowHint(); return false; }
+    try { const fresh = await call('flowSettings', data); renderFlowHint(fresh || undefined); return true; }
+    catch (e) { toast(String((e && e.message) || e)); return false; }
+  }
+  const saveFlowSoon = () => { clearTimeout(flowTimer); flowTimer = setTimeout(() => { flowTimer = 0; saveFlow(); }, 500); };
 
   // ---- khởi tạo
   fillSelects();
@@ -232,6 +280,7 @@
   $('restoreCamera').value = saved.camera === 'fixed' ? 'fixed' : 'varied';
   $('restorePlace').value = saved.place || '';
   $('restorePerson').checked = saved.person !== false;
+  $('restoreProvider').value = P.PROVIDERS.includes(saved.provider) ? saved.provider : 'muse';
   $('restoreWho').value = P.WHO.includes(saved.who) ? saved.who : 'female';
   $('restorePersonDesc').value = saved.personDesc || '';
   $('restoreLight').value = saved.light || '';
@@ -242,8 +291,17 @@
   shownLang = lang();
   renderThemes(); syncTheme(); renderPhoto(); renderMusic(); renderCount();
 
-  for (const id of ['restoreMinutes', 'restoreParallel', 'restoreSecs', 'restoreAspect', 'restoreCamera', 'restorePerson', 'restoreWho', 'restoreFaceless', 'restoreAnchor', 'restoreAuto']) $(id).onchange = () => { remember(); renderCount(); };
+  for (const id of ['restoreProvider', 'restoreMinutes', 'restoreParallel', 'restoreSecs', 'restoreAspect', 'restoreCamera', 'restorePerson', 'restoreWho', 'restoreFaceless', 'restoreAnchor', 'restoreAuto']) $(id).onchange = () => { remember(); renderCount(); };
   for (const id of ['restorePlace', 'restorePersonDesc', 'restoreLight', 'restoreCustom']) $(id).oninput = () => { remember(); renderCount(); };
+  $('restoreProvider').addEventListener('change', renderPhoto);
+  $('flowProject').oninput = () => { renderFlowHint(); saveFlowSoon(); };
+  $('flowProject').onchange = () => { clearTimeout(flowTimer); flowTimer = 0; saveFlow(); };
+  for (const id of ['flowModel', 'flowParallel']) $(id).onchange = async () => { await saveFlow(); renderCount(); };
+  $('flowOpen').onclick = async () => {
+    if (!(await saveFlow())) return;
+    $('flowOpen').disabled = true;
+    try { const fresh = await call('flowOpen'); if (fresh) render(fresh); } catch (e) { toast(String((e && e.message) || e)); } finally { renderFlowHint(); }
+  };
   $('restorePhoto').onclick = async () => { const list = await call('images', { multiple: false }); if (list && list[0]) { photo = list[0]; renderPhoto(); } };
   $('restorePhotoClear').onclick = () => { photo = ''; renderPhoto(); };
   $('restoreMusic').onclick = async () => { const file = await call('chooseMusic'); if (file) { music = file; renderMusic(); } };

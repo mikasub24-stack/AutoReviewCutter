@@ -12,9 +12,12 @@
   const MAX_PARALLEL = 10;                              // tối đa 10 tài khoản / trình duyệt
   const MIN_SEGMENT = 6;                                // mỗi đoạn chạy song song có ít nhất 6 cảnh (ngắn hơn thì chỉ thêm chỗ nối, không nhanh thêm)
   const MAX_CLIPS = 720;                                // 120 phút ÷ 10 giây
+  const MAX_CLIPS_FLOW = 900;                           // Google Flow (Veo 3.1): mỗi clip 8 giây → 120 phút = 900 clip
+  const PROVIDERS = ['muse', 'flow'];
   const SECONDS = [5, 6, 8, 10];
   const MAX_SECONDS = 10;
   const MAX_CUSTOM = 20;
+  const NO_SPEECH_FLOW = 'Audio: only the quiet natural sounds of the work itself (brushing, sweeping, water, tools); no speech, no dialogue, no singing, no narration, no music.';
   const NO_SPEECH = 'Audio: no speech, no dialogue, no singing, no narration, no music, no sound effects, no ambient noise - the video must be completely silent with no audio at all.';
   // Muse từ chối video có người thật / người nổi tiếng / nhân vật có bản quyền («blocked by policy»). Mọi prompt đều nói rõ người trong cảnh là người vô danh, hư cấu.
   // Đồng nhất là điều quan trọng nhất: mọi prompt lặp nguyên văn danh sách «không được đổi».
@@ -260,13 +263,14 @@
     const theme = themeOf(input.theme);
     const minutes = MINUTES.includes(Number(input.minutes)) ? Number(input.minutes) : 2;
     const seconds = SECONDS.includes(Number(input.seconds)) ? Number(input.seconds) : 8;
+    const provider = input.provider === 'flow' ? 'flow' : 'muse';   // flow = Google Flow (Veo 3.1): mỗi clip đúng 8 giây
     const person = theme.person ? true : input.person !== false;      // luôn có người làm việc (mặc định bật; sinh tồn không tắt được), nếu không việc dọn tự xảy ra nhìn rất giả
     const custom = String(input.customSteps == null ? '' : input.customSteps).split(/\r?\n/).map(s => clean(s, 200)).filter(Boolean).slice(0, MAX_CUSTOM);
     return {
       theme: theme.id,
       name: clean(input.name, 80),
       place: clean(input.place, 300),
-      minutes, seconds: minutes >= LONG_MINUTES ? MAX_SECONDS : Math.min(MAX_SECONDS, seconds),
+      provider, minutes, seconds: provider === 'flow' ? 8 : minutes >= LONG_MINUTES ? MAX_SECONDS : Math.min(MAX_SECONDS, seconds),
       aspect: ASPECTS.includes(input.aspect) ? input.aspect : '16:9',
       person, who: WHO.includes(input.who) ? input.who : 'female', personDesc: clean(input.personDesc, 300) || personFor(theme, WHO.includes(input.who) ? input.who : 'female'),
       lang: input.lang === 'en' ? 'en' : 'vi',
@@ -280,7 +284,7 @@
   }
 
   // Số cảnh = số phút ÷ số giây mỗi cảnh (làm tròn lên, tối thiểu 2).
-  const clipCount = config => Math.max(2, Math.min(MAX_CLIPS, Math.ceil(config.minutes * 60 / config.seconds)));
+  const clipCount = config => Math.max(2, Math.min(config.provider === 'flow' ? MAX_CLIPS_FLOW : MAX_CLIPS, Math.ceil(config.minutes * 60 / config.seconds)));
 
   // Chia việc cho từng cảnh. Chủ đề có sẵn có 15 việc nối tiếp: ít cảnh hơn thì chọn đều (luôn có việc đầu và việc cuối), nhiều cảnh hơn thì mỗi việc kéo dài qua vài cảnh liên tiếp
   // («phần 2/3»: tiếp tục chính việc đó). Chủ đề tự nhập: dùng các dòng người dùng ghi (nếu có), không thì mỗi cảnh là một mức hoàn thành cao hơn của cả công trình.
@@ -393,7 +397,7 @@
       'Realism: it must look like a real person really doing this job. Natural human movement, real weight and real physics. Every change in the scene is made visibly by the person with their own hands and real tools; nothing ever changes by itself, by magic or by a cut.',
       'Continuity: the attached image shows the exact current state. Keep the same place, the same viewpoint, the same lighting and everything already done exactly as in the image. Do not add, remove, move or change anything except what this step does. Do not cut to another scene.',
       first ? '' : 'This clip continues directly from the previous clip without any jump: the person keeps the same pose, the same tool in the hands and the same movement as in the attached frame, and goes on working.',
-      NO_SPEECH,
+      config.provider === 'flow' ? NO_SPEECH_FLOW : NO_SPEECH,
       'No text, captions, logos or watermarks in the video.'
     ].filter(Boolean).join('\n');
   }
@@ -493,7 +497,7 @@
     const steps = stepsOf(config), total = steps.length, jobs = [];
     const starts = segmentsOf(config, accounts), startSet = new Set(starts.slice(1));
     const source = photo ? { file: photo } : { phase: 'image', number: 1 };
-    const base = photo ? null : { kind: 'restore', storyId, phase: 'image', number: 1, title: config.lang === 'en' ? 'Original photo' : 'Ảnh gốc', prompt: baseImagePrompt(config), references: [] };
+    const base = photo ? null : { kind: 'restore', storyId, phase: 'image', number: 1, title: config.lang === 'en' ? 'Original photo' : 'Ảnh gốc', prompt: baseImagePrompt(config), references: [], ...(config.provider === 'flow' ? { provider: 'flow', aspect: config.aspect } : {}) };
     if (base) jobs.push(base);
     steps.forEach((step, i) => {
       const number = i + 1;
@@ -510,7 +514,7 @@
       if (config.anchor && number > 1 && !startSet.has(i)) prompt += '\nThe second attached image is only a reference of the ORIGINAL place and person: keep the architecture, the viewpoint and the person\'s face and clothes consistent with it, but the video itself must start from the FIRST attached image and show the progress already made.';
       jobs.push({
         kind: 'restore', storyId, phase: 'clip', number, title: step.title, prompt, durationSeconds: config.seconds,
-        references: [], needs, refList
+        references: [], needs, refList, ...(config.provider === 'flow' ? { provider: 'flow', aspect: config.aspect } : {})
       });
     });
     // Ảnh mốc (nằm sau các cảnh trong hàng đợi để đoạn đầu được ưu tiên): mỗi đoạn song song từ đoạn thứ 2 có một ảnh mốc làm từ ảnh gốc.
@@ -518,7 +522,7 @@
       jobs.push({
         kind: 'restore', storyId, phase: 'image', number: k + 2, title: (config.lang === 'en' ? 'Part start ' : 'Mốc đoạn ') + (k + 2),
         prompt: keyframePrompt(config, steps[clipIndex], clipIndex, total), references: [],
-        needs: photo ? [] : [{ phase: 'image', number: 1 }], refList: [{ ...source }]
+        needs: photo ? [] : [{ phase: 'image', number: 1 }], refList: [{ ...source }], ...(config.provider === 'flow' ? { provider: 'flow', aspect: config.aspect } : {})
       });
     });
     return jobs;
@@ -528,5 +532,5 @@
   function storyIdBase(config) { return slug(config.name) || slug(themeOf(config.theme).label) || 'DonNha'; }
   function videoTitle(config) { return config.name || text(config.theme, config.lang).label; }
 
-  return { ASPECTS, MINUTES, LONG_MINUTES, VERY_LONG_MINUTES, SECONDS, MAX_CLIPS, clipCount, THEMES, EN, text, themeOf, options, stepsOf, sceneBible, baseImagePrompt, clipPrompt, segmentsOf, seamsOf, keyframePrompt, MAX_PARALLEL, MIN_SEGMENT, problems, screenText, screenConfig, isPolicyError, safeRetryPrompt, buildJobs, storyIdBase, videoTitle, SURVIVOR, WORKER, SURVIVOR_F, WORKER_F, PHOTO_PERSON, WHO, personFor, DEFAULT_LIGHT };
+  return { ASPECTS, MINUTES, LONG_MINUTES, VERY_LONG_MINUTES, SECONDS, MAX_CLIPS, clipCount, THEMES, EN, text, themeOf, options, stepsOf, sceneBible, baseImagePrompt, clipPrompt, segmentsOf, seamsOf, keyframePrompt, PROVIDERS, MAX_CLIPS_FLOW, MAX_PARALLEL, MIN_SEGMENT, problems, screenText, screenConfig, isPolicyError, safeRetryPrompt, buildJobs, storyIdBase, videoTitle, SURVIVOR, WORKER, SURVIVOR_F, WORKER_F, PHOTO_PERSON, WHO, personFor, DEFAULT_LIGHT };
 });

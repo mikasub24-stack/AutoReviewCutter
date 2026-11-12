@@ -334,3 +334,24 @@ test('«Giống người trong ảnh gốc»: bắt buộc có ảnh, prompt gi�
   assert.match(jobs[0].prompt, /same single person who appears in the attached reference photo/);
   assert.ok(P.screenConfig(c).length === 0, 'mô tả theo ảnh không bị coi là tên người nổi tiếng');
 });
+
+test('Google Flow: luôn clip 8 giây, 120 phút = 900 clip, job mang provider/aspect, không lời thoại, mặc định là Muse', () => {
+  assert.equal(P.options({ theme: 'cabin' }).provider, 'muse');
+  assert.equal(P.options({ theme: 'cabin', provider: 'lạ' }).provider, 'muse');
+  assert.deepEqual(P.PROVIDERS, ['muse', 'flow']);
+  const f = extra => P.options({ theme: 'house_full', provider: 'flow', ...extra });
+  assert.equal(f({ minutes: 20, seconds: 5 }).seconds, 8, 'Flow ép 8 giây, kể cả từ 20 phút');
+  assert.equal(P.clipCount(f({ minutes: 1 })), 8);
+  assert.equal(P.clipCount(f({ minutes: 20 })), 150);
+  assert.equal(P.clipCount(f({ minutes: 120 })), 900);
+  assert.equal(P.clipCount(P.options({ theme: 'house_full', minutes: 120 })), 720, 'Muse vẫn 720');
+  const cfg = f({ minutes: 5, aspect: '9:16' });
+  const jobs = P.buildJobs(cfg, { storyId: 's', photo: '', accounts: 3 });
+  assert.ok(jobs.length > 38 && jobs.every(j => j.provider === 'flow' && j.aspect === '9:16'), 'mọi job (ảnh, clip) đều chạy bằng Flow');
+  const clips = jobs.filter(j => j.phase === 'clip');
+  assert.equal(clips.length, 38);
+  assert.match(clips[1].prompt, /no speech, no dialogue, no singing, no narration, no music/);
+  assert.deepEqual(clips[1].needs, [{ phase: 'clip', number: 1 }], 'vẫn nối bằng khung cuối của clip trước');
+  const museJobs = P.buildJobs(P.options({ theme: 'house_full', minutes: 5 }), { storyId: 's', photo: '', accounts: 3 });
+  assert.ok(museJobs.every(j => !j.provider), 'Muse: không gắn provider');
+});

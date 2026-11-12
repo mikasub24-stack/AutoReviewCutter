@@ -1,0 +1,71 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Fake Flow</title>
+<style>
+body{margin:0;background:#000;color:#fff;font:14px sans-serif;width:1280px;height:800px}
+header{position:absolute;left:0;top:0;width:1280px;height:60px}
+nav{position:absolute;left:0;top:70px;width:200px}
+#grid{position:absolute;left:260px;top:80px;width:900px;display:flex;flex-wrap:wrap;gap:12px}
+.tile{width:300px;height:180px;border:1px solid #444;position:relative;background:#222}
+.tile button{visibility:hidden;position:absolute;right:4px;top:4px}
+.tile:hover button{visibility:visible}
+#bar{position:absolute;left:300px;top:700px;width:660px;height:96px;border:1px solid #666}
+#menu,#dlg,#cm,#sub,#modelList{display:none;position:absolute;background:#222;border:1px solid #555;padding:6px}
+#menu{left:420px;top:380px;width:300px}#dlg{left:140px;top:140px;width:700px;height:520px}#cm{width:200px}#sub{width:140px}
+.slot{display:inline-block;width:50px;height:50px;border:1px solid #888}.slot.filled{background:#363}
+[role=textbox]{display:block;min-height:24px;margin:4px;outline:1px solid #333}
+</style></head><body>
+<header><button>ULTRA</button><button>more_vert</button></header>
+<nav><div>Tất cả</div><div>Hình ảnh</div><div>Video</div></nav>
+<div id="grid"></div>
+<div id="bar">
+ <div id="slots"><span class="slot" id="slotStart">Bắt đầu</span> <span>swap_horiz</span> <span class="slot" id="slotEnd">Kết thúc</span></div>
+ <button id="addBtn" style="display:none"><span>add</span></button>
+ <div role="textbox" class="ProseMirror" contenteditable="true" data-ph="Bạn muốn tạo những gì?"></div>
+ <button id="settings"><span id="smode">Video</span> · 720p · <span id="ssec">8 giây</span> <span>crop_16_9</span> <span id="sx">x1</span></button>
+ <button type="submit" id="go"><span>arrow_forward</span></button>
+</div>
+<div id="menu">
+ <div><button>Hình ảnh</button><button>Video</button></div>
+ <div id="modes"><button>Khung hình</button><button>Thành phần</button></div>
+ <div><button>16:9</button><button>9:16</button></div>
+ <div id="model">Veo 3.1 - Lite</div>
+ <div id="durs"><button>4 giây</button><button>6 giây</button><button>8 giây</button></div>
+ <div><button>x1</button><button>x2</button><button>x3</button><button>x4</button></div>
+ <div>Quá trình tạo sẽ tốn 5 tín dụng</div>
+</div>
+<div id="modelList"><div>Veo 3.1 - Lite</div><div>Veo 3.1 - Fast</div><div>Veo 3.1 - Quality</div></div>
+<div id="dlg"><div id="dtitle">Chọn một hình ảnh khung</div><div id="dlist"></div><div id="prev"></div><button id="addp" style="display:none">Thêm vào câu lệnh</button><button id="upl">Tải nội dung ...</button><input type="file" id="file" style="display:none"></div>
+<div id="cm"><div id="cmdl">Tải xuống</div><div>Sao chép</div></div>
+<div id="sub"><div class="opt"><span>270p</span><small>Ảnh GIF động</small></div><div class="opt"><span>720p</span><small>Kích thước gốc</small></div><div class="opt"><span>1080p</span><small>Đã tăng độ phân giải</small></div><div class="opt"><span>4K</span><small>Đã tăng độ phân giải · 50 tín dụng</small></div></div>
+<script>
+const $=id=>document.getElementById(id);
+window.state={mode:'video',frames:true,model:'Veo 3.1 - Lite',filled:false,count:0,log:[],opener:null,selected:false};
+function refresh(){ $('slots').style.display=state.mode==='video'&&state.frames?'block':'none'; $('addBtn').style.display=state.mode==='image'||(state.mode==='video'&&!state.frames)?'inline-block':'none'; $('smode').textContent=state.mode==='video'?'Video':'Hình ảnh'; $('go').disabled=!(state.filled||state.mode==='image')||!$('bar').querySelector('[role=textbox]').innerText.trim(); }
+setInterval(refresh,100);
+$('settings').onclick=()=>{$('menu').style.display=$('menu').style.display==='block'?'none':'block'};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('menu').style.display='none';$('modelList').style.display='none';$('cm').style.display='none';$('sub').style.display='none';}});
+$('menu').addEventListener('click',e=>{const t=e.target.textContent.trim();
+ if(e.target.tagName==='BUTTON'){ if(t==='Hình ảnh'){state.mode='image';} if(t==='Video'){state.mode='video';} if(t==='Khung hình'){state.frames=true;} if(t==='Thành phần'){state.frames=false;} state.log.push('menu:'+t); if(/giây/.test(t))$('ssec').textContent=t; if(/^x\d$/.test(t))$('sx').textContent=t; }
+ if(e.target.id==='model'){$('modelList').style.display='block';$('modelList').style.left='430px';$('modelList').style.top='520px';}
+});
+$('modelList').addEventListener('click',e=>{state.model=e.target.textContent.trim();$('model').textContent=state.model;$('modelList').style.display='none';state.log.push('model:'+state.model)});
+function openDlg(opener){state.opener=opener;state.selected=false;$('addp').style.display='none';$('prev').innerHTML='';$('dlg').style.display='block';$('dtitle').textContent=opener==='slot'?'Chọn một hình ảnh khung':'Thêm thành phần vào dự án';}
+$('slotStart').onclick=()=>openDlg('slot');$('addBtn').onclick=()=>openDlg('ref');
+$('upl').onclick=()=>$('file').click();
+$('file').onchange=()=>{const f=$('file').files[0];if(!f)return;state.log.push('upload:'+f.name);setTimeout(()=>{const d=document.createElement('div');d.className='asset';const i=document.createElement('img');i.src=URL.createObjectURL(f);i.width=60;i.height=40;d.appendChild(i);d.appendChild(document.createTextNode(f.name));i.onclick=()=>{state.selected=true;$('addp').style.display='block';$('prev').textContent='preview '+f.name};$('dlist').prepend(d);},400);};
+$('addp').onclick=()=>{ if(state.opener==='slot'){state.filled=true;$('slotStart').classList.add('filled');} $('dlg').style.display='none';state.log.push('added:'+state.opener);};
+$('go').onclick=()=>{
+ const text=$('bar').querySelector('[role=textbox]').innerText;state.count++;const n=state.count;state.log.push('submit:'+text.slice(0,30)+':'+state.model+':'+$('ssec').textContent+':'+state.mode);
+ const t=document.createElement('div');t.className='tile';t.dataset.n=n;t.innerHTML='<span class="pct">0%</span><button>more_vert</button>';$('grid').prepend(t);
+ $('bar').querySelector('[role=textbox]').innerText='';state.filled=false;$('slotStart').classList.remove('filled');
+ let p=0;const iv=setInterval(()=>{p+=25;if(/BLOCKME/.test(text)&&p>=50){clearInterval(iv);t.querySelector('.pct').outerHTML='<span>Không thể tạo video này: vi phạm chính sách</span>';return;}
+  if(p<100){t.querySelector('.pct').textContent=p+'%';return;} clearInterval(iv);
+  const old=t.querySelector('.pct');old.remove();
+  if(state.mode==='image'){const im=document.createElement('img');im.src='/img.png';im.width=280;im.height=160;t.prepend(im);}
+  else{const v=document.createElement('video');v.src='/clip'+n+'.mp4';v.width=280;v.height=160;v.muted=true;t.prepend(v);}
+  const ti=document.createElement('div');ti.textContent='Tạo cảnh '+n;t.appendChild(ti);},250);
+};
+$('grid').addEventListener('click',e=>{ if(e.target.tagName==='BUTTON'&&e.target.textContent==='more_vert'){const r=e.target.getBoundingClientRect();$('cm').style.display='block';$('cm').style.left=(r.left+10)+'px';$('cm').style.top=(r.bottom+4)+'px';window.cmTile=e.target.closest('.tile').dataset.n;}});
+$('cmdl').onmouseenter=$('cmdl').onclick=()=>{const r=$('cmdl').getBoundingClientRect();$('sub').style.display='block';$('sub').style.left=(r.right+6)+'px';$('sub').style.top=r.top+'px';};
+$('sub').addEventListener('click',e=>{const opt=e.target.closest('.opt');if(!opt)return;const t=opt.querySelector('span').textContent;state.log.push('dl:'+t+':'+window.cmTile);$('cm').style.display='none';$('sub').style.display='none';
+ if(t==='720p'){const isImg=document.querySelector('.tile[data-n="'+window.cmTile+'"] img');const a=document.createElement('a');a.href=(isImg?'/img.png':'/clip'+window.cmTile+'.mp4')+'?dl=1';a.download='flow.bin';document.body.appendChild(a);a.click();a.remove();}});
+</script></body></html>

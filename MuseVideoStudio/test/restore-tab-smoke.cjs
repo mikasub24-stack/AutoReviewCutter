@@ -17,11 +17,12 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.addInitScript(() => {
       localStorage.setItem('museStudio.language', localStorage.getItem('testLang') || 'vi');
       const s = {
-        version: '1.7.10', active: false, paused: true, jobs: [],
+        version: '1.8.0', active: false, paused: true, jobs: [],
         license: { status: 'active', plan: 'short', longTerm: false, device: 'TESTDEVICE', expiresAt: Date.now() + 86400000 * 30, message: 'Đã kích hoạt key.' },
         story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: false, clone: false }, platform: 'win32', edgeVoices: [], clones: [] } },
         restore: { busy: false, progress: '', error: '', storyId: '', stories: {} },
-        settings: { browserChoice: 'builtin', browserPath: '', output: 'C:\\Videos', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 1, composer: 'textarea', fileInput: 'input[type=file]', submit: 'button[type=submit]' }
+        flow: { open: false, opening: false },
+        settings: { browserChoice: 'builtin', browserPath: '', output: 'C:\\Videos', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', accountCount: 1, flowProjectUrl: '', flowModel: 'lite', flowParallel: 3, composer: 'textarea', fileInput: 'input[type=file]', submit: 'button[type=submit]' }
       };
       window.calls = []; window.s = s; let listener, id = 100;
       window.push = () => listener(structuredClone(s));
@@ -35,6 +36,8 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
             s.restore.stories[storyId] = { ...data.meta };
             return { storyId, count: data.jobs.length };
           }
+          if (name === 'flowSettings') { Object.assign(s.settings, data); setTimeout(window.push, 0); return structuredClone(s); }
+          if (name === 'flowOpen') { s.flow.open = true; setTimeout(window.push, 0); return structuredClone(s); }
           if (name === 'images') return ['C:\\Refs\\nha.jpg'];
           if (name === 'chooseMusic') return 'C:\\Music\\nen.mp3';
           return structuredClone(s);
@@ -213,6 +216,53 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     const firstOfSegment = par.jobs.find(j => j.phase === 'clip' && j.number === par.meta.seams[0] + 1);
     assert.ok(firstOfSegment.needs.some(n => n.phase === 'image'), 'đầu đoạn 2 chờ ảnh mốc, không chờ khung cuối của clip trước');
     assert.ok(!firstOfSegment.needs.some(n => n.phase === 'clip'));
+
+    // Google Flow: ô chọn nhà cung cấp, ô dự án, ép 8 giây, chặn tạo khi chưa có đường dẫn, tạo đủ job gắn provider.
+    await page.evaluate(() => { window.s.jobs.length = 0; window.s.settings.dispatchMode = 'sequential'; window.s.settings.accountCount = 1; window.push(); });
+    assert.equal(await page.locator('#restoreProvider').inputValue(), 'muse', 'mặc định Muse');
+    assert.equal(await page.locator('#restoreFlowBox').isVisible(), false, 'Muse: ẩn phần Flow');
+    await page.selectOption('#restoreProvider', 'flow');
+    assert.equal(await page.locator('#restoreFlowBox').isVisible(), true);
+    assert.equal(await page.locator('#restoreSecs').inputValue(), '8');
+    assert.equal(await page.locator('#restoreSecs').isDisabled(), true, 'Flow luôn clip 8 giây');
+    await page.selectOption('#restoreMinutes', '10');
+    const flowText = await page.locator('#restoreCount').textContent();
+    assert.match(flowText, /75 clip × 8 giây ≈ 10 phút/);
+    assert.match(flowText, /375 tín dụng Flow/, 'Lite: 5 tín dụng mỗi clip');
+    assert.match(flowText, /Chạy 3 clip cùng lúc/);
+    assert.match(await page.locator('#flowHint').textContent(), /Bước 1/);
+    const before = (await calls('restoreCreate')).length;
+    await page.click('#restoreCreate');
+    await page.waitForFunction(() => /Dán đường dẫn dự án Flow/.test(document.body.textContent));
+    assert.equal((await calls('restoreCreate')).length, before, 'chưa có đường dẫn dự án thì không tạo');
+    await page.fill('#flowProject', 'https://example.com/x');
+    assert.match(await page.locator('#flowHint').textContent(), /phải dạng/);
+    assert.equal(await page.locator('#flowOpen').isDisabled(), true);
+    await page.fill('#flowProject', 'https://flow.google.com/project/abc-123');
+    await page.locator('#flowProject').blur();
+    await page.waitForFunction(() => window.calls.some(c => c.name === 'flowSettings' && c.data.flowProjectUrl === 'https://flow.google.com/project/abc-123' && c.data.flowModel === 'lite' && c.data.flowParallel === 3));
+    await page.waitForFunction(() => /Bước 2/.test(document.getElementById('flowHint').textContent));
+    await page.selectOption('#flowModel', 'fast');
+    await page.waitForFunction(() => /750 tín dụng Flow/.test(document.getElementById('restoreCount').textContent));
+    await page.selectOption('#flowParallel', '2');
+    await page.waitForFunction(() => /Chạy song song 2 đoạn trên 2 luồng Flow/.test(document.getElementById('restoreCount').textContent));
+    await page.click('#flowOpen');
+    await page.waitForFunction(() => window.calls.some(c => c.name === 'flowOpen'));
+    await page.waitForFunction(() => /Cửa sổ Flow đang mở/.test(document.getElementById('flowHint').textContent));
+    await page.selectOption('#restoreAspect', '9:16');
+    await page.click('#restoreCreate');
+    await page.waitForFunction(() => window.calls.filter(c => c.name === 'restoreCreate').length > 0 && window.calls.filter(c => c.name === 'restoreCreate').at(-1).data.meta.provider === 'flow');
+    const fl = (await calls('restoreCreate')).at(-1).data;
+    assert.ok(fl.jobs.length > 75 && fl.jobs.every(j => j.provider === 'flow' && j.aspect === '9:16'), 'mọi cảnh gắn provider và tỉ lệ');
+    assert.equal(fl.jobs.filter(j => j.phase === 'clip').length, 75);
+    assert.equal(fl.meta.seams.length, 1, '2 clip cùng lúc = 2 đoạn = 1 chỗ nối');
+    assert.ok(fl.jobs.filter(j => j.phase === 'clip').every(j => j.durationSeconds === 8), 'mọi clip Flow dài 8 giây');
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('museStudio.restore')).provider), 'flow', 'nhớ lựa chọn nhà cung cấp');
+    await page.selectOption('#restoreProvider', 'muse');
+    assert.equal(await page.locator('#restoreFlowBox').isVisible(), false);
+    assert.equal(await page.locator('#restoreSecs').isDisabled(), false, 'về Muse thì mở lại ô giây');
+    await page.selectOption('#restoreAspect', '16:9');
+    await page.selectOption('#restoreMinutes', '10');
 
     // Tiếng Anh: chữ động đổi theo ngôn ngữ.
     await page.evaluate(() => { localStorage.setItem('testLang', 'en'); });

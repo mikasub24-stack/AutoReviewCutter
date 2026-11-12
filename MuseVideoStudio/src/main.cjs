@@ -27,6 +27,9 @@ const { exportEditPackage } = require('./edit-package.cjs');
 const { createSessionStore } = require('./session-store.cjs');
 const { resolveBrowser } = require('./browser-discovery.cjs');
 const { launchExternalBrowser } = require('./external-browser.cjs');
+const { startFlowBrowser, FLOW_URL } = require('./flow-browser.cjs');
+const { createFlowRunner } = require('./flow-runner.cjs');
+const flowDriver = require('./flow-driver.cjs');
 const { createHash,randomUUID } = require('node:crypto');
 const ownsInstance = app.requestSingleInstanceLock({appId:'local.musevideostudio.app'});
 if (!ownsInstance) app.quit();
@@ -45,11 +48,12 @@ const browserTests=new Map();
 const nextDispatchAt=new Map();
 const MAX_ACCOUNTS = 10;
 const resettingAccounts = new Set(), accountResets = new Map();
-const defaults = { language:'en', accountSessionIds:{}, dispatchMode:'parallel', cooldownSeconds:3, messageSelector:'', stopSelector:'', attachmentReadySelector:'', browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', restoreStories: {}, accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', image: 'img', timeoutMinutes: 15 };
+const defaults = { language:'en', accountSessionIds:{}, dispatchMode:'parallel', cooldownSeconds:3, messageSelector:'', stopSelector:'', attachmentReadySelector:'', browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', restoreStories: {}, accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', image: 'img', timeoutMinutes: 15, flowProjectUrl: '', flowParallel: 3, flowModel: 'lite' };
 function ui(vi,en){return settings?.language==='vi'?vi:en;}
 async function atomic(file, data) { await fs.writeFile(file + '.tmp', JSON.stringify(data, null, 2)); await fs.rename(file + '.tmp', file); }
 function snapshot() {
   return {version:app.getVersion?.()||require('../package.json').version,jobs:queue.jobs,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,restore:{...restoreState,stories:settings.restoreStories||{}},story:{...(storyService?.status()||{}),analyze:storyAnalyzer?.status()||{},voice:voiceService?.status()||{}},
+    flow:{open:Boolean(flowBrowser&&!flowBrowser.isClosed()),opening:Boolean(flowLaunch)},
     accounts:Array.from({length:Math.max(settings.accountCount,MAX_ACCOUNTS)},(_,index)=>{
       const browser=browsers.get(index),external=settings.browserChoice !== 'builtin';
       return {index,opened:Boolean(browser && !browser.isDestroyed()),rememberSession:external ? Boolean(browser?.external && browser.isSessionEnabled()) : profiles.get(index)?.store.isEnabled() || false,warning:external ? browserWarnings.get(index) || '' : profiles.get(index)?.warning || ''};
@@ -266,14 +270,18 @@ async function download(muse,job,signal) {
     if(muse.external)await muse.captureDownload(temporary,options);
     else await captureElectronDownload(muse.webContents,temporary,options);
     if(signal.aborted)throw stoppedError();
-    const format=await validateVideo(temporary);
-    if(signal.aborted)throw stoppedError();
-    const target=await saveOrderedOutput(temporary,outputDir,job,format.extension);
-    job.downloadCompletedAt=new Date().toISOString();
-    if(job.kind==='restore'&&job.phase==='clip')await restoreFrameGuard(job,target);
-    if(job.kind==='restore')job.lastFrame=await saveLastFrame(job,target);
-    return target;
+    return await finishVideoFile(job,temporary,outputDir,signal);
   }catch(error){await fs.rm(temporary,{force:true}).catch(()=>{});throw error;}
+}
+// Đuôi chung của mọi cách tải clip (Muse hoặc Flow): kiểm tra tệp, lưu đúng số thứ tự, kiểm tra khung đầu và lấy khung cuối cho cảnh kế.
+async function finishVideoFile(job,temporary,outputDir,signal){
+  const format=await validateVideo(temporary);
+  if(signal.aborted)throw stoppedError();
+  const target=await saveOrderedOutput(temporary,outputDir,job,format.extension);
+  job.downloadCompletedAt=new Date().toISOString();
+  if(job.kind==='restore'&&job.phase==='clip')await restoreFrameGuard(job,target);
+  if(job.kind==='restore')job.lastFrame=await saveLastFrame(job,target);
+  return target;
 }
 const imageDirectory=()=>path.join(settings.output,'Anh');
 // Việc «ảnh» của chế độ Mẹo vặt (nằm trong hàng đợi kể chuyện): ảnh lưu cạnh clip của truyện, thư mục «anh».
@@ -334,7 +342,58 @@ async function saveImages(muse,job,signal,count) {
   return saved[0];
 }
 function transientDOM(error){return error?.code==='MUSE_DOM_TIMEOUT'||/Execution context was destroyed|context.*destroyed|Target closed|navigation|not respond|chưa phản hồi/i.test(error?.message||'');}
+// ---- Google Flow (Veo 3.1): trình duyệt riêng (Chrome/Edge mở bình thường, tool nối vào bằng cổng gỡ lỗi), người dùng đăng nhập Google một lần.
+let flowBrowser=null,flowLaunch=null;
+function flowExecutable(){
+  const choice=settings.browserChoice==='builtin'?'chrome':settings.browserChoice;
+  try{return resolveBrowser({choice,customPath:settings.browserPath});}
+  catch(e){
+    if(settings.browserChoice==='builtin'){try{return resolveBrowser({choice:'edge'});}catch{}}
+    throw Error('Flow cần Google Chrome hoặc Microsoft Edge (trình duyệt Chromium khác như Cốc Cốc thì chọn «Đường dẫn tùy chọn» trong Cài đặt). '+e.message);
+  }
+}
+async function ensureFlowBrowser(){
+  if(flowBrowser&&!flowBrowser.isClosed())return flowBrowser;
+  if(flowLaunch)return flowLaunch;
+  flowLaunch=(async()=>{
+    const browser=await startFlowBrowser({executablePath:flowExecutable(),profileDir:path.join(app.getPath('userData'),'flow-profile'),url:settings.flowProjectUrl||FLOW_URL,onClosed:()=>{flowBrowser=null;notify();}});
+    if(flushingQuit){await browser.close();return null;}
+    flowBrowser=browser;notify();return browser;
+  })();
+  try{return await flowLaunch;}finally{flowLaunch=null;notify();}
+}
+flowDriver.configure({debugDir:path.join(app.getPath('userData'),'flow-debug')});
+const flowRunner=createFlowRunner({driver:flowDriver,getPage:async()=>{const browser=await ensureFlowBrowser();if(!browser)throw stoppedError();return browser.page();}});
+// Lưu kết quả Flow: video đi qua đúng đuôi xử lý như Muse (kiểm tra, đánh số, khung cuối); ảnh lưu vào thư mục «anh» của truyện.
+async function storeFlowOutput(job,capture,signal){
+  const photo=isPhoto(job),directory=photo?photoDirectory(job):jobFolder(job);
+  await fs.mkdir(directory,{recursive:true});
+  const temporary=path.join(directory,`.flow-${job.id}-${randomUUID().slice(0,8)}.part`);
+  try{
+    await capture(temporary);
+    if(signal.aborted)throw stoppedError();
+    if(!photo)return await finishVideoFile(job,temporary,directory,signal);
+    const buffer=await fs.readFile(temporary);
+    if(buffer.length>62914560)throw Error('Ảnh tải về lớn hơn giới hạn.');
+    if(!sniffImage(buffer))throw Error('Tệp Flow tải về không phải ảnh.');
+    const saved=await saveImageBuffer(buffer,directory,job,{suffix:''});
+    job.outputs=[saved];job.downloadCompletedAt=new Date().toISOString();
+    return saved;
+  }finally{await fs.rm(temporary,{force:true}).catch(()=>{});}
+}
+async function runFlowJob(job,worker,signal,{recover=false}={}){
+  const check=()=>{if(signal.aborted)throw stoppedError();};
+  check();
+  if(!recover)await abortable(licenseManager.requireLongTerm(),signal);
+  if(!settings.output)throw Error('Chọn thư mục lưu video trước.');
+  if(!/^https:\/\/flow\.google\.com\/(?:[a-z-]+\/)?project\/[\w-]+/i.test(settings.flowProjectUrl||''))throw Error('Dán đường dẫn dự án Flow (dạng flow.google.com/project/…) vào Cài đặt → Google Flow. Tạo sẵn một dự án trống trong Flow rồi copy đường dẫn trên thanh địa chỉ.');
+  job.account=0;job.mayHaveSubmitted=false;
+  const stage=(value,message)=>{check();job.stage=value;job.stageMessage=message;notify();};
+  const output=await flowRunner.run(job,{signal,stage,save:()=>save(),model:settings.flowModel,aspect:job.aspect,projectUrl:settings.flowProjectUrl,timeoutMinutes:settings.timeoutMinutes,store:capture=>storeFlowOutput(job,capture,signal)});
+  return output;
+}
 async function runJob(job,worker,signal,{recover=false}={}) {
+  if(job.provider==='flow')return runFlowJob(job,worker,signal,{recover});
   const pinned=recover||Boolean(job.resumeMode);
   const rest=job.kind==='restore'?queue.exhaustedAccounts():[];   // tài khoản đang nghỉ vì hết hạn mức thì bỏ qua (nếu còn tài khoản khác)
   const pickNext=()=>{for(let tries=0;tries<settings.accountCount;tries++){const next=nextAccount++%settings.accountCount;if(!(job.avoidAccounts||[]).includes(next+1)&&!rest.includes(next+1))return next;}return nextAccount++%settings.accountCount;};
@@ -502,7 +561,7 @@ async function stopAll(){
   const probes=[...browserTests.values()].filter(t=>testing&&t.mayHaveSubmitted&&t.status!=='ready').map(t=>({id:t.id,trackerId:t.id,account:t.index+1,mayHaveSubmitted:true}));
   const jobs=[...queue.jobs.filter(j=>!probes.some(t=>t.account===j.account)&&(j.status==='running'||(['failed','interrupted'].includes(j.status)&&j.mayHaveSubmitted&&!['confirmed','ui-stopped'].includes(j.remoteStop?.state)))),...probes];notify();
   const requests=jobs.map(remoteStopJob);
-  try{await queue.stop();await Promise.allSettled(requests);for(const job of jobs){job.error='';job.stageMessage=['confirmed','ui-stopped'].includes(job.remoteStop?.state)?'Đã dừng trong Muse · Tiếp tục sẽ gửi lại cảnh đã khóa':job.remoteStop?.state==='completed'?'Clip đã có · Tiếp tục sẽ tải về':'Chưa xác nhận dừng trên Muse · Tiếp tục sẽ chờ đúng kết quả, không gửi trùng';}await save();}
+  try{await queue.stop();await Promise.allSettled(requests);for(const job of jobs){job.error='';job.stageMessage=job.provider==='flow'?(job.flowCard?'Đã dừng · cảnh đã gửi vào Flow được giữ, Tiếp tục sẽ nối lại và tải về, không gửi trùng':'Đã dừng · cảnh chưa gửi vào Flow'):['confirmed','ui-stopped'].includes(job.remoteStop?.state)?'Đã dừng trong Muse · Tiếp tục sẽ gửi lại cảnh đã khóa':job.remoteStop?.state==='completed'?'Clip đã có · Tiếp tục sẽ tải về':'Chưa xác nhận dừng trên Muse · Tiếp tục sẽ chờ đúng kết quả, không gửi trùng';}await save();}
   finally{stopping=false;notify();}
   return snapshot();
 }
@@ -840,7 +899,11 @@ app.whenReady().then(async () => {
         if(kind==='restore'){await licenseManager.requireLongTerm();await checkTools(settings.ffmpeg).catch(()=>{throw Error('Tab «Dọn nhà · Sinh tồn» cần FFmpeg để nối cảnh và dựng video. Chọn ffmpeg.exe (cùng thư mục ffprobe.exe) ở «Kết nối & cài đặt».');});}
         else await licenseManager.ensureAllowed();
         if(epoch!==runEpoch || flushingQuit)return snapshot();
-        await Promise.all(Array.from({length:settings.accountCount},async(_,index)=>{
+        const pendingRestore=kind==='restore'?queue.jobs.filter(j=>j.kind==='restore'&&j.status!=='completed'):[];
+        const flowMode=pendingRestore.some(j=>j.provider==='flow');
+        if(flowMode&&pendingRestore.some(j=>j.provider!=='flow'))throw Error('Hàng đợi đang có cảnh chạy bằng Flow lẫn cảnh chạy bằng Muse. Chạy xong hoặc xóa một loại trước.');
+        if(flowMode){await ensureFlowBrowser();if(epoch!==runEpoch||flushingQuit)return snapshot();}
+        else await Promise.all(Array.from({length:settings.accountCount},async(_,index)=>{
           if(epoch!==runEpoch||flushingQuit)return;
           if(opening.has(index))await opening.get(index);
           const browser=browsers.get(index);if(!browser||browser.isDestroyed()||!browser.museStarted)await openMuse(index);
@@ -853,7 +916,7 @@ app.whenReady().then(async () => {
         if(unavailable)throw Error('Cảnh đang dở gắn với tài khoản '+unavailable.account+'. Chọn đủ tài khoản trước khi Tiếp tục.');
         queue.prepareResume(kind);
         if(!data?.auto)queue.exhausted.clear();   // người dùng bấm chạy tay: thử lại mọi tài khoản, kể cả tài khoản đang nghỉ
-        queue.concurrency=settings.dispatchMode==='parallel'?settings.accountCount:1;
+        queue.concurrency=flowMode?settings.flowParallel:settings.dispatchMode==='parallel'?settings.accountCount:1;
         queue.start(kind).then(async()=>{
           const videos=queue.jobs.filter(j=>j.kind==='video');
           if(kind==='video' && !queue.paused && videos.length && videos.every(j=>j.status==='completed')) {
@@ -871,7 +934,7 @@ app.whenReady().then(async () => {
       await licenseManager.requireLongTerm();
       if(!settings.output)throw Error('Chọn thư mục lưu video trước.');
       const jobs=Array.isArray(data?.jobs)?JSON.parse(JSON.stringify(data.jobs)):[];
-      if(!jobs.length||jobs.length>740||jobs.some(j=>!j||j.kind!=='restore'||typeof j.prompt!=='string'))throw Error('Không có cảnh hợp lệ để thêm.');
+      if(!jobs.length||jobs.length>1000||jobs.some(j=>!j||j.kind!=='restore'||typeof j.prompt!=='string'))throw Error('Không có cảnh hợp lệ để thêm.');
       const meta=data?.meta||{};
       const storyId=await freeRestoreId(String(data?.idBase||'DonNha'));
       const folder=restoreFolder(settings.output,storyId);
@@ -973,6 +1036,12 @@ app.whenReady().then(async () => {
       if(attachmentReadySelector.length>2000)throw Error('Selector ảnh quá dài.');
       const minutes = Number(data.timeoutMinutes); if (!Number.isFinite(minutes) || minutes < 1 || minutes > 120) throw Error('Ngưỡng báo Muse chậm phải từ 1–120 phút.');
       const accountCount = Number(data.accountCount); if (!Number.isInteger(accountCount) || accountCount < 1 || accountCount > 10) throw Error('Chọn từ 1–10 tài khoản.');
+      const flowProjectUrl=typeof data.flowProjectUrl==='string'?data.flowProjectUrl.trim():settings.flowProjectUrl;
+      if(flowProjectUrl&&!/^https:\/\/flow\.google\.com\/(?:[a-z-]+\/)?project\/[\w-]+/i.test(flowProjectUrl))throw Error('Đường dẫn dự án Flow phải dạng https://flow.google.com/project/… (copy từ thanh địa chỉ khi đang mở dự án).');
+      const flowParallel=data.flowParallel==null?settings.flowParallel:Number(data.flowParallel);
+      if(!Number.isInteger(flowParallel)||flowParallel<1||flowParallel>6)throw Error('Số clip Flow chạy cùng lúc từ 1–6.');
+      const flowModel=data.flowModel??settings.flowModel;
+      if(!['lite','fast','quality'].includes(flowModel))throw Error('Chọn mô hình Veo hợp lệ (Lite, Fast hoặc Quality).');
       if(typeof data.ffmpeg !== 'string' || !data.ffmpeg.trim()) throw Error('Nhập đường dẫn FFmpeg hoặc ffmpeg nếu đã thêm vào PATH.');
       if (!['keep','package','merge'].includes(data.finishAction)) throw Error('Chọn cách xử lý sau khi tạo video.');
       const browserChoice=data.browserChoice ?? settings.browserChoice,browserPath=typeof data.browserPath === 'string' ? data.browserPath.trim() : settings.browserPath;
@@ -982,8 +1051,21 @@ app.whenReady().then(async () => {
         resolveBrowser({choice:browserChoice,customPath:browserPath});
         browserWarnings.clear();
       }
-      settings = { ...settings, image, stopSelector, dispatchMode,cooldownSeconds,messageSelector, attachmentReadySelector, browserChoice, browserPath, autoMerge: data.finishAction === 'merge', autoPackage: data.finishAction === 'package', ffmpeg: data.ffmpeg.trim(), accountCount, composer: data.composer, fileInput: data.fileInput, submit: data.submit, video: data.video, timeoutMinutes: minutes }; await save(); notify(); return snapshot();
+      settings = { ...settings, image, stopSelector, dispatchMode,cooldownSeconds,messageSelector, attachmentReadySelector, browserChoice, browserPath, autoMerge: data.finishAction === 'merge', autoPackage: data.finishAction === 'package', ffmpeg: data.ffmpeg.trim(), accountCount, flowProjectUrl, flowParallel, flowModel, composer: data.composer, fileInput: data.fileInput, submit: data.submit, video: data.video, timeoutMinutes: minutes }; await save(); notify(); return snapshot();
     },
+    // Chỉ cập nhật phần cài đặt Google Flow (không đụng cài đặt Muse).
+    flowSettings: async data => {
+      const url=typeof data?.flowProjectUrl==='string'?data.flowProjectUrl.trim():settings.flowProjectUrl;
+      if(url&&!/^https:\/\/flow\.google\.com\/(?:[a-z-]+\/)?project\/[\w-]+/i.test(url))throw Error('Đường dẫn dự án Flow phải dạng https://flow.google.com/project/… (copy từ thanh địa chỉ khi đang mở dự án).');
+      const parallel=data?.flowParallel==null?settings.flowParallel:Number(data.flowParallel);
+      if(!Number.isInteger(parallel)||parallel<1||parallel>6)throw Error('Số clip Flow chạy cùng lúc từ 1–6.');
+      const model=data?.flowModel??settings.flowModel;
+      if(!['lite','fast','quality'].includes(model))throw Error('Chọn mô hình Veo hợp lệ.');
+      if(queue.active&&(url!==settings.flowProjectUrl||model!==settings.flowModel))throw Error('Dừng hàng đợi trước khi đổi dự án hoặc mô hình Flow.');
+      settings={...settings,flowProjectUrl:url,flowParallel:parallel,flowModel:model};await save();notify();return snapshot();
+    },
+    // Mở (hoặc đưa lên trước) cửa sổ Chrome/Edge của Flow để đăng nhập Google một lần.
+    flowOpen: async () => { await licenseManager.requireLongTerm();const browser=await ensureFlowBrowser();if(browser){const page=await browser.page();await page.bringToFront().catch(()=>{});}return snapshot(); },
     reveal: id => { const j = queue.jobs.find(j => j.id === id); if (j?.output||j?.previousOutput) shell.showItemInFolder(j.output||j.previousOutput); },
     export: async () => { const r = await dialog.showSaveDialog(main, { defaultPath: 'muse-project.json', filters: [{ name: 'JSON', extensions: ['json'] }] }); if (!r.canceled) await atomic(r.filePath, { jobs: queue.jobs }); }
   };
@@ -1002,6 +1084,7 @@ app.on('before-quit', event => {
     const closingExternal=Promise.allSettled([...browsers.values()].filter(browser=>browser.external&&!browser.isDestroyed()).map(browser=>browser.close()));
     for(const browser of browsers.values())if(!browser.external&&!browser.isDestroyed())browser.destroy();
     await Promise.allSettled([...accountResets.values()]);
+    await Promise.allSettled([flowLaunch,flowBrowser?.close()].filter(Boolean));
     await Promise.allSettled([...externalLaunches.values()]);
     const externalResults=await closingExternal;
     const results = await Promise.allSettled([...profiles.values()].map(async profile=>{

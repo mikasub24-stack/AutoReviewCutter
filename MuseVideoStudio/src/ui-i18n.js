@@ -739,6 +739,14 @@ Người trong video|Person in the video
 Nữ trẻ, da trắng, xinh|Young woman, fair skin, pretty
 Nam|Man
 Giống người trong ảnh gốc|Same person as in the photo
+Tạo video bằng|Create the video with
+Đường dẫn dự án Flow|Flow project address
+Mô hình Veo|Veo model
+Veo 3.1 Lite (5 tín dụng, rẻ nhất)|Veo 3.1 Lite (5 credits, cheapest)
+Veo 3.1 Fast (10 tín dụng)|Veo 3.1 Fast (10 credits)
+Veo 3.1 Quality (100 tín dụng)|Veo 3.1 Quality (100 credits)
+Clip chạy cùng lúc|Clips at once
+Mở Flow để đăng nhập Google|Open Flow to sign in to Google
 `.trim().split('\n').map(line=>line.split('|')));
   const norm=s=>String(s).replace(/\s+/g,' ').trim();
   let language='en';try{language=localStorage.getItem('museStudio.language')==='vi'?'vi':'en';}catch{}
