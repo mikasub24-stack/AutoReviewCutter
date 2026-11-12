@@ -1,4 +1,4 @@
-#define Version "0.2.1"
+#define Version "0.2.2"
 [Setup]
 AppId={{AB8D6D18-541F-437B-86DA-9183FD483629}
 AppName=Wan Local Studio

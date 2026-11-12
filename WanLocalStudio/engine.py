@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import secrets
 import shutil
+import struct
 import subprocess
 import sys
 import time
@@ -15,11 +16,13 @@ import urllib.parse
 import urllib.request
 import uuid
 
-VERSION = '0.2.1'
+VERSION = '0.2.2'
 ROOT = (Path(sys.executable).resolve().parent if '__compiled__' in globals()
         else Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)))
 FPS = 24
 FRAMES = 121
+WIDTH, HEIGHT = 1280, 736  # Wan spatial grid is aligned to 32 pixels.
+OUTPUT_WIDTH, OUTPUT_HEIGHT = 1280, 720
 MODELS = {
     'UNETLoader': ('unet_name', 'wan2.2_ti2v_5B_fp16.safetensors'),
     'CLIPLoader': ('clip_name', 'umt5_xxl_fp8_e4m3fn_scaled.safetensors'),
@@ -112,7 +115,8 @@ def plan(topic, minutes):
                   'Slow, steady camera. No cuts, no time lapse, no sudden changes, no speech.')
         scenes.append({'index': i + 1, 'prompt': prompt, 'seed': secrets.randbits(48)})
     return {'version': VERSION, 'topic': topic, 'minutes': minutes, 'frames': total,
-            'fps': FPS, 'width': 832, 'height': 480, 'scene_frames': FRAMES,
+            'fps': FPS, 'width': WIDTH, 'height': HEIGHT, 'scene_frames': FRAMES,
+            'output_width': OUTPUT_WIDTH, 'output_height': OUTPUT_HEIGHT, 'output_policy': 'native_center_crop',
             'scenes': scenes, 'reference_policy': 'persistent_character_and_previous_last_frame',
             'character': CHARACTER, 'transition_frames': transition, 'steps': 16,
             'notice': 'Wan tạo hình không có âm thanh. Giữ tham chiếu không bảo đảm nhận dạng tuyệt đối.'}
@@ -251,7 +255,7 @@ class Comfy:
         target = Path(destination); temp = target.with_suffix('.part'); temp.write_bytes(data); temp.replace(target)
 
 
-def graph(scene, models, reference=None, prefix='WanLocal', steps=20):
+def graph(scene, models, reference=None, prefix='WanLocal', steps=20, width=WIDTH, height=HEIGHT):
     def node(kind, **inputs): return {'class_type': kind, 'inputs': inputs}
     workflow = {
         'unet': node('UNETLoader', unet_name=models['unet_name'], weight_dtype='default'),
@@ -260,7 +264,7 @@ def graph(scene, models, reference=None, prefix='WanLocal', steps=20):
         'sampling': node('ModelSamplingSD3', model=['unet', 0], shift=8.0),
         'positive': node('CLIPTextEncode', clip=['clip', 0], text=scene['prompt']),
         'negative': node('CLIPTextEncode', clip=['clip', 0], text=NEGATIVE),
-        'latent': node('Wan22ImageToVideoLatent', vae=['vae', 0], width=832, height=480, length=FRAMES, batch_size=1),
+        'latent': node('Wan22ImageToVideoLatent', vae=['vae', 0], width=width, height=height, length=FRAMES, batch_size=1),
         'sampler': node('KSampler', model=['sampling', 0], positive=['positive', 0], negative=['negative', 0],
                         latent_image=['latent', 0], seed=scene['seed'], steps=steps, cfg=5.0,
                         sampler_name='uni_pc', scheduler='simple', denoise=1.0),
@@ -283,6 +287,22 @@ def valid_artifact(project, scene):
         reference_ok = previous.is_file() and digest(previous) == scene.get('input_reference_sha256')
     return (reference_ok and scene.get('output_sha256') and output.is_file() and last.is_file()
             and digest(output) == scene['output_sha256'] and digest(last) == scene.get('reference_sha256'))
+
+
+def geometry(data):
+    width, height = int(data.get('width', 832)), int(data.get('height', 480))
+    out_width, out_height = int(data.get('output_width', width)), int(data.get('output_height', height))
+    if (width % 32 or height % 32 or min(width, height, out_width, out_height) <= 0
+            or out_width > width or out_height > height or out_width % 2 or out_height % 2):
+        raise ValueError('Kích thước dự án không hợp lệ; bản này chỉ cắt ảnh gốc, không upscale.')
+    return width, height, out_width, out_height
+
+
+def png_dimensions(path):
+    with Path(path).open('rb') as file: header = file.read(24)
+    if len(header) != 24 or header[:8] != b'\x89PNG\r\n\x1a\n' or header[12:16] != b'IHDR':
+        raise RuntimeError('Khung PNG không có thông tin kích thước hợp lệ.')
+    return struct.unpack('>II', header[16:24])
 
 
 _encoders = {}
@@ -340,13 +360,15 @@ def edit_sequence(project, data, executable, codec, cancelled, notify):
 def _generate(project, client, cancelled, notify):
     project = Path(project)
     data = json.loads((project / 'project.json').read_text(encoding='utf-8'))
-    if data.get('version') not in ('0.1.0', '0.2.0', VERSION): raise ValueError('Phiên bản dự án chưa được hỗ trợ.')
+    if data.get('version') not in ('0.1.0', '0.2.0', '0.2.1', VERSION): raise ValueError('Phiên bản dự án chưa được hỗ trợ.')
+    width, height, out_width, out_height = geometry(data)
     if (data.get('server') and data['server'] != client.url
             and any(scene.get('prompt_id') or scene.get('request_marker') for scene in data['scenes'] if not valid_artifact(project, scene))):
         raise ValueError('Dự án đang gắn với ComfyUI ở ' + data['server'] + '. Dùng cùng địa chỉ để nhận tác vụ cũ.')
     ffmpeg_path = ffmpeg()
     models = client.preflight()
     codec = encoder_options(ffmpeg_path)
+    notify(f'Độ phân giải sinh gốc: {width}×{height} · Xuất {out_width}×{out_height} (không upscale)')
     notify('Mã hóa MP4: ' + ('GPU NVIDIA NVENC' if 'h264_nvenc' in codec else 'CPU (NVENC chưa dùng được; Wan vẫn dùng GPU)'))
     profile = Path(data['profile_dir']) if data.get('profile_dir') else None
     if profile and not (project / 'nhan-vat-goc.png').exists() and (profile / 'reference.png').is_file():
@@ -378,7 +400,7 @@ def _generate(project, client, cancelled, notify):
                 elif (project / 'nhan-vat-goc.png').is_file():
                     reference = client.upload(project / 'nhan-vat-goc.png')
                     scene['character_reference_sha256'] = digest(project / 'nhan-vat-goc.png')
-                workflow = graph(scene, models, reference, f'WanLocal/{data["id"]}/scene-{position + 1}', data.get('steps', 20))
+                workflow = graph(scene, models, reference, f'WanLocal/{data["id"]}/scene-{position + 1}', data.get('steps', 20), width, height)
                 atomic_json(project / f'workflow-{position + 1:04}.json', workflow)
                 scene['request_marker'] = uuid.uuid4().hex
                 save()  # Durable intent before a non-idempotent POST.
@@ -402,6 +424,8 @@ def _generate(project, client, cancelled, notify):
         for index, frame in enumerate(frames):
             if cancelled.is_set(): raise Cancelled('Đã dừng tải khung hình. Tác vụ vẫn được lưu để tiếp tục.')
             client.download(frame, folder / f'{index:04}.png')
+            if png_dimensions(folder / f'{index:04}.png') != (width, height):
+                raise RuntimeError(f'Wan trả khung không đúng {width}×{height}; dừng để tránh xuất nhầm độ phân giải.')
         last = project / f'tham-chieu-{position + 1:04}.png'
         shutil.copy2(folder / f'{FRAMES - 1:04}.png', last)
         if position == 0: shutil.copy2(folder / '0000.png', project / 'tham-chieu-goc.png')
@@ -410,7 +434,8 @@ def _generate(project, client, cancelled, notify):
         # Subsequent first frames are duplicates of the previous reference.
         start = 1 if position else 0
         command = [ffmpeg_path, '-y', '-framerate', str(FPS), '-start_number', str(start), '-i', str(folder / '%04d.png'),
-                   '-frames:v', str(FRAMES - start), *codec,
+                   '-frames:v', str(FRAMES - start), '-vf',
+                   f'crop={out_width}:{out_height}:(iw-{out_width})/2:(ih-{out_height})/2,setsar=1', *codec,
                    '-pix_fmt', 'yuv420p', '-an', str(temporary)]
         run_command(command, cancelled, project / 'ffmpeg.log')
         temporary.replace(output)

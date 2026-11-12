@@ -1,6 +1,12 @@
-# Wan Local Studio 0.2.1
+# Wan Local Studio 0.2.2
 
 App Windows tiếng Việt cho RTX 3060 12GB / RAM 32GB. Màn hình gọn: chọn **Dọn nhà bỏ hoang** hoặc **Sinh tồn trong rừng**, nhập số phút và bấm **Tạo video**. Nút **Cài & tải bộ Wan** cho phép chuẩn bị dữ liệu trước; bấm Tạo khi chưa có bộ chạy cũng tự thực hiện bước chuẩn bị.
+
+## 0.2.2: 720p gốc 16:9
+
+Dự án mới sinh từng khung ở 1280×736 (lưới Wan chia hết cho 32), cắt 8 pixel trên và 8 pixel dưới để xuất đúng 1280×720, SAR 1:1. Không upscale và không kéo giãn người. Kiểm tra kích thước PNG đầu ra ComfyUI trước khi mã hóa; nếu nhận khung 480p thì dừng, không gắn nhãn 720p. Ảnh tham chiếu gốc và khung cuối vẫn giữ nguyên kích thước sinh.
+
+Video/dự án 480p cũ vẫn tiếp tục ở độ phân giải đã lưu, không bị tự nâng thành 720p; tạo dự án mới để sinh 720p. Dùng lại cùng model và hồ sơ nhân vật, không tải lại model. 720p nặng hơn 480p; chưa đo tốc độ/VRAM trên 3060 thật.
 
 ## 0.2.1: bản biên dịch native
 
@@ -26,7 +32,7 @@ Mặc định: một phụ nữ châu Á trưởng thành 24 tuổi, da sáng, k
 
 ## Tự dựng và GPU
 
-- Wan 2.2 TI2V 5B tạo lần lượt 121 khung/cảnh, 832×480, 24 fps, 16 bước UniPC cho dự án mới. Encoder văn bản trên CPU, VAE giải mã theo ô, ComfyUI chạy `--lowvram`. Chưa xác nhận inference thành công/VRAM cụ thể trên 3060 thật.
+- Wan 2.2 TI2V 5B tạo lần lượt 121 khung/cảnh, 1280×736 sinh gốc → 1280×720 xuất, 24 fps, 16 bước UniPC cho dự án mới. Encoder văn bản trên CPU, VAE giải mã theo ô, ComfyUI chạy `--lowvram`. Chưa xác nhận inference thành công/VRAM cụ thể trên 3060 thật.
 - Kiểm tra NVENC bằng một lần encode thật trước khi chọn `h264_nvenc`; nếu driver/binary không dùng được thì báo chuyển sang CPU. Wan vẫn dùng CUDA. Không giả báo mã hóa GPU chỉ vì FFmpeg có tên encoder.
 - Mỗi cảnh kiểm tra đủ khung, mã hóa MP4. Tự bỏ khung tham chiếu lặp, cắt đầu/cuối và tạo chuyển cảnh hòa trộn 0,25 giây. Số cảnh tính bù phần chuyển cảnh để MP4 cuối đủ thời lượng. Chỉ xử lý hai clip một lúc để tránh tải tất cả clip vào RAM.
 - Nhạc của người dùng là tùy chọn, tự hạ âm lượng và fade đầu/cuối. Wan không tự sinh tiếng động/giọng đọc. Không tự lặp hoặc kéo giãn clip để giả đủ thời lượng.

@@ -4,15 +4,22 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import struct
 import sys
 import tempfile
 import threading
 import unittest
+import zlib
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import engine
 
-PNG = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0gAAAABJRU5ErkJggg==')
+def blank_png(width,height):
+    def chunk(kind,data):return struct.pack('>I',len(data))+kind+data+struct.pack('>I',zlib.crc32(kind+data)&0xffffffff)
+    return (b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',width,height,8,2,0,0,0))
+            +chunk(b'IDAT',zlib.compress((b'\0'+b'\0'*(width*3))*height))+chunk(b'IEND',b''))
+
+PNG = blank_png(engine.WIDTH,engine.HEIGHT)
 
 
 def metadata():
@@ -63,6 +70,15 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(linked['clip']['inputs']['device'],'cpu')
         self.assertEqual(linked['decode']['class_type'],'VAEDecodeTiled')
         self.assertEqual(linked['save']['class_type'],'SaveImage')
+
+    def test_720_generation_is_native_and_legacy_projects_keep_their_dimensions(self):
+        data=engine.plan(engine.TOPICS[0],.1)
+        self.assertEqual(engine.geometry(data),(1280,736,1280,720))
+        flow=engine.graph(data['scenes'][0],FakeComfy().preflight())
+        self.assertEqual(flow['latent']['inputs']['width'],1280)
+        self.assertEqual(flow['latent']['inputs']['height'],736)
+        self.assertEqual(engine.geometry({'width':832,'height':480}),(832,480,832,480))
+        with self.assertRaises(ValueError):engine.geometry({'width':832,'height':480,'output_width':1280,'output_height':720})
 
     def test_character_reference_is_reused_across_new_video_projects(self):
         with tempfile.TemporaryDirectory() as td:
@@ -125,18 +141,20 @@ class EngineTests(unittest.TestCase):
             encoder=str(candidate) if candidate.is_file() else None
         if not encoder:self.skipTest('FFmpeg unavailable')
         with tempfile.TemporaryDirectory() as td:
-            # Real 480p synthetic frames exercise FFmpeg only, not GPU inference.
+            # Native-size synthetic frames exercise crop/encoding, not GPU inference.
             project=engine.new_project(td,engine.TOPICS[0],.1)
             image=Path(td)/'frame.png'
-            subprocess.run([encoder,'-y','-f','lavfi','-i','color=c=green:s=832x480','-frames:v','1',str(image)],check=True,capture_output=True)
+            subprocess.run([encoder,'-y','-f','lavfi','-i','color=c=green:s=1280x736','-frames:v','1',str(image)],check=True,capture_output=True)
             other=Path(td)/'other.png'
-            subprocess.run([encoder,'-y','-f','lavfi','-i','color=c=blue:s=832x480','-frames:v','1',str(other)],check=True,capture_output=True)
+            subprocess.run([encoder,'-y','-f','lavfi','-i','color=c=blue:s=1280x736','-frames:v','1',str(other)],check=True,capture_output=True)
             class Frames(FakeComfy):
                 def download(self,description,path):shutil.copy2(image if len(self.sent)==1 else other,path)
             with patch.object(engine,'ffmpeg',return_value=encoder):
                 result=engine.generate(project,Frames(),threading.Event(),lambda _:None)
             decoded=subprocess.run([encoder,'-i',str(result),'-map','0:v:0','-f','framemd5','-'],check=True,capture_output=True,text=True)
             lines=[x for x in decoded.stdout.splitlines() if x and not x.startswith('#')]
+            self.assertRegex(decoded.stdout,r'#dimensions\s+0:\s+1280x720')
+            self.assertRegex(decoded.stdout,r'#sar\s+0:\s+1/1')
             self.assertEqual(len(lines),144)
             self.assertGreater(len(set(line.split(',')[-1].strip() for line in lines)),2)
             self.assertGreater(result.stat().st_size,1000)

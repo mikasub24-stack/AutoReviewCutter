@@ -82,7 +82,7 @@ class App(ctk.CTk):
         line2=ctk.CTkFrame(self.options,fg_color='transparent');line2.pack(fill='x',padx=10,pady=4)
         self.reset_button=ctk.CTkButton(line2,text='Tạo lại cảnh lỗi',command=self.reset,width=130,height=26);self.reset_button.pack(side='left',padx=(0,6))
         ctk.CTkButton(line2,text='Xem nhân vật gốc',command=self.show_character,width=140,height=26).pack(side='left')
-        ctk.CTkLabel(self.options,text='3060 12GB / RAM 32GB • 480p • Wan dùng GPU, mã hóa thử NVENC.\nẢnh gốc được dùng lại qua các video; vẫn có thể lệch chi tiết. Wan không tự tạo tiếng động.',wraplength=640,justify='left',font=('Segoe UI',11),text_color='#a9c3d6').pack(anchor='w',padx=10,pady=8)
+        ctk.CTkLabel(self.options,text='3060 12GB / RAM 32GB • 720p gốc 16:9 • Wan dùng GPU, mã hóa thử NVENC.\nẢnh gốc được dùng lại qua các video; vẫn có thể lệch chi tiết. Wan không tự tạo tiếng động.',wraplength=640,justify='left',font=('Segoe UI',11),text_color='#a9c3d6').pack(anchor='w',padx=10,pady=8)
         self.controls=[self.create_button,self.install_button,self.resume_button,self.check_button,self.music_button,self.folder_button,self.asset_button,self.reset_button]
         self.minutes.trace_add('write',self.update_count);self.update_count()
         self.after(150,self.poll);self.protocol('WM_DELETE_WINDOW',self.close)
@@ -116,7 +116,7 @@ class App(ctk.CTk):
     def update_count(self,*_):
         try:
             data=engine.plan(self.topic.get(),self.minutes.get().replace(',','.'))
-            self.count.set(f'{len(data["scenes"])} cảnh · {data["frames"]/24:g} giây · Tự tham chiếu, chuyển cảnh và dựng MP4.')
+            self.count.set(f'{len(data["scenes"])} cảnh · {data["frames"]/24:g} giây · 720p gốc 16:9 · Tự tham chiếu và dựng MP4.')
         except (ValueError,TypeError): self.count.set('Nhập số từ 0,1 đến 15. Ví dụ 0,1 = 6 giây; 1 = 60 giây.')
 
     def save_settings(self):
