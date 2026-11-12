@@ -330,7 +330,7 @@
       `SCENE (identical in every clip): ${placeOf(config)}.`,
       config.camera === 'fixed'
         ? 'Camera: one fixed camera on a tripod, same position, same height, same angle and same lens in every clip; no zoom, no pan, no tilt, no cuts, no camera shake.'
-        : 'Camera: smooth, steady cinematic camera moves (slow push-in and pull-out) between wide, medium and close-up views of the SAME place, like a professional renovation video; the place, the lighting and the lens look stay identical; no jump cuts, no shaking, no handheld wobble.',
+        : 'Camera: a steady, mostly static real camera on a tripod like a time-lapse cleanup video; it only reframes slowly, once, when the work moves to a new area; never a push-in, never a zoom, never a face close-up, no orbiting, no handheld wobble, no shaking, no jump cuts; the place, the lighting and the lens look stay identical.',
       `Light: ${config.light}.`,
       'Look: real-life footage filmed with a camera, photorealistic, natural colors, real textures and real materials; not animation, not cartoon, not CGI, not a painting, not an illustration.',
       'Quality: sharp, crisp, high-detail, clean and stable image; no blur, no flicker, no distortion, and no morphing of the building, the objects or the person.',
@@ -361,25 +361,17 @@
     ].filter(Boolean).join('\n');
   }
 
-  // Cảnh xa / vừa / gần: mỗi clip kết thúc ở một cỡ cảnh, clip sau bắt đầu đúng từ khung cuối đó rồi chuyển tiếp bằng chuyển động máy mượt (không cắt nhảy).
-  // Cuối mỗi bước luôn lùi ra CẢNH XA để thấy công việc đã xong; các phần giữa của một bước xen kẽ cảnh vừa, cận tay / dụng cụ và cận mặt.
+  // Máy quay ỔN ĐỊNH như video làm nhà thật (máy dựng chân / time-lapse): không đẩy vào mặt, không zoom, không lia qua lại trong clip.
+  // Chỉ chỉnh khung MỘT lần, chậm và êm, ở đầu bước mới nếu chỗ làm đổi sang khu vực khác; các phần còn lại của bước giữ nguyên khung của khung hình đầu.
   function shotLines(config, step, number, total) {
-    const face = config.person && !config.faceless, person = config.person;
-    const SHOT = {
-      wide: 'a WIDE shot that shows the whole place and all the progress made so far',
-      medium: person ? `a MEDIUM shot of the person at work, ${face ? 'the face and the upper body clearly visible' : 'the body seen from behind or the side'}, with the work area around` : 'a MEDIUM shot of the work area and the work in progress',
-      hands: person ? 'a CLOSE-UP of the hands, the tools and the material being worked on, in sharp detail' : 'a CLOSE-UP of the tools, the material and the surface being worked on, in sharp detail',
-      face: 'a CLOSE-UP of the person\'s face and shoulders while working, the face clearly visible, calm natural expression'
-    };
-    const cycle = face ? ['medium', 'hands', 'face', 'medium', 'hands'] : ['medium', 'hands'];
-    const lastOfStep = number === total || step.part >= step.parts;
     if (config.camera === 'fixed') return [];
-    if (lastOfStep) {
-      const mid = cycle[(number - 1) % cycle.length];
-      return [`SHOT: start from the attached frame; during the clip the camera moves smoothly in to ${SHOT[mid]} while the work happens, then pulls smoothly back out and settles on ${SHOT.wide}, with the same wide framing, viewpoint, angle and distance as the wide view used in the rest of this video, for the last two seconds, so the finished step is clearly visible. No jump cuts.`];
-    }
-    const end = cycle[(step.part - 1) % cycle.length];
-    return [`SHOT: start from the attached frame and move the camera smoothly to ${SHOT[end]}; the clip ends on this view and the next clip continues from it. No jump cuts.`];
+    const view = config.person
+      ? 'a MEDIUM or WIDE view of the person at work with the whole work area around, framed on the work and the hands, never on the face'
+      : 'a MEDIUM or WIDE view of the whole work area';
+    const hold = 'The camera is completely still for the rest of the clip: no zoom, no push-in, no pan, no tilt, no orbit, no camera move toward the person\'s face, and never a face close-up.';
+    if (number === 1) return [`SHOT: keep exactly the framing of the attached frame (same position, angle and distance). ${hold}`];
+    if (step.part <= 1) return [`SHOT: start from the attached frame. If the work moved to a new area, the camera reframes ONCE, slowly and steadily, in the first two seconds to ${view}; otherwise it stays exactly as it is. ${hold}`];
+    return [`SHOT: keep exactly the framing of the attached frame (same position, angle and distance). ${hold}`];
   }
 
   function clipPrompt(config, step, number, total, { first = false } = {}) {

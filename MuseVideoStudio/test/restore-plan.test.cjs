@@ -123,26 +123,30 @@ test('không lộ mặt: bỏ yêu cầu mặt, thêm lệnh quay từ sau lưng
   assert.match(P.baseImagePrompt(c), /seen from behind/);
 });
 
-test('góc quay: xen kẽ xa / vừa / gần, cuối mỗi bước lùi ra cảnh xa; cố định thì không có dòng SHOT', () => {
+test('góc quay: ổn định như video thật, không bao giờ cận mặt / zoom / đẩy vào; chỉnh khung một lần ở đầu bước mới; cố định thì không có dòng SHOT', () => {
   const c = P.options({ theme: 'cabin', minutes: 20 });   // 120 cảnh → mỗi việc nhiều phần
   const steps = P.stepsOf(c);
-  const shot = i => P.clipPrompt(c, steps[i], i + 1, steps.length).split('\n').find(l => l.startsWith('SHOT:'));
-  const kinds = new Set();
+  const prompts = steps.map((s, i) => P.clipPrompt(c, s, i + 1, steps.length));
+  const shot = i => prompts[i].split('\n').find(l => l.startsWith('SHOT:'));
   for (const [i, s] of steps.entries()) {
     const line = shot(i);
     assert.ok(line, 'cảnh ' + (i + 1) + ' có dòng SHOT');
-    if (s.part >= s.parts) assert.match(line, /settles on a WIDE shot/);
-    else { const m = /to a (MEDIUM|CLOSE-UP|WIDE)/.exec(line); assert.ok(m); kinds.add(m[1]); }
+    assert.match(line, /The camera is completely still/);
+    assert.match(line, /never a face close-up/);
+    assert.doesNotMatch(prompts[i], /CLOSE-UP|face and shoulders|push-in and pull-out|moves smoothly in to/, 'không còn lệnh cận mặt / đẩy vào / lùi ra');
+    if (i === 0 || s.part > 1) assert.match(line, /keep exactly the framing of the attached frame/);
+    else assert.match(line, /reframes ONCE/);
   }
-  assert.ok(kinds.has('MEDIUM') && kinds.has('CLOSE-UP'), 'có cả cảnh vừa và cảnh gần');
-  assert.ok([...steps.keys()].some(i => /face and shoulders/.test(shot(i))), 'có cảnh cận mặt khi để lộ mặt');
+  assert.match(prompts[0], /steady, mostly static real camera on a tripod/);
+  assert.ok(steps.some(s => s.part > 1), 'có bước nhiều phần để kiểm tra phần giữa');
   const hidden = P.options({ theme: 'cabin', minutes: 20, faceless: true }), hs = P.stepsOf(hidden);
-  assert.ok(hs.every((s, i) => !/face and shoulders/.test(P.clipPrompt(hidden, s, i + 1, hs.length))), 'không lộ mặt thì không có cận mặt');
+  assert.ok(hs.every((s, i) => !/face and shoulders|CLOSE-UP/.test(P.clipPrompt(hidden, s, i + 1, hs.length))));
   const fixed = P.options({ theme: 'cabin', minutes: 2, camera: 'fixed' });
   const prompt = P.clipPrompt(fixed, P.stepsOf(fixed)[0], 1, 15, { first: true });
   assert.doesNotMatch(prompt, /SHOT:/);
   assert.match(prompt, /one fixed camera on a tripod/);
 });
+
 
 test('chặn người nổi tiếng và nhân vật khi gõ chữ, không chặn chữ thường dùng', () => {
   for (const bad of ['poster of Donald Trump on the wall', 'Phòng khách giống ca sĩ Sơn Tùng', 'a Spider-Man toy', 'Elon Musk standing', 'Pikachu doll', 'Bác Hồ', 'looks like a famous actor', 'tổng thống']) {

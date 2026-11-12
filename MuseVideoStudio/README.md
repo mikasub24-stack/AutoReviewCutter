@@ -142,6 +142,9 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.8.2
+- **Máy quay ổn định như video làm nhà thật, không còn «kiểu AI»:** bỏ hẳn lệnh đẩy máy vào, lùi ra và **cận mặt** giữa mỗi clip. Chế độ «Ổn định» (mặc định) giữ nguyên khung của khung hình đầu suốt clip, chỉ chỉnh khung **một lần, chậm** ở đầu bước mới khi chỗ làm đổi sang khu vực khác, và luôn đóng khung vào công việc và đôi tay, không bao giờ vào mặt. Muốn y hệt một góc cố định cả video thì chọn «Cố định một góc». Video đã tạo dở giữ nguyên prompt cũ; chỉ video tạo mới dùng cách quay này.
+
 ## Update 1.8.1
 - **Sửa lỗi nghiêm trọng của 1.8.0:** hàng đợi làm rơi nhãn «Flow» của từng cảnh nên chọn Google Flow vẫn chạy như Muse. Đã sửa và có test. Ai đã cài 1.8.0 hãy cài 1.8.1.
 - **Mở 5 (hoặc 10) trình duyệt mà chỉ 1 ô làm việc:** video tạo lúc chọn ít ô hơn chỉ có 1–3 đoạn nên chỉ 1–3 cảnh chạy được cùng lúc (cảnh sau chờ khung cuối cảnh trước). Bây giờ khi bấm **Chạy / Tiếp tục**, tool tự **chia lại phần chưa làm** thành đủ số đoạn bằng số ô đang bật (tối đa 10): thêm ảnh mốc đầu mỗi đoạn mới và cập nhật chỗ nối khi dựng. Cảnh đã xong và cảnh đang chạy giữ nguyên. Nếu bạn chủ động chọn số đoạn cố định (không để «Tự động») thì tool giữ đúng số đó.
