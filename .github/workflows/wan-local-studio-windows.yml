@@ -1,0 +1,78 @@
+name: Wan Local Studio Windows
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/vst3-discovery]
+    paths: ['WanLocalStudio/**', '.github/workflows/wan-local-studio-windows.yml']
+permissions:
+  contents: read
+concurrency:
+  group: wan-local-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Test and package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force dist-wan | Out-Null
+          Start-Transcript -Path "$env:RUNNER_TEMP/wan-build.log" | Out-Null
+          trap {
+            $detail = (Get-Content "$env:RUNNER_TEMP/wan-build.log" -Tail 80) -join "`n"
+            $detail += ($_ | Out-String) + $_.ScriptStackTrace
+            if (Test-Path $env:WAN_SMOKE_REPORT) { $detail += Get-Content $env:WAN_SMOKE_REPORT -Raw }
+            $detail = $detail.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Host "::error title=Wan Local Windows build::$detail"
+            exit 1
+          }
+          python -m venv .venv-wan
+          $env:PATH = (Join-Path (Get-Location) '.venv-wan/Scripts') + [IO.Path]::PathSeparator + $env:PATH
+          $env:WAN_SMOKE_REPORT = Join-Path (Get-Location) 'dist-wan/SmokeError.txt'
+          $env:WAN_UI_PREVIEW = Join-Path (Get-Location) 'dist-wan/UI-Preview.png'
+          python -m pip install --require-hashes --only-binary=:all: -r WanLocalStudio/requirements-windows.lock
+          if ($LASTEXITCODE) { throw 'pip failed' }
+          New-Item -ItemType Directory -Force WanLocalStudio/runtime | Out-Null
+          $encoder = python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
+          Copy-Item $encoder WanLocalStudio/runtime/ffmpeg.exe
+          & WanLocalStudio/runtime/ffmpeg.exe -version 2>&1 | Out-File WanLocalStudio/runtime/FFMPEG-BUILD.txt -Encoding utf8
+          python WanLocalStudio/build_assets.py
+          if ($LASTEXITCODE) { throw 'Build assets failed' }
+          python -m unittest discover -s WanLocalStudio/tests -v
+          if ($LASTEXITCODE) { throw 'Engine tests failed' }
+          python WanLocalStudio/app.py --smoke-test
+          if ($LASTEXITCODE) { throw 'Source GUI smoke failed' }
+          python -m PyInstaller --noconfirm --windowed --clean --noupx --version-file WanLocalStudio/version-info.txt --collect-all customtkinter --collect-all darkdetect --name WanLocalStudio --icon WanLocalStudio/icon.ico --distpath WanLocalStudio/build --workpath WanLocalStudio/pybuild --specpath WanLocalStudio --add-data 'WanLocalStudio/icon.ico;.' --add-data 'WanLocalStudio/runtime;runtime' --add-data 'WanLocalStudio/vendor;vendor' WanLocalStudio/app.py
+          if ($LASTEXITCODE) { throw 'EXE packaging failed' }
+          Copy-Item WanLocalStudio/README.vi.md,WanLocalStudio/THIRD-PARTY.md WanLocalStudio/build/WanLocalStudio/
+          $p = Start-Process WanLocalStudio/build/WanLocalStudio/WanLocalStudio.exe -ArgumentList '--smoke-test' -Wait -PassThru
+          if ($p.ExitCode) { throw 'Packaged GUI smoke failed' }
+          python WanLocalStudio/build_assets.py --manifest WanLocalStudio/build/WanLocalStudio
+          if ($LASTEXITCODE) { throw 'Manifest failed' }
+          Copy-Item WanLocalStudio/build/WanLocalStudio/BuildManifest.json dist-wan/BuildManifest.json
+          & 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe' WanLocalStudio/installer.iss
+          if ($LASTEXITCODE) { throw 'Installer failed' }
+          $install = Join-Path $env:RUNNER_TEMP 'WanLocal-installed'
+          $p = Start-Process dist-wan/WanLocalStudio-0.1.0-Setup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
+          if ($p.ExitCode) { throw 'Installation failed' }
+          $p = Start-Process "$install/WanLocalStudio.exe" -ArgumentList '--smoke-test' -Wait -PassThru
+          if ($p.ExitCode) { throw 'Installed GUI smoke failed' }
+          & ./VocalStudio/scripts/scan-windows.ps1 -RuntimeDirectory WanLocalStudio/build/WanLocalStudio -PackageDirectory dist-wan
+          & git archive '--format=zip' '--output=dist-wan/WanLocalStudio-0.1.0-Source.zip' HEAD WanLocalStudio .github/workflows/wan-local-studio-windows.yml VocalStudio/scripts/scan-windows.ps1
+          if ($LASTEXITCODE) { throw 'Source archive failed' }
+          Get-FileHash dist-wan/* -Algorithm SHA256 | Format-List | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          'Tests use simulated ComfyUI responses and real FFmpeg. GPU inference and identity consistency are NOT verified by this build.' | Out-File $env:GITHUB_STEP_SUMMARY -Append
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WanLocalStudio-0.1.0-Installer
+          path: dist-wan/*
+          if-no-files-found: error
