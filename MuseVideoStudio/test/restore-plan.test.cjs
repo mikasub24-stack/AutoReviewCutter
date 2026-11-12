@@ -144,7 +144,8 @@ test('góc quay: máy luôn đứng yên, không cận mặt / zoom / lia; ngoà
   assert.match(line(5), /clean, clearly visible cut in the first second to the new camera angle: ONE fixed angle/, 'vào nhà: cắt sang một góc cố định trong nhà');
   assert.match(line(6), /ONE clear, clean cut in the first second to a new fixed angle/, 'trong nhà: sang chỗ khác trong phòng thì cắt một lần');
   assert.match(line(19), /clean, clearly visible cut in the first second to the new camera angle: a WIDE, distant shot/, 'ra ngoài: cắt về cảnh rộng');
-  assert.match(line(20), /keeping exactly the framing/);
+  assert.match(line(20), /clean, clearly visible cut in the first second to the new camera angle: ONE fixed angle/, 'xong nhà: quay bên trong nhà mới, cắt sang một góc cố định trong nhà');
+  assert.match(line(21), /clean, clearly visible cut in the first second to the new camera angle: a WIDE, distant shot/, 'rồi cắt ra toàn cảnh ngoài nhà mới');
   assert.doesNotMatch(P.clipPrompt(house, hs[at(5)], at(5) + 1, hs.length), /camera follows/);
   const inside = P.options({ theme: 'house_in', minutes: 5 }), is = P.stepsOf(inside);
   assert.match(shotOf(inside, is[0], 1, is.length), /ONE fixed angle chosen so the whole action is clearly visible/);
@@ -223,7 +224,7 @@ test('tiêu đề tiếng Anh và tên chủ đề', () => {
   assert.notEqual(vi[0].title, en[0].title);
   assert.equal(P.videoTitle(P.options({ theme: 'bunker', lang: 'en' })), 'Survival · dig an underground shelter');
   assert.equal(P.THEMES.length, 9);
-  assert.ok(P.THEMES.every(t => t.id === 'custom' || t.steps.length === (t.id === 'house_full' ? 20 : 15)));
+  assert.ok(P.THEMES.every(t => t.id === 'custom' || t.steps.length === (t.id === 'house_full' ? 21 : 15)));
   for (const t of P.THEMES) if (t.id !== 'custom') assert.equal(P.EN[t.id].titles.length, t.steps.length, t.id);
 });
 
@@ -235,18 +236,20 @@ test('«cả ngôi nhà»: toàn cảnh rậm rạp → dọn ngoài → vào nh
   const order = [/overgrown with tall weeds/, /weeds, vines and bushes .* cut down/, /yard .* raked clean/, /pressure-washed/, /opens the front door/, /inside the house the big trash/, /primer/, /painted with two clean coats/, /new flooring/, /light bulbs/, /kitchen counter/, /furniture is carried in/, /outer walls are painted/, /brand new/].map(at);
   assert.ok(order.every(i => i >= 0), order.join());
   assert.deepEqual([...order].sort((a, b) => a - b), order, 'đúng thứ tự người dùng mô tả');
-  assert.equal(theme.steps.length, 20);
+  assert.equal(theme.steps.length, 21);
+  const inside = theme.steps.findIndex(st => /finished, furnished room, spotless/.test(st[1]));
+  assert.ok(inside > at(/outer walls are painted/) && inside < at(/wide shot from far outside/), 'xong nhà: quay trong rồi mới quay toàn cảnh ngoài');
   assert.match(theme.base, /weeds and vines/);
   // camera luôn xen kẽ vì đi từ ngoài vào trong
   assert.equal(P.options({ theme: 'house_full', camera: 'fixed' }).camera, 'varied');
-  // dài 10 phút: đủ 20 việc theo thứ tự, mỗi việc nhiều phần; ngắn thì vẫn có việc đầu và cuối
+  // dài 10 phút: đủ 21 việc theo thứ tự, mỗi việc nhiều phần; ngắn thì vẫn có việc đầu và cuối
   const ten = P.stepsOf(P.options({ theme: 'house_full', minutes: 10 }));
   assert.equal(ten[0].step, 1);
-  assert.equal(ten[ten.length - 1].step, 20);
+  assert.equal(ten[ten.length - 1].step, 21);
   assert.deepEqual([...ten.map(s => s.step)].sort((a, b) => a - b), ten.map(s => s.step), 'không đảo thứ tự');
   const short = P.stepsOf(P.options({ theme: 'house_full', minutes: 1 }));
   assert.equal(short[0].step, 1);
-  assert.equal(short[short.length - 1].step, 20);
+  assert.equal(short[short.length - 1].step, 21);
   // bước không bị gán «done by the person» thừa khi câu đã có người
   const c = P.options({ theme: 'house_full', minutes: 2 }), steps = P.stepsOf(c);
   const first = P.clipPrompt(c, steps[0], 1, steps.length, { first: true });

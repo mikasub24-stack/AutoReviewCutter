@@ -46,7 +46,7 @@
   // Mỗi chủ đề: base = hiện trạng ban đầu (dùng khi để Muse tạo ảnh gốc); steps = 15 việc nối tiếp nhau (vi = nhãn trên thẻ, en = việc làm trong clip).
   const THEMES = [
     {
-      id: 'house_full', label: 'Dọn nhà bỏ hoang · cả ngôi nhà (ngoài → trong → hoàn thiện)', hint: 'Ảnh gốc: TOÀN CẢNH mặt ngoài ngôi nhà hoang rậm rạp. Video đi đúng thứ tự: toàn cảnh → dọn bên ngoài → vào dọn bên trong → sơn sửa → lắp đèn, thiết bị → hoàn thiện như nhà mới.', person: false, personDefault: WORKER, forceVaried: true,
+      id: 'house_full', label: 'Dọn nhà bỏ hoang · cả ngôi nhà (ngoài → trong → hoàn thiện)', hint: 'Ảnh gốc: TOÀN CẢNH mặt ngoài ngôi nhà hoang rậm rạp. Video đi đúng thứ tự: toàn cảnh → dọn bên ngoài → vào dọn bên trong → sơn sửa → lắp đèn, thiết bị → hoàn thiện: quay bên trong nhà mới xong rồi cắt ra toàn cảnh bên ngoài như nhà mới.', person: false, personDefault: WORKER, forceVaried: true,
       place: 'an old abandoned house with its overgrown yard, seen from outside first and later from inside', placeholder: 'Ví dụ: nhà gạch hai tầng bỏ hoang trên đồi, cỏ cao quá đầu, dây leo phủ kín tường, cửa sổ vỡ',
       base: 'tall weeds and vines covering the walls and the whole yard, broken windows, peeling paint, a collapsed fence, junk and trash everywhere',
       steps: [
@@ -69,6 +69,7 @@
         ['Lắp bếp, vòi nước, tủ', 'a kitchen counter, a sink with a tap, shelves and cabinets are installed and fixed in place'],
         ['Đặt nội thất, trang trí', 'furniture is carried in and placed: a sofa, a table, chairs and a rug, then curtains, plants and pictures are added'],
         ['Sơn ngoài, sân vườn', 'the person goes outside and the outer walls are painted fresh, the fence is rebuilt, a path is laid and fresh lawn and flowers are planted'],
+        ['Nhà mới · bên trong', 'the person walks in through the new front door; then the view changes with a clean cut to a fixed angle inside that shows the finished, furnished room, spotless and brand new, with the warm lights on, while the person stands in the room, looks around and nods with satisfaction'],
         ['Hoàn thiện như nhà mới', 'a wide shot from far outside shows the whole house, now repaired, freshly painted, with a tidy garden and warm lights glowing inside through the windows, looking brand new, while the person stands by the gate and looks at the finished house']
       ]
     },
@@ -234,8 +235,8 @@
   ];
   // Tiếng Anh cho giao diện / tiêu đề thẻ cảnh khi app đang ở English (prompt gửi Muse luôn bằng tiếng Anh).
   const EN = {
-    house_full: { label: 'Abandoned house · the whole house (outside → inside → finished)', hint: 'Start photo: a WIDE view of the overgrown outside of the abandoned house. The video follows the real order: wide view → clean outside → go in and clean inside → repairs and paint → lights and fittings → finished like new.', placeholder: 'e.g. two-story brick house on a hill, grass taller than a person, vines over the walls, broken windows',
-      titles: ['Abandoned house overview', 'Cut the weeds', 'Clear yard trash', 'Wash outer walls', 'Walk inside', 'Haul out trash', 'Sweep dust and cobwebs', 'Scrub walls and floor', 'Tear out damaged parts', 'Patch walls and ceiling', 'Sand smooth', 'Prime the walls', 'Paint the walls', 'Lay new flooring', 'Fit windows and doors', 'Install wiring and lights', 'Install kitchen and fittings', 'Furnish and decorate', 'Paint outside and garden', 'Finished like new'] },
+    house_full: { label: 'Abandoned house · the whole house (outside → inside → finished)', hint: 'Start photo: a WIDE view of the overgrown outside of the abandoned house. The video follows the real order: wide view → clean outside → go in and clean inside → repairs and paint → lights and fittings → finished: the new inside, then a cut to a wide shot of the outside, like new.', placeholder: 'e.g. two-story brick house on a hill, grass taller than a person, vines over the walls, broken windows',
+      titles: ['Abandoned house overview', 'Cut the weeds', 'Clear yard trash', 'Wash outer walls', 'Walk inside', 'Haul out trash', 'Sweep dust and cobwebs', 'Scrub walls and floor', 'Tear out damaged parts', 'Patch walls and ceiling', 'Sand smooth', 'Prime the walls', 'Paint the walls', 'Lay new flooring', 'Fit windows and doors', 'Install wiring and lights', 'Install kitchen and fittings', 'Furnish and decorate', 'Paint outside and garden', 'Finished inside', 'Finished like new'] },
     house_in: { label: 'Abandoned house cleanup · inside', hint: 'Start photo: a wide view of the room to clean.', placeholder: 'e.g. living room of an old brick house, peeling paint, broken window glass',
       titles: ['Haul out big trash', 'Sweep dust and cobwebs', 'Scrub walls and floor', 'Tear out damaged parts', 'Patch walls and ceiling', 'Sand smooth', 'Prime the walls', 'Paint the walls', 'Lay new flooring', 'Fit new windows', 'Install lights', 'Install shelves', 'Place furniture', 'Add curtains and decor', 'Finished room'] },
     house_out: { label: 'Abandoned house cleanup · outside', hint: 'Start photo: the front of the house as a wide view.', placeholder: 'e.g. abandoned two-story house on a grassy hill, walls covered in vines',
