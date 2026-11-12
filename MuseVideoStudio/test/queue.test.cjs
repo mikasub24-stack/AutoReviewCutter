@@ -574,3 +574,59 @@ test('restore: lỗi thường (không phải hết hạn mức) vẫn dừng h�
   assert.equal(v.jobs[0].status, 'failed', 'tab Video giữ hành vi cũ');
   assert.equal(v.exhausted.size, 0);
 });
+
+test('add giữ nhãn provider «flow» và tỉ lệ khung hình của cảnh (không giữ giá trị lạ)', async () => {
+  const q = new Queue({ ...base });
+  await q.add([
+    { kind: 'restore', storyId: 'S', phase: 'clip', number: 1, prompt: 'a', provider: 'flow', aspect: '9:16' },
+    { kind: 'restore', storyId: 'S', phase: 'clip', number: 2, prompt: 'b', provider: 'evil', aspect: 'x' },
+    { kind: 'restore', storyId: 'S', phase: 'clip', number: 3, prompt: 'c' }
+  ]);
+  assert.deepEqual(q.jobs.map(j => [j.provider, j.aspect]), [['flow', '9:16'], [undefined, undefined], [undefined, undefined]]);
+});
+
+test('restore: cảnh dở gắn với tài khoản đang nghỉ (hết hạn mức) được tài khoản khác nhận, không kẹt chờ', async () => {
+  const ran = [];
+  const q = new Queue({ ...base, concurrency: 3, accounts: 3, gateWaitMs: 5, run: async (j, slot) => { ran.push([j.number, slot + 1]); j.lastFrame = '/f.png'; return `/v/${j.number}.mp4`; } });
+  await q.add([
+    { kind: 'restore', storyId: 'S', phase: 'clip', number: 1, prompt: 'a' },
+    { kind: 'restore', storyId: 'S', phase: 'clip', number: 2, prompt: 'b' }
+  ]);
+  Object.assign(q.jobs[0], { account: 1, resumeMode: 'resubmit' });
+  q.exhausted.set(1, Date.now() + 3600000);
+  await q.start('restore');
+  assert.ok(q.jobs.every(j => j.status === 'completed'), 'không kẹt');
+  assert.ok(ran.every(([, account]) => account !== 1), 'tài khoản 1 đang nghỉ nên không chạy');
+});
+
+test('video tạo lúc 3 tài khoản, giờ chạy 5 trình duyệt: chia lại phần chưa làm rồi chạy đủ 5 cảnh cùng lúc, xong hết, đúng thứ tự nối', async () => {
+  const P = require('../src/restore-plan.js');
+  const cfg = P.options({ theme: 'house_full', minutes: 15, seconds: 8 });
+  const q = new Queue({ ...base, concurrency: 5, accounts: 5, gateWaitMs: 2, run: async (j, slot) => {
+    j.account = slot + 1; running++; max = Math.max(max, running);
+    await new Promise(r => setTimeout(r, 3));
+    running--; order.push(j);
+    if (j.phase === 'clip') j.lastFrame = `/f/${j.number}.png`;
+    return j.phase === 'image' ? `/i/${j.number}.png` : `/v/${j.number}.mp4`;
+  } });
+  let running = 0, max = 0; const order = [];
+  await q.add(P.buildJobs(cfg, { storyId: 'S', photo: '/p.jpg', accounts: 3 }));
+  const clips = q.jobs.filter(j => j.phase === 'clip');
+  q.jobs.filter(j => j.phase === 'image').forEach(j => Object.assign(j, { status: 'completed', output: `/i/${j.number}.png` }));
+  clips.slice(0, 13).forEach(j => Object.assign(j, { status: 'completed', output: `/v/${j.number}.mp4`, lastFrame: `/f/${j.number}.png` }));
+  Object.assign(clips[13], { status: 'interrupted', account: 2 });   // đang chạy thì bấm Dừng
+  const plan = P.resegment(q.jobs, 5);
+  assert.ok(plan && plan.images.length === 2);
+  for (const ch of plan.changes) Object.assign(q.jobs.find(j => j.number === ch.number && j.phase === 'clip'), { needs: ch.needs, refList: ch.refList, prompt: ch.prompt });
+  await q.add(plan.images);
+  q.prepareResume('restore');
+  await q.start('restore');
+  assert.ok(q.jobs.every(j => j.status === 'completed'), 'xong hết: ' + JSON.stringify(q.jobs.filter(j => j.status !== 'completed').map(j => j.phase + j.number + ':' + j.status)));
+  assert.equal(max, 5, 'đủ 5 cảnh chạy cùng lúc');
+  const at = j => order.indexOf(j);
+  for (const j of q.jobs.filter(x => x.phase === 'clip' && x.number > 1)) {
+    const need = j.needs[0], dep = q.jobs.find(d => d.phase === need.phase && d.number === need.number);
+    if (!j.startedAt || at(j) < 0) continue;        // cảnh đã xong từ trước thì không chạy lại
+    assert.ok(at(dep) < 0 || at(dep) < at(j), `cảnh ${j.number} chạy sau việc nó cần`);
+  }
+});

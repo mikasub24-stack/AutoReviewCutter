@@ -355,3 +355,72 @@ test('Google Flow: luôn clip 8 giây, 120 phút = 900 clip, job mang provider/a
   const museJobs = P.buildJobs(P.options({ theme: 'house_full', minutes: 5 }), { storyId: 's', photo: '', accounts: 3 });
   assert.ok(museJobs.every(j => !j.provider), 'Muse: không gắn provider');
 });
+
+// ---- chia lại truyện đang chạy
+function liveStory(accounts, { photo = '/p.jpg', doneClips = 13, running = 14 } = {}) {
+  const cfg = P.options({ theme: 'house_full', minutes: 15, seconds: 8 });
+  const jobs = P.buildJobs(cfg, { storyId: 'S', photo, accounts }).map((j, i) => ({ ...j, id: 'j' + i, status: 'pending' }));
+  const clips = jobs.filter(j => j.phase === 'clip');
+  jobs.filter(j => j.phase === 'image').forEach(j => { j.status = 'completed'; j.output = '/img' + j.number + '.png'; });
+  clips.slice(0, doneClips).forEach(j => { j.status = 'completed'; j.output = '/v' + j.number + '.mp4'; j.lastFrame = '/f' + j.number + '.png'; });
+  if (running) clips[running - 1].status = 'running';
+  return { cfg, jobs, clips };
+}
+
+test('resegment: truyện tạo lúc 3 tài khoản, giờ có 5 → chia thêm 2 đoạn ở phần chưa làm, ảnh mốc biết «đã xong những gì»', () => {
+  const { jobs, clips } = liveStory(3);
+  const plan = P.resegment(jobs, 5);
+  assert.ok(plan, 'phải chia được');
+  assert.equal(plan.images.length, 2);
+  assert.equal(plan.changes.length, 2);
+  assert.deepEqual(plan.images.map(j => j.number), [4, 5], 'tiếp số sau ảnh mốc 2, 3 đã có');
+  assert.equal(plan.seams.length, 4, '5 đoạn = 4 chỗ nối');
+  assert.ok(plan.seams.every((v, i, a) => i === 0 || v > a[i - 1]));
+  for (const ch of plan.changes) {
+    const job = jobs.find(j => j.id === ch.id);
+    assert.equal(job.status, 'pending');
+    assert.ok(!ch.prompt.includes('continues directly from the previous clip'), 'đầu đoạn mới không còn dòng nối cảnh trước');
+    assert.deepEqual(ch.needs, ch.refList.map(r => ({ phase: r.phase, number: r.number })));
+    assert.equal(ch.needs[0].phase, 'image');
+    assert.ok(plan.images.some(im => im.number === ch.needs[0].number));
+  }
+  for (const im of plan.images) {
+    assert.match(im.prompt, /Edit the attached photo/);
+    assert.match(im.prompt, /already finished: /, 'có liệt kê các bước đã xong');
+    assert.deepEqual(im.refList, [{ file: '/p.jpg' }]);
+    assert.deepEqual(im.needs, []);
+  }
+});
+
+test('resegment: không chia khi đã đủ đoạn, khi chỉ muốn 1, hoặc khi còn quá ít cảnh chưa làm', () => {
+  const five = liveStory(5);
+  assert.equal(P.resegment(five.jobs, 5), null, 'đã đủ 5 đoạn đang hoạt động');
+  assert.equal(P.resegment(liveStory(3).jobs, 1), null);
+  const nearEnd = liveStory(1, { doneClips: 108, running: 109 });
+  assert.equal(P.resegment(nearEnd.jobs, 5), null, 'còn 5 cảnh: chia ra chỉ thêm chỗ nối');
+});
+
+test('resegment: một chuỗi duy nhất, chưa có ảnh gốc của người dùng → ảnh mốc dựa vào ảnh Muse tạo (ảnh 1)', () => {
+  const { jobs } = liveStory(1, { photo: '', doneClips: 10, running: 11 });
+  const plan = P.resegment(jobs, 4);
+  assert.equal(plan.images.length, 3);
+  assert.deepEqual(plan.images[0].needs, [{ phase: 'image', number: 1 }]);
+  assert.deepEqual(plan.images[0].refList, [{ phase: 'image', number: 1 }]);
+  assert.deepEqual(plan.images.map(j => j.number), [2, 3, 4]);
+  const starts = plan.changes.map(c => c.number).sort((a, b) => a - b);
+  assert.ok(starts[0] > 15, 'điểm chia nằm trong phần chưa làm, sau cảnh đang chạy');
+  assert.ok(Math.min(starts[1] - starts[0], 114 - starts[2]) >= 4, 'mỗi đoạn còn ít nhất 4 cảnh');
+});
+
+test('resegment: không đụng cảnh đã gửi / đã xong; ảnh gốc của truyện Flow giữ provider', () => {
+  const { jobs, clips } = liveStory(3);
+  // một cảnh ở giữa đã bị gửi dở (đang chờ gửi lại) thì không dùng làm điểm chia
+  const plan0 = P.resegment(jobs, 5);
+  const used = new Set(plan0.changes.map(c => c.number));
+  clips.filter(c => used.has(c.number)).forEach(c => { c.resumeMode = 'resubmit'; });
+  const plan1 = P.resegment(jobs, 5);
+  if (plan1) for (const ch of plan1.changes) assert.ok(!jobs.find(j => j.id === ch.id).resumeMode);
+  const flow = liveStory(3).jobs.map(j => ({ ...j, provider: 'flow', aspect: '16:9' }));
+  const planF = P.resegment(flow, 5);
+  assert.ok(planF.images.every(im => im.provider === 'flow' && im.aspect === '16:9'));
+});

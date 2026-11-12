@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.8.1
+- **Sửa lỗi nghiêm trọng của 1.8.0:** hàng đợi làm rơi nhãn «Flow» của từng cảnh nên chọn Google Flow vẫn chạy như Muse. Đã sửa và có test. Ai đã cài 1.8.0 hãy cài 1.8.1.
+- **Mở 5 (hoặc 10) trình duyệt mà chỉ 1 ô làm việc:** video tạo lúc chọn ít ô hơn chỉ có 1–3 đoạn nên chỉ 1–3 cảnh chạy được cùng lúc (cảnh sau chờ khung cuối cảnh trước). Bây giờ khi bấm **Chạy / Tiếp tục**, tool tự **chia lại phần chưa làm** thành đủ số đoạn bằng số ô đang bật (tối đa 10): thêm ảnh mốc đầu mỗi đoạn mới và cập nhật chỗ nối khi dựng. Cảnh đã xong và cảnh đang chạy giữ nguyên. Nếu bạn chủ động chọn số đoạn cố định (không để «Tự động») thì tool giữ đúng số đó.
+- **Cảnh dở gắn với tài khoản đang nghỉ** (hết hạn mức) không còn bị kẹt: tài khoản khác nhận cảnh đó.
+- Hiện rõ ở phần «Chạy song song» những tài khoản đang nghỉ vì hết hạn mức và giờ tự thử lại; bấm Tiếp tục để thử lại ngay.
+
 ## Update 1.8.0 (bản thử nghiệm)
 - **Tab «Dọn nhà · Sinh tồn» có thêm nhà cung cấp «Google Flow (Veo 3.1)»** cho lúc Muse hết hạn mức tạo video. Chọn **Tạo video bằng → Google Flow**, chọn số phút, bấm «Tạo và chạy tự động» như cũ: tool tự gửi từng cảnh vào Flow, chờ, tải video 720p gốc về và dựng thành một video liền mạch. Cần **gói Google AI Ultra** (hoặc gói có đủ tín dụng Flow).
 - **Cách chuẩn bị (một lần):** 1) vào flow.google.com, tạo **một dự án trống**, copy địa chỉ trên thanh địa chỉ (dạng `https://flow.google.com/project/…`) rồi dán vào ô «Đường dẫn dự án Flow»; 2) bấm **«Mở Flow để đăng nhập Google»**: tool mở một cửa sổ Chrome/Edge riêng (hồ sơ riêng của tool, không đụng hồ sơ Chrome cá nhân), bạn tự đăng nhập Google một lần, các lần sau không phải đăng nhập lại; 3) quay lại tab, chọn mô hình và bấm tạo. Đừng đóng cửa sổ Flow khi đang chạy.

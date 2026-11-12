@@ -465,6 +465,7 @@
 
   // Danh sách việc đầy đủ của chủ đề (để tả «đã xong những gì» cho ảnh mốc).
   function fullSteps(config) {
+    if (Array.isArray(config.stepList)) return config.stepList.map(en => ({ en }));   // dựng lại từ prompt các cảnh đã có (chia lại truyện đang chạy)
     const theme = themeOf(config.theme);
     if (theme.id === 'custom') return config.customSteps.map(t => ({ en: t }));
     return theme.steps.map(st => ({ en: st[1] }));
@@ -528,9 +529,76 @@
     return jobs;
   }
 
+  // ---- Chia lại phần CHƯA LÀM của một truyện đang chạy thành thêm đoạn song song.
+  // Truyện tạo lúc ít tài khoản (hoặc chỉ 1 chuỗi) thì sau này mở thêm trình duyệt cũng không nhanh hơn: chuỗi nối tiếp chỉ có MỘT cảnh chạy được mỗi lúc.
+  // Hàm thuần: nhận danh sách việc của MỘT truyện, trả về {changes, images, seams} (không sửa dữ liệu vào); null nếu không cần / không thể chia.
+  const CONT_LINE = 'This clip continues directly from the previous clip without any jump: the person keeps the same pose, the same tool in the hands and the same movement as in the attached frame, and goes on working.';
+  const STEP_RE = /STEP (\d+) of (\d+)(?:, part (\d+) of (\d+))?: ([^\n]*?)\.(?:\n|$)/;
+  const MIN_REMAIN = 4;                                  // mỗi nửa sau khi chia còn ít nhất 4 cảnh chưa làm
+  function resegment(jobs, want) {
+    const clips = (jobs || []).filter(j => j.phase === 'clip' && Number.isInteger(j.number)).sort((a, b) => a.number - b.number);
+    const images = (jobs || []).filter(j => j.phase === 'image');
+    want = Math.min(MAX_PARALLEL, Math.floor(Number(want) || 1));
+    if (want < 2 || clips.length < MIN_REMAIN * 2) return null;
+    const parsed = clips.map(c => STEP_RE.exec(String(c.prompt || '')));
+    if (parsed.some(m => !m)) return null;
+    const isStart = c => c.number === 1 || !(c.needs || []).some(n => n.phase === 'clip');
+    const idx = clips.map((c, i) => i).filter(i => isStart(clips[i]));
+    if (!idx.length || idx[0] !== 0) return null;
+    const segs = idx.map((from, i) => ({ from, to: i + 1 < idx.length ? idx[i + 1] : clips.length }));
+    const done = c => c.status === 'completed';
+    const untouched = c => c.status === 'pending' && !c.resumeMode && !c.submittedAt && !c.mayHaveSubmitted && !c.output;
+    const frontier = seg => { for (let i = seg.from; i < seg.to; i++) if (!done(clips[i])) return i; return -1; };
+    const active = () => segs.filter(seg => frontier(seg) >= 0);
+    const splits = [];
+    while (active().length < want) {
+      let best = null;
+      for (const seg of segs) {
+        const f = frontier(seg);
+        if (f < 0) continue;
+        const left = seg.to - f;                                   // số cảnh chưa xong của đoạn này
+        if (left < MIN_REMAIN * 2) continue;
+        const at = f + Math.floor(left / 2);
+        let ok = true;
+        for (let i = at; i < seg.to; i++) if (!untouched(clips[i])) { ok = false; break; }
+        if (ok && (!best || left > best.left)) best = { seg, at, left };
+      }
+      if (!best) break;
+      splits.push(best.at);
+      segs.push({ from: best.at, to: best.seg.to }); best.seg.to = best.at;   // đoạn mới bắt đầu từ cảnh `at`
+    }
+    if (!splits.length) return null;
+    // Danh sách việc đầy đủ (để ảnh mốc biết «đã xong những gì») dựng từ prompt của các cảnh.
+    const stepList = [];
+    parsed.forEach(m => { const n = Number(m[1]); if (!stepList[n - 1]) stepList[n - 1] = m[5].replace(/^the person /, ''); });
+    for (let i = 0; i < Number(parsed[0][2]); i++) if (!stepList[i]) stepList[i] = 'the work continues';
+    const firstLine = String(clips[0].prompt).split('\n')[0];
+    const aspect = Object.keys(RATIO).find(k => RATIO[k] === firstLine) || '16:9';
+    const en = images.some(j => /^(Original photo|Part start)/.test(j.title || ''));
+    const cfg = { stepList, aspect, person: false, theme: 'cabin' };
+    const base = clips[0].refList && clips[0].refList[0];
+    const flow = clips[0].provider === 'flow' ? { provider: 'flow', aspect: clips[0].aspect } : {};
+    let nextImage = Math.max(1, ...images.map(j => j.number || 0)) + 1;
+    const result = { changes: [], images: [], seams: [] };
+    splits.sort((a, b) => a - b).forEach(at => {
+      const c = clips[at], m = parsed[at], k = nextImage++;
+      const step = { step: Number(m[1]), steps: Number(m[2]), part: Number(m[3] || 1), parts: Number(m[4] || 1) };
+      result.images.push({
+        kind: 'restore', storyId: c.storyId, phase: 'image', number: k, title: (en ? 'Part start ' : 'Mốc đoạn ') + k,
+        prompt: keyframePrompt(cfg, step, at, clips.length), references: [],
+        needs: base && base.file ? [] : [{ phase: 'image', number: 1 }], refList: [base && base.file ? { file: base.file } : { phase: 'image', number: 1 }], ...flow
+      });
+      result.changes.push({ id: c.id, number: c.number, needs: [{ phase: 'image', number: k }], refList: [{ phase: 'image', number: k }],
+        prompt: String(c.prompt).replace('\n' + CONT_LINE, '').replace(/\nThe second attached image is only a reference[^\n]*/, '') });
+    });
+    // Mọi chỗ bắt đầu đoạn (chỉ số từ 0, không tính cảnh đầu) — dùng làm chỗ nối khi dựng video.
+    result.seams = segs.map(seg => seg.from).filter(i => i > 0).sort((a, b) => a - b);
+    return result;
+  }
+
   const slug = text => String(text || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
   function storyIdBase(config) { return slug(config.name) || slug(themeOf(config.theme).label) || 'DonNha'; }
   function videoTitle(config) { return config.name || text(config.theme, config.lang).label; }
 
-  return { ASPECTS, MINUTES, LONG_MINUTES, VERY_LONG_MINUTES, SECONDS, MAX_CLIPS, clipCount, THEMES, EN, text, themeOf, options, stepsOf, sceneBible, baseImagePrompt, clipPrompt, segmentsOf, seamsOf, keyframePrompt, PROVIDERS, MAX_CLIPS_FLOW, MAX_PARALLEL, MIN_SEGMENT, problems, screenText, screenConfig, isPolicyError, safeRetryPrompt, buildJobs, storyIdBase, videoTitle, SURVIVOR, WORKER, SURVIVOR_F, WORKER_F, PHOTO_PERSON, WHO, personFor, DEFAULT_LIGHT };
+  return { ASPECTS, MINUTES, LONG_MINUTES, VERY_LONG_MINUTES, SECONDS, MAX_CLIPS, clipCount, THEMES, EN, text, themeOf, options, stepsOf, sceneBible, baseImagePrompt, clipPrompt, segmentsOf, resegment, seamsOf, keyframePrompt, PROVIDERS, MAX_CLIPS_FLOW, MAX_PARALLEL, MIN_SEGMENT, problems, screenText, screenConfig, isPolicyError, safeRetryPrompt, buildJobs, storyIdBase, videoTitle, SURVIVOR, WORKER, SURVIVOR_F, WORKER_F, PHOTO_PERSON, WHO, personFor, DEFAULT_LIGHT };
 });

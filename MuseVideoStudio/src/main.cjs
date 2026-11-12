@@ -52,7 +52,7 @@ const defaults = { language:'en', accountSessionIds:{}, dispatchMode:'parallel',
 function ui(vi,en){return settings?.language==='vi'?vi:en;}
 async function atomic(file, data) { await fs.writeFile(file + '.tmp', JSON.stringify(data, null, 2)); await fs.rename(file + '.tmp', file); }
 function snapshot() {
-  return {version:app.getVersion?.()||require('../package.json').version,jobs:queue.jobs,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,restore:{...restoreState,stories:settings.restoreStories||{}},story:{...(storyService?.status()||{}),analyze:storyAnalyzer?.status()||{},voice:voiceService?.status()||{}},
+  return {version:app.getVersion?.()||require('../package.json').version,jobs:queue.jobs,resting:queue.exhaustedAccounts().sort((a,b)=>a-b),restingUntil:queue.exhausted.size?queue.nextExhaustedAt():0,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,restore:{...restoreState,stories:settings.restoreStories||{}},story:{...(storyService?.status()||{}),analyze:storyAnalyzer?.status()||{},voice:voiceService?.status()||{}},
     flow:{open:Boolean(flowBrowser&&!flowBrowser.isClosed()),opening:Boolean(flowLaunch)},
     accounts:Array.from({length:Math.max(settings.accountCount,MAX_ACCOUNTS)},(_,index)=>{
       const browser=browsers.get(index),external=settings.browserChoice !== 'builtin';
@@ -634,6 +634,28 @@ async function buildRestoreStory(storyId){
   }catch(e){restoreState={busy:false,progress:'',error:e.message,storyId};}
   finally{await save();notify();}
 }
+// Truyện tạo lúc ít tài khoản (hoặc 1 chuỗi) chỉ có vài cảnh chạy được cùng lúc. Trước khi chạy / tiếp tục: chia lại phần CHƯA LÀM thành đủ số đoạn bằng số ô đang bật.
+async function resegmentRestore(want){
+  if(!(want>1))return 0;
+  const stories=new Map();
+  for(const job of queue.jobs)if(job.kind==='restore'&&job.storyId){if(!stories.has(job.storyId))stories.set(job.storyId,[]);stories.get(job.storyId).push(job);}
+  let added=0;
+  for(const [storyId,list] of stories){
+    if(Number(settings.restoreStories?.[storyId]?.parallel)>0)continue;   // người dùng đã tự chọn số đoạn: giữ nguyên
+    let plan=null;
+    try{plan=restorePlan.resegment(list,want);}catch{plan=null;}
+    if(!plan)continue;
+    const targets=plan.changes.map(ch=>({ch,job:queue.jobs.find(j=>j.id===ch.id)}));
+    if(targets.some(({job})=>!job||job.status!=='pending'||job.resumeMode))continue;
+    for(const {ch,job} of targets){job.needs=ch.needs;job.refList=ch.refList;job.prompt=ch.prompt;}
+    const meta=settings.restoreStories?.[storyId];
+    if(meta)meta.seams=plan.seams.map(Number).filter(n=>Number.isInteger(n)&&n>0&&n<1000).slice(0,20);
+    await queue.add(plan.images);
+    added+=plan.images.length;
+  }
+  if(added)await save();
+  return added;
+}
 // Sau khi hàng đợi chạy xong: truyện nào đủ cảnh và chưa dựng đúng bản clip này thì dựng.
 async function buildRestoreStories({auto=false}={}){
   if(restoreState.busy||merging||packaging)return;
@@ -917,6 +939,7 @@ app.whenReady().then(async () => {
         queue.prepareResume(kind);
         if(!data?.auto)queue.exhausted.clear();   // người dùng bấm chạy tay: thử lại mọi tài khoản, kể cả tài khoản đang nghỉ
         queue.concurrency=flowMode?settings.flowParallel:settings.dispatchMode==='parallel'?settings.accountCount:1;
+        if(kind==='restore'&&queue.concurrency>1){try{const n=await resegmentRestore(queue.concurrency);if(n)notify();}catch{}}
         queue.start(kind).then(async()=>{
           const videos=queue.jobs.filter(j=>j.kind==='video');
           if(kind==='video' && !queue.paused && videos.length && videos.every(j=>j.status==='completed')) {
@@ -957,7 +980,7 @@ app.whenReady().then(async () => {
         music=path.join(folder,'nhac-nen'+path.extname(meta.music).toLowerCase());await fs.copyFile(meta.music,music);
       }
       const all=settings.restoreStories||(settings.restoreStories={});
-      all[storyId]={name:String(meta.name||storyId).slice(0,120),aspect:['16:9','9:16'].includes(meta.aspect)?meta.aspect:'16:9',music,seams:Array.isArray(meta.seams)?meta.seams.map(Number).filter(n=>Number.isInteger(n)&&n>0&&n<1000).slice(0,20):[],auto:meta.auto!==false,theme:String(meta.theme||'').slice(0,40),createdAt:Date.now()};
+      all[storyId]={name:String(meta.name||storyId).slice(0,120),aspect:['16:9','9:16'].includes(meta.aspect)?meta.aspect:'16:9',music,seams:Array.isArray(meta.seams)?meta.seams.map(Number).filter(n=>Number.isInteger(n)&&n>0&&n<1000).slice(0,20):[],auto:meta.auto!==false,theme:String(meta.theme||'').slice(0,40),parallel:Number(meta.parallel)>0?Math.min(10,Math.round(Number(meta.parallel))):0,createdAt:Date.now()};
       for(const id of Object.keys(all).slice(0,Math.max(0,Object.keys(all).length-40)))delete all[id];
       await queue.add(jobs);
       await save();notify();

@@ -789,7 +789,7 @@ Mở Flow để đăng nhập Google|Open Flow to sign in to Google
       [/^(\d+) đang làm$/,m=>m[1]+' processing'],[/^(\d+) đang chờ$/,m=>m[1]+' pending'],[/^(\d+) cảnh dở(?: \/ lỗi)?$/,m=>m[1]+' interrupted / failed'],
       [/^(\d+) trình duyệt · (\d+) ô$/,m=>m[1]+' browsers · '+m[2]+' slots'],
       [/^Mở (\d+) trình duyệt$/,m=>'Open '+m[1]+' browsers'],
-      [/^Song song (\d+) trình duyệt · mỗi trình duyệt 1 prompt$/,m=>'Parallel: '+m[1]+' browsers · 1 prompt each'],
+      [/^Song song (\d+) trình duyệt · mỗi trình duyệt 1 prompt(.*)$/,m=>'Parallel: '+m[1]+' browsers · 1 prompt each'+m[2].replace(' · Đang nghỉ vì hết hạn mức: TK ',' · Resting (quota reached): account ').replace('đến ','until ').replace('bấm Tiếp tục để thử lại ngay','press Continue to retry now')],
       [/^Trình duyệt (\d+): (.+)$/,m=>'Browser '+m[1]+': '+t(m[2])],
       [/^Đã xử lý (.+)$/,m=>'Elapsed '+m[1]],[/^Đã tải (.+)$/,m=>'Downloaded '+m[1]],
       [/^(🔒 Đã khóa · )?(\d+) ảnh tham chiếu(.*)$/,m=>(m[1]?'🔒 Locked · ':'')+m[2]+' reference image(s)'+m[3].replace('TK ','Account ')],

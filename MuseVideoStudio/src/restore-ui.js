@@ -143,7 +143,7 @@
     const jobs = P.buildJobs(c, { storyId: 'x', photo, accounts });
     $('restoreCreate').disabled = true;
     try {
-      const result = await call('restoreCreate', { jobs, idBase: P.storyIdBase(c), meta: { name: P.videoTitle(c), provider: c.provider, aspect: c.aspect, music, seams: P.seamsOf(c, accounts), auto: $('restoreAuto').checked, theme } });
+      const result = await call('restoreCreate', { jobs, idBase: P.storyIdBase(c), meta: { name: P.videoTitle(c), provider: c.provider, parallel: c.parallel, aspect: c.aspect, music, seams: P.seamsOf(c, accounts), auto: $('restoreAuto').checked, theme } });
       if (result) {
         toast(result.startError
           ? tr('Đã thêm các cảnh nhưng chưa chạy được: ', 'Scenes added but could not start: ') + result.startError
