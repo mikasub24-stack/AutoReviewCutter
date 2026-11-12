@@ -44,12 +44,12 @@ class FakeComfy:
 
 class EngineTests(unittest.TestCase):
     def test_duration_plan_covers_requested_frames_and_uses_stable_setting(self):
-        for minutes in (.1,1,10,15):
+        for minutes in (.1,1,10,15,20,60):
             data=engine.plan(engine.TOPICS[0],minutes)
             self.assertGreaterEqual(len(data['scenes'])*(engine.FRAMES-1)+1,data['frames'])
             self.assertIn(engine.STORIES[engine.TOPICS[0]]['setting'],data['scenes'][-1]['prompt'])
         self.assertEqual(len(engine.plan(engine.TOPICS[0],1)['scenes']),13)
-        for bad in ('nan','inf','-1','0','16'):
+        for bad in ('nan','inf','-1','0','61'):
             with self.assertRaises(ValueError):engine.plan(engine.TOPICS[0],bad)
 
     def test_loopback_only_and_missing_models_are_actionable(self):

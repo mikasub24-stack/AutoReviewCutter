@@ -10,7 +10,7 @@ if '--manifest' in sys.argv:
     root=Path(sys.argv[-1])
     files={str(p.relative_to(root)).replace('\\','/'):hashlib.sha256(p.read_bytes()).hexdigest()
            for p in root.rglob('*') if p.is_file() and p.name!='BuildManifest.json'}
-    data={'version':'0.2.2','sourceCommit':os.environ.get('GITHUB_SHA','local'),'files':files,
+    data={'version':'0.2.3','sourceCommit':os.environ.get('GITHUB_SHA','local'),'files':files,
           'python':sys.version,'compiler':'Nuitka '+importlib.metadata.version('Nuitka')+' / MSVC','gpuInferenceTested':False,'referencePolicy':'persistent_character_and_previous_last_frame',
           'nativeGenerationSize':[1280,736],'outputSize':[1280,720],'upscale':False,'fullModelDownloadTested':False,'comfyPortable':'v0.45.0 NVIDIA CUDA 12.6',
           'codeSigned':False,'browserDownloadVerdict':'unverified'}

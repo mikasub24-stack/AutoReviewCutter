@@ -1,6 +1,12 @@
-# Wan Local Studio 0.2.2
+# Wan Local Studio 0.2.3
 
 App Windows tiếng Việt cho RTX 3060 12GB / RAM 32GB. Màn hình gọn: chọn **Dọn nhà bỏ hoang** hoặc **Sinh tồn trong rừng**, nhập số phút và bấm **Tạo video**. Nút **Cài & tải bộ Wan** cho phép chuẩn bị dữ liệu trước; bấm Tạo khi chưa có bộ chạy cũng tự thực hiện bước chuẩn bị.
+
+## 0.2.3: sửa lỗi OpenBLAS khi khởi động
+
+Backend riêng nhận giới hạn OpenBLAS 1 luồng, OMP/MKL/NumExpr 2 luồng trước khi import thư viện. Tắt pinned memory và async offload bằng hai cờ có trong ComfyUI v0.45.0 để giảm áp lực RAM trên cấu hình 32 GB; không thay biến môi trường toàn hệ thống. Log ghi RAM vật lý/bộ nhớ cấp phát còn trống. Lỗi hiện gọn trong app, log chi tiết vẫn giữ tại thư mục dữ liệu. Nếu vẫn thiếu bộ nhớ, cần kiểm tra RAM/commit đang còn và cấu hình bộ nhớ ảo Windows; app không tự sửa pagefile hoặc đóng ứng dụng khác.
+
+Cho nhập 0,1–60 phút, bao gồm 20 phút. Render tuần tự, nhưng video dài 720p trên 3060 vẫn có thể mất nhiều giờ và tốn nhiều ổ đĩa. Nên thử 0,1 phút trước. Không tải lại model đã được kiểm tra. Giữ toàn bộ tính năng 720p gốc của bản 0.2.2.
 
 ## 0.2.2: 720p gốc 16:9
 

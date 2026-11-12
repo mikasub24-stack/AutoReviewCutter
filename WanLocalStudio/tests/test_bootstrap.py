@@ -1,6 +1,7 @@
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -8,7 +9,7 @@ import sys
 import tempfile
 import threading
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import zipfile
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import bootstrap
@@ -16,6 +17,34 @@ import engine
 
 
 class BootstrapTests(unittest.TestCase):
+    def test_backend_limits_blas_threads_without_changing_global_environment(self):
+        with patch.dict(os.environ,{'OPENBLAS_NUM_THREADS':'64','OMP_NUM_THREADS':'32','PYTHONHOME':'unrelated'}):
+            env=bootstrap.backend_environment()
+            self.assertEqual(env['OPENBLAS_NUM_THREADS'],'1');self.assertEqual(env['OMP_NUM_THREADS'],'2')
+            self.assertNotIn('PYTHONHOME',env)
+            self.assertEqual(os.environ['OPENBLAS_NUM_THREADS'],'64')
+
+    def test_managed_backend_launch_disables_pinned_ram_and_async_offload(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td);child=Mock();child.poll.return_value=None
+            with patch.object(engine.Comfy,'preflight',side_effect=[RuntimeError('not started'),{}]),patch.object(bootstrap.subprocess,'run',return_value=subprocess.CompletedProcess([],0,'RTX 3060\n','')) as probe,patch.object(bootstrap.subprocess,'Popen',return_value=child) as spawn:
+                client=bootstrap.start_backend(root,root,threading.Event(),lambda _:None)
+            self.assertEqual(client.url,bootstrap.MANAGED_URL)
+            args=spawn.call_args.args[0];env=spawn.call_args.kwargs['env']
+            self.assertIn('--disable-pinned-memory',args);self.assertIn('--disable-async-offload',args)
+            self.assertEqual(env['OPENBLAS_NUM_THREADS'],'1')
+            self.assertEqual(probe.call_args.kwargs['env']['OPENBLAS_NUM_THREADS'],'1')
+            bootstrap._children.remove(child)
+
+    def test_startup_memory_error_is_short_and_ignores_old_log_attempts(self):
+        with tempfile.TemporaryDirectory() as td:
+            path=Path(td)/'comfyui.log';old=b'old unrelated error\n'
+            path.write_bytes(old+b'\x1b[32mOpenBLAS error: Memory allocation still failed after 10 retries, giving up.\x1b[0m\n')
+            message=bootstrap.startup_error(path,len(old))
+            self.assertIn('thiếu bộ nhớ',message);self.assertNotIn('\x1b',message);self.assertLess(len(message),400)
+            path.write_bytes(old+b'new failure\n')
+            self.assertNotIn('old unrelated',bootstrap.startup_error(path,len(old)))
+
     def test_metadata_requires_real_lfs_hash_and_size(self):
         text='version https://git-lfs.github.com/spec/v1\r\noid sha256:'+'a'*64+'\r\nsize 2000000\r\n'
         self.assertEqual(bootstrap.parse_pointer(text),('a'*64,2000000))

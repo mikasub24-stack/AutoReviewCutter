@@ -29,7 +29,7 @@ class App(ctk.CTk):
     def __init__(self):
         ctk.set_appearance_mode('dark')
         super().__init__()
-        self.title('Wan Local Studio · Tạo video trên máy của bạn')
+        self.title('Wan Local Studio '+engine.VERSION+' · Tạo video trên máy của bạn')
         self.geometry('740x530'); self.minsize(700,500)
         self.configure(fg_color='#0b1220')
         if os.name == 'nt': self.iconbitmap(str(engine.ROOT / 'icon.ico'))
@@ -117,7 +117,7 @@ class App(ctk.CTk):
         try:
             data=engine.plan(self.topic.get(),self.minutes.get().replace(',','.'))
             self.count.set(f'{len(data["scenes"])} cảnh · {data["frames"]/24:g} giây · 720p gốc 16:9 · Tự tham chiếu và dựng MP4.')
-        except (ValueError,TypeError): self.count.set('Nhập số từ 0,1 đến 15. Ví dụ 0,1 = 6 giây; 1 = 60 giây.')
+        except (ValueError,TypeError): self.count.set('Nhập số từ 0,1 đến 60. Ví dụ 0,1 = 6 giây; 1 = 60 giây.')
 
     def save_settings(self):
         path=settings_path();path.parent.mkdir(parents=True,exist_ok=True)

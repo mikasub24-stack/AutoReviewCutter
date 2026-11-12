@@ -24,6 +24,44 @@ SOURCES = (
 _children = []
 
 
+def backend_environment():
+    env = os.environ.copy()
+    env.pop('PYTHONHOME', None); env.pop('PYTHONPATH', None)
+    # Apply before either torch/NumPy import. Only the child gets these values.
+    env.update({'OPENBLAS_NUM_THREADS': '1', 'OPENBLAS_DEFAULT_NUM_THREADS': '1',
+                'GOTO_NUM_THREADS': '1', 'OMP_NUM_THREADS': '2', 'MKL_NUM_THREADS': '2',
+                'NUMEXPR_NUM_THREADS': '2', 'BLIS_NUM_THREADS': '1', 'VECLIB_MAXIMUM_THREADS': '2',
+                'PYTHONUTF8': '1', 'NO_COLOR': '1'})
+    return env
+
+
+def memory_status():
+    if os.name != 'nt': return None
+    import ctypes
+    class Status(ctypes.Structure):
+        _fields_ = [('length',ctypes.c_ulong),('load',ctypes.c_ulong),
+                    ('total_ram',ctypes.c_ulonglong),('free_ram',ctypes.c_ulonglong),
+                    ('total_commit',ctypes.c_ulonglong),('free_commit',ctypes.c_ulonglong),
+                    ('total_virtual',ctypes.c_ulonglong),('free_virtual',ctypes.c_ulonglong),
+                    ('extended',ctypes.c_ulonglong)]
+    value = Status(); value.length = ctypes.sizeof(value)
+    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(value)): return None
+    return {'free_ram': value.free_ram, 'free_commit': value.free_commit}
+
+
+def startup_error(log_path, offset):
+    with Path(log_path).open('rb') as file:
+        file.seek(0,2); end = file.tell()
+        file.seek(max(offset,end-8192)); text = file.read().decode('utf-8','replace')
+    text = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text)
+    if 'OpenBLAS' in text and ('Memory allocation' in text or 'memory' in text.lower()):
+        return ('ComfyUI thiếu bộ nhớ khi khởi tạo OpenBLAS. Đã giới hạn luồng và tắt ghim RAM; '
+                'nếu vẫn lỗi, đóng bớt ứng dụng và kiểm tra bộ nhớ ảo Windows. Log: ' + str(log_path))
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    tail = '\n'.join(lines[-4:])[-450:]
+    return 'ComfyUI chưa mở được. ' + tail + '\nLog: ' + str(log_path)
+
+
 def default_root():
     return Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'WanLocalStudioData'
 
@@ -209,7 +247,9 @@ def start_backend(folder, root, cancelled, notify):
     except Exception: pass
     folder = Path(folder); root = Path(root)
     notify('Đang kiểm tra GPU NVIDIA/CUDA…')
-    env = os.environ.copy(); env.pop('PYTHONHOME', None); env.pop('PYTHONPATH', None)
+    env = backend_environment()
+    memory = memory_status()
+    if memory: notify(f'RAM trống: {memory["free_ram"]/1024**3:.1f} GB · Bộ nhớ cấp phát trống: {memory["free_commit"]/1024**3:.1f} GB')
     python = folder / 'python_embeded/python.exe'
     test = subprocess.run([str(python), '-I', '-c', 'import torch; print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "NO_CUDA"); raise SystemExit(0 if torch.cuda.is_available() else 2)'],
                           capture_output=True, text=True, timeout=90, env=env,
@@ -219,9 +259,11 @@ def start_backend(folder, root, cancelled, notify):
         raise RuntimeError('Chưa dùng được GPU CUDA. Kiểm tra driver NVIDIA. ' + (test.stdout + test.stderr)[-1500:])
     notify('GPU: ' + test.stdout.strip() + ' · Đang mở ComfyUI riêng của tool…')
     log = (root / 'comfyui.log').open('ab')
+    log_offset = log.tell()
     try:
         child = subprocess.Popen([str(python), '-s', str(folder / 'ComfyUI/main.py'), '--windows-standalone-build',
-                                  '--listen', '127.0.0.1', '--port', '8189', '--lowvram', '--preview-method', 'none'],
+                                  '--listen', '127.0.0.1', '--port', '8189', '--lowvram', '--preview-method', 'none',
+                                  '--disable-pinned-memory', '--disable-async-offload'],
                                  cwd=folder, env=env, stdout=log, stderr=log,
                                  creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     finally: log.close()
@@ -230,8 +272,7 @@ def start_backend(folder, root, cancelled, notify):
     while time.monotonic() < deadline:
         check_cancel(cancelled)
         if child.poll() is not None:
-            tail = (root / 'comfyui.log').read_text(encoding='utf-8', errors='replace')[-2000:]
-            raise RuntimeError('ComfyUI chưa mở được: ' + tail)
+            raise RuntimeError(startup_error(root / 'comfyui.log', log_offset))
         try: client.preflight(); return client
         except RuntimeError: pass
         if cancelled.wait(2): check_cancel(cancelled)
