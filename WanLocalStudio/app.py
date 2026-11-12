@@ -239,6 +239,14 @@ class App(ctk.CTk):
 
 def smoke_test():
     import tempfile
+    if os.name == 'nt':
+        import subprocess
+        for name, option in [('ffmpeg.exe','-version'),('7z.exe','-h')]:
+            path=engine.ROOT/'runtime'/name
+            assert path.is_file(),str(path)
+            result=subprocess.run([str(path),option],capture_output=True,timeout=20,
+                                  creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+            assert result.returncode==0,(name,result.stderr)
     with tempfile.TemporaryDirectory() as td:
         with_settings=Path(td)/'settings.json'
         global settings_path

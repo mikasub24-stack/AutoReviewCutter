@@ -4,7 +4,7 @@ Workflow reference: Comfy-Org/workflow_templates at a8bc07a76478dfada740fa8fa49a
 
 ComfyUI and Wan weights are not redistributed in this installer. Their own licenses apply to separate installations/model downloads. Official source: https://github.com/Comfy-Org/ComfyUI and https://github.com/Wan-Video/Wan2.2 .
 
-Packaged dependencies: CustomTkinter (MIT), darkdetect (BSD), Pillow (HPND), Python (PSF), PyInstaller (GPL with bootloader exception), imageio-ffmpeg (BSD). Distribution license files are copied into runtime/licenses during build.
+Packaged dependencies: CustomTkinter (MIT), darkdetect (BSD), Pillow (HPND), Python (PSF), Nuitka 4.3.5 (AGPLv3 with Nuitka Runtime Library Exception 1.0), imageio-ffmpeg (BSD). Distribution license files are copied into runtime/licenses during build.
 
 The FFmpeg binary is distributed by imageio-ffmpeg/imageio-binaries, with exact version and build configuration in runtime/FFMPEG-BUILD.txt. FFmpeg licensing depends on the configuration (GPL components may be enabled). Binary/build and corresponding source information: https://github.com/imageio/imageio-binaries/tree/master/ffmpeg and https://ffmpeg.org/download.html#get-sources . Notices supplied with the binary package are included.
 

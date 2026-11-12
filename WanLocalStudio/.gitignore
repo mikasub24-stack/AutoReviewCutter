@@ -5,3 +5,4 @@ pybuild/
 runtime/
 icon.ico
 *.spec
+compiled/

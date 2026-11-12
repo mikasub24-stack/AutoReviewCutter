@@ -5,17 +5,18 @@ on:
     branches: [fix/vst3-discovery]
     paths: ['WanLocalStudio/**', '.github/workflows/wan-local-studio-windows.yml']
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: wan-local-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   windows:
     runs-on: windows-2022
-    timeout-minutes: 20
+    timeout-minutes: 40
     env:
       PYTHONUTF8: '1'
       PYTHONIOENCODING: utf-8
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,6 +42,8 @@ jobs:
           $env:WAN_UI_PREVIEW = Join-Path (Get-Location) 'dist-wan/UI-Preview.png'
           python -m pip install --require-hashes --only-binary=:all: -r WanLocalStudio/requirements-windows.lock
           if ($LASTEXITCODE) { throw 'pip failed' }
+          python -m pip install --require-hashes --no-build-isolation --no-deps -r WanLocalStudio/compiler-windows.lock
+          if ($LASTEXITCODE) { throw 'Pinned source compiler install failed' }
           New-Item -ItemType Directory -Force WanLocalStudio/runtime | Out-Null
           $encoder = python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
           Copy-Item $encoder WanLocalStudio/runtime/ffmpeg.exe
@@ -61,12 +64,17 @@ jobs:
           if ($LASTEXITCODE) { throw 'Engine tests failed' }
           python WanLocalStudio/app.py --smoke-test
           if ($LASTEXITCODE) { throw 'Source GUI smoke failed' }
-          python -m PyInstaller --noconfirm --windowed --clean --noupx --version-file WanLocalStudio/version-info.txt --collect-all customtkinter --collect-all darkdetect --name WanLocalStudio --icon WanLocalStudio/icon.ico --distpath WanLocalStudio/build --workpath WanLocalStudio/pybuild --specpath . --add-data 'WanLocalStudio/icon.ico;.' --add-data 'WanLocalStudio/runtime;runtime' --add-data 'WanLocalStudio/vendor;vendor' WanLocalStudio/app.py 2>&1 | Tee-Object -Variable packOutput
+          python -m nuitka --standalone --msvc=latest --jobs=3 --enable-plugin=tk-inter --include-package=customtkinter --include-package=darkdetect --include-package-data=customtkinter --windows-console-mode=disable --windows-icon-from-ico=WanLocalStudio/icon.ico --output-filename=WanLocalStudio.exe --output-dir=WanLocalStudio/compiled --include-data-files=WanLocalStudio/icon.ico=icon.ico --include-data-dir=WanLocalStudio/vendor=vendor --company-name='Wan Local Studio contributors' --product-name='Wan Local Studio' --file-description='Wan Local Studio - local video generator' --file-version=0.2.1.0 --product-version=0.2.1 --assume-yes-for-downloads WanLocalStudio/app.py 2>&1 | Tee-Object -Variable packOutput
           if ($LASTEXITCODE) {
-            $detail = (($packOutput | Select-Object -Last 50) | Out-String).Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
-            Write-Host "::error title=Wan EXE packager::$detail"
-            throw 'EXE packaging failed'
+            $detail = (($packOutput | Select-Object -Last 60) | Out-String).Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Host "::error title=Wan native compiler::$detail"
+            throw 'Native compilation failed'
           }
+          $native = @(Get-ChildItem WanLocalStudio/compiled -Directory -Filter '*.dist')
+          if ($native.Count -ne 1) { throw 'Expected one standalone native distribution' }
+          New-Item -ItemType Directory -Force WanLocalStudio/build/WanLocalStudio | Out-Null
+          Copy-Item (Join-Path $native[0].FullName '*') WanLocalStudio/build/WanLocalStudio/ -Recurse -Force
+          Copy-Item WanLocalStudio/runtime WanLocalStudio/build/WanLocalStudio/runtime -Recurse -Force
           Copy-Item WanLocalStudio/README.vi.md,WanLocalStudio/THIRD-PARTY.md WanLocalStudio/build/WanLocalStudio/
           $p = Start-Process WanLocalStudio/build/WanLocalStudio/WanLocalStudio.exe -ArgumentList '--smoke-test' -Wait -PassThru
           if ($p.ExitCode) { throw 'Packaged GUI smoke failed' }
@@ -76,17 +84,42 @@ jobs:
           & 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe' WanLocalStudio/installer.iss
           if ($LASTEXITCODE) { throw 'Installer failed' }
           $install = Join-Path $env:RUNNER_TEMP 'WanLocal-installed'
-          $p = Start-Process dist-wan/WanLocalStudio-0.2.0-Setup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
+          $p = Start-Process dist-wan/WanLocalStudio-0.2.1-Setup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
           if ($p.ExitCode) { throw 'Installation failed' }
           $p = Start-Process "$install/WanLocalStudio.exe" -ArgumentList '--smoke-test' -Wait -PassThru
           if ($p.ExitCode) { throw 'Installed GUI smoke failed' }
           & ./VocalStudio/scripts/scan-windows.ps1 -RuntimeDirectory WanLocalStudio/build/WanLocalStudio -PackageDirectory dist-wan
-          & git archive '--format=zip' '--output=dist-wan/WanLocalStudio-0.2.0-Source.zip' HEAD WanLocalStudio .github/workflows/wan-local-studio-windows.yml VocalStudio/scripts/scan-windows.ps1
+          & git archive '--format=zip' '--output=dist-wan/WanLocalStudio-0.2.1-Source.zip' HEAD WanLocalStudio .github/workflows/wan-local-studio-windows.yml VocalStudio/scripts/scan-windows.ps1
           if ($LASTEXITCODE) { throw 'Source archive failed' }
+          Get-ChildItem dist-wan -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $_.Name } | Set-Content dist-wan/SHA256SUMS.txt -Encoding utf8
           Get-FileHash dist-wan/* -Algorithm SHA256 | Format-List | Out-File $env:GITHUB_STEP_SUMMARY -Append
           'Tests use simulated ComfyUI responses and real FFmpeg. GPU inference and identity consistency are NOT verified by this build.' | Out-File $env:GITHUB_STEP_SUMMARY -Append
       - uses: actions/upload-artifact@v4
         with:
-          name: WanLocalStudio-0.2.0-Installer
+          name: WanLocalStudio-0.2.1-Installer
           path: dist-wan/*
           if-no-files-found: error
+      - name: Publish installer with a direct release download URL
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = 'wan-local-studio-v0.2.1'
+          $notes = @'
+          Bản thử Windows 0.2.1 biên dịch Nuitka/MSVC, giữ cài ComfyUI/tải model, ảnh nhân vật dùng lại và tự dựng MP4.
+
+          Tải WanLocalStudio-0.2.1-Setup.exe. SHA-256, kết quả Defender và mã nguồn tương ứng được đính kèm.
+
+          Bộ cài chưa ký số nhà phát hành. Chưa xác nhận Chrome/Cốc Cốc chấp nhận file mới; kết quả Defender không thay thế kết quả kiểm tra của trình duyệt. Chưa thử tải toàn bộ model hoặc inference trên RTX 3060 thật.
+          '@
+          $notes | Set-Content "$env:RUNNER_TEMP/wan-release.md" -Encoding utf8
+          $existing = & gh release view $tag --repo $env:GITHUB_REPOSITORY --json isDraft 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            if (!(($existing | ConvertFrom-Json).isDraft)) { throw 'Version already published; never replace an existing public installer' }
+          } else {
+            & gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title 'Wan Local Studio 0.2.1' --notes-file "$env:RUNNER_TEMP/wan-release.md"
+            if ($LASTEXITCODE) { throw 'Draft release failed' }
+          }
+          & gh release upload $tag --repo $env:GITHUB_REPOSITORY dist-wan/WanLocalStudio-0.2.1-Setup.exe dist-wan/WanLocalStudio-0.2.1-Source.zip dist-wan/SHA256SUMS.txt dist-wan/DefenderReport.json dist-wan/BuildManifest.json --clobber
+          if ($LASTEXITCODE) { throw 'Release asset upload failed' }
+          & gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --prerelease --notes-file "$env:RUNNER_TEMP/wan-release.md"
+          if ($LASTEXITCODE) { throw 'Publish release failed' }

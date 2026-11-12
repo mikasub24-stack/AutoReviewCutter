@@ -1,6 +1,12 @@
-# Wan Local Studio 0.2.0
+# Wan Local Studio 0.2.1
 
 App Windows tiếng Việt cho RTX 3060 12GB / RAM 32GB. Màn hình gọn: chọn **Dọn nhà bỏ hoang** hoặc **Sinh tồn trong rừng**, nhập số phút và bấm **Tạo video**. Nút **Cài & tải bộ Wan** cho phép chuẩn bị dữ liệu trước; bấm Tạo khi chưa có bộ chạy cũng tự thực hiện bước chuẩn bị.
+
+## 0.2.1: bản biên dịch native
+
+Thay PyInstaller bằng Nuitka 4.3.5/MSVC ở chế độ standalone; không dùng onefile hoặc UPX. Ghim hash source compiler và các wheel; kiểm tra GUI và các công cụ FFmpeg/7-Zip từ bản đã biên dịch và đã cài. Có link tải Setup trực tiếp trên GitHub Releases, cùng SHA-256, báo cáo Defender và mã nguồn. Giữ nguyên chức năng và đọc lại được dự án 0.1.0/0.2.0.
+
+Thay cách đóng gói chưa chứng minh nguyên nhân cảnh báo bản cũ; bản 0.2.1 chưa ký số nhà phát hành và chưa có xác nhận của Chrome/Cốc Cốc. Không khẳng định cảnh báo đã được gỡ.
 
 ## Cài và dùng
 

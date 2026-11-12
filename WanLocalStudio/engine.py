@@ -15,8 +15,9 @@ import urllib.parse
 import urllib.request
 import uuid
 
-VERSION = '0.2.0'
-ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
+VERSION = '0.2.1'
+ROOT = (Path(sys.executable).resolve().parent if '__compiled__' in globals()
+        else Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)))
 FPS = 24
 FRAMES = 121
 MODELS = {
@@ -339,7 +340,7 @@ def edit_sequence(project, data, executable, codec, cancelled, notify):
 def _generate(project, client, cancelled, notify):
     project = Path(project)
     data = json.loads((project / 'project.json').read_text(encoding='utf-8'))
-    if data.get('version') not in ('0.1.0', VERSION): raise ValueError('Phiên bản dự án chưa được hỗ trợ.')
+    if data.get('version') not in ('0.1.0', '0.2.0', VERSION): raise ValueError('Phiên bản dự án chưa được hỗ trợ.')
     if (data.get('server') and data['server'] != client.url
             and any(scene.get('prompt_id') or scene.get('request_marker') for scene in data['scenes'] if not valid_artifact(project, scene))):
         raise ValueError('Dự án đang gắn với ComfyUI ở ' + data['server'] + '. Dùng cùng địa chỉ để nhận tác vụ cũ.')

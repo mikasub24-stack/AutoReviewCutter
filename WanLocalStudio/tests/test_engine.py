@@ -91,6 +91,8 @@ class EngineTests(unittest.TestCase):
                 final=engine.generate(project,client,threading.Event(),lambda _:None)
                 self.assertTrue(final.is_file());self.assertEqual(len(client.sent),2)
                 self.assertEqual(client.uploaded,[PNG]);self.assertTrue((project/'tham-chieu-goc.png').is_file())
+                old=json.loads((project/'project.json').read_text(encoding='utf-8'));old['version']='0.2.0'
+                engine.atomic_json(project/'project.json',old)
                 engine.generate(project,client,threading.Event(),lambda _:None)
                 self.assertEqual(len(client.sent),2)
                 self.assertFalse((project/'frames-0001').exists())
