@@ -557,7 +557,7 @@ async function remoteStopJob(job){
 async function stopAll(){
   if(stopping){while(stopping)await delay(50);return snapshot();}
   storyAnalyzer?.cancel();
-  stopping=true;lastStopAt=Date.now();clearTimeout(quotaTimer);quotaTimer=null;clearInterval(rebalanceTimer);rebalanceTimer=null;runEpoch++;starting=false;probeController?.abort();queue.pause();
+  stopping=true;lastStopAt=Date.now();clearTimeout(quotaTimer);quotaTimer=null;clearTimeout(rebalanceTimer);rebalanceTimer=null;rebalanceEpoch++;runEpoch++;starting=false;probeController?.abort();queue.pause();
   const probes=[...browserTests.values()].filter(t=>testing&&t.mayHaveSubmitted&&t.status!=='ready').map(t=>({id:t.id,trackerId:t.id,account:t.index+1,mayHaveSubmitted:true}));
   const jobs=[...queue.jobs.filter(j=>!probes.some(t=>t.account===j.account)&&(j.status==='running'||(['failed','interrupted'].includes(j.status)&&j.mayHaveSubmitted&&!['confirmed','ui-stopped'].includes(j.remoteStop?.state)))),...probes];notify();
   const requests=jobs.map(remoteStopJob);
@@ -686,7 +686,7 @@ async function buildRestoreStories({auto=false}={}){
 const RESTORE_RETRIES=3,RESTORE_RETRY_WAIT=90000;
 let restoreRetrying=false,lastStopAt=0;
 // Mọi tài khoản đều hết hạn mức: hàng đợi tạm dừng; hẹn giờ tự chạy lại khi tài khoản đầu tiên hết nghỉ (không cần ai bấm). Bấm Dừng thì hủy hẹn.
-let quotaTimer=null,rebalanceTimer=null,rebalancing=false;
+let quotaTimer=null,rebalanceTimer=null,rebalancing=false,rebalanceEpoch=0;
 function restoreQuotaResume(){
   if(quotaTimer||flushingQuit||!queue.paused||!queue.allExhausted())return;
   if(!queue.jobs.some(j=>j.kind==='restore'&&j.status==='pending'))return;
@@ -957,18 +957,22 @@ app.whenReady().then(async () => {
         queue.concurrency=flowMode?settings.flowParallel:thumbOnly?1:settings.dispatchMode==='parallel'?settings.accountCount:1;
         if(kind==='restore'&&queue.concurrency>1){try{const n=await resegmentRestore(queue.concurrency);if(n)notify();}catch{}}
         // Đang chạy mà có ô rảnh (đoạn của ô đó đã xong, đoạn khác còn dài): chia nốt phần còn lại của đoạn dài cho ô rảnh, để các ô «xoay vòng» sang chỗ còn việc.
-        clearInterval(rebalanceTimer);rebalanceTimer=null;
+        clearTimeout(rebalanceTimer);rebalanceTimer=null;const rebalanceNow=++rebalanceEpoch;
         if(kind==='restore'&&queue.concurrency>1){
           const lane=queue.concurrency;
-          rebalanceTimer=setInterval(async()=>{
-            if(!queue.active||queue.paused||rebalancing||flushingQuit)return;
-            if(queue.jobs.filter(j=>j.kind==='restore'&&j.status==='running').length>=lane)return;
-            rebalancing=true;
-            try{const n=await resegmentRestore(lane);if(n)notify();}catch{}finally{rebalancing=false;}
-          },15000);
+          const tick=async()=>{
+            rebalanceTimer=null;
+            if(rebalanceNow!==rebalanceEpoch||!queue.active||queue.paused||flushingQuit)return;
+            if(!rebalancing&&queue.jobs.filter(j=>j.kind==='restore'&&j.status==='running').length<lane){
+              rebalancing=true;
+              try{const n=await resegmentRestore(lane);if(n)notify();}catch{}finally{rebalancing=false;}
+            }
+            if(rebalanceNow===rebalanceEpoch&&queue.active&&!queue.paused&&!flushingQuit&&!stopping)rebalanceTimer=setTimeout(tick,15000);
+          };
+          rebalanceTimer=setTimeout(tick,15000);
         }
         queue.start(kind).then(async()=>{
-          clearInterval(rebalanceTimer);rebalanceTimer=null;
+          clearTimeout(rebalanceTimer);rebalanceTimer=null;if(rebalanceNow===rebalanceEpoch)rebalanceEpoch++;
           const videos=queue.jobs.filter(j=>j.kind==='video');
           if(kind==='video' && !queue.paused && videos.length && videos.every(j=>j.status==='completed')) {
             if(settings.autoMerge) await mergeProject();else if(settings.autoPackage) await packageProject();
