@@ -51,8 +51,12 @@ jobs:
           if ($LASTEXITCODE) { throw 'Engine tests failed' }
           python WanLocalStudio/app.py --smoke-test
           if ($LASTEXITCODE) { throw 'Source GUI smoke failed' }
-          python -m PyInstaller --noconfirm --windowed --clean --noupx --version-file WanLocalStudio/version-info.txt --collect-all customtkinter --collect-all darkdetect --name WanLocalStudio --icon WanLocalStudio/icon.ico --distpath WanLocalStudio/build --workpath WanLocalStudio/pybuild --specpath WanLocalStudio --add-data 'WanLocalStudio/icon.ico;.' --add-data 'WanLocalStudio/runtime;runtime' --add-data 'WanLocalStudio/vendor;vendor' WanLocalStudio/app.py
-          if ($LASTEXITCODE) { throw 'EXE packaging failed' }
+          python -m PyInstaller --noconfirm --windowed --clean --noupx --version-file WanLocalStudio/version-info.txt --collect-all customtkinter --collect-all darkdetect --name WanLocalStudio --icon WanLocalStudio/icon.ico --distpath WanLocalStudio/build --workpath WanLocalStudio/pybuild --specpath . --add-data 'WanLocalStudio/icon.ico;.' --add-data 'WanLocalStudio/runtime;runtime' --add-data 'WanLocalStudio/vendor;vendor' WanLocalStudio/app.py 2>&1 | Tee-Object -Variable packOutput
+          if ($LASTEXITCODE) {
+            $detail = (($packOutput | Select-Object -Last 50) | Out-String).Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Host "::error title=Wan EXE packager::$detail"
+            throw 'EXE packaging failed'
+          }
           Copy-Item WanLocalStudio/README.vi.md,WanLocalStudio/THIRD-PARTY.md WanLocalStudio/build/WanLocalStudio/
           $p = Start-Process WanLocalStudio/build/WanLocalStudio/WanLocalStudio.exe -ArgumentList '--smoke-test' -Wait -PassThru
           if ($p.ExitCode) { throw 'Packaged GUI smoke failed' }
