@@ -1,10 +1,10 @@
-# Wan Local Studio 0.3.0
+# Hunyuan Local Studio 0.3.0
 
 App Windows tiếng Việt cho RTX 3060 12GB / RAM 32GB. Màn hình gọn: chọn **Dọn nhà bỏ hoang** hoặc **Sinh tồn trong rừng**, nhập số phút và bấm **Tạo video**. Nút **Cài & tải model** cho phép chuẩn bị dữ liệu trước; bấm Tạo khi chưa có bộ chạy cũng tự thực hiện bước chuẩn bị.
 
 ## 0.3.0: chuyển dự án mới sang HunyuanVideo 1.5
 
-Dự án mới dùng HunyuanVideo 1.5 720p I2V: sinh trực tiếp 1280×720, 121 khung/cảnh, 24 fps; Euler/simple, CFG 6, shift 7, 50 bước theo công thức ComfyUI chính thức. UNET nạp FP8 e4m3fn, Qwen/ByT5 trên CPU, ComfyUI lowvram/offload. Không dùng model 480p hoặc upscale để gọi là 720p. Giữ tên app/thư mục để cập nhật tại chỗ.
+Dự án mới dùng HunyuanVideo 1.5 720p I2V: sinh trực tiếp 1280×720, 121 khung/cảnh, 24 fps; Euler/simple, CFG 6, shift 7, 50 bước theo công thức ComfyUI chính thức. UNET nạp FP8 e4m3fn, Qwen/ByT5 trên CPU, ComfyUI lowvram/offload. Không dùng model 480p hoặc upscale để gọi là 720p. Đổi tên hiển thị và bộ cài thành Hunyuan Local Studio; giữ mã ứng dụng/thư mục dữ liệu để cập nhật tại chỗ và đọc cấu hình cũ.
 
 **Tencent công bố tối thiểu 14 GB VRAM khi offload. Cấu hình FP8 này chưa được kiểm chứng trên RTX 3060 12 GB.** Có thể chậm hoặc thiếu bộ nhớ; thử 0,1 phút trước khi làm dài. NVENC chỉ tăng tốc mã hóa MP4, không tăng tốc các bước AI. Giữ 50 bước để ưu tiên chi tiết, không giả hứa vừa nhanh vừa hết méo. Chưa có phép đo tốc độ hoặc inference Hunyuan trong môi trường build.
 

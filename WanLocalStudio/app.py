@@ -30,7 +30,7 @@ class App(ctk.CTk):
     def __init__(self):
         ctk.set_appearance_mode('dark')
         super().__init__()
-        self.title('Wan Local Studio '+engine.VERSION+' · HunyuanVideo 1.5')
+        self.title('Hunyuan Local Studio '+engine.VERSION+' · HunyuanVideo 1.5')
         self.geometry('740x530'); self.minsize(700,500)
         self.configure(fg_color='#0b1220')
         if os.name == 'nt': self.iconbitmap(str(engine.ROOT / 'icon.ico'))
@@ -174,7 +174,7 @@ class App(ctk.CTk):
         if self.busy:return
         folder=filedialog.askdirectory(title='Mở thư mục dự án có project.json')
         if not folder:return
-        if not (Path(folder)/'project.json').is_file():messagebox.showerror('Chưa đúng dự án','Chọn thư mục Wan Local Studio có project.json.');return
+        if not (Path(folder)/'project.json').is_file():messagebox.showerror('Chưa đúng dự án','Chọn thư mục dự án có project.json.');return
         try:client=engine.Comfy(self.url.get())
         except ValueError as e:messagebox.showerror('Địa chỉ ComfyUI',str(e));return
         self.project=Path(folder);self.save_settings();root=self.asset_root

@@ -20,7 +20,9 @@ else:
     root=Path(__file__).resolve().parent
     icon=Image.new('RGBA',(256,256),(11,18,32,255));draw=ImageDraw.Draw(icon)
     draw.rounded_rectangle((12,12,244,244),radius=52,fill=(41,170,144))
-    draw.line([(46,78),(76,182),(128,113),(180,182),(210,78)],fill=(9,28,43),width=21,joint='curve')
+    draw.line([(76,65),(76,191)],fill=(9,28,43),width=24)
+    draw.line([(180,65),(180,191)],fill=(9,28,43),width=24)
+    draw.line([(76,128),(180,128)],fill=(9,28,43),width=24)
     icon.save(root/'icon.ico',sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])
     licenses=root/'runtime/licenses';licenses.mkdir(parents=True,exist_ok=True)
     python_license=Path(sys.base_prefix)/'LICENSE.txt'
