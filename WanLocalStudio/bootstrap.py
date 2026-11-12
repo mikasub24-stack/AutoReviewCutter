@@ -12,6 +12,7 @@ import urllib.error
 import urllib.request
 import engine
 import hunyuan
+import backend_control
 
 COMFY_VERSION = 'v0.45.0'
 COMFY_URL = 'https://github.com/Comfy-Org/ComfyUI/releases/download/v0.45.0/ComfyUI_windows_portable_nvidia_cu126.7z'
@@ -253,6 +254,7 @@ def _install(root, cancelled, notify,backend=hunyuan.BACKEND,need_t2v=False):
 
 def start_backend(folder, root, cancelled, notify,backend=hunyuan.BACKEND,need_t2v=False):
     client = engine.Comfy(MANAGED_URL,backend,need_t2v)
+    backend_control.ensure_launch_profile(folder,root,client,notify)
     try: client.preflight(); return client
     except Exception: pass
     folder = Path(folder); root = Path(root)
@@ -272,12 +274,14 @@ def start_backend(folder, root, cancelled, notify,backend=hunyuan.BACKEND,need_t
     log_offset = log.tell()
     try:
         child = subprocess.Popen([str(python), '-s', str(folder / 'ComfyUI/main.py'), '--windows-standalone-build',
-                                  '--listen', '127.0.0.1', '--port', '8189', '--lowvram', '--preview-method', 'none',
+                                  '--listen', '127.0.0.1', '--port', '8189', '--normalvram', '--reserve-vram', '1', '--preview-method', 'none',
                                   '--disable-pinned-memory', '--disable-async-offload'],
                                  cwd=folder, env=env, stdout=log, stderr=log,
                                  creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     finally: log.close()
     _children.append(child)
+    engine.atomic_json(root/'backend-launch.json',{'profile':backend_control.PROFILE,'pid':child.pid,
+                      'executable':str(python),'main':str(folder/'ComfyUI/main.py')})
     deadline = time.monotonic() + 240
     while time.monotonic() < deadline:
         check_cancel(cancelled)
@@ -291,12 +295,12 @@ def start_backend(folder, root, cancelled, notify,backend=hunyuan.BACKEND,need_t
 
 def ensure_ready(root, preferred, cancelled, notify,backend=hunyuan.BACKEND,need_t2v=False):
     remove_wan_models(root,notify)
-    client = engine.Comfy(preferred,backend,need_t2v)
-    try: client.preflight(); return client
-    except Exception: pass
-    try:
-        managed = engine.Comfy(MANAGED_URL,backend,need_t2v); managed.preflight(); return managed
-    except Exception: pass
+    for url in dict.fromkeys((preferred,MANAGED_URL)):
+        client=engine.Comfy(url,backend,need_t2v)
+        if url==MANAGED_URL and layout_valid(layout(root)):
+            backend_control.ensure_launch_profile(layout(root),root,client,notify)
+        try:client.preflight();return client
+        except RuntimeError:pass
     folder = install(root, cancelled, notify,backend,need_t2v)
     return start_backend(folder, root, cancelled, notify,backend,need_t2v)
 

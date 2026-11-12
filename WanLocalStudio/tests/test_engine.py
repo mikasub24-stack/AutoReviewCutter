@@ -68,13 +68,13 @@ class EngineTests(unittest.TestCase):
         with patch.object(client,'request',return_value=info):
             with self.assertRaisesRegex(RuntimeError,'hunyuanvideo1.5_720p_i2v'):client.preflight()
 
-    def test_graph_uses_optional_reference_and_cpu_text_encoder(self):
+    def test_graph_uses_optional_reference_and_managed_text_encoder(self):
         scene=engine.plan(engine.TOPICS[0],.1)['scenes'][0];models=FakeComfy().preflight()
         empty=engine.graph(scene,models)
         self.assertNotIn('start_image',empty['latent']['inputs'])
         linked=engine.graph(scene,models,'uploaded.png')
         self.assertEqual(linked['condition']['inputs']['start_image'],['reference',0])
-        self.assertEqual(linked['clip']['inputs']['device'],'cpu')
+        self.assertEqual(linked['clip']['inputs']['device'],'default')
         self.assertEqual(linked['decode']['class_type'],'VAEDecodeTiled')
         self.assertEqual(linked['save']['class_type'],'SaveImage')
 

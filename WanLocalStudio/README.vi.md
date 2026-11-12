@@ -1,6 +1,18 @@
-# Hunyuan Local Studio 0.3.1
+# Hunyuan Local Studio 0.3.2
 
 App Windows tiếng Việt: chọn chủ đề, nhập số phút, bấm Tạo video. Bản này chỉ dùng **HunyuanVideo 1.5**, không tải/chạy hoặc tiếp tục dự án Wan. Hồ sơ nhân vật mới trong `%LOCALAPPDATA%/HunyuanLocalStudio/character`, không nhập ảnh mờ hoặc cảnh Wan cũ. Khi chuẩn bị bộ chạy mới, ảnh/profile nhân vật Wan cũ do app lưu cũng được bỏ. Thư mục nguồn/tên exe nội bộ giữ để cập nhật từ bộ cài cũ; tên hiển thị và Setup là Hunyuan Local Studio.
+
+## 0.3.2: giảm tải bước đầu, giữ 720p
+
+Bỏ ép Qwen chạy CPU: DualCLIPLoader dùng device default, backend riêng chạy normal VRAM với reserve 1 GB; ComfyUI vẫn tự offload khi cần. Không dùng gpu-only/highvram, không ép toàn bộ model vào 12 GB. Giữ FP8, 50 bước và 1280×720 theo lựa chọn ưu tiên chất lượng. Đây là sửa cấu hình có căn cứ từ mã ComfyUI, chưa có benchmark trên GPU người dùng.
+
+Dự án mới tạo một khung T2V 720p làm ảnh nhân vật trước, rồi I2V mới tạo chuyển động. Schema Hunyuan cho phép length=1, giảm temporal latent của tác vụ tạo ảnh từ 31 xuống 1; không phải lời hứa thời gian nhanh gấp 31. Ảnh hiện ngay khi xong, dùng prompt thấy rõ mặt. Chất lượng một khung vẫn cần thử thực tế. Dự án cũ có tác vụ đã gửi không bị tự tạo thêm ảnh hoặc gửi trùng.
+
+Tiến độ lấy từ WebSocket của ComfyUI theo đúng prompt_id: nạp model, mã hóa chữ, bước sampling/max, giải mã và lưu. Thanh phần trăm là bước hiện tại, không phải toàn bộ video. ETA chỉ ước tính phần sampling sau ít nhất hai khoảng đo, không hứa thời gian xong toàn bộ phim. Mất telemetry thì báo chưa nhận số bước thực, vẫn nhận kết quả bằng HTTP.
+
+Nút Kiểm tra GPU / log đọc nvidia-smi thực (nếu có), hiện VRAM/mức dùng GPU và log lưu có thời gian sửa; xuất chan-doan-gpu.json. Một mẫu GPU 0% hoặc thiếu nvidia-smi không đủ chứng minh tác vụ bị lỗi. Log có thể từ phiên trước, được ghi rõ và che các dòng có dấu hiệu token.
+
+**Cập nhật:** backend cũ ép CPU vẫn có thể sống sau khi đóng cửa sổ. Bản mới chỉ khởi động lại đúng tiến trình Python/main.py trong bộ riêng ở 127.0.0.1:8189 khi hàng đợi rỗng, xác minh process handle và thông tin tạo process để tránh PID tái sử dụng. Không ngắt server/tác vụ khác. Nếu còn job cũ, dùng Xóa dự án đang tạo để chọn và bỏ dự án đó trước; chỉ đóng app cũ chưa chắc dừng ComfyUI.
 
 ## Cài và tạo mới
 
@@ -12,9 +24,9 @@ App Windows tiếng Việt: chọn chủ đề, nhập số phút, bấm Tạo v
 
 ## Model và chất lượng
 
-- HunyuanVideo 1.5 720p T2V tạo cảnh đầu khi chưa có ảnh nhân vật Hunyuan; I2V tạo các cảnh sau. Tự tải UNET tương ứng, Qwen 2.5 VL FP8, ByT5, VAE và SigCLIP. Setup không nhúng các trọng số lớn.
+- HunyuanVideo 1.5 720p T2V tạo một ảnh đầu khi chưa có ảnh nhân vật Hunyuan; I2V tạo các cảnh sau. Tự tải UNET tương ứng, Qwen 2.5 VL FP8, ByT5, VAE và SigCLIP. Setup không nhúng các trọng số lớn.
 - Sinh gốc 1280×720, 121 khung/cảnh, 24 fps. Không upscale 480p. Euler/simple, CFG 6, shift 9 T2V / 7 I2V, 50 bước theo hướng dẫn Tencent/ComfyUI.
-- UNET FP8 e4m3fn, text encoder trên CPU, ComfyUI `--lowvram`, không pinned RAM/async offload. **Tencent công bố tối thiểu 14 GB VRAM với offload. Cấu hình FP8 chưa kiểm chứng trên RTX 3060 12 GB.** Có thể thiếu bộ nhớ hoặc chậm. NVENC chỉ tăng tốc mã hóa MP4; không tăng tốc các bước AI sinh hình.
+- UNET FP8 e4m3fn, text encoder dùng GPU khi ComfyUI chọn được, ComfyUI `--normalvram --reserve-vram 1` với offload tự động, không pinned RAM/async offload. **Tencent công bố tối thiểu 14 GB VRAM với offload. Cấu hình FP8 chưa kiểm chứng trên RTX 3060 12 GB.** Có thể thiếu bộ nhớ hoặc chậm. NVENC chỉ tăng tốc mã hóa MP4; không tăng tốc các bước AI sinh hình.
 - VAE chia ô không gian 512/64, giữ temporal_size 4096 / overlap 8 theo khuyến nghị Hunyuan. Clip Wan người dùng gửi bị nhấp nháy theo nhịp 12 khung, trùng stride giải mã cũ 16/4. Sửa cấu hình này không bảo đảm model hết mọi méo tay/mặt hoặc chi tiết sai.
 - Nhân vật mới mặc định: nữ châu Á trưởng thành 24 tuổi, da sáng, tóc đen buộc cao, áo thể thao hai dây crop top đen ôm dáng, legging đen và giày trắng. Chỉ ảnh gốc mới do Hunyuan tạo được dùng lại cho các video Hunyuan sau; ảnh Wan không được nhập.
 - Khung cuối cảnh trước làm đầu vào VAE để nối cảnh; SigCLIP dùng ảnh gốc để giữ tham chiếu nhân vật. Đây là điều chỉnh so với template dùng cùng ảnh, chưa kiểm chứng chất lượng, không phải adapter khóa khuôn mặt. Vẫn có thể lệch nhân vật/vật dụng và sai hành động.

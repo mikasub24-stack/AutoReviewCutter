@@ -10,9 +10,9 @@ if '--manifest' in sys.argv:
     root=Path(sys.argv[-1])
     files={str(p.relative_to(root)).replace('\\','/'):hashlib.sha256(p.read_bytes()).hexdigest()
            for p in root.rglob('*') if p.is_file() and p.name!='BuildManifest.json'}
-    data={'version':'0.3.1','sourceCommit':os.environ.get('GITHUB_SHA','local'),'files':files,
+    data={'version':'0.3.2','sourceCommit':os.environ.get('GITHUB_SHA','local'),'files':files,
           'python':sys.version,'compiler':'Nuitka '+importlib.metadata.version('Nuitka')+' / MSVC','gpuInferenceTested':False,'referencePolicy':'persistent_character_and_previous_last_frame',
-          'backend':'HunyuanVideo 1.5','weightDtype':'fp8_e4m3fn','gpu12GBValidated':False,'nativeGenerationSize':[1280,720],'outputSize':[1280,720],'upscale':False,'fullModelDownloadTested':False,'comfyPortable':'v0.45.0 NVIDIA CUDA 12.6',
+          'backend':'HunyuanVideo 1.5','weightDtype':'fp8_e4m3fn','textEncoderDevice':'default GPU with normal-vram automatic offload','portraitFirstFrameCount':1,'progressSource':'ComfyUI websocket with matching prompt_id','gpu12GBValidated':False,'nativeGenerationSize':[1280,720],'outputSize':[1280,720],'upscale':False,'fullModelDownloadTested':False,'comfyPortable':'v0.45.0 NVIDIA CUDA 12.6',
           'codeSigned':False,'browserDownloadVerdict':'unverified'}
     (root/'BuildManifest.json').write_text(json.dumps(data,indent=2),encoding='utf-8')
 else:

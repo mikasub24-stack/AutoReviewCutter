@@ -17,8 +17,10 @@ import urllib.parse
 import urllib.request
 import uuid
 import hunyuan
+import portrait
+from progress import ProgressMonitor
 
-VERSION = '0.3.1'
+VERSION = '0.3.2'
 ROOT = (Path(sys.executable).resolve().parent if '__compiled__' in globals()
         else Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)))
 FPS = 24
@@ -119,8 +121,9 @@ def plan(topic, minutes, backend=hunyuan.BACKEND):
             'notice': 'Hunyuan tạo hình không có âm thanh. Giữ tham chiếu không bảo đảm nhận dạng tuyệt đối.'}
 
 
-def new_project(parent, topic, minutes, profile_dir=None, backend=hunyuan.BACKEND):
+def new_project(parent, topic, minutes, profile_dir=None, backend=hunyuan.BACKEND, portrait_first=False):
     data = plan(topic, minutes,backend)
+    data['portrait_first']=portrait_first
     folder = Path(parent) / ('Hunyuan-' + time.strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:6])
     folder.mkdir(parents=True)
     data['id'] = uuid.uuid4().hex
@@ -213,6 +216,8 @@ class Comfy:
 
     def wait(self, prompt_id, cancelled, notify):
         started = time.monotonic()
+        monitor=getattr(self,'progress_monitor',None)
+        if monitor:monitor.bind(prompt_id)
         while True:
             if cancelled.is_set():
                 # Remove only our queued job. Do not send global /interrupt:
@@ -232,7 +237,12 @@ class Comfy:
             all_tasks = queue.get('queue_running', []) + queue.get('queue_pending', [])
             if not record and not any(x[1] == prompt_id for x in all_tasks):
                 raise RuntimeError('Tác vụ không còn trong ComfyUI (có thể đã khởi động lại). Bấm Tạo lại cảnh lỗi để tiếp tục.')
-            notify(f'Hunyuan đang render · đã chờ {int(time.monotonic() - started)} giây; chưa có ước tính thời gian.')
+            state=monitor.snapshot() if monitor else {}
+            description=monitor.describe() if monitor else None
+            elapsed=int(time.monotonic()-started)
+            message=(description+f' · đã chờ {elapsed} giây') if description else f'Đang chờ tiến độ từ ComfyUI · {elapsed} giây (chưa có số bước thực)'
+            fraction=state.get('value',0)/state['maximum'] if state.get('maximum') else None
+            notify({'type':'progress','status':message,'fraction':fraction})
             if cancelled.wait(2): continue
 
     def download(self, description, destination):
@@ -341,6 +351,8 @@ def _generate(project, client, cancelled, notify):
         shutil.copy2(profile / 'reference.png', project / 'nhan-vat-goc.png')
     client.backend=backend;client.need_t2v=backend==hunyuan.BACKEND and not (project/'nhan-vat-goc.png').is_file()
     models = client.preflight()
+    if data.get('portrait_first') and not (project/'nhan-vat-goc.png').is_file() and not any(s.get('prompt_id') or s.get('request_marker') for s in data['scenes']):
+        portrait.ensure(project,data,client,models,cancelled,notify,width,height,profile)
     codec = encoder_options(ffmpeg_path)
     notify(f'Độ phân giải sinh gốc: {width}×{height} · Xuất {out_width}×{out_height} (không upscale)')
     notify('Mã hóa MP4: ' + ('GPU NVIDIA NVENC' if 'h264_nvenc' in codec else 'CPU (NVENC chưa dùng được; model sinh vẫn dùng GPU)'))
@@ -394,7 +406,7 @@ def _generate(project, client, cancelled, notify):
                     raise RuntimeError('ComfyUI không nhận workflow: ' + json.dumps(result, ensure_ascii=False)[-3000:])
                 scene['prompt_id'] = result['prompt_id']; save()
         try:
-            frames = client.wait(scene['prompt_id'], cancelled, lambda text: notify(f'Cảnh {position + 1}/{len(data["scenes"])} · {text}'))
+            frames = client.wait(scene['prompt_id'], cancelled, lambda text: notify(dict(text,status=f'Cảnh {position+1}/{len(data["scenes"])} · '+text['status']) if isinstance(text,dict) else f'Cảnh {position+1}/{len(data["scenes"])} · {text}'))
         except Cancelled:
             queue = client.request('/queue')
             record = client.request('/history/' + scene['prompt_id'])
@@ -478,7 +490,14 @@ def project_lock(project):
 
 def generate(project, client, cancelled, notify):
     with project_lock(project):
-        return _generate(project,client,cancelled,notify)
+        monitor=None
+        if isinstance(client,Comfy):
+            data=json.loads((Path(project)/'project.json').read_text(encoding='utf-8'))
+            monitor=ProgressMonitor(client.url,data['id']).start();monitor.ready.wait(.5)
+            client.progress_monitor=monitor
+        try:return _generate(project,client,cancelled,notify)
+        finally:
+            if monitor:monitor.close();client.progress_monitor=None
 
 
 def delete_project(project, client, notify, managed_comfy=None):
@@ -491,7 +510,7 @@ def delete_project(project, client, notify, managed_comfy=None):
         raise ValueError('Không phải dự án do tool tạo.')
     with project_lock(project):
         ids=set()
-        for scene in data['scenes']:
+        for scene in data['scenes']+[data.get('portrait_request',{})]:
             pid=scene.get('prompt_id')
             if not pid and scene.get('request_marker'):pid=client.find_request(scene['request_marker'])
             if pid:ids.add(pid)
@@ -526,10 +545,11 @@ def delete_project(project, client, notify, managed_comfy=None):
                 reference.unlink();(profile/'profile.json').unlink()
         if ids:client.request('/history',{'delete':sorted(ids)})
         for child in project.iterdir():
-            if child.name=='.render.lock':continue
+            if child.name in ('.render.lock','project.json'):continue
             if child.is_dir() and not child.is_symlink():shutil.rmtree(child)
             else:child.unlink()
     (project/'.render.lock').unlink(missing_ok=True)
+    (project/'project.json').unlink()
     project.rmdir()
     return 'Đã xóa dự án, các cảnh và dữ liệu tạo dở. Model dùng chung được giữ.'
 
@@ -538,6 +558,9 @@ def reset_failed_scene(project):
     """Explicit user action only: never silently resubmit uncertain jobs."""
     project = Path(project)
     data = json.loads((project / 'project.json').read_text(encoding='utf-8'))
+    if data.get('portrait_first') and not (project/'nhan-vat-goc.png').is_file() and data.get('portrait_request'):
+        data['portrait_request'].pop('request_marker',None);data['portrait_request'].pop('prompt_id',None)
+        atomic_json(project/'project.json',data);return
     for scene in data['scenes']:
         if not valid_artifact(project, scene):
             scene.pop('request_marker', None); scene.pop('prompt_id', None)

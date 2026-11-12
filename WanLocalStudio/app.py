@@ -15,6 +15,7 @@ import customtkinter as ctk
 import engine
 import bootstrap
 import hunyuan
+import diagnostics
 
 
 def settings_path():
@@ -66,7 +67,7 @@ class App(ctk.CTk):
         self.install_button=ctk.CTkButton(row,text='Cài & tải model',command=self.prepare,height=34,width=155);self.install_button.pack(side='left',padx=(0,8))
         self.pause_button=ctk.CTkButton(row,text='Tạm dừng',command=self.cancel.set,height=34,width=105,fg_color='#753b50',state='disabled');self.pause_button.pack(side='right')
         self.delete_button=ctk.CTkButton(row,text='Xóa dự án đang tạo',command=self.delete_current,height=34,width=145,fg_color='#753b50');self.delete_button.pack(side='right',padx=6)
-        self.status=tk.StringVar(value='Bộ Hunyuan cần tải thêm model lớn; chọn ổ đủ chỗ trong Cài đặt. Render 50 bước sẽ chậm hơn. Thử 0,1 phút trước.')
+        self.status=tk.StringVar(value='720p gốc: tạo ảnh nhân vật trước, rồi sinh chuyển động. Hiển thị tiến độ thực theo từng bước; thử 0,1 phút trước.')
         ctk.CTkLabel(panel,textvariable=self.status,wraplength=670,justify='left',anchor='w',font=('Segoe UI',12)).pack(fill='x',pady=(8,4))
         self.progress=ctk.CTkProgressBar(panel,mode='determinate',progress_color='#5de0c1',height=6);self.progress.pack(fill='x',pady=6);self.progress.set(0)
         preview=ctk.CTkFrame(panel,fg_color='#152235');preview.pack(fill='x',pady=5)
@@ -86,6 +87,7 @@ class App(ctk.CTk):
         links=ctk.CTkFrame(panel,fg_color='transparent');links.pack(fill='x',pady=(8,4))
         ctk.CTkButton(links,text='Cài đặt',command=self.toggle_settings,width=100,height=26,fg_color='#25364c').pack(side='left',padx=(0,8))
         ctk.CTkButton(links,text='Nhật ký',command=self.toggle_log,width=100,height=26,fg_color='#25364c').pack(side='left')
+        ctk.CTkButton(links,text='Kiểm tra GPU / log',command=self.gpu_log,width=145,height=26,fg_color='#25364c').pack(side='left',padx=8)
         self.log=ctk.CTkTextbox(panel,height=100,font=('Consolas',11))
         self.options=ctk.CTkFrame(panel)
         ctk.CTkLabel(self.options,text='ComfyUI có sẵn (không bắt buộc; tool tự cài nếu chưa có)',font=('Segoe UI',11)).pack(anchor='w',padx=10,pady=(8,0))
@@ -98,7 +100,7 @@ class App(ctk.CTk):
         line2=ctk.CTkFrame(self.options,fg_color='transparent');line2.pack(fill='x',padx=10,pady=4)
         self.reset_button=ctk.CTkButton(line2,text='Tạo lại cảnh lỗi',command=self.reset,width=130,height=26);self.reset_button.pack(side='left',padx=(0,6))
         ctk.CTkButton(line2,text='Xem nhân vật gốc',command=self.show_character,width=140,height=26).pack(side='left')
-        ctk.CTkLabel(self.options,text='Hunyuan 1.5 FP8/offload • 720p gốc • 50 bước • Chưa kiểm chứng trên 3060 12GB.\nẢnh gốc được dùng lại qua các video; vẫn có thể lệch chi tiết. Model không tự tạo tiếng động.',wraplength=640,justify='left',font=('Segoe UI',11),text_color='#a9c3d6').pack(anchor='w',padx=10,pady=8)
+        ctk.CTkLabel(self.options,text='Hunyuan 1.5 FP8 • 720p gốc • 50 bước • GPU mã hóa chữ, tự chuyển model qua RAM.\nẢnh gốc được dùng lại qua các video; vẫn có thể lệch chi tiết. Model không tự tạo tiếng động.',wraplength=640,justify='left',font=('Segoe UI',11),text_color='#a9c3d6').pack(anchor='w',padx=10,pady=8)
         self.controls=[self.create_button,self.install_button,self.resume_button,self.check_button,self.music_button,self.folder_button,self.asset_button,self.reset_button]
         self.minutes.trace_add('write',self.update_count);self.update_count()
         self.after(150,self.poll);self.protocol('WM_DELETE_WINDOW',self.close)
@@ -167,7 +169,15 @@ class App(ctk.CTk):
         threading.Thread(target=work,daemon=True).start()
 
     def notify(self,text):
-        self.events.put(('preview' if isinstance(text,dict) else 'status',text))
+        kind=text.get('type','preview') if isinstance(text,dict) else 'status'
+        self.events.put((kind,text))
+
+    def gpu_log(self):
+        def collect():
+            report=diagnostics.collect(self.asset_root,engine.VERSION)
+            path=diagnostics.export(self.asset_root,self.project,engine.VERSION)
+            self.events.put(('diagnostic',(report,path)))
+        threading.Thread(target=collect,daemon=True).start()
 
     def create(self):
         if self.busy:return
@@ -182,7 +192,7 @@ class App(ctk.CTk):
         def work():
             ready=bootstrap.ensure_ready(root,preferred,self.cancel,self.notify,hunyuan.BACKEND,not (profile/'reference.png').is_file())
             self.events.put(('backend',ready.url));parent.mkdir(parents=True,exist_ok=True)
-            self.project=engine.new_project(parent,topic,minutes,profile,hunyuan.BACKEND)
+            self.project=engine.new_project(parent,topic,minutes,profile,hunyuan.BACKEND,portrait_first=True)
             if music:shutil.copy2(music,self.project/'nhac-nen.audio')
             self.notify('Đã lưu dự án: '+str(self.project))
             return engine.generate(self.project,ready,self.cancel,self.notify)
@@ -220,6 +230,22 @@ class App(ctk.CTk):
         try:
             while True:
                 kind,value=self.events.get_nowait()
+                if kind=='diagnostic':
+                    report,path=value
+                    self.log.pack(fill='x',pady=6)
+                    self.log.insert('end',diagnostics.describe(report)+'\nLog đã lưu: '+str(path)+'\n'+'\n'.join(report['backend_log']['lines'])+'\n');self.log.see('end');continue
+                if kind=='progress':
+                    self.status.set(value['status'])
+                    fraction=value.get('fraction')
+                    mode='determinate' if fraction is not None else 'indeterminate'
+                    if self.progress.cget('mode')!=mode:
+                        self.progress.stop();self.progress.configure(mode=mode)
+                        if fraction is None:self.progress.start()
+                    if fraction is not None:self.progress.set(max(0,min(1,fraction)))
+                    continue
+                if kind=='portrait':
+                    key='Ảnh nhân vật mới';self.previews[key]=dict(value,clip=None)
+                    self.scene_choice.configure(values=list(self.previews));self.scene_choice.set(key);self.select_preview(key);continue
                 if kind=='cleared':
                     self.previews.clear();self.preview_clip=None;self.scene_play.configure(state='disabled');self.preview_image.configure(image=self.preview_blank,text='Đã xóa dự án');self.preview_status.configure(text='Chưa có cảnh hoàn tất');self.scene_choice.configure(values=['Chưa có cảnh']);self.scene_choice.set('Chưa có cảnh');continue
                 if kind=='preview':
@@ -254,8 +280,13 @@ class App(ctk.CTk):
             picture=ImageOps.contain(original.convert('RGB'),(440,247),Image.Resampling.LANCZOS)
         self.preview_photo=ctk.CTkImage(light_image=picture,dark_image=picture,size=picture.size)
         self.preview_image.configure(image=self.preview_photo,text='')
-        self.preview_status.configure(text=f'Cảnh {item["scene"]}/{item["total"]} đã xong\nĐã có {len(self.previews)} cảnh để xem')
-        self.preview_clip=Path(item['clip']);self.scene_play.configure(state='normal')
+        if item.get('type')=='portrait':
+            self.preview_status.configure(text='Ảnh nhân vật mới đã xong. Đang chuẩn bị chuyển động 720p.')
+        else:
+            count=sum(bool(x.get('clip')) for x in self.previews.values())
+            self.preview_status.configure(text=f'Cảnh {item["scene"]}/{item["total"]} đã xong\nĐã có {count} cảnh để xem')
+        self.preview_clip=Path(item['clip']) if item.get('clip') else None
+        self.scene_play.configure(state='normal' if self.preview_clip else 'disabled')
 
     def play_scene(self):
         if self.preview_clip and self.preview_clip.is_file():
@@ -330,6 +361,10 @@ def smoke_test():
         app.save_settings();assert load_settings()['minutes']=='1'
         from PIL import Image
         preview=Path(td)/'preview.png';Image.new('RGB',(1280,720),'#256f67').save(preview)
+        app.notify({'type':'portrait','image':str(preview)});app.poll();app.update()
+        assert app.preview_clip is None and app.scene_play.cget('state')=='disabled'
+        app.notify({'type':'progress','status':'Sinh hình · bước 25/50','fraction':.5});app.poll();app.update()
+        assert app.progress.cget('mode')=='determinate' and app.status.get()=='Sinh hình · bước 25/50'
         app.notify({'scene':1,'total':2,'image':str(preview),'clip':str(Path(td)/'scene.mp4')});app.poll();app.update()
         assert app.preview_clip==Path(td)/'scene.mp4'
         assert app.scene_play.cget('state')=='normal'

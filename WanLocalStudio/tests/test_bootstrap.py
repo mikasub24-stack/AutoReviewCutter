@@ -26,12 +26,13 @@ class BootstrapTests(unittest.TestCase):
 
     def test_managed_backend_launch_disables_pinned_ram_and_async_offload(self):
         with tempfile.TemporaryDirectory() as td:
-            root=Path(td);child=Mock();child.poll.return_value=None
+            root=Path(td);child=Mock();child.pid=123;child.poll.return_value=None
             with patch.object(engine.Comfy,'preflight',side_effect=[RuntimeError('not started'),{}]),patch.object(bootstrap.subprocess,'run',return_value=subprocess.CompletedProcess([],0,'RTX 3060\n','')) as probe,patch.object(bootstrap.subprocess,'Popen',return_value=child) as spawn:
                 client=bootstrap.start_backend(root,root,threading.Event(),lambda _:None)
             self.assertEqual(client.url,bootstrap.MANAGED_URL)
             args=spawn.call_args.args[0];env=spawn.call_args.kwargs['env']
             self.assertIn('--disable-pinned-memory',args);self.assertIn('--disable-async-offload',args)
+            self.assertIn('--normalvram',args);self.assertIn('--reserve-vram',args);self.assertNotIn('--lowvram',args)
             self.assertEqual(env['OPENBLAS_NUM_THREADS'],'1')
             self.assertEqual(probe.call_args.kwargs['env']['OPENBLAS_NUM_THREADS'],'1')
             bootstrap._children.remove(child)

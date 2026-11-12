@@ -44,7 +44,7 @@ def graph(scene, models, reference=None, identity=None, prefix='HunyuanLocal', s
         raise RuntimeError('Chưa có ảnh nhân vật và model T2V Hunyuan. Dùng Cài & tải model để chuẩn bị ảnh đầu tự động.')
     flow={
         'unet':node('UNETLoader',unet_name=models['unet_name'] if reference else models['t2v_name'],weight_dtype='fp8_e4m3fn'),
-        'clip':node('DualCLIPLoader',clip_name1=models['clip_name1'],clip_name2=models['clip_name2'],type='hunyuan_video_15',device='cpu'),
+        'clip':node('DualCLIPLoader',clip_name1=models['clip_name1'],clip_name2=models['clip_name2'],type='hunyuan_video_15',device='default'),
         'vae':node('VAELoader',vae_name=models['vae_name']),
         'positive':node('CLIPTextEncode',clip=['clip',0],text=scene['prompt']),
         'negative':node('CLIPTextEncode',clip=['clip',0],text=''),
