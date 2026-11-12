@@ -492,3 +492,25 @@ test('đồ cầm trên tay: mọi cảnh chỉ cầm một dụng cụ giữ ng
   const cont = jobs.find(j => /part [2-9] of/.test(j.prompt));
   if (cont) assert.doesNotMatch(cont.prompt, /Changing tools/, 'cảnh tiếp tục cùng một bước thì giữ nguyên dụng cụ, không đổi');
 });
+
+test('ảnh mốc đầu đoạn: dặn trạng thái đã xong (sơn rồi thì tường sạch, lát sàn rồi thì sàn mới…) và giữ đúng một ngôi nhà', () => {
+  const config = P.options({ theme: 'house_full', minutes: 20, seconds: 8, aspect: '16:9', person: true, parallel: 1, lang: 'vi' });
+  const steps = P.stepsOf(config), total = steps.length;
+  const at = re => steps.findIndex(st => re.test(st.en));
+  const early = P.keyframePrompt(config, steps[0], 0, total);
+  assert.doesNotMatch(early, /So the place now looks like this/, 'đầu bài chưa có gì xong');
+  const flooring = P.keyframePrompt(config, steps[at(/new flooring is laid/)], at(/new flooring is laid/), total);
+  assert.match(flooring, /already painted: clean, even and fresh, with no peeling paint or wallpaper/);
+  assert.match(flooring, /every wall and ceiling is smooth and flat/);
+  assert.doesNotMatch(flooring, /whole inside floor is already covered/, 'đang lát sàn thì chưa xong sàn');
+  const windows = P.keyframePrompt(config, steps[at(/windows and new doors/)], at(/windows and new doors/), total);
+  assert.match(windows, /already painted/); assert.match(windows, /whole inside floor is already covered with new flooring planks/);
+  const wiring = P.keyframePrompt(config, steps[at(/new wiring/)], at(/new wiring/), total);
+  assert.match(wiring, /windows and doors are new, clean and sealed/);
+  const last = P.keyframePrompt(config, steps[total - 1], total - 1, total);
+  assert.match(last, /the room is furnished and decorated/);
+  for (const text of [early, flooring, windows, wiring, last]) assert.match(text, /The building keeps its exact architecture in every picture: the same number of floors, the same roof shape/);
+  // chủ đề tự viết không có danh sách bước thì không thêm trạng thái bịa
+  const custom = P.options({ theme: 'custom', customText: 'dọn phòng', minutes: 5, seconds: 8, aspect: '16:9', person: false, parallel: 1, lang: 'vi' });
+  assert.doesNotMatch(P.keyframePrompt(custom, P.stepsOf(custom)[3], 3, P.stepsOf(custom).length), /So the place now looks like this/);
+});

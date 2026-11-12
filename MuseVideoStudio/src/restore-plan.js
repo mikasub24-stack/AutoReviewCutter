@@ -510,17 +510,35 @@
     return theme.steps.map(st => ({ en: st[1] }));
   }
   // Ảnh MỐC đầu mỗi đoạn song song: chỉnh từ ảnh gốc, giữ nguyên nhà / người / góc nhìn, chỉ đổi tiến độ công việc tới đúng chỗ đoạn này bắt đầu.
+  // Ảnh mốc đầu đoạn do Muse vẽ lại từ ảnh gốc nên hay «quên» việc đã xong (đã sơn rồi mà tường vẫn bong, đã lát sàn mà dây điện vẫn hở).
+  // Từ các bước đã xong, dặn rõ TRẠNG THÁI hiện tại của chỗ đó; chỉ nêu những gì các bước đã xong chắc chắn đã đổi.
+  const STATE_RULES = [
+    [/plaster and smoothed|sanded smooth/, 'every wall and ceiling is smooth and flat, with no holes, no cracks and no bare plaster or bricks'],
+    [/rolled with white primer|painted with two clean coats/, 'the walls and the ceiling inside are already painted: clean, even and fresh, with no peeling paint or wallpaper, no stains, no mold and no exposed bricks or wires on any inside wall'],
+    [/flooring is laid/, 'the whole inside floor is already covered with new flooring planks, with no debris, no old floor and no trash on it'],
+    [/windows and new doors are fitted/, 'the windows and doors are new, clean and sealed, with no broken glass and no old frames'],
+    [/new wiring, switches/, 'all wiring is hidden inside the walls, the switches, sockets and light fixtures are installed and the lights are on, with no exposed wires'],
+    [/kitchen counter/, 'the kitchen counter, sink with tap, shelves and cabinets are installed and clean'],
+    [/furniture is carried in/, 'the room is furnished and decorated']
+  ];
+  function stateGuards(done) {
+    const text = done.join('; ');
+    return STATE_RULES.filter(([re]) => re.test(text)).map(([, line]) => line);
+  }
+  const SAME_HOUSE = 'The building keeps its exact architecture in every picture: the same number of floors, the same roof shape and size, the same footprint and the same door and window positions; only its condition changes (cleaner, repaired, repainted), never a different house.';
   function keyframePrompt(config, step, clipIndex, total) {
     const list = fullSteps(config), custom = themeOf(config.theme).id === 'custom' && !list.length;
     let progress;
     if (custom) progress = `the whole project is about ${Math.round(100 * clipIndex / total)}% complete, with clearly visible progress compared to the original photo`;
     else {
       const done = list.slice(0, step.step - 1).map(x => x.en), now = list[step.step - 1].en, pct = Math.round(100 * (step.part - 1) / step.parts);
-      progress = `${done.length ? `already finished: ${done.join('; ')}. ` : ''}Currently in progress: ${now}${pct ? ` (about ${pct}% of this step is done)` : ' (just starting)'}`;
+      const guards = stateGuards(done);
+      progress = `${done.length ? `already finished: ${done.join('; ')}. ` : ''}${guards.length ? `So the place now looks like this, and it must stay this way in the picture: ${guards.join('; ')}. ` : ''}Currently in progress: ${now}${pct ? ` (about ${pct}% of this step is done)` : ' (just starting)'}`;
     }
     return [
       'Edit the attached photo. Keep exactly the same place, the same building or object, the same viewpoint and framing, the same light and the same person (same face, hair, body and clothes) as in the attached photo.',
       config.person ? `The person in the picture is ${config.personDesc}, ${config.faceless ? 'seen from behind or from far away' : 'seen clearly'}, working in the scene, ${clipIndex / total < 0.25 ? 'fresh with a little sweat' : clipIndex / total < 0.6 ? 'sweaty, hair damp, shirt dark with sweat' : 'soaked in sweat, dirty and visibly tired'}. The person holds only the one tool that this moment of the work needs, and nothing else in the hands.` : '',
+      SAME_HOUSE,
       `Change only the state of the work so that the picture shows this moment: ${progress}.`,
       'Everything that is not mentioned keeps exactly the same shape, size, position and color as in the attached photo.',
       IMG_RATIO[config.aspect],

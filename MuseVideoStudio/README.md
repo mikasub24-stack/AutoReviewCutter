@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.8.6
+
+- **Tab Dọn nhà · Sinh tồn: bớt «lùi trạng thái» giữa các đoạn.** Ảnh mốc đầu mỗi đoạn do Muse vẽ lại từ ảnh gốc nên hay quên việc đã xong (đã sơn rồi mà tường vẫn bong, đã lát sàn mà dây điện vẫn hở, lắp cửa sổ trong căn phòng còn trần trụi). Giờ ảnh mốc dặn rõ trạng thái hiện tại theo các bước đã xong: tường trát phẳng, đã sơn sạch không bong tróc, sàn đã lát mới, cửa mới, dây điện đã giấu và đèn đã bật, bếp đã lắp, nhà đã có nội thất.
+- **Giữ đúng MỘT ngôi nhà:** mọi ảnh mốc được dặn giữ nguyên kiến trúc (cùng số tầng, dáng mái, mặt bằng, vị trí cửa), chỉ đổi tình trạng (sạch hơn, sửa xong, sơn mới), không thành nhà khác.
+- Áp dụng cho video tạo MỚI (video đang chạy dở vẫn dùng ảnh mốc cũ).
+
 ## Update 1.8.5
 
 - **Tab Kể chuyện, chế độ «Cây trồng»: cây lớn TỪ TỪ.** Trước đây câu hướng dẫn Muse có sẵn ví dụ cả vòng đời (hạt nứt, mầm nhú, lá, hoa, quả) nên Muse chép cả chuỗi đó vào MỖI clip: cảnh nào cũng nảy mầm rồi ra quả luôn trong vài giây. Giờ mỗi clip chỉ là MỘT bước nhỏ (vài ngày tới một hai tuần: cao thêm vài cm, thêm vài lá, một nụ nở, một quả to thêm), nảy mầm chỉ ở cảnh nảy mầm, hoa chỉ ở cảnh hoa, quả chỉ ở cảnh quả.
