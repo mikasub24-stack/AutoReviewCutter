@@ -409,6 +409,15 @@
     return [`Emotion and effort (the person is a real tired human, never a calm robot): ${work} ${tired} ${how}`];
   }
 
+  // Đồ cầm trên tay: AI hay «đổi đồ» giữa chừng (đang cầm chổi thì thành xẻng, tay tự mọc thêm đồ). Mỗi cảnh chỉ cầm MỘT dụng cụ đúng việc, giữ nguyên cả clip;
+  // sang bước mới thì đặt dụng cụ cũ xuống thấy rõ rồi nhặt dụng cụ mới lên, không đổi tức thì.
+  const ITEMS = 'Hand items: the person holds ONLY the one tool or item that this step needs, and it is the same item for the entire clip. It never changes shape, size, color or type, never turns into another item, and no extra or new item ever appears in the hands (the other hand is empty or simply helps). The tool is clearly the right one for this job.';
+  const SWAP = 'Changing tools: the person first puts the previous tool down in plain view (on the ground or on a table), then visibly picks up the tool that this step needs. A tool is never swapped, vanishing or appearing instantly or in the middle of a motion.';
+  function itemLines(step, number) {
+    const lines = [ITEMS];
+    if (number > 1 && step.part <= 1 && step.step > 1) lines.push(SWAP);
+    return lines;
+  }
   function clipPrompt(config, step, number, total, { first = false } = {}) {
     const last = number === total;
     return [
@@ -421,6 +430,7 @@
       ...shotLines(config, step, number, total),
       sceneBible(config),
       ...effortLines(config, step, number, total),
+      ...itemLines(step, number),
       'Pace: fast and energetic, as in a sped-up video; quick hands, quick steps, fast tool movements and rapid progress. Never slow motion, never slow or calm movement.',
       'Realism: it must look like a real person really doing this job. Natural human movement, real weight and real physics. Every change in the scene is made visibly by the person with their own hands and real tools; nothing ever changes by itself, by magic or by a cut.',
       'Continuity: the attached image shows the exact current state. Keep the same place, the same viewpoint, the same lighting and everything already done exactly as in the image. Do not add, remove, move or change anything except what this step does. Do not cut to another scene.',
@@ -509,7 +519,7 @@
     }
     return [
       'Edit the attached photo. Keep exactly the same place, the same building or object, the same viewpoint and framing, the same light and the same person (same face, hair, body and clothes) as in the attached photo.',
-      config.person ? `The person in the picture is ${config.personDesc}, ${config.faceless ? 'seen from behind or from far away' : 'seen clearly'}, working in the scene, ${clipIndex / total < 0.25 ? 'fresh with a little sweat' : clipIndex / total < 0.6 ? 'sweaty, hair damp, shirt dark with sweat' : 'soaked in sweat, dirty and visibly tired'}.` : '',
+      config.person ? `The person in the picture is ${config.personDesc}, ${config.faceless ? 'seen from behind or from far away' : 'seen clearly'}, working in the scene, ${clipIndex / total < 0.25 ? 'fresh with a little sweat' : clipIndex / total < 0.6 ? 'sweaty, hair damp, shirt dark with sweat' : 'soaked in sweat, dirty and visibly tired'}. The person holds only the one tool that this moment of the work needs, and nothing else in the hands.` : '',
       `Change only the state of the work so that the picture shows this moment: ${progress}.`,
       'Everything that is not mentioned keeps exactly the same shape, size, position and color as in the attached photo.',
       IMG_RATIO[config.aspect],

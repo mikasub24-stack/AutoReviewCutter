@@ -477,3 +477,15 @@ test('thumbnail 16:9: prompt nhờ Muse ghép ảnh trước / sau, có tiêu đ
   assert.deepEqual(b.images.map(j => j.number), a.images.map(j => j.number));
   assert.ok(b.images.every(j => j.number < P.THUMB_NUMBER));
 });
+
+test('đồ cầm trên tay: mọi cảnh chỉ cầm một dụng cụ giữ nguyên cả clip; sang bước mới thì đặt cái cũ xuống rồi nhặt cái mới', () => {
+  const config = P.options({ theme: 'house_full', minutes: 5, seconds: 8, aspect: '16:9', person: true, parallel: 1, lang: 'vi' });
+  const jobs = P.buildJobs(config, { storyId: 's', photo: 'p.png' }).filter(j => j.phase === 'clip');
+  assert.ok(jobs.length > 10);
+  assert.ok(jobs.every(j => /Hand items: the person holds ONLY the one tool/.test(j.prompt)), 'cảnh nào cũng có luật đồ cầm');
+  assert.doesNotMatch(jobs[0].prompt, /Changing tools/, 'cảnh đầu chưa có dụng cụ trước');
+  const starts = jobs.filter(j => /STEP (\d+) of \d+(, part 1 of \d+)?:/.test(j.prompt.split('\n').find(l => /^STEP /.test(l)) || '') && !/STEP 1 of/.test(j.prompt));
+  assert.ok(starts.length > 0 && starts.every(j => /Changing tools: the person first puts the previous tool down/.test(j.prompt)), 'đầu mỗi bước mới: đặt dụng cụ cũ xuống rồi nhặt dụng cụ mới');
+  const cont = jobs.find(j => /part [2-9] of/.test(j.prompt));
+  if (cont) assert.doesNotMatch(cont.prompt, /Changing tools/, 'cảnh tiếp tục cùng một bước thì giữ nguyên dụng cụ, không đổi');
+});
