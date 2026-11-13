@@ -17,11 +17,10 @@
   const SECONDS = [5, 6, 8, 10];
   const MAX_SECONDS = 10;
   const MAX_CUSTOM = 20;
-  const NO_SPEECH_FLOW = 'Audio: only the quiet natural sounds of the work itself (brushing, sweeping, water, tools); no speech, no dialogue, no singing, no narration, no music.';
-  const NO_SPEECH = 'Audio: no speech, no dialogue, no singing, no narration, no music, no sound effects, no ambient noise - the video must be completely silent with no audio at all.';
+  const NO_SPEECH_FLOW = 'Audio: only the quiet natural sounds of the work itself (brushing, sweeping, water, tools, footsteps); no speech, no dialogue, no singing, no narration, no music.';
   // Muse từ chối video có người thật / người nổi tiếng / nhân vật có bản quyền («blocked by policy»). Mọi prompt đều nói rõ người trong cảnh là người vô danh, hư cấu.
   // Đồng nhất là điều quan trọng nhất: mọi prompt lặp nguyên văn danh sách «không được đổi».
-  const LOCKED = 'LOCKED - these never change unless the current step is working on them: the shape, size and style of the building or the room, the exact number and position of the windows and doors, the roof and the wall layout, the surroundings and the background, the direction of the light and the weather, the colors of everything this step does not touch, and the person\'s face, hair, skin, body size and clothes.';
+  const LOCKED = 'LOCKED - these never change unless the current step is working on them: the shape, size, height and style of the building or the room, the exact number of floors (storeys) of the building (a two-floor house always stays a two-floor house, never lower), the exact number and position of the windows and doors, the roof and the wall layout, the surroundings and the background, the direction of the light and the weather, the colors of everything this step does not touch, and the person\'s face, hair, skin, body size and clothes.';
   const SAFE_PEOPLE = 'People: every person in the video is an anonymous, generic, fictional individual - not any real person, not a celebrity, politician, athlete or public figure, not a lookalike of anyone, and not a known fictional, cartoon or movie character. No logos, brand names or trademarks are visible.';
   const SAFE_PEOPLE_IMAGE = SAFE_PEOPLE.replace('in the video', 'in the picture');
   const FACELESS = 'The person is always filmed from behind, from a distance or from the side, or only the hands and the body are shown; the face is never shown clearly and never in close-up.';
@@ -441,7 +440,7 @@
       'Realism: it must look like a real person really doing this job. Natural human movement, real weight and real physics. Every change in the scene is made visibly by the person with their own hands and real tools; nothing ever changes by itself, by magic or by a cut.',
       'Continuity: the attached image shows the exact current state. Keep the same place, the same viewpoint, the same lighting and everything already done exactly as in the image. Do not add, remove, move or change anything except what this step does. Do not cut to another scene.',
       first ? '' : 'This clip continues directly from the previous clip without any jump: the person keeps the same pose, the same tool in the hands and the same movement as in the attached frame, and goes on working.',
-      config.provider === 'flow' ? NO_SPEECH_FLOW : NO_SPEECH,
+      NO_SPEECH_FLOW,   // Muse và Flow đều xin tiếng động tự nhiên của công việc (chổi, nước, dụng cụ); không lời, không nhạc. Trước 1.9.1 Muse bị dặn «hoàn toàn im lặng» nên video ra không có âm thanh.
       'No text, captions, logos or watermarks in the video.'
     ].filter(Boolean).join('\n');
   }

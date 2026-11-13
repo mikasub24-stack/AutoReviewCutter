@@ -17,7 +17,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.addInitScript(() => {
       localStorage.setItem('museStudio.language', localStorage.getItem('testLang') || 'vi');
       const s = {
-        version: '1.9.0', active: false, paused: true, jobs: [],
+        version: '1.9.1', active: false, paused: true, jobs: [],
         license: { status: 'active', plan: 'short', longTerm: false, device: 'TESTDEVICE', expiresAt: Date.now() + 86400000 * 30, message: 'Đã kích hoạt key.' },
         story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: false, clone: false }, platform: 'win32', edgeVoices: [], clones: [] } },
         restore: { busy: false, progress: '', error: '', storyId: '', stories: {} },
@@ -199,6 +199,16 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.waitForFunction(() => window.calls.some(c => c.name === 'restoreSave'));
     assert.equal((await calls('restoreSave'))[0].data.storyId, 'Don-nha-1');
     await page.waitForFunction(() => /Nhà mới\.mp4/.test(document.body.textContent));
+    // Cảnh bị loại khỏi video (sai đồ vật / hành động): ghi rõ cảnh nào; video đã dựng chưa phản ánh thay đổi thì nhắc dựng lại.
+    const sigOf = skip => page.evaluate(skipList => window.s.jobs.filter(j => j.phase === 'clip' && !skipList.includes(j.number)).sort((a, b) => a.number - b.number).map(j => j.output).join('|'), skip);
+    await page.evaluate(sig => { const m = window.s.restore.stories['Don-nha-1']; m.clipSig = sig; m.excluded = [3]; window.push(); }, await sigOf([]));
+    await page.waitForFunction(() => /Đang bỏ khỏi video: cảnh 3\./.test(document.getElementById('restoreRuns').textContent));
+    assert.match(await page.locator('#restoreRuns').textContent(), /Bấm «Dựng lại video» để áp dụng thay đổi/);
+    await page.evaluate(sig => { window.s.restore.stories['Don-nha-1'].clipSig = sig; window.push(); }, await sigOf([3]));
+    await page.waitForFunction(() => !/Bấm «Dựng lại video» để áp dụng/.test(document.getElementById('restoreRuns').textContent));
+    assert.match(await page.locator('#restoreRuns').textContent(), /Đang bỏ khỏi video: cảnh 3\./, 'đã dựng lại: vẫn ghi cảnh đang bỏ');
+    await page.evaluate(sig => { const m = window.s.restore.stories['Don-nha-1']; m.excluded = []; m.clipSig = sig; window.push(); }, await sigOf([]));
+    await page.waitForFunction(() => !/Đang bỏ khỏi video/.test(document.getElementById('restoreRuns').textContent));
     // Video xong: có khung xem thử, nút «Tạo thumbnail 16:9» (IPC restoreThumb); thumbnail xong thì hiện ảnh + «Lưu thumbnail…» (IPC restoreThumbSave); việc thumbnail không tính vào số cảnh.
     assert.equal(await page.locator('#restoreRuns video.restoreVideo').count(), 1, 'khung xem thử video đã dựng');
     assert.match(await page.locator('#restoreRuns video.restoreVideo').getAttribute('src'), /^file:\/\/\/C:\/Videos\/DonNha\/Don-nha-1\/Nh/);

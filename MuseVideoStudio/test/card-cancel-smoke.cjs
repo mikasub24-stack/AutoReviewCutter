@@ -118,6 +118,36 @@ const root=path.resolve(__dirname,'../src');
     await page.evaluate(()=>{Object.assign(window.s.jobs[3],{status:'completed',stage:'completed',output:'C:/Videos/004.mp4'});window.push();});
     assert.equal(await panel('next').isVisible(),false);assert.equal(await edit('next').isVisible(),false);
     assert.deepEqual(errors,[]);
+    // «Bỏ khỏi video» (1.9.1): chỉ trên cảnh dọn nhà ĐÃ XONG; đã bỏ thì đổi nhãn, ghi rõ trên thẻ; gửi đúng storyId + số cảnh.
+    const page2=await browser.newPage({viewport:{width:1436,height:886}}),errors2=[];
+    page2.on('pageerror',e=>errors2.push(e.message));page2.on('dialog',d=>d.accept());
+    await page2.addInitScript(()=>{
+      localStorage.setItem('museStudio.language','vi');localStorage.setItem('museStudio.mode','restore');let listener;window.calls=[];
+      window.s={jobs:[
+        {id:'r1',kind:'restore',phase:'clip',storyId:'S1',number:1,title:'Cảnh 1',prompt:'p',references:[],status:'completed',stage:'completed',output:'C:/Videos/S1/001.mp4'},
+        {id:'r2',kind:'restore',phase:'clip',storyId:'S1',number:2,title:'Cảnh 2',prompt:'p',references:[],status:'completed',stage:'completed',output:'C:/Videos/S1/002.mp4'},
+        {id:'r3',kind:'restore',phase:'clip',storyId:'S1',number:3,title:'Cảnh 3',prompt:'p',references:[],status:'running',stage:'waiting',startedAt:Date.now()},
+        {id:'r4',kind:'restore',phase:'image',storyId:'S1',number:1,title:'Ảnh',prompt:'p',references:[],status:'completed',stage:'completed',output:'C:/Videos/S1/img.png'}],
+        active:false,paused:false,browserTests:[],restore:{busy:false,stories:{S1:{name:'S1',excluded:[2]}}},settings:{output:'C:/Videos',browserChoice:'builtin',browserPath:'',accountCount:1,composer:'textarea',fileInput:'input',submit:'',video:'video',attachmentReadySelector:'',timeoutMinutes:15,ffmpeg:'ffmpeg',autoMerge:false,autoPackage:false}};
+      window.push=()=>listener(structuredClone(window.s));
+      window.studio={onUpdate:fn=>listener=fn,invoke:async(name,data)=>{window.calls.push({name,data});return structuredClone(window.s);}};
+    });
+    await page2.goto(`http://127.0.0.1:${server.address().port}/`);
+    await page2.waitForSelector('[data-job-id="r1"]');
+    const ex=id=>page2.locator(`[data-job-id=${id}] .cardActions button`).filter({hasText:/^(Bỏ khỏi video|Đưa lại vào video)$/});
+    assert.equal(await ex('r1').isVisible(),true,'cảnh dọn nhà đã xong có nút');
+    assert.equal((await ex('r1').textContent()).trim(),'Bỏ khỏi video');
+    assert.equal((await ex('r2').textContent()).trim(),'Đưa lại vào video','cảnh đã bỏ đổi nhãn');
+    assert.match(await page2.locator('[data-job-id=r2] .fileLine').textContent(),/đang bỏ khỏi video/);
+    assert.equal(await page2.locator('[data-job-id=r1] .fileLine').textContent().then(t=>/đang bỏ khỏi video/.test(t)),false);
+    assert.equal(await ex('r3').isVisible(),false,'cảnh đang chạy chưa có clip: không có nút');
+    assert.equal(await ex('r4').isVisible(),false,'ảnh nền không phải cảnh clip');
+    await ex('r1').click();await ex('r2').click();
+    assert.deepEqual(await page2.evaluate(()=>window.calls.filter(c=>c.name==='restoreExclude').map(c=>c.data)),[{storyId:'S1',number:1,exclude:true},{storyId:'S1',number:2,exclude:false}]);
+    await page2.evaluate(()=>{window.s.active=true;window.push();});
+    assert.equal(await ex('r1').isDisabled(),true,'đang chạy hàng đợi thì khóa nút');
+    assert.deepEqual(errors2,[]);
+    await page2.close();
     await page.screenshot({path:process.env.MUSE_UI_SCREENSHOT||path.join(require('node:os').tmpdir(),'muse-card-cancel.png')});
     console.log('PASS: card-cancel smoke (Dừng cảnh này / Tạo lại ngay chỉ hiện trên cảnh đang chạy, đúng IPC, khóa khi đang dừng cả hàng đợi)');
   }finally{await browser.close();server.close();}

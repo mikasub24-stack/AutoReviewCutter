@@ -142,6 +142,7 @@
         const r = await call('wildBuild', { storyId: id, sfx: $('wildSfx').value, voice: { engine: 'edge', voice: $('wildVoice').value || (meta.voice && meta.voice.voice) || '', tempo: tempo(), volume: 1 } });
         if (r) { runsKey = ''; render(r); }
       }, anyBusy));
+      if (meta.output) actions.append(button('Lưu video…', 'primary', async () => { const r = await call('wildSave', { storyId: id }); if (r && r.file) toast('Đã lưu video: ' + r.file); }));
       if (meta.output) actions.append(button('Mở video', 'secondary', () => call('wildReveal', { storyId: id })));
       actions.append(button('Mở thư mục', 'secondary', () => call('openOutput', { kind: 'wild' })));
       box.append(top, bar, text, ...extra, actions);

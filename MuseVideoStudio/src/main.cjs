@@ -18,7 +18,7 @@ const {createLicense,deviceCode}=require('./license.cjs');
 const {payment}=require('./payment.cjs');
 const {createVoiceService}=require('./story-voice.cjs');
 const {createStoryService,storyFolder,freeStoryId}=require('./story-service.cjs');
-const {restoreFolder,extractLastFrame,frameSimilarity,assembleRestore,MUSIC_EXT}=require('./restore-render.cjs');
+const {restoreFolder,extractLastFrame,frameSimilarity,assembleRestore,planAssembly,MUSIC_EXT}=require('./restore-render.cjs');
 const restorePlan=require('./restore-plan.js');
 const wildPlan=require('./wild-plan.js');
 const {createWildWriter}=require('./wild-write.cjs');
@@ -611,6 +611,9 @@ async function addUserFont(source){
 let restoreState={busy:false,progress:'',error:'',storyId:''};
 const restoreClips=storyId=>queue.jobs.filter(j=>j.kind==='restore'&&j.phase==='clip'&&j.storyId===storyId).sort((a,b)=>(a.number||0)-(b.number||0));
 const restoreDone=clips=>clips.length>0&&clips.every(j=>j.status==='completed'&&j.output);
+// Các cảnh thật sự vào video (đã bỏ cảnh người dùng loại) và chữ ký của chúng, để biết video đã dựng có còn đúng không.
+const restorePlanOf=(storyId,meta)=>planAssembly({clips:restoreClips(storyId),excluded:meta?.excluded,seams:meta?.seams});
+const restoreSigOf=(storyId,meta)=>{try{return restorePlanOf(storyId,meta).used.map(j=>j.output).join('|');}catch{return '';}};
 function pruneRestoreStories(){
   const ids=new Set(queue.jobs.filter(j=>j.kind==='restore').map(j=>j.storyId));
   const all=settings.restoreStories||(settings.restoreStories={});
@@ -650,8 +653,9 @@ async function buildRestoreStory(storyId){
     await licenseManager.requireLongTerm();
     await closeAllBrowsers().catch(()=>{});
     restoreState.progress='Chuẩn bị dựng video…';notify();
-    const file=await assembleRestore({clips:clips.map(j=>j.output),dir:restoreFolder(settings.output,storyId),name:meta.name||storyId,ffmpeg:settings.ffmpeg,aspect:meta.aspect,music:meta.music,seams:meta.seams,onProgress:t=>{restoreState.progress=t;notify();}});
-    Object.assign(meta,{output:file,builtAt:Date.now(),clipSig:clips.map(j=>j.output).join('|')});
+    const plan=restorePlanOf(storyId,meta);
+    const file=await assembleRestore({clips:plan.used.map(j=>j.output),dir:restoreFolder(settings.output,storyId),name:meta.name||storyId,ffmpeg:settings.ffmpeg,aspect:meta.aspect,music:meta.music,seams:plan.seams,onProgress:t=>{restoreState.progress=t;notify();}});
+    Object.assign(meta,{output:file,builtAt:Date.now(),clipSig:plan.used.map(j=>j.output).join('|'),builtCount:plan.used.length});
     restoreState={busy:false,progress:'Video đã dựng xong',error:'',storyId};
   }catch(e){restoreState={busy:false,progress:'',error:e.message,storyId};}
   finally{await save();notify();}
@@ -684,7 +688,7 @@ async function buildRestoreStories({auto=false}={}){
   for(const [storyId,meta] of Object.entries(settings.restoreStories||{})){
     const clips=restoreClips(storyId);
     if(!restoreDone(clips))continue;
-    if(auto&&(!meta.auto||meta.clipSig===clips.map(j=>j.output).join('|')))continue;
+    if(auto&&(!meta.auto||meta.clipSig===restoreSigOf(storyId,meta)))continue;
     await buildRestoreStory(storyId);
   }
 }
@@ -925,6 +929,8 @@ app.whenReady().then(async () => {
       try{
         await licenseManager.ensureAllowed();await openMuse(index);
         if(epoch!==runEpoch||flushingQuit||stopping)return snapshot();
+        // Cảnh dọn nhà đã loại khỏi video mà được tạo lại: bản mới là bản người dùng muốn dùng, đưa lại vào video.
+        {const em=job.kind==='restore'?settings.restoreStories?.[job.storyId]:null;if(em?.excluded?.length){em.excluded=em.excluded.filter(n=>Number(n)!==Number(job.number));await save();}}
         if(job.kind==='video')invalidateOutputs();queue.regenerate(id).catch(e=>dialog.showErrorBox(ui('Tạo lại','Regenerate'),e.message)).finally(notify);
       }finally{starting=false;notify();}
       return snapshot();
@@ -1129,6 +1135,22 @@ app.whenReady().then(async () => {
       await buildRestoreStory(String(data.storyId));
       return snapshot();
     },
+    // «Bỏ khỏi video» / «Đưa lại vào video»: cảnh sai đồ vật hoặc hành động thì loại khỏi bản dựng; bấm «Dựng lại video» để áp dụng.
+    restoreExclude: async data => {
+      const storyId=String(data?.storyId||''),number=Number(data?.number),meta=settings.restoreStories?.[storyId];
+      if(!meta)throw Error(ui('Không thấy video này.','This video was not found.'));
+      if(queue.active||starting||merging||packaging||restoreState.busy)throw Error(ui('Chờ xử lý hiện tại hoàn tất.','Wait for the current work to finish.'));
+      const clips=restoreClips(storyId);
+      if(!clips.some(j=>Number(j.number)===number))throw Error(ui('Không thấy cảnh này.','This scene was not found.'));
+      const set=new Set((meta.excluded||[]).map(Number));
+      if(data?.exclude===false)set.delete(number);
+      else{
+        set.add(number);
+        if(clips.every(j=>set.has(Number(j.number))))throw Error(ui('Phải giữ lại ít nhất một cảnh trong video.','Keep at least one scene in the video.'));
+      }
+      meta.excluded=[...set].sort((a,b)=>a-b);
+      await save();notify();return snapshot();
+    },
     // «Lưu video…»: hộp «Lưu như…» để chọn nơi lưu và đặt tên cho bản sao MP4 hoàn chỉnh.
     restoreSave: async data => {
       const out=settings.restoreStories?.[String(data?.storyId||'')]?.output;
@@ -1150,7 +1172,7 @@ app.whenReady().then(async () => {
       let before=clips[0].references?.[0]||clips[0].refList?.find(r=>r.file)?.file||'';
       if(!await exists(before)){const base=queue.jobs.find(j=>j.kind==='restore'&&j.storyId===storyId&&j.phase==='image'&&j.number===1);before=base?.output||'';}
       if(!await exists(before))throw Error(ui('Không thấy ảnh gốc của video này để làm ảnh «trước».','The original photo of this video is missing, so there is no “before” picture.'));
-      const last=clips[clips.length-1];let after=last.lastFrame||'';
+      const last=restorePlanOf(storyId,meta).used.at(-1)||clips[clips.length-1];let after=last.lastFrame||'';   // khung cuối của cảnh cuối cùng THỰC SỰ có trong video
       if(!await exists(after))after=await extractLastFrame({ffmpeg:settings.ffmpeg,clip:last.output,out:path.join(restoreFolder(settings.output,storyId),'thumb-sau.png')});
       const old=queue.jobs.find(j=>j.kind==='restore'&&j.storyId===storyId&&j.phase==='image'&&j.number===restorePlan.THUMB_NUMBER);
       if(old)await queue.remove(old.id);
@@ -1213,6 +1235,16 @@ app.whenReady().then(async () => {
       if(data?.sfx)meta.sfx=data.sfx==='low'?'low':'mid';
       void buildWildStory(String(data.storyId));
       return snapshot();
+    },
+    // «Lưu video…»: hộp «Lưu như…» để chọn nơi lưu và đặt tên cho bản sao MP4 phim hoàn chỉnh.
+    wildSave: async data => {
+      const out=settings.wildStories?.[String(data?.storyId||'')]?.output;
+      if(!out||!await fs.stat(out).then(s=>s.isFile(),()=>false))throw Error(ui('Chưa có video hoàn chỉnh để lưu.','There is no finished video to save yet.'));
+      const picked=await dialog.showSaveDialog(main,{title:ui('Lưu video về','Save video'),defaultPath:path.join(app.getPath('downloads'),path.basename(out)),filters:[{name:'MP4',extensions:['mp4']}]});
+      if(picked.canceled||!picked.filePath)return false;
+      const dest=/\.mp4$/i.test(picked.filePath)?picked.filePath:picked.filePath+'.mp4';
+      if(path.resolve(dest).toLowerCase()!==path.resolve(out).toLowerCase())await fs.copyFile(out,dest);
+      shell.showItemInFolder(dest);return{file:dest};
     },
     wildReveal: async data => {
       const id=String(data?.storyId||''),meta=settings.wildStories?.[id];

@@ -129,3 +129,30 @@ test('thiếu clip hoặc danh sách rỗng thì báo lỗi rõ', opts, async ()
   await assert.rejects(R.assembleRestore({ clips: [], dir: os.tmpdir() }), /Chưa có clip/);
   await assert.rejects(R.assembleRestore({ clips: ['/không/có/tệp.mp4'], dir: os.tmpdir() }), /Không thấy tệp clip/);
 });
+
+test('planAssembly: bỏ cảnh người dùng loại, chỗ cắt mới thành chỗ nối, giữ chỗ nối song song cũ', () => {
+  const mk = n => Array.from({ length: n }, (_, i) => ({ number: i + 1, output: `c${i + 1}.mp4` }));
+  const all = mk(6);
+  // không loại gì: giữ nguyên danh sách và chỗ nối cũ (chỉ số theo clips)
+  assert.deepEqual(R.planAssembly({ clips: all, seams: [3] }).seams, [3]);
+  assert.equal(R.planAssembly({ clips: all }).used.length, 6);
+  // loại cảnh 3: cảnh 4 (đứng sau chỗ khuyết) thành chỗ nối, chỉ số trong danh sách mới là 2
+  const gap = R.planAssembly({ clips: all, excluded: [3] });
+  assert.deepEqual(gap.used.map(c => c.number), [1, 2, 4, 5, 6]);
+  assert.deepEqual(gap.seams, [2]);
+  // loại cảnh 1: cảnh 2 thành cảnh đầu, không có chỗ nối ở vị trí 0
+  const head = R.planAssembly({ clips: all, excluded: [1] });
+  assert.deepEqual(head.used.map(c => c.number), [2, 3, 4, 5, 6]);
+  assert.deepEqual(head.seams, []);
+  // loại cảnh cuối: không có chỗ nối nào mới
+  assert.deepEqual(R.planAssembly({ clips: all, excluded: [6] }).seams, []);
+  // loại hai cảnh liền nhau và một cảnh rời; chỗ nối song song cũ ở cảnh 4 (chỉ số 3) vẫn đúng chỗ
+  const multi = R.planAssembly({ clips: all, excluded: [2, 3, 5], seams: [3] });
+  assert.deepEqual(multi.used.map(c => c.number), [1, 4, 6]);
+  assert.deepEqual(multi.seams, [1, 2]);
+  // chỗ nối cũ rơi vào cảnh bị loại thì mất; cảnh kế tiếp vẫn là chỗ nối vì có khuyết
+  assert.deepEqual(R.planAssembly({ clips: all, excluded: [4], seams: [3] }).seams, [3]);
+  // số cảnh viết dạng chuỗi vẫn hiểu; loại hết thì báo lỗi rõ
+  assert.deepEqual(R.planAssembly({ clips: all, excluded: ['2'] }).used.map(c => c.number), [1, 3, 4, 5, 6]);
+  assert.throws(() => R.planAssembly({ clips: mk(2), excluded: [1, 2] }), /ít nhất một cảnh/);
+});

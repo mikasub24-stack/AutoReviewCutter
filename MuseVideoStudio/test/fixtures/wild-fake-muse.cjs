@@ -8,13 +8,17 @@ function biblePlain(total, chapters) {
     'NHÂN VẬT:', `1 | chính | đực trưởng thành | ${lock}`, '2 | rắn | rắn hổ mang | adult cobra with glossy dark olive scales and pale belly, two meters',
     'BỐI CẢNH: African savanna in the dry season, golden grass, acacia trees and termite mounds, low warm sun.',
     'ẢNH BÌA: the lead mongoose on a termite mound at sunrise',
-    'CHƯƠNG:', ...Array.from({ length: chapters }, (_, i) => `${i + 1} | Chương ${i + 1} | ${per + (i < rest ? 1 : 0)} | diễn biến ${i + 1} | bình minh`),
+    'CỐT TRUYỆN: Mùa khô kéo dài, đàn cầy mangut phải đi xa tìm thức ăn cho đàn con đói. Họ gặp một con rắn hổ mang chặn đường và bị mất một con non, rồi tìm ra bãi mồi mới và đẩy lui con rắn.',
+    'CHƯƠNG:', ...Array.from({ length: chapters }, (_, i) => `${i + 1} | Chương ${i + 1} | ${per + (i < rest ? 1 : 0)} | tình huống mới ${i + 1} | bình minh | địa điểm ${i + 1}: bãi cỏ khô`),
     'MSDONEabc123'
   ].join('\n');
 }
+// Cảnh chia hết cho 6 là cảnh QUANG CẢNH không có nhân vật (NV: KHÔNG), luôn là cảnh MỚI.
+const scenery = n => n % 6 === 0;
 const sceneText = (n, { omit = false } = {}) => omit ? '' : [
-  `CẢNH ${n}`, n % 5 === 0 ? 'LỜI: —' : `LỜI: Câu thuyết minh riêng của cảnh số ${n}.`, n === 1 || n % 4 === 1 ? 'NỐI: MỚI' : 'NỐI: TIẾP', 'NV: 1,2',
-  n === 1 || n % 4 === 1 ? 'KHUNG: Wide shot at dawn, the mongoose stands on the mound in the centre, golden grass and an acacia tree.' : '',
+  `CẢNH ${n}`, n % 5 === 0 ? 'LỜI: —' : `LỜI: Câu thuyết minh riêng của cảnh số ${n}.`, n === 1 || n % 4 === 1 || scenery(n) ? 'NỐI: MỚI' : 'NỐI: TIẾP',
+  scenery(n) ? 'LOẠI: QUANG CẢNH' : 'LOẠI: CHÍNH', scenery(n) ? 'NV: KHÔNG' : 'NV: 1,2',
+  n === 1 || n % 4 === 1 || scenery(n) ? (scenery(n) ? 'KHUNG: Very wide landscape of the dry savanna at dusk, golden grass moving in the wind, distant acacia trees and a huge orange sky, no animals.' : 'KHUNG: Wide shot at dawn, the mongoose stands on the mound in the centre, golden grass and an acacia tree.') : '',
   `HÀNH ĐỘNG: Telephoto shot number ${n}. 0-3s the mongoose scans the grass; 3-6s it turns left; 6-10s it walks forward slowly.`,
   `CUỐI: End state of scene ${n}: the mongoose walks left through tall grass, head up.`, 'ÂM THANH: wind', ''
 ].filter(x => x !== '').join('\n');
@@ -35,4 +39,4 @@ function fakeMuse({ total = 130, chapters = 16, drop = () => false } = {}) {
   return { ask, log };
 }
 
-module.exports = { biblePlain, sceneText, fakeMuse };
+module.exports = { biblePlain, sceneText, scenery, fakeMuse };

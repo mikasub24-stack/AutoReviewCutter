@@ -166,6 +166,10 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.evaluate(() => { Object.assign(window.s.wild, { busy: false, phase: 'done' }); window.s.wild.build = {}; window.s.wild.stories['DV-Cay-mangut'].output = 'C:\\Videos\\DongVat\\DV-Cay-mangut\\Cay mangut.mp4'; window.s.wild.stories['DV-Cay-mangut'].builtAt = 5; window.s.wild.stories['DV-Cay-mangut'].status = 'built'; window.push(); });
     await page.waitForSelector('#wildRuns video');
     assert.match(await page.locator('#wildRuns .restoreRunText').first().textContent(), /Phim hoàn chỉnh: Cay mangut\.mp4.*ghi-chu-dang-video\.txt/);
+    // «Lưu video…» chỉ hiện khi phim đã dựng xong và gửi đúng mã phim.
+    await page.click('#wildRuns button:has-text("Lưu video…")');
+    await flush();
+    assert.deepEqual((await calls('wildSave'))[0].data, { storyId: 'DV-Cay-mangut' });
     await page.click('#wildRuns button:has-text("Mở video")');
     await flush();
     assert.deepEqual((await calls('wildReveal'))[0].data, { storyId: 'DV-Cay-mangut' });

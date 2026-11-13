@@ -124,7 +124,7 @@
     $('restorePhoto').textContent = photo ? tr('Đổi ảnh gốc', 'Change photo') : tr('Chọn ảnh gốc', 'Choose photo');
   }
   function renderMusic() {
-    $('restoreMusicName').textContent = music ? base(music) : tr('Không nhạc nền (video im lặng).', 'No background music (silent video).');
+    $('restoreMusicName').textContent = music ? base(music) : tr('Không nhạc nền (chỉ tiếng động gốc của clip).', 'No background music (only the clips’ own sounds).');
     $('restoreMusicClear').hidden = !music;
     $('restoreMusic').textContent = music ? tr('Đổi nhạc nền', 'Change music') : tr('Chọn nhạc nền', 'Choose music');
   }
@@ -167,7 +167,7 @@
     const info = s.restore || {}, stories = info.stories || {};
     const runs = runsOf(s);
     const key = JSON.stringify([lang(), Boolean(s.active), Boolean(s.starting), info.busy, info.progress, info.error, info.storyId,
-      runs.map(r => [r.id, r.list.map(j => j.status + (j.stage || '') + (isThumb(j) ? j.output || '' : '')), (stories[r.id] || {}).output || '', (stories[r.id] || {}).builtAt || 0])]);
+      runs.map(r => [r.id, r.list.map(j => j.status + (j.stage || '') + (isThumb(j) ? j.output || '' : '')), (stories[r.id] || {}).output || '', (stories[r.id] || {}).builtAt || 0, ((stories[r.id] || {}).excluded || []).join(','), (stories[r.id] || {}).clipSig || ''])]);
     if (key === runsKey) return;
     runsKey = key;
     // Phần nhập dài chiếm hết màn hình: khi bắt đầu chạy thì thu gọn lại để thấy ngay tiến độ và hàng đợi (bấm «Tạo video mới» để mở lại).
@@ -226,6 +226,18 @@
         } else if (['failed', 'interrupted'].includes(thumb.status)) { note.textContent = tr('Thumbnail lỗi: ', 'Thumbnail failed: ') + (thumb.error || thumb.stageMessage || tr('chưa tạo được', 'could not be created')); note.classList.add('warn'); }
         else note.textContent = tr('Đang nhờ Muse vẽ thumbnail 16:9 từ ảnh gốc và khung cuối của video…', 'Asking Muse to draw the 16:9 thumbnail from the original photo and the last frame…');
         tbox.append(note); extra.push(tbox);
+      }
+      // Cảnh bị loại khỏi video (sai đồ vật / hành động): nói rõ cảnh nào, và nhắc dựng lại nếu video đang xem chưa phản ánh thay đổi.
+      {
+        const clipsAll = list.filter(j => j.phase === 'clip').sort((a, b) => (a.number || 0) - (b.number || 0));
+        const left = (meta.excluded || []).map(Number).filter(n => clipsAll.some(j => Number(j.number) === n));
+        const usedSig = clipsAll.filter(j => !left.includes(Number(j.number))).map(j => j.output).join('|');
+        const stale = Boolean(meta.output && allClips && meta.clipSig && meta.clipSig !== usedSig);
+        if (left.length || stale) {
+          const note = document.createElement('p'); note.className = 'restoreRunText' + (stale ? ' warn' : '');
+          note.textContent = (left.length ? tr('Đang bỏ khỏi video: cảnh ', 'Left out of the video: scene ') + left.join(', ') + '. ' : '') + (stale ? tr('Bấm «Dựng lại video» để áp dụng thay đổi.', 'Click “Rebuild video” to apply the change.') : '');
+          extra.push(note);
+        }
       }
       const actions = document.createElement('div'); actions.className = 'restoreRunActions';
       const busy = Boolean(s.active || s.starting), unfinished = list.some(j => ['pending', 'interrupted', 'failed'].includes(j.status));

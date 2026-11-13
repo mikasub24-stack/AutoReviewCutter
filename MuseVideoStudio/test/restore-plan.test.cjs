@@ -93,6 +93,14 @@ test('prompt: khóa đồng nhất, người vô danh, cảnh nối cảnh, ti�
   const first = P.clipPrompt(c, steps[0], 1, 15, { first: true });
   const next = P.clipPrompt(c, steps[1], 2, 15);
   assert.match(first, /starts EXACTLY from the attached image/);
+  // Âm thanh: Muse và Flow đều xin tiếng động tự nhiên của công việc (không còn «hoàn toàn im lặng» như trước 1.9.1)
+  for (const provider of ['muse', 'flow']) {
+    const p = P.clipPrompt(P.options({ theme: 'house_in', minutes: 2, place: 'old brick house living room', provider }), steps[0], 1, 15, { first: true });
+    assert.match(p, /only the quiet natural sounds of the work itself/, provider);
+    assert.match(p, /no speech[\s\S]*no music/, provider);
+    assert.doesNotMatch(p, /completely silent|no audio at all|no ambient noise/, provider);
+    assert.match(p, /exact number of floors \(storeys\)[^.]*never lower/, provider);   // nhà 2 tầng không được thành 1 tầng
+  }
   assert.match(first, /old brick house living room/);
   assert.match(first, /LOCKED - these never change/);
   assert.match(first, /anonymous, generic, fictional individual/);
@@ -101,7 +109,7 @@ test('prompt: khóa đồng nhất, người vô danh, cảnh nối cảnh, ti�
   assert.match(first, /face is clearly visible/);
   assert.doesNotMatch(first, /continues directly from the previous clip/);
   assert.match(next, /continues directly from the previous clip/);
-  assert.match(first, /Audio: no speech/);
+  assert.match(first, /Audio: only the quiet natural sounds/);
   assert.match(first, /FAST-MOTION real-life video of a person doing the work/);
   assert.match(first, /Never slow motion/);
   assert.match(first, /sharp, crisp, high-detail/);

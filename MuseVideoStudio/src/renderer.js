@@ -129,6 +129,8 @@ function makeCard(id){
   row.remove=action('Xóa',async()=>render(await call('remove',row.job.id)));
   row.regenerate=action('Tạo lại',async()=>render(await call('regenerate',row.job.id)));
   row.regenerate.title='Tạo lại cảnh này; giữ video cũ.';
+  row.exclude=action('Bỏ khỏi video',async()=>{const j=row.job,meta=state.restore?.stories?.[j.storyId],out=(meta?.excluded||[]).map(Number).includes(Number(j.number));render(await call('restoreExclude',{storyId:j.storyId,number:j.number,exclude:!out}));});
+  row.exclude.title='Cảnh sai đồ vật hoặc hành động? Loại cảnh này khỏi video (không xóa clip), rồi bấm «Dựng lại video» ở phần Dọn nhà. Bấm lần nữa để đưa lại.';
   row.cancelBtn=action('Dừng cảnh này',async()=>{if(row.job.status==='pending'){if(confirm('Dừng cảnh này (chưa chạy)? Cảnh thành «Đã dừng» để bạn sửa prompt rồi bấm «Gửi lại prompt» tạo lại sau. Các cảnh khác vẫn chạy tiếp.'))render(await call('holdJob',row.job.id));return;}if(confirm('Dừng chờ cảnh này? Các cảnh khác vẫn chạy tiếp. Cảnh này thành «Bị gián đoạn»: sau đó có thể «Tìm / tải video đã tạo» hoặc «Gửi lại prompt».'))render(await call('cancelJob',{id:row.job.id,mode:'skip'}));});
   row.cancelBtn.title='Không chờ cảnh này nữa; tab khác vẫn chạy tiếp.';row.cancelBtn.classList.add('danger');
   row.restartBtn=action('Tạo lại ngay',async()=>{if(confirm('Bấm dừng cảnh này trong Muse rồi gửi lại prompt ngay? Nếu Muse đang tạo dở thì phần đó bị bỏ.'))render(await call('cancelJob',{id:row.job.id,mode:'again'}));});
@@ -220,6 +222,9 @@ function updateCard(row,job,index){
   row.cancelBtn.hidden=!['running','pending'].includes(job.status)||(job.status==='pending'&&Boolean(job.mayHaveSubmitted||job.submittedAt));row.restartBtn.hidden=job.status!=='running';row.cancelBtn.disabled=row.restartBtn.disabled=Boolean(state.stopping||state.merging||state.packaging);
   row.otherBtn.hidden=job.status!=='running'||!(Number(state.settings.accountCount)>1);row.otherBtn.disabled=row.cancelBtn.disabled;
   row.upload.hidden=photo||job.kind==='image'||job.status==='completed';row.upload.disabled=Boolean(state.stopping||state.merging||state.packaging);
+  const rmeta=job.kind==='restore'&&job.phase==='clip'?state.restore?.stories?.[job.storyId]:null,left=Boolean(rmeta&&(rmeta.excluded||[]).map(Number).includes(Number(job.number)));
+  row.exclude.hidden=!(rmeta&&job.status==='completed');text(row.exclude,left?'Đưa lại vào video':'Bỏ khỏi video');row.exclude.disabled=Boolean(state.active||state.starting||state.stopping||state.merging||state.packaging||state.restore?.busy);
+  if(left){row.fileLine.hidden=false;text(row.fileLine,(job.output?'✓ '+job.output.split(/[\\/]/).pop():'')+' · đang bỏ khỏi video');}
   row.regenerate.hidden=job.status!=='completed';row.regenerate.disabled=Boolean(state.active||state.starting||state.stopping||state.testing||state.merging||state.packaging);
   const recoverable=['failed','interrupted'].includes(job.status)&&Boolean(job.mayHaveSubmitted||job.submittedAt||job.resultReadyAt);
   row.recover.hidden=!recoverable;row.recover.disabled=Boolean(state.active||state.starting||state.stopping||state.merging||state.packaging);

@@ -5,7 +5,7 @@ const P = require('../src/wild-plan.js');
 const castLock = 'adult male banded mongoose, sandy brown fur with darker transverse bands across the back, a small notch in the left ear, lean muscular build';
 const BIBLE_REPLY = (total = 130, chapters = 16) => {
   const per = Math.floor(total / chapters), rest = total - per * chapters;
-  const rows = Array.from({ length: chapters }, (_, i) => `${i + 1} | Chương ${i + 1} | ${per + (i < rest ? 1 : 0)} | Diễn biến số ${i + 1} của phim | bình minh`);
+  const rows = Array.from({ length: chapters }, (_, i) => `${i + 1} | Chương ${i + 1} | ${per + (i < rest ? 1 : 0)} | Tình huống mới số ${i + 1} của phim | bình minh | Địa điểm ${i + 1}: gò mối`);
   return [
     '**TIÊU ĐỀ:** Cầy mangut: người gác hang trên thảo nguyên',
     'LOÀI: Cầy mangut sọc (Mungos mungo), châu Phi hạ Sahara, thảo nguyên và savan',
@@ -22,6 +22,7 @@ const BIBLE_REPLY = (total = 130, chapters = 16) => {
     '3 | con non | cầy mangut con | young banded mongoose pup, small, fluffy light brown fur with faint stripes',
     'BỐI CẢNH: African savanna in the dry season, golden grass, scattered acacia trees and termite mounds, warm low sun at dawn and dusk, dusty air.',
     'ẢNH BÌA: the lead mongoose standing upright on a termite mound at sunrise, backlit by golden light, grassland behind',
+    'CỐT TRUYỆN: Mùa khô kéo dài, cầy mangut đực dẫn đàn đi tìm mồi cho đàn con đói; một con rắn hổ mang chặn đường, đàn mất một con non, rồi tìm được bãi mồi mới.',
     'CHƯƠNG:',
     ...rows,
     'MSDONE1a2b3c'
@@ -33,6 +34,7 @@ const sceneBlock = (n, extra = {}) => [
   `CẢNH ${n}`,
   `LỜI: ${extra.narration ?? `Bình minh lên, cầy mangut đứng gác trên gò mối số ${n}.`}`,
   `NỐI: ${extra.join ?? 'TIẾP'}`,
+  extra.kind === undefined ? '' : `LOẠI: ${extra.kind}`,
   `NV: ${extra.cast ?? '1,2'}`,
   extra.frame === undefined ? '' : `KHUNG: ${extra.frame}`,
   `HÀNH ĐỘNG: ${extra.action ?? 'Telephoto close-up. 0-3s the mongoose stands upright and scans the grass; 3-6s it turns its head to the left; 6-10s it drops to all fours and sniffs the ground.'}`,
@@ -245,4 +247,55 @@ test('ghi chú đi kèm: sự thật cần kiểm, lời thuyết minh, nhắc k
 test('mã phim theo tên con vật, không dấu', () => {
   assert.equal(P.storyIdBase(P.options({ topic: 'Cầy mangut và rắn hổ mang' })), 'DV-Cay-mangut-va-ran-ho-mang');
   assert.equal(P.storyIdBase(P.options({ topic: '' })), 'DV-phim');
+});
+
+test('hồ sơ phim: cốt truyện và địa điểm từng chương được đọc và gửi lại cho từng lượt viết', () => {
+  const b = bible();
+  assert.match(b.plot, /Mùa khô kéo dài.*rắn hổ mang.*bãi mồi mới/);
+  assert.equal(b.chapters[0].place, 'Địa điểm 1: gò mối');
+  assert.equal(b.chapters[5].place, 'Địa điểm 6: gò mối');
+  const cfg = { topic: 'Cầy mangut', minutes: 20 };
+  const ask = P.buildBibleInstruction(cfg, { marker: 'x1' });
+  for (const part of ['CÂU CHUYỆN, KHÔNG PHẢI BÀI GIỚI THIỆU', 'ít nhất HAI BƯỚC NGOẶT', 'HÀNH TRÌNH QUA NHIỀU NƠI', 'CHUYẾN ĐI SĂN LÀ SỢI CHỈ CHÍNH', 'NHỊP ĐIỆN ẢNH', 'CỐT TRUYỆN:', '<địa điểm cụ thể>']) assert.ok(ask.includes(part), 'thiếu: ' + part);
+  const text = P.buildChapterInstruction(cfg, b, { chapter: b.chapters[2], range: [b.chapters[2].from, b.chapters[2].from + 4] });
+  assert.match(text, /CỐT TRUYỆN \(cả phim\): Mùa khô kéo dài/);
+  assert.match(text, /\(địa điểm: Địa điểm 3: gò mối\)/);
+  for (const part of ['LOẠI: <CHÍNH | CẬN | XA | QUANG CẢNH | MÔI TRƯỜNG | THÚ PHỤ>', 'ÍT NHẤT 3 cảnh thuộc loại XA, QUANG CẢNH, MÔI TRƯỜNG hoặc THÚ PHỤ', 'không để quá 2 cảnh CHÍNH hoặc CẬN liên tiếp', 'ghi KHÔNG nếu cảnh chỉ có phong cảnh', 'đẩy câu chuyện đi tiếp']) assert.ok(text.includes(part), 'thiếu: ' + part);
+});
+
+test('cảnh quang cảnh: NV: KHÔNG hợp lệ, luôn là cảnh MỚI, không kéo nhân vật chính vào khung', () => {
+  const read = (extra, n = 7) => P.parseScenes(sceneBlock(n, { kind: 'QUANG CẢNH', ...extra }), { topic: 'x' })[0];
+  const land = read({ cast: 'KHÔNG', join: 'NEW', frame: 'Very wide landscape of the dry savanna at dusk, no animals.' });
+  assert.equal(land.noCast, true);
+  assert.deepEqual(land.cast, []);
+  assert.equal(land.kind, 'QUANG CẢNH');
+  assert.equal(read({ cast: '0', join: 'NEW', frame: 'x wide' }).noCast, true);
+  assert.equal(read({ cast: 'none', join: 'NEW', frame: 'x wide' }).noCast, true);
+  const withZero = read({ cast: '0,1', join: 'NEW', frame: 'x wide' });
+  assert.equal(withZero.noCast, false);
+  assert.deepEqual(withZero.cast, [1]);
+  const junk = read({ cast: 'abc', join: 'NEW', frame: 'x wide' });
+  assert.equal(junk.noCast, false);
+  const cfg = { topic: 'x', minutes: 20 };
+  assert.ok(P.checkScenes([junk], [7, 7], cfg, { castIds: [1, 2, 3] }).issues.some(t => /thiếu NV/.test(t)), 'NV rác vẫn bị báo thiếu');
+  assert.ok(!P.checkScenes([land], [7, 7], cfg, { castIds: [1, 2, 3] }).issues.some(t => /thiếu NV/.test(t)), 'NV: KHÔNG không bị báo thiếu NV');
+  // dù Muse ghi TIẾP, cảnh không nhân vật vẫn là cảnh MỚI (cắt sang phong cảnh)
+  const b = bible();
+  const [a, c] = [P.parseScenes(sceneBlock(1, { join: 'NEW', frame: FRAME }), { topic: 'x' })[0], P.parseScenes(sceneBlock(2, { kind: 'QUANG CẢNH', cast: 'KHÔNG', join: 'CONTINUE', frame: 'Very wide landscape at dusk, no animals.' }), { topic: 'x' })[0]];
+  const assembled = P.assemble(b, [a, c]);
+  assert.equal(assembled[1].join, 'NEW');
+  const jobs = P.buildJobs({ topic: 'Cầy mangut', minutes: 20 }, b, [a, c], { storyId: 'DV-Cay-mangut' });
+  const key2 = jobs.find(j => j.phase === 'image' && j.number === 2);
+  assert.ok(key2, 'cảnh quang cảnh có ảnh mốc riêng');
+  assert.deepEqual(key2.refList, []);
+  assert.deepEqual(key2.needs, []);
+  assert.match(key2.prompt, /NOT in this shot|no animals/);
+  assert.doesNotMatch(key2.prompt, /attached image shows the individual animal/);
+  assert.match(key2.prompt, /expansive, deep-focus wide landscape/);
+  const clip2 = jobs.find(j => j.phase === 'clip' && j.number === 2);
+  assert.deepEqual(clip2.needs, [{ phase: 'image', number: 2 }]);
+  assert.match(clip2.prompt, /expansive, deep-focus wide landscape/);
+  // cảnh có nhân vật vẫn dùng phong cách chung, không phải khung rộng
+  const clip1 = jobs.find(j => j.phase === 'clip' && j.number === 1);
+  assert.doesNotMatch(clip1.prompt, /expansive, deep-focus wide landscape/);
 });

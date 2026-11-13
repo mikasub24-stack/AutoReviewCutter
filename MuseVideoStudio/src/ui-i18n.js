@@ -223,6 +223,9 @@ Ghép video chưa xong|The video was not finished
 Nếu app chưa tự ghép, mở mục «Giọng, phụ đề & xuất MP4» rồi bấm «Xuất MP4».|If the app has not assembled it yet, open “Voice, subtitles & MP4 export” and press “Export MP4”.
 Mở mục «Giọng, phụ đề & xuất MP4» để xem video.|Open “Voice, subtitles & MP4 export” to watch the video.
 Mở video|Open video
+Lưu video…|Save video…
+Bỏ khỏi video|Leave out of video
+Đưa lại vào video|Put back in video
 Tải video|Save video
 Video đã xuất|Exported video
 Không mở được video này ở đây. Bấm «Mở video» để mở thư mục chứa file.|This video cannot be opened here. Click “Open video” to show its folder.
@@ -728,7 +731,7 @@ Các bước, mỗi dòng một bước (để trống thì tool tự chia)|Step
 Đính kèm thêm ảnh gốc ở mọi cảnh để chống lệch (thử nghiệm: nếu video bị kéo về nguyên trạng thì tắt mục này)|Also attach the start photo to every scene to reduce drift (experimental: turn this off if the video gets pulled back to its original state)
 Chọn nhạc nền|Choose music
 Bỏ nhạc|Remove music
-Không nhạc nền (video im lặng).|No background music (silent video).
+Không nhạc nền (chỉ tiếng động gốc của clip).|No background music (only the clips’ own sounds).
 Tự động làm hết: tạo các cảnh, nối cảnh và dựng video hoàn chỉnh|Do everything automatically: create the scenes, connect them and build the finished video
 Tạo và chạy tự động|Create and run automatically
 Danh sách cảnh dọn nhà · sinh tồn|House cleanup · survival scene list
@@ -787,6 +790,8 @@ Mở Flow để đăng nhập Google|Open Flow to sign in to Google
       [/^Hàng đợi đã dừng, còn (\d+) cảnh chưa xong nên chưa tự xuất MP4\. .*$/,m=>'The queue stopped with '+m[1]+' scene(s) unfinished, so the MP4 was not exported automatically. Click “Continue” to carry on.'],
       [/^Tài khoản (\d+)$/,m=>'Account '+m[1]],
       [/^Đã lưu video: (.+)$/,m=>'Video saved: '+m[1]],
+      [/^(✓ .+) · đang bỏ khỏi video$/,m=>m[1]+' · left out of the video'],
+      [/^· đang bỏ khỏi video$/,()=>'· left out of the video'],
       [/^Đã thấy tin nhắn · chờ Muse phản hồi \((.+)\)$/,m=>'Message found · Waiting for Muse response ('+t(m[1])+')'],
       [/^Đang bấm chuột phải → Tải xuống \(ảnh (\d+)\/(\d+)\)$/,m=>'Right-clicking the image → Download (image '+m[1]+'/'+m[2]+')'],
       [/^thấy (\d+) tin nhắn giống prompt, lúc gửi có (\d+|\?)$/,m=>'found '+m[1]+' message(s) matching the prompt, '+m[2]+' when it was sent'],

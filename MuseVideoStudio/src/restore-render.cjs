@@ -121,4 +121,17 @@ async function assembleRestore({ clips, dir, name = 'Video', ffmpeg = 'ffmpeg', 
   }
 }
 
-module.exports = { restoreFolder, extractLastFrame, frameSimilarity, assembleRestore, CHUNK, SIZES, MUSIC_EXT, cleanId };
+// Chọn các clip đưa vào video: bỏ cảnh người dùng đã loại (excluded = số cảnh). Chỗ cắt giữa hai cảnh KHÔNG liền nhau (do bỏ cảnh)
+// coi như chỗ nối mới (không bỏ khung trùng, mờ nhẹ vào / ra) vì khung đầu cảnh sau không còn trùng khung cuối cảnh trước.
+// clips: [{number, output}] đã xếp theo số cảnh; seams: chỉ số (theo `clips`) của đầu mỗi đoạn chạy song song. Trả về {used, seams} với seams theo `used`.
+function planAssembly({ clips, excluded = [], seams = [] }) {
+  const out = new Set((Array.isArray(excluded) ? excluded : []).map(Number));
+  const used = clips.filter(c => !out.has(Number(c.number)));
+  if (!used.length) throw Error('Phải giữ lại ít nhất một cảnh trong video.');
+  const seamClips = new Set();
+  for (const i of Array.isArray(seams) ? seams : []) if (clips[i]) seamClips.add(clips[i]);
+  used.forEach((c, k) => { if (k > 0 && clips[clips.indexOf(c) - 1] !== used[k - 1]) seamClips.add(c); });
+  return { used, seams: used.map((c, k) => (k > 0 && seamClips.has(c) ? k : -1)).filter(k => k > 0) };
+}
+
+module.exports = { planAssembly, restoreFolder, extractLastFrame, frameSimilarity, assembleRestore, CHUNK, SIZES, MUSIC_EXT, cleanId };

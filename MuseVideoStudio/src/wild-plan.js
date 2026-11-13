@@ -68,6 +68,14 @@
     'Không có con người, nhà cửa hay đồ vật nhân tạo trong phim (trừ khi chủ đề bắt buộc).'
   ];
 
+  // Phim phải là MỘT CÂU CHUYỆN (có mục tiêu, cản trở, bước ngoặt, cao trào, kết) đi qua nhiều nơi, không phải bài giới thiệu loài cứ lặp một việc.
+  const STORY_RULES = [
+    'CÂU CHUYỆN, KHÔNG PHẢI BÀI GIỚI THIỆU: phim kể MỘT câu chuyện có mở – thắt – đỉnh – kết. Nhân vật chính có MỘT MỤC TIÊU rõ và lý do cấp bách ngay lúc này (con đói, mùa khô kéo dài, con non cần bảo vệ, bị đuổi khỏi lãnh thổ…), có CẢN TRỞ thật, ít nhất HAI BƯỚC NGOẶT (một lần thất bại hoặc bất ngờ), CAO TRÀO rồi KẾT QUẢ. Mỗi chương phải đẩy câu chuyện đi tiếp bằng một tình huống MỚI; tuyệt đối không có hai chương cùng làm một việc («lại rình, lại đuổi» lặp lại là lỗi).',
+    'HÀNH TRÌNH QUA NHIỀU NƠI: nhân vật đi qua ít nhất 4–6 địa điểm KHÁC NHAU trong cùng bối cảnh (tổ hoặc hang, bãi trống, bờ nước, bụi rậm hoặc rừng, gò đá, đường mòn…), vào các thời điểm khác nhau trong ngày hoặc mùa; mỗi chương ghi rõ ĐỊA ĐIỂM của nó.',
+    'CHUYẾN ĐI SĂN LÀ SỢI CHỈ CHÍNH (nếu loài có săn mồi): đói, thức dậy → rời tổ → tuần tra lãnh thổ, đánh hơi dấu vết → phát hiện con mồi (hoặc một lần hụt) → rình, tiếp cận từng bước → đuổi bắt → kết quả (thất bại thường xuyên; có thể bị cướp mồi hoặc bị thiên địch cắt ngang) → ăn hoặc mang về cho con → nghỉ. Loài không săn mồi thì sợi chỉ chính là chuyến đi kiếm ăn, tìm nước hoặc tìm chỗ sinh sản.',
+    'NHỊP ĐIỆN ẢNH: xen kẽ quang cảnh, cảnh rất xa (thú chỉ là chấm nhỏ giữa cảnh quan), chi tiết môi trường (cỏ rung trong gió, mặt nước, côn trùng, bầu trời, mây, thời tiết, ánh sáng đổi theo giờ) và các loài khác trong hệ sinh thái phản ứng (báo động, bay lên, chạy tán loạn) với cảnh nhân vật chính; không để khán giả nhìn một con thú hoài.'
+  ];
+
   function langName(config) { return LANGS[config.lang] || LANGS.vi; }
 
   function buildBibleInstruction(input, ctx = {}) {
@@ -86,6 +94,7 @@
       `${RULES_TRUTH.length + 2}. Dàn ý PHẢI có đủ: bối cảnh và giới thiệu nhân vật; đời sống thường ngày (di chuyển, kiếm ăn, nghỉ, giao tiếp); ít nhất MỘT cuộc săn mồi hoặc tìm mồi diễn ra qua nhiều chương nhỏ (rình, tiếp cận, đuổi bắt, kết quả — có thể thất bại); ít nhất MỘT mối đe dọa thật (thiên địch, đối thủ, thời tiết); việc NUÔI VÀ BẢO VỆ CON NON (hang / tổ, cho ăn, dạy con, bảo vệ khi có nguy hiểm); và MỘT thay đổi theo mùa hoặc thời tiết. Các chương nối nhau thành MỘT câu chuyện liền mạch, không rời rạc.`,
       `${RULES_TRUTH.length + 3}. Nếu chủ đề là hai loài đối đầu (ví dụ cầy mangut và rắn hổ mang) thì cả hai đều là nhân vật; nhưng vẫn kể đúng tập tính thật của mỗi loài, không biến thành «trận đấu» giả.`,
       `${RULES_TRUTH.length + 4}. Mục NHÂN VẬT (2–${MAX_CAST} cá thể) và BỐI CẢNH viết bằng TIẾNG ANH, rất cụ thể về hình dạng để mọi cảnh vẽ ra cùng một cá thể: loài, giới, tuổi, màu lông / vảy, hoa văn, vết sẹo hoặc dấu nhận dạng, kích thước. Cá thể con non (nếu có) là một nhân vật riêng.`,
+      ...STORY_RULES.map((r, i) => `${RULES_TRUTH.length + 5 + i}. ${r}`),
       '',
       'Trả lời đúng khuôn sau, KHÔNG viết thêm câu dẫn hay giải thích:',
       `TIÊU ĐỀ: <tiêu đề phim hấp dẫn, trung thực, bằng ${langName(config)}, không giật gân sai sự thật>`,
@@ -97,8 +106,9 @@
       '2 | ...',
       'BỐI CẢNH: <ENGLISH: vùng, mùa, thảm thực vật, thời tiết, ánh sáng theo giờ trong ngày — một đoạn>',
       'ẢNH BÌA: <ENGLISH: một khoảnh khắc ấn tượng nhất của phim làm ảnh bìa, KHÔNG chữ, không máu>',
+      `CỐT TRUYỆN: <3–5 câu bằng ${langName(config)}: ai là nhân vật chính, họ cần gì và vì sao gấp, điều gì cản trở, hai bước ngoặt, cao trào và cái kết>`,
       'CHƯƠNG:',
-      `1 | <tên chương> | <số cảnh> | <diễn biến cụ thể, tập tính nào được kể> | <thời điểm trong ngày / mùa>`,
+      `1 | <tên chương> | <số cảnh> | <tình huống MỚI của chương này và tập tính nào được kể> | <thời điểm trong ngày / mùa> | <địa điểm cụ thể>`,
       '2 | ...',
       marker ? `(dòng cuối cùng của trả lời chỉ gồm đúng một từ: MSDONE${marker})` : '',
       ...(ctx.fix ? ['', 'SỬA LỖI – lần trước còn lỗi sau; viết lại ĐỦ toàn bộ hồ sơ, đúng khuôn trên:', ctx.fix] : []),
@@ -117,7 +127,8 @@
   const BIBLE_KEYS = [
     ['title', /^(?:tieu de|title)$/], ['species', /^(?:loai|species)$/], ['facts', /^(?:su that|facts?|su that khoa hoc)$/],
     ['cast', /^(?:nhan vat|characters?|cast)$/], ['world', /^(?:boi canh|setting|world)$/], ['cover', /^(?:anh bia|cover|thumbnail)$/],
-    ['chapters', /^(?:chuong|cac chuong|chapters?)$/]
+    ['chapters', /^(?:chuong|cac chuong|chapters?)$/],
+    ['plot', /^(?:cot truyen|plot|story|logline)$/]
   ];
   // Cắt trả lời thành các mục theo nhãn đầu dòng; trả về {key: [các dòng]} (dòng đầu là phần sau dấu «:» nếu có).
   function sectionsOf(reply, table) {
@@ -170,7 +181,7 @@
       if (parts.length < 4 || !/^\d+$/.test(parts[0])) continue;
       const scenes = Number((/\d+/.exec(parts[2]) || [])[0]);
       if (!Number.isFinite(scenes) || scenes < 1) continue;
-      rows.push({ title: parts[1].slice(0, 100), scenes, beats: parts[3].slice(0, 500), time: (parts[4] || '').slice(0, 100) });
+      rows.push({ title: parts[1].slice(0, 100), scenes, beats: parts[3].slice(0, 500), time: (parts[4] || '').slice(0, 100), place: (parts[5] || '').slice(0, 160) });
     }
     const errors = [];
     if (!title) errors.push('thiếu TIÊU ĐỀ');
@@ -183,8 +194,9 @@
     if (errors.length) throw Object.assign(Error('Hồ sơ phim Muse viết chưa đúng khuôn: ' + errors.join('; ') + '.'), { fixable: true, fix: errors.join('; ') });
     const counts = normalizeChapters(rows, config.scenes);
     let from = 1;
-    const chapters = rows.map((r, i) => { const c = { n: i + 1, title: r.title, beats: r.beats, time: r.time, from, to: from + counts[i] - 1 }; from += counts[i]; return c; });
-    return { title, species, facts, cast: cast.slice(0, MAX_CAST), world, cover, chapters, total: from - 1 };
+    const chapters = rows.map((r, i) => { const c = { n: i + 1, title: r.title, beats: r.beats, time: r.time, place: r.place, from, to: from + counts[i] - 1 }; from += counts[i]; return c; });
+    const plot = flat((sec.plot || []).join(' ')).slice(0, 900);
+    return { title, species, facts, cast: cast.slice(0, MAX_CAST), world, cover, plot, chapters, total: from - 1 };
   }
 
   // ---------- Lời nhắc viết từng cảnh ----------
@@ -208,10 +220,11 @@
       'NHÂN VẬT (số | vai | nhận dạng):',
       ...bible.cast.map(castLine),
       `BỐI CẢNH: ${bible.world}`,
-      'DÀN Ý CÁC CHƯƠNG (số | tên | cảnh từ–đến | diễn biến):',
-      ...bible.chapters.map(c => `${c.n}${c.n === chapter.n ? ' ◄ ĐANG VIẾT' : ''} | ${c.title} | ${c.from}–${c.to} | ${c.beats}`),
+      bible.plot ? `CỐT TRUYỆN (cả phim): ${bible.plot}` : '',
+      'DÀN Ý CÁC CHƯƠNG (số | tên | cảnh từ–đến | diễn biến | địa điểm):',
+      ...bible.chapters.map(c => `${c.n}${c.n === chapter.n ? ' ◄ ĐANG VIẾT' : ''} | ${c.title} | ${c.from}–${c.to} | ${c.beats}${c.place ? ' | ' + c.place : ''}`),
       '',
-      `DIỄN BIẾN CHƯƠNG NÀY: ${chapter.beats}${chapter.time ? ` (thời điểm: ${chapter.time})` : ''}`,
+      `DIỄN BIẾN CHƯƠNG NÀY: ${chapter.beats}${chapter.time ? ` (thời điểm: ${chapter.time})` : ''}${chapter.place ? ` (địa điểm: ${chapter.place})` : ''}`,
       prior.length ? 'CÁC CẢNH NGAY TRƯỚC (nối tiếp liền mạch, KHÔNG viết lại; cảnh đầu của lượt này bắt đầu đúng từ trạng thái cuối của cảnh trước):' : '',
       ...prior.map(s => `Cảnh ${s.number}: lời: ${s.narration || '—'} | trạng thái cuối: ${s.end || '—'}`),
       '',
@@ -222,15 +235,19 @@
       `${RULES_TRUTH.length + 3}. HÀNH ĐỘNG (tiếng Anh): MỘT cú máy liền ${config.seconds} giây không cắt cảnh. Ghi loại cỡ cảnh và máy quay (ví dụ: telephoto close-up, low tracking shot, wide shot from a distance), rồi các nhịp theo giây (0–3 s, 3–6 s, …), chỉ tả động tác thật, vật lý hợp lý của loài đó. Ghi rõ nhân vật nào làm gì bằng SỐ nhân vật (xem NV).`,
       `${RULES_TRUTH.length + 4}. NỐI: «TIẾP» = cảnh này bắt đầu ĐÚNG từ khung cuối của cảnh trước (cùng thời điểm, cùng chỗ; thường dùng cho ~70% cảnh). «MỚI» = cắt sang góc / nơi / lúc khác (bắt buộc có KHUNG). Không để quá ${MAX_CHAIN - 1} cảnh TIẾP liền nhau. Cảnh ${a}${a === 1 ? ' (cảnh đầu phim)' : ''} ${a === 1 ? 'PHẢI là MỚI' : 'có thể là TIẾP hoặc MỚI'}.`,
       `${RULES_TRUTH.length + 5}. CUỐI (tiếng Anh): tả CHÍNH XÁC khung hình cuối cảnh: vị trí, tư thế, hướng nhìn của từng cá thể và chỗ họ đứng; cảnh TIẾP kế sau sẽ bắt đầu đúng như thế. KHUNG (tiếng Anh, chỉ khi NỐI: MỚI): tả một ảnh tĩnh làm khung hình đầu: bố cục, cá thể ở đâu, nền, ánh sáng, máy quay.`,
-      `${RULES_TRUTH.length + 6}. NV: liệt kê số nhân vật xuất hiện (trong ${ids}), nhân vật chính của cảnh đứng ĐẦU (ví dụ «1,2»). ÂM THANH (tiếng Anh): tiếng tự nhiên của cảnh (gió, côn trùng, chim, bước chân, tiếng kêu của thú); không nhạc, không lời người.`,
-      firstChapter && a === 1 ? `${RULES_TRUTH.length + 7}. Cảnh 1–2 là MỞ ĐẦU gây tò mò (một khoảnh khắc căng thẳng, ít lời), rồi phim quay về bối cảnh ở các chương sau.` : '',
-      lastChapter && b === bible.total ? `${RULES_TRUTH.length + 7}. Cảnh ${bible.total} là cảnh KẾT, yên bình, thể hiện vòng tuần hoàn của sự sống; lời kết ngắn, không giáo điều.` : '',
+      `${RULES_TRUTH.length + 6}. NV: liệt kê số nhân vật xuất hiện (trong ${ids}), nhân vật chính của cảnh đứng ĐẦU (ví dụ «1,2»); ghi KHÔNG nếu cảnh chỉ có phong cảnh, môi trường hoặc loài khác ngoài hồ sơ. ÂM THANH (tiếng Anh): tiếng tự nhiên của cảnh (gió, côn trùng, chim, bước chân, tiếng kêu của thú); không nhạc, không lời người.`,
+      `${RULES_TRUTH.length + 7}. LOẠI (mỗi cảnh một nhãn): CHÍNH (nhân vật chính hành động), CẬN (đặc tả mắt, chân, hơi thở…), XA (toàn cảnh rất xa, thú chỉ là một chấm nhỏ giữa cảnh quan), QUANG CẢNH (phong cảnh, bầu trời, bình minh, hoàng hôn, KHÔNG có thú nào là chủ thể), MÔI TRƯỜNG (chi tiết: cỏ rung trong gió, mặt nước, côn trùng, mây, bụi, thời tiết), THÚ PHỤ (loài khác trong vùng phản ứng: báo động, bay lên, chạy tán loạn).`,
+      `${RULES_TRUTH.length + 8}. NHỊP: trong mỗi 10 cảnh có ÍT NHẤT 3 cảnh thuộc loại XA, QUANG CẢNH, MÔI TRƯỜNG hoặc THÚ PHỤ; không để quá 2 cảnh CHÍNH hoặc CẬN liên tiếp mà không xen một cảnh thuộc các loại đó. Cảnh QUANG CẢNH và MÔI TRƯỜNG ghi NV: KHÔNG, luôn là cảnh MỚI (cắt) có KHUNG đầy đủ, và lời thuyết minh của chúng DẪN CHUYỆN (điều sắp xảy ra, tiếng báo động từ xa, cảm giác của vùng đất) chứ không chỉ tả cảnh. Cảnh ngay sau đó trở lại nhân vật chính là MỚI (hoặc TIẾP nếu cảnh quang cảnh kết bằng việc con thú bước vào khung, ghi rõ ở CUỐI).`,
+      `${RULES_TRUTH.length + 9}. CÂU CHUYỆN: mỗi cảnh phải đẩy câu chuyện đi tiếp hoặc tăng căng thẳng (mục tiêu, cản trở, bước ngoặt trong CỐT TRUYỆN), không lặp một hành động; địa điểm và thời điểm đúng như chương này.`,
+      firstChapter && a === 1 ? `${RULES_TRUTH.length + 10}. Cảnh 1–2 là MỞ ĐẦU gây tò mò (một khoảnh khắc căng thẳng, ít lời), rồi phim quay về bối cảnh ở các chương sau.` : '',
+      lastChapter && b === bible.total ? `${RULES_TRUTH.length + 10}. Cảnh ${bible.total} là cảnh KẾT, yên bình, thể hiện vòng tuần hoàn của sự sống; lời kết ngắn, không giáo điều.` : '',
       '',
       `Trả lời đúng khuôn sau cho ĐỦ các cảnh ${a}–${b} (không bỏ số nào), KHÔNG viết thêm câu dẫn hay giải thích:`,
       'CẢNH <số>',
       `LỜI: <thuyết minh bằng ${langName(config)}, hoặc —>`,
       'NỐI: <TIẾP hoặc MỚI>',
-      'NV: <số nhân vật>',
+      'LOẠI: <CHÍNH | CẬN | XA | QUANG CẢNH | MÔI TRƯỜNG | THÚ PHỤ>',
+      'NV: <số nhân vật, hoặc KHÔNG>',
       'KHUNG: <English, chỉ khi NỐI là MỚI>',
       'HÀNH ĐỘNG: <English>',
       'CUỐI: <English>',
@@ -244,7 +261,7 @@
   const SCENE_HEAD = /^[\t ]*(?:#{1,6}[\t ]*)?(?:[-*•][\t ]*)?(?:\*\*|__)?(?:\[)?(?:canh|cảnh|scene)[\t ]*(\d+)[A-Za-z]?(?:\])?(?:\*\*|__)?[\t ]*(?:[:：.\-–—)].*)?$/i;
   const SCENE_KEYS = [
     ['narration', /^(?:loi|loi doc|loi ke|thuyet minh|narration|voice|voiceover|voice over)$/], ['join', /^(?:noi|lien ket|connect|join|link)$/],
-    ['cast', /^(?:nv|nhan vat|cast|characters?)$/], ['frame', /^(?:khung|khung dau|frame|first frame|anh)$/],
+    ['cast', /^(?:nv|nhan vat|cast|characters?)$/], ['kind', /^(?:loai|loai canh|kind|type|shot type)$/], ['frame', /^(?:khung|khung dau|frame|first frame|anh)$/],
     ['action', /^(?:hanh dong|chuyen dong|action|shot|motion)$/], ['end', /^(?:cuoi|khung cuoi|end|end state|trang thai cuoi)$/],
     ['sound', /^(?:am thanh|sound|audio|ambience)$/]
   ];
@@ -272,9 +289,12 @@
       if (seen.has(s.number)) continue;
       const r = s.raw, narrationRaw = flat(r.narration || '');
       const join = /^(?:tiep|tie p|continue|cont)/.test(norm(r.join || '')) ? 'CONTINUE' : /^(?:moi|new|cut)/.test(norm(r.join || '')) ? 'NEW' : '';
-      const cast = [...new Set(String(r.cast || '').split(/[^0-9]+/).filter(Boolean).map(Number))].slice(0, MAX_CAST);
+      const castRaw = String(r.cast || '').trim();
+      const cast = [...new Set(castRaw.split(/[^0-9]+/).filter(Boolean).map(Number).filter(n => n > 0))].slice(0, MAX_CAST);
+      // «NV: KHÔNG» (hoặc 0 / —) = cảnh quang cảnh, môi trường hoặc loài khác: không đưa nhân vật chính vào khung.
+      const noCast = !cast.length && (/^[-–—]+$/.test(castRaw) || /^(?:0|khong|none|no|n a|na|nothing|scenery|landscape|phong canh|quang canh|moi truong)\b/.test(norm(castRaw)));
       const scene = {
-        number: s.number, narration: SILENT.test(narrationRaw) ? '' : narrationRaw.replace(/^["“”'`]+|["“”'`]+$/g, ''), join, cast,
+        number: s.number, narration: SILENT.test(narrationRaw) ? '' : narrationRaw.replace(/^["“”'`]+|["“”'`]+$/g, ''), join, cast, noCast, kind: flat(r.kind || '').slice(0, 40),
         frame: flat(r.frame || ''), action: flat(r.action || ''), end: flat(r.end || ''), sound: flat(r.sound || '')
       };
       seen.add(s.number); scenes.push(scene);
@@ -307,7 +327,7 @@
       if (count(s.end) < 12) why.push('thiếu CUỐI');
       if (!s.join) why.push('thiếu NỐI (TIẾP/MỚI)');
       if ((s.join === 'NEW' || n === 1) && count(s.frame) < 20) why.push('cảnh MỚI thiếu KHUNG');
-      if (!s.cast.length) why.push('thiếu NV');
+      if (!s.cast.length && !s.noCast) why.push('thiếu NV (ghi số nhân vật, hoặc KHÔNG nếu cảnh chỉ có phong cảnh / môi trường)');
       if (castIds.length && s.cast.some(id => !castIds.includes(id))) why.push('NV có số không có trong hồ sơ');
       if (why.length) { bad.push(n); issues.push(`Cảnh ${n}: ${why.join(', ')}`); }
     }
@@ -330,7 +350,7 @@
     let run = 0;
     return sorted.map((s, i) => {
       const prev = sorted[i - 1];
-      let join = s.join === 'NEW' || !prev || !prev.end && s.join !== 'CONTINUE' ? 'NEW' : 'CONTINUE';
+      let join = s.join === 'NEW' || s.noCast || !prev || !prev.end && s.join !== 'CONTINUE' ? 'NEW' : 'CONTINUE';
       if (join === 'CONTINUE' && run >= MAX_CHAIN - 1) join = 'NEW';
       let frame = s.frame;
       if (join === 'NEW' && count(frame) < 20) frame = prev && prev.end ? `The same moment right after: ${prev.end}` : flat(s.action).slice(0, 300);
@@ -343,6 +363,10 @@
   const IMG_RATIO = { '16:9': 'Horizontal 16:9 widescreen image.', '9:16': 'Vertical 9:16 portrait image (full-screen phone photo).' };
   const VID_RATIO = { '16:9': 'Horizontal 16:9 widescreen video.', '9:16': 'Vertical 9:16 portrait video (full-screen phone video).' };
   const STYLE = 'Look: a real nature-documentary shot filmed in the wild with a long telephoto lens: natural light, shallow depth of field, true-to-life colors and textures, real animal anatomy, fur, scales and movement. It must look like genuine wildlife footage, not animation, not CGI, not a painting, not a game.';
+  const STYLE_WIDE = 'Look: a real nature-documentary shot filmed in the wild: expansive, deep-focus wide landscape photography with natural light, true-to-life colors and textures, real plants, rocks, water and sky. It must look like genuine wildlife footage, not animation, not CGI, not a painting, not a game.';
+  const kindKey = k => String(k || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').toLowerCase().trim();
+  // Cảnh XA và QUANG CẢNH dùng khung hình rộng, sâu nét; mọi cảnh khác dùng phong cách phim tài liệu chung.
+  const styleOf = scene => scene && (/^(?:xa|quang canh)$/.test(kindKey(scene.kind)) || (scene.noCast && !scene.kind)) ? STYLE_WIDE : STYLE;
   const NO_TEXT = 'No text, lettering, numbers, logos, watermarks or captions anywhere.';
   const NO_HUMANS = 'No people, no human-made objects, no buildings, no vehicles.';
   const NO_GORE = 'No blood, no gore, no graphic injury: any impact is shown only by dust, motion or the aftermath.';
@@ -351,6 +375,7 @@
 
   const castById = (bible, id) => bible.cast.find(c => c.id === id);
   function castLocks(bible, scene) {
+    if (scene.noCast) return 'SUBJECT: the main characters of the film are NOT in this shot unless the SHOT text says so; the subject is exactly what the SHOT describes (landscape, plants, water, sky, insects or other wildlife of the same region).';
     const ids = scene.cast && scene.cast.length ? scene.cast : [bible.cast[0].id];
     const rows = ids.map(id => castById(bible, id)).filter(Boolean);
     if (!rows.length) rows.push(bible.cast[0]);
@@ -382,7 +407,7 @@
       `First frame of a wildlife documentary shot: ${scene.frame}`,
       castLocks(bible, scene), worldLine(bible), timeLine(chapter),
       hasRef ? 'The attached image shows the individual animal: keep exactly the same individual (the same size, colors, markings and scars). Take only the animal\'s identity from it: the pose, place, light and camera are the new ones described above.' : '',
-      STYLE, NO_HUMANS, NO_GORE, NO_TEXT
+      styleOf(scene), NO_HUMANS, NO_GORE, NO_TEXT
     ].filter(Boolean).join('\n');
   }
   function clipPrompt(config, bible, scene, chapter, { first = false } = {}) {
@@ -395,7 +420,7 @@
       first ? '' : 'This clip continues directly from the previous clip without any jump: the same animals keep the same positions, poses and movement as in the attached frame, and the action goes on from there.',
       'Do not cut to another scene or angle; the camera stays in one continuous take.',
       scene.sound ? `Natural sound: ${scene.sound}.` : '',
-      STYLE, REAL, NO_HUMANS, NO_GORE, AUDIO, NO_TEXT
+      styleOf(scene), REAL, NO_HUMANS, NO_GORE, AUDIO, NO_TEXT
     ].filter(Boolean).join('\n');
   }
 
@@ -429,7 +454,7 @@
     scenes.forEach(s => {
       const chapter = chapterOf(bible, s.number), title = `Cảnh ${s.number} · ${chapter.title}`;
       const first = s.join === 'NEW';
-      const lead = portraitNo((s.cast && s.cast[0]) || bible.cast[0].id);
+      const lead = s.noCast ? 0 : portraitNo((s.cast && s.cast[0]) || bible.cast[0].id);
       if (first) {
         jobs.push({
           ...base, phase: 'image', number: s.number, title: `${title} · ảnh mốc`, prompt: keyframePrompt(config, bible, s, chapter, { hasRef: Boolean(lead) }), references: [],

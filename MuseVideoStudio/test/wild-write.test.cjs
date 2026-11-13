@@ -26,6 +26,12 @@ test('viết cả phim 20 phút: một lượt hồ sơ rồi các lượt ≤ 1
   assert.equal(w.status().done, 130);
   const longest = (() => { let run = 0, best = 0; for (const s of result.scenes) { run = s.join === 'CONTINUE' ? run + 1 : 0; best = Math.max(best, run); } return best; })();
   assert.ok(longest <= P.MAX_CHAIN - 1);
+  // cảnh quang cảnh (NV: KHÔNG) được nhận như cảnh hợp lệ, luôn MỚI, và chiếm khoảng 1/6 phim
+  const wide = result.scenes.filter(s => s.noCast);
+  assert.equal(wide.length, 21);
+  assert.ok(wide.every(s => s.number % 6 === 0 && s.cast.length === 0 && s.join === 'NEW' && /QUANG CẢNH/.test(s.kind)));
+  assert.equal(result.bible.plot.length > 40, true);
+  assert.ok(result.bible.chapters.every(c => /địa điểm/i.test(c.place)));
 });
 
 test('Muse bỏ sót cảnh ở lần đầu: hỏi lại chỉ phần thiếu, nhận đủ', async () => {
