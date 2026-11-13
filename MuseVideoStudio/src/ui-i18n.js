@@ -773,7 +773,15 @@ Mở Flow để đăng nhập Google|Open Flow to sign in to Google
 `.trim().split('\n').map(line=>line.split('|')));
   const norm=s=>String(s).replace(/\s+/g,' ').trim();
   let language='en';try{language=localStorage.getItem('museStudio.language')==='vi'?'vi':'en';}catch{}
+  // t() chạy cho MỖI đoạn chữ mỗi lần giao diện đổi (cả trăm thẻ cảnh); với chuỗi không có trong từ điển nó dựng lại cả trăm biểu thức chính quy mỗi lần gọi. Kết quả chỉ phụ thuộc chính chuỗi (khi đang tiếng Anh), nên nhớ lại để các lần sau trả ngay.
+  const memo=new Map();
   function t(value){
+    const raw=String(value??'');if(language==='vi')return raw;
+    let out=memo.get(raw);
+    if(out===undefined){out=translate(raw);if(memo.size>8000)memo.clear();memo.set(raw,out);}
+    return out;
+  }
+  function translate(value){
     const raw=String(value??'');if(language==='vi')return raw;
     const key=norm(raw);if(dictionary[key])return raw.replace(key,dictionary[key]);
     const decorated=key.match(/^([▶■▱▦▧✎⌂☘↗⚙✓＋+\s]*)(.*?)([＋▾\s]*)$/u);
@@ -887,27 +895,53 @@ Mở Flow để đăng nhập Google|Open Flow to sign in to Google
     ];
     for(const [re,fn]of patterns){const m=key.match(re);if(m)return fn(m);}return raw;
   }
-  const records=new WeakMap(),attrs=new WeakMap();let scheduled=false;
+  const records=new WeakMap(),attrs=new WeakMap(),skipped=new WeakSet();
   const excluded='script,style,textarea,input,.prompt,.jobTitle,.referenceName,.fileLine,.jobSource p,.draftContent>strong,#folderPath,#deviceCode,[data-i18n-skip]';
+  const ATTR_SELECTOR='[placeholder],[title],[aria-label],img[alt]',ATTR_NAMES=['placeholder','title','aria-label','alt'];
+  // Dịch MỘT đoạn chữ. Chữ đã dịch và chưa đổi, hoặc nằm trong vùng không dịch, thì bỏ qua ngay (không gọi closest()).
+  function translateText(node){
+    if(skipped.has(node))return;
+    let r=records.get(node);
+    if(r&&r.language===language&&node.nodeValue===r.rendered)return;
+    if(!node.parentElement||!node.nodeValue.trim())return;
+    if(node.parentElement.closest(excluded)){skipped.add(node);return;}
+    if(!r||node.nodeValue!==r.rendered)r={source:node.nodeValue};
+    r.rendered=t(r.source);r.language=language;if(node.nodeValue!==r.rendered)node.nodeValue=r.rendered;records.set(node,r);
+  }
+  function translateAttrs(e){
+    if(e.closest('[data-i18n-skip]')||e.classList.contains('card'))return;
+    const r=attrs.get(e)||{};
+    for(const name of ATTR_NAMES)if(e.hasAttribute(name)){
+      const value=e.getAttribute(name);let a=r[name];
+      if(a&&a.language===language&&value===a.rendered)continue;
+      if(!a||value!==a.rendered)a={source:value};a.rendered=t(a.source);a.language=language;if(a.rendered!==value)e.setAttribute(name,a.rendered);r[name]=a;
+    }attrs.set(e,r);
+  }
+  // Dịch phần mới thêm / vừa đổi. Trước đây MỖI lần giao diện đổi là đi lại TOÀN BỘ chữ và thuộc tính của trang (hàng chục nghìn nút khi có vài trăm thẻ cảnh): bấm «Tạo ảnh + clip» cho 210 cảnh mất hơn 20 giây.
+  function translateTree(root){
+    if(root.nodeType===3){translateText(root);return;}
+    if(root.nodeType!==1)return;
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;
+    while(node=walker.nextNode())translateText(node);
+    if(root.matches(ATTR_SELECTOR))translateAttrs(root);
+    for(const e of root.querySelectorAll(ATTR_SELECTOR))translateAttrs(e);
+  }
+  const OBSERVE={subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:ATTR_NAMES};
   function apply(){
     observer.disconnect();
-    const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let node;
-    while(node=walker.nextNode()){
-      if(!node.parentElement||node.parentElement.closest(excluded)||!node.nodeValue.trim())continue;
-      let r=records.get(node);if(!r||node.nodeValue!==r.rendered)r={source:node.nodeValue};
-      r.rendered=t(r.source);if(node.nodeValue!==r.rendered)node.nodeValue=r.rendered;records.set(node,r);
-    }
-    for(const e of document.querySelectorAll('[placeholder],[title],[aria-label],img[alt]')){
-      if(e.closest('[data-i18n-skip]')||e.classList.contains('card'))continue;
-      const r=attrs.get(e)||{};
-      for(const name of ['placeholder','title','aria-label','alt'])if(e.hasAttribute(name)){
-        const value=e.getAttribute(name);let a=r[name];if(!a||value!==a.rendered)a={source:value};a.rendered=t(a.source);if(a.rendered!==value)e.setAttribute(name,a.rendered);r[name]=a;
-      }attrs.set(e,r);
-    }
+    translateTree(document.body);
     document.documentElement.lang=language;const picker=document.getElementById('languagePicker');if(picker)picker.value=language;
-    observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['placeholder','title','aria-label','alt']});
+    observer.observe(document.body,OBSERVE);
   }
-  const observer=new MutationObserver(()=>{if(!scheduled){scheduled=true;queueMicrotask(()=>{scheduled=false;apply();});}});
+  const observer=new MutationObserver(list=>{
+    observer.disconnect();
+    for(const m of list){
+      if(m.type==='childList'){for(const n of m.addedNodes)translateTree(n);}
+      else if(m.type==='characterData')translateTree(m.target);
+      else if(m.type==='attributes'&&m.target.nodeType===1)translateAttrs(m.target);
+    }
+    observer.observe(document.body,OBSERVE);
+  });
   function setLanguage(next){if(!['vi','en'].includes(next))return;language=next;try{localStorage.setItem('museStudio.language',next);}catch{}apply();}
   const nativeConfirm=window.confirm.bind(window);window.confirm=message=>nativeConfirm(t(message));
   window.studioI18n={t,setLanguage,apply,get language(){return language;}};apply();

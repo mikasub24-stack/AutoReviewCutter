@@ -76,7 +76,7 @@
     try {
       const fresh = await call('wildMake', { topic: c.topic, signature: c.signature, minutes: c.minutes, lang: c.lang, aspect: c.aspect, sfx: $('wildSfx').value, voice: { engine: 'edge', voice: $('wildVoice').value, tempo: tempo(), volume: 1 } });
       if (fresh) { $('wildForm').open = false; toast('Muse đang viết kịch bản phim. Các bước sau tự chạy, bạn không cần bấm gì thêm.'); runsKey = ''; const state = await call('state'); if (state) render(state); }
-    } finally { $('wildCreate').disabled = false; }
+    } finally { $('wildCreate').disabled = Boolean(lastState && createBlocked(lastState)); }   // không bật lại nút khi Muse đã bắt đầu viết (trước đây bật lại ngay sau khi vừa khóa, đến lần cập nhật sau mới khóa lại)
   }
 
   // ---- danh sách phim
@@ -157,6 +157,7 @@
     $('wildLockText').textContent = 'Bản dùng thử và gói 30 ngày không dùng được tab này. Nâng cấp lên gói Năm hoặc Vĩnh viễn rồi nhập key mới.';
   }
 
+  const createBlocked = s => Boolean(((s && s.wild) || {}).busy || (s && (s.active || s.starting || s.merging || s.packaging)));
   function render(s) {
     if (!s) return;
     lastState = s;
@@ -164,7 +165,7 @@
     renderVoice(s);
     renderCount();
     const info = s.wild || {};
-    $('wildCreate').disabled = Boolean(info.busy || s.active || s.starting || s.merging || s.packaging);
+    $('wildCreate').disabled = createBlocked(s);
     renderRuns(s);
   }
 

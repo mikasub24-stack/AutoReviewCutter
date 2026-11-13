@@ -156,6 +156,21 @@ const root=path.resolve(__dirname,'../src');
       await new Promise(r=>setTimeout(r,100));mo.disconnect();return n;
     });
     assert.equal(mutations,0,'nhãn nút không bị ghi lại khi cập nhật');
+    // Hiệu năng giao diện tiếng Anh: thêm 420 thẻ cảnh rồi cập nhật liên tục KHÔNG được dịch lại cả trang mỗi lần
+    // (trước đây mỗi lần đổi giao diện đi lại toàn bộ chữ của trang: bấm «Tạo ảnh + clip» cho 210 cảnh mất hơn 20 giây và làm test Windows quá hạn 30 giây).
+    const walks=await page2.evaluate(async()=>{
+      const many=[];for(let i=1;i<=420;i++)many.push({id:'m'+i,kind:'restore',phase:i%2?'clip':'image',storyId:'S1',number:i,title:'Cảnh '+i,prompt:'Prompt dài số '+i,references:[],status:'completed',stage:'completed',output:'C:/Videos/S1/'+i+'.mp4'});
+      window.s.jobs=window.s.jobs.concat(many);window.s.active=false;
+      const original=document.createTreeWalker.bind(document);let whole=0,partial=0;
+      document.createTreeWalker=(root,...rest)=>{if(root===document.body)whole++;else partial++;return original(root,...rest);};
+      for(let i=0;i<6;i++){window.push();await Promise.resolve();await new Promise(r=>setTimeout(r,0));}
+      document.createTreeWalker=original;
+      return {whole,partial};
+    });
+    assert.equal(walks.whole,0,'cập nhật thẻ không được dịch lại cả trang');
+    assert.ok(walks.partial>0,'phần mới thêm vẫn được dịch');
+    assert.equal(await page2.locator('.card').count()>=424,true);
+    assert.match(await page2.locator('[data-job-id=m1] .cardActions').textContent(),/Leave out of video/,'thẻ thêm sau vẫn được dịch');
     assert.deepEqual(errors2,[]);
     await page2.close();
     await page.screenshot({path:process.env.MUSE_UI_SCREENSHOT||path.join(require('node:os').tmpdir(),'muse-card-cancel.png')});
