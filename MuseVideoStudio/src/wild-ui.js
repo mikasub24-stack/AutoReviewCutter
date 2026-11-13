@@ -30,7 +30,7 @@
     min.value = P.MINUTES.includes(Number(saved.minutes)) ? String(saved.minutes) : '20';
     lang.value = P.LANGS[saved.lang] ? saved.lang : 'vi';
   }
-  const config = () => P.options({ topic: $('wildTopic').value, minutes: $('wildMinutes').value, lang: $('wildLang').value, aspect: $('wildAspect').value });
+  const config = () => P.options({ topic: $('wildTopic').value, signature: $('wildSignature').value, minutes: $('wildMinutes').value, lang: $('wildLang').value, aspect: $('wildAspect').value });
   const tempo = () => Math.min(1.3, Math.max(0.8, Number($('wildTempo').value) || 1));
 
   function renderCount() {
@@ -74,7 +74,7 @@
     if (!c.topic) { toast('Nhập tên con vật hoặc chủ đề (ví dụ: Cầy mangut và rắn hổ mang).'); $('wildTopic').focus(); return; }
     $('wildCreate').disabled = true;
     try {
-      const fresh = await call('wildMake', { topic: c.topic, minutes: c.minutes, lang: c.lang, aspect: c.aspect, sfx: $('wildSfx').value, voice: { engine: 'edge', voice: $('wildVoice').value, tempo: tempo(), volume: 1 } });
+      const fresh = await call('wildMake', { topic: c.topic, signature: c.signature, minutes: c.minutes, lang: c.lang, aspect: c.aspect, sfx: $('wildSfx').value, voice: { engine: 'edge', voice: $('wildVoice').value, tempo: tempo(), volume: 1 } });
       if (fresh) { $('wildForm').open = false; toast('Muse đang viết kịch bản phim. Các bước sau tự chạy, bạn không cần bấm gì thêm.'); runsKey = ''; const state = await call('state'); if (state) render(state); }
     } finally { $('wildCreate').disabled = false; }
   }
@@ -171,15 +171,17 @@
   // ---- khởi tạo
   fillSelects();
   $('wildTopic').value = saved.topic || '';
+  $('wildSignature').value = saved.signature || '';
   $('wildAspect').value = P.ASPECTS.includes(saved.aspect) ? saved.aspect : '16:9';
   $('wildSfx').value = saved.sfx === 'low' ? 'low' : 'mid';
   $('wildTempo').value = String(saved.tempo || 1);
   const showTempo = () => { $('wildTempoOut').textContent = tempo().toFixed(2) + '×'; };
   showTempo();
   renderCount();
-  const remember = () => { saved = { ...saved, topic: $('wildTopic').value, minutes: $('wildMinutes').value, lang: $('wildLang').value, aspect: $('wildAspect').value, sfx: $('wildSfx').value, tempo: tempo() }; persist(); };
+  const remember = () => { saved = { ...saved, topic: $('wildTopic').value, signature: $('wildSignature').value, minutes: $('wildMinutes').value, lang: $('wildLang').value, aspect: $('wildAspect').value, sfx: $('wildSfx').value, tempo: tempo() }; persist(); };
   for (const id of ['wildMinutes', 'wildAspect', 'wildSfx']) $(id).onchange = () => { remember(); renderCount(); };
   $('wildTopic').oninput = () => { remember(); renderCount(); };
+  $('wildSignature').oninput = remember;
   $('wildTempo').oninput = () => { showTempo(); remember(); };
   $('wildLang').onchange = () => { remember(); shownVoiceKey = ''; renderVoice(lastState); renderCount(); };
   $('wildVoice').onchange = () => { saved.voices = { ...(saved.voices || {}), [$('wildLang').value]: $('wildVoice').value }; persist(); };

@@ -31,7 +31,9 @@ test('viết cả phim 20 phút: một lượt hồ sơ rồi các lượt ≤ 1
   assert.equal(wide.length, 21);
   assert.ok(wide.every(s => s.number % 6 === 0 && s.cast.length === 0 && s.join === 'NEW' && /QUANG CẢNH/.test(s.kind)));
   assert.equal(result.bible.plot.length > 40, true);
-  assert.ok(result.bible.chapters.every(c => /địa điểm/i.test(c.place)));
+  assert.ok(result.bible.chapters.every(c => /^Dry grass clearing \d+: a termite mound/.test(c.place)), 'mô tả bối cảnh cố định từng chương');
+  assert.equal(result.bible.highlights.length, 3);
+  assert.deepEqual(result.bible.chapters.filter(c => c.highlights.length).map(c => c.n), [2, 4, 6], 'khoảnh khắc đặc sắc gắn đúng chương');
 });
 
 test('Muse bỏ sót cảnh ở lần đầu: hỏi lại chỉ phần thiếu, nhận đủ', async () => {

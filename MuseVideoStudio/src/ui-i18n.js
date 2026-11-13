@@ -701,6 +701,8 @@ Gõ tên con vật → tự viết kịch bản, quay, thuyết minh và dựng 
 Làm phim mới|New movie
 Chỉ cần gõ tên con vật hoặc chủ đề. Muse tự viết kịch bản phim tài liệu (tập tính thật, săn mồi, bảo vệ con non), tự tạo ảnh và clip nối tiếp liền mạch, tự thuyết minh kể chuyện rồi dựng thành một video hoàn chỉnh.|Just type an animal or a topic. Muse writes a documentary script (real behavior, hunting, protecting the young), creates connected pictures and clips, narrates the story itself and edits everything into one finished video.
 Tên con vật hoặc chủ đề|Animal or topic
+Khoảnh khắc đặc sắc muốn có (không bắt buộc)|Highlight moments you want (optional)
+Ví dụ: chim cổ rắn xòe cánh làm bóng dụ cá; điệu múa tán tỉnh; xây tổ. Chỉ ghi tập tính có thật|For example: an anhinga spreads its wings to shade and lure fish; a courtship dance; nest building. Only real behaviours
 Độ dài phim|Movie length
 Ngôn ngữ thuyết minh|Narration language
 Tiếng thiên nhiên nền|Background nature sound

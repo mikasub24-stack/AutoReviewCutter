@@ -9,7 +9,8 @@ function biblePlain(total, chapters) {
     'BỐI CẢNH: African savanna in the dry season, golden grass, acacia trees and termite mounds, low warm sun.',
     'ẢNH BÌA: the lead mongoose on a termite mound at sunrise',
     'CỐT TRUYỆN: Mùa khô kéo dài, đàn cầy mangut phải đi xa tìm thức ăn cho đàn con đói. Họ gặp một con rắn hổ mang chặn đường và bị mất một con non, rồi tìm ra bãi mồi mới và đẩy lui con rắn.',
-    'CHƯƠNG:', ...Array.from({ length: chapters }, (_, i) => `${i + 1} | Chương ${i + 1} | ${per + (i < rest ? 1 : 0)} | tình huống mới ${i + 1} | bình minh | địa điểm ${i + 1}: bãi cỏ khô`),
+    'ĐẶC SẮC:', '2 | Nghi thức tán tỉnh: hai con đực múa đứng thẳng, chuẩn bị, đỉnh điểm, hệ quả', `${Math.min(chapters, 4)} | Cuộc săn rắn: rình, tiếp cận, đớp, kết quả thất bại`, `${Math.min(chapters, 6)} | Chăm con non: dẫn đi, canh chừng, cho ăn, nghỉ`,
+    'CHƯƠNG:', ...Array.from({ length: chapters }, (_, i) => `${i + 1} | Chương ${i + 1} | ${per + (i < rest ? 1 : 0)} | tình huống mới ${i + 1} | bình minh | Dry grass clearing ${i + 1}: a termite mound at the left, one acacia tree at the right, low sun from the east`),
     'MSDONEabc123'
   ].join('\n');
 }

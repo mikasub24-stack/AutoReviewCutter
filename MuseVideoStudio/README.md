@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.2
+
+- **Động vật hoang dã: phim tài liệu có nhiều «khoảnh khắc đặc sắc», không chỉ tấn công.** Muse phải chọn ít nhất 3 khoảnh khắc KHÁC LOẠI nhau (phim 20 phút; phim dài hơn nhiều hơn, tối đa 12): săn mồi chỉ là một loại, còn tán tỉnh, xây tổ, chăm con, làm khô hoặc chải lông, dùng công cụ, hợp tác, phòng thủ, di cư… Mỗi khoảnh khắc được kể thành CHUỖI 3–5 cảnh nối liền nhau trong cùng một chỗ (chuẩn bị → diễn biến → đỉnh → hệ quả), mỗi cảnh một nhịp ngắn, và gắn vào đúng chương. Hồ sơ phim thiếu phần này bị bắt viết lại. Luật cũ «chuyến đi săn là sợi chỉ chính» đã đổi thành «đi theo nhu cầu lớn nhất của loài, săn mồi chỉ là một trong các khoảnh khắc».
+- **Ô «Khoảnh khắc đặc sắc muốn có (không bắt buộc)».** Gõ các tập tính bạn muốn thấy (ví dụ: chim cổ rắn xòe cánh làm bóng dụ cá; điệu múa tán tỉnh). Nhiều ý cách nhau bằng dấu chấm phẩy. Chỉ ghi tập tính CÓ THẬT: tool bảo Muse chỉ giữ ý có thật ở loài đó, ý không có thật thì thay bằng tập tính thật tương tự (và ghi ở mục Sự thật). Tool không tự kiểm chứng, bạn cần xem lại ở file ghi chú đi kèm.
+- **Bối cảnh cố định từng chương (để phim dài vẫn đồng nhất).** Mỗi chương có mô tả địa điểm bằng tiếng Anh (khúc gỗ, đá, mặt nước, cây ở đâu, hướng sáng) và mô tả này được gắn vào MỌI prompt ảnh mốc và clip của chương đó, để các cảnh vẽ ra cùng một chỗ. Quay lại một nơi cũ thì Muse phải chép nguyên mô tả. Con vật vẫn được giữ đồng nhất bằng ảnh nhân vật; cảnh nối liền nhau bắt đầu từ khung cuối của cảnh trước (tối đa 6 cảnh một chuỗi, sau đó cắt sang ảnh mốc mới).
+- CHƯA thử với Muse thật: không biết Muse có dựng ra được các pha tập tính phức tạp (đòn nhanh, mồi bay, bắn nước) hay không. Cảnh nào hỏng thì dùng «Tạo lại» cho cảnh đó. Phim cũ giữ kịch bản cũ.
+
 ## Update 1.9.1
 
 - **Tab «Dọn nhà · Sinh tồn» có âm thanh:** prompt gửi Muse trước đây ghi «video hoàn toàn im lặng, không âm thanh» (chỉ Google Flow được xin tiếng động), nên clip Muse ra im lặng và video cuối không có tiếng. Giờ Muse cũng được xin tiếng động tự nhiên của công việc (chổi, nước, dụng cụ, bước chân), không lời nói, không nhạc. Phần dựng vẫn giữ tiếng gốc của từng clip như từ 1.8.4. Clip đã tạo từ bản cũ vẫn im lặng: muốn có tiếng thì tạo lại các clip, hoặc chọn «Chọn nhạc nền» rồi «Dựng lại video». Chưa kiểm chứng với Muse thật là Muse có tạo tiếng khi được xin hay không.

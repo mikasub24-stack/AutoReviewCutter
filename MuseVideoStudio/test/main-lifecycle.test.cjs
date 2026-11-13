@@ -859,7 +859,7 @@ test('tab Động vật hoang dã: viết kịch bản → 130 cảnh + ảnh v�
     await assert.rejects(app.invoke('wildMake', { topic: 'Cầy mangut', voice: { engine: 'edge', voice: 'vi-VN-HoaiMyNeural' } }), /Chưa cài giọng Microsoft/);
     assert.equal(fake.log.bible, 0, 'lỗi đầu vào thì chưa gửi gì cho Muse');
 
-    const made = await app.invoke('wildMake', { topic: 'Cầy mangut', minutes: 20, lang: 'vi', aspect: '16:9', voice: { engine: 'none' } });
+    const made = await app.invoke('wildMake', { topic: 'Cầy mangut', signature: 'điệu múa tán tỉnh; xây tổ', minutes: 20, lang: 'vi', aspect: '16:9', voice: { engine: 'none' } });
     assert.equal(made.storyId, 'DV-Cay-mangut');
     await assert.rejects(app.invoke('wildMake', { topic: 'Sư tử', voice: { engine: 'none' } }), /Đang làm phim|Hàng đợi đang chạy/);
     await until(() => app.invoke('state').wild.stories['DV-Cay-mangut']?.status === 'queued', 20000);
@@ -879,6 +879,9 @@ test('tab Động vật hoang dã: viết kịch bản → 130 cảnh + ảnh v�
     assert.equal(draft.final, true);
     assert.equal(draft.scenes.length, 130);
     assert.equal(fake.log.bible, 1);
+    // Khoảnh khắc người dùng muốn có đi vào lời nhắc lập hồ sơ (dưới dạng dữ liệu); các lượt viết chương nhắc khoảnh khắc đặc sắc của chương.
+    assert.ok(fake.log.instructions[0].includes('KHOẢNH KHẮC NGƯỜI LÀM PHIM MUỐN CÓ') && fake.log.instructions[0].includes('điệu múa tán tỉnh; xây tổ'));
+    assert.ok(fake.log.instructions.some(t => t.includes('KHOẢNH KHẮC ĐẶC SẮC CỦA CHƯƠNG NÀY (bắt buộc kể trọn)')), 'lượt viết chương có khoảnh khắc đặc sắc');
 
     // Clip làm tay: mỗi cảnh một file 1 giây rồi báo đã xong; dựng phim thật.
     const folder = path.join(dir, 'DongVat', 'DV-Cay-mangut');

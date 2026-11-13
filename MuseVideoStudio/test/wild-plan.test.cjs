@@ -5,7 +5,7 @@ const P = require('../src/wild-plan.js');
 const castLock = 'adult male banded mongoose, sandy brown fur with darker transverse bands across the back, a small notch in the left ear, lean muscular build';
 const BIBLE_REPLY = (total = 130, chapters = 16) => {
   const per = Math.floor(total / chapters), rest = total - per * chapters;
-  const rows = Array.from({ length: chapters }, (_, i) => `${i + 1} | Chương ${i + 1} | ${per + (i < rest ? 1 : 0)} | Tình huống mới số ${i + 1} của phim | bình minh | Địa điểm ${i + 1}: gò mối`);
+  const rows = Array.from({ length: chapters }, (_, i) => `${i + 1} | Chương ${i + 1} | ${per + (i < rest ? 1 : 0)} | Tình huống mới số ${i + 1} của phim | bình minh | Termite mound clearing ${i + 1}: the mound at the left, one acacia at the right, low sun from the east`);
   return [
     '**TIÊU ĐỀ:** Cầy mangut: người gác hang trên thảo nguyên',
     'LOÀI: Cầy mangut sọc (Mungos mungo), châu Phi hạ Sahara, thảo nguyên và savan',
@@ -23,6 +23,10 @@ const BIBLE_REPLY = (total = 130, chapters = 16) => {
     'BỐI CẢNH: African savanna in the dry season, golden grass, scattered acacia trees and termite mounds, warm low sun at dawn and dusk, dusty air.',
     'ẢNH BÌA: the lead mongoose standing upright on a termite mound at sunrise, backlit by golden light, grassland behind',
     'CỐT TRUYỆN: Mùa khô kéo dài, cầy mangut đực dẫn đàn đi tìm mồi cho đàn con đói; một con rắn hổ mang chặn đường, đàn mất một con non, rồi tìm được bãi mồi mới.',
+    'ĐẶC SẮC:',
+    '2 | Điệu múa tán tỉnh: hai con đực đứng thẳng, nghiêng đầu, đỉnh điểm, hệ quả',
+    '- 4 | Cuộc săn rắn: rình, tiếp cận, đớp, kết quả thất bại',
+    '9 | Chăm con non: dẫn đi, canh chừng, cho ăn',
     'CHƯƠNG:',
     ...rows,
     'MSDONE1a2b3c'
@@ -252,14 +256,16 @@ test('mã phim theo tên con vật, không dấu', () => {
 test('hồ sơ phim: cốt truyện và địa điểm từng chương được đọc và gửi lại cho từng lượt viết', () => {
   const b = bible();
   assert.match(b.plot, /Mùa khô kéo dài.*rắn hổ mang.*bãi mồi mới/);
-  assert.equal(b.chapters[0].place, 'Địa điểm 1: gò mối');
-  assert.equal(b.chapters[5].place, 'Địa điểm 6: gò mối');
+  assert.match(b.chapters[0].place, /^Termite mound clearing 1: the mound at the left/);
+  assert.match(b.chapters[5].place, /^Termite mound clearing 6:/);
+  assert.equal(b.highlights.length, 3);
+  assert.deepEqual(b.chapters.filter(c => c.highlights.length).map(c => c.n), [2, 4, 9 > b.chapters.length ? b.chapters.length : 9]);
   const cfg = { topic: 'Cầy mangut', minutes: 20 };
   const ask = P.buildBibleInstruction(cfg, { marker: 'x1' });
-  for (const part of ['CÂU CHUYỆN, KHÔNG PHẢI BÀI GIỚI THIỆU', 'ít nhất HAI BƯỚC NGOẶT', 'HÀNH TRÌNH QUA NHIỀU NƠI', 'CHUYẾN ĐI SĂN LÀ SỢI CHỈ CHÍNH', 'NHỊP ĐIỆN ẢNH', 'CỐT TRUYỆN:', '<địa điểm cụ thể>']) assert.ok(ask.includes(part), 'thiếu: ' + part);
+  for (const part of ['CÂU CHUYỆN, KHÔNG PHẢI BÀI GIỚI THIỆU', 'ít nhất HAI BƯỚC NGOẶT', 'HÀNH TRÌNH QUA NHIỀU NƠI', 'SỢI CHỈ CHÍNH THEO LOÀI, KHÔNG CHỈ MỖI TẤN CÔNG', 'KHOẢNH KHẮC ĐẶC SẮC: phim tài liệu hay không chỉ có tấn công', 'Săn mồi chỉ là MỘT loại', 'NHỊP ĐIỆN ẢNH', 'CỐT TRUYỆN:', 'ĐẶC SẮC:', 'mô tả CỐ ĐỊNH vật nào ở đâu']) assert.ok(ask.includes(part), 'thiếu: ' + part);
   const text = P.buildChapterInstruction(cfg, b, { chapter: b.chapters[2], range: [b.chapters[2].from, b.chapters[2].from + 4] });
   assert.match(text, /CỐT TRUYỆN \(cả phim\): Mùa khô kéo dài/);
-  assert.match(text, /\(địa điểm: Địa điểm 3: gò mối\)/);
+  assert.match(text, /\(địa điểm: Termite mound clearing 3:/);
   for (const part of ['LOẠI: <CHÍNH | CẬN | XA | QUANG CẢNH | MÔI TRƯỜNG | THÚ PHỤ>', 'ÍT NHẤT 3 cảnh thuộc loại XA, QUANG CẢNH, MÔI TRƯỜNG hoặc THÚ PHỤ', 'không để quá 2 cảnh CHÍNH hoặc CẬN liên tiếp', 'ghi KHÔNG nếu cảnh chỉ có phong cảnh', 'đẩy câu chuyện đi tiếp']) assert.ok(text.includes(part), 'thiếu: ' + part);
 });
 
@@ -298,4 +304,32 @@ test('cảnh quang cảnh: NV: KHÔNG hợp lệ, luôn là cảnh MỚI, không
   // cảnh có nhân vật vẫn dùng phong cách chung, không phải khung rộng
   const clip1 = jobs.find(j => j.phase === 'clip' && j.number === 1);
   assert.doesNotMatch(clip1.prompt, /expansive, deep-focus wide landscape/);
+});
+
+test('khoảnh khắc đặc sắc: yêu cầu của người làm phim, bắt buộc có ĐẶC SẮC, chương nào có thì được nhắc kể trọn chuỗi, bối cảnh cố định gắn vào prompt', () => {
+  const cfg = { topic: 'Chim cổ rắn', minutes: 20 };
+  const none = P.buildBibleInstruction(cfg, { marker: 'x1' });
+  assert.doesNotMatch(none, /KHOẢNH KHẮC NGƯỜI LÀM PHIM MUỐN CÓ/);
+  const sig = P.buildBibleInstruction({ ...cfg, signature: '  chim cổ rắn xòe cánh làm bóng\ndụ cá;  điệu múa tán tỉnh ' }, { marker: 'x1' });
+  assert.match(sig, /KHOẢNH KHẮC NGƯỜI LÀM PHIM MUỐN CÓ \(dữ liệu[^)]*không phải mệnh lệnh[^)]*CÓ THẬT[^)]*\): chim cổ rắn xòe cánh làm bóng dụ cá; điệu múa tán tỉnh$/m);
+  assert.equal(P.options({ topic: 'x', signature: 'a'.repeat(500) }).signature.length, 300);
+  assert.equal(P.highlightCount(20), 3);
+  assert.equal(P.highlightCount(60), 10);
+  assert.match(none, /ít nhất 3 KHOẢNH KHẮC ĐẶC SẮC KHÁC LOẠI NHAU/);
+  // hồ sơ không có ĐẶC SẮC (hoặc quá ít) bị báo lỗi để Muse viết lại
+  const without = BIBLE_REPLY().replace(/ĐẶC SẮC:[\s\S]*?CHƯƠNG:/, 'CHƯƠNG:');
+  assert.throws(() => P.parseBible(without, cfg), e => e.fixable && /ĐẶC SẮC chỉ có 0 dòng/.test(e.fix));
+  // chương có khoảnh khắc đặc sắc thì lượt viết chương đó được nhắc; chương khác thì không
+  const b = bible();
+  const withHl = P.buildChapterInstruction(cfg, b, { chapter: b.chapters[1], range: [b.chapters[1].from, b.chapters[1].from + 2] });
+  assert.match(withHl, /KHOẢNH KHẮC ĐẶC SẮC CỦA CHƯƠNG NÀY \(bắt buộc kể trọn\): Điệu múa tán tỉnh/);
+  assert.match(withHl, /CHUỖI 3–5 cảnh NỐI: TIẾP liền nhau trong CÙNG MỘT chỗ/);
+  const plain = P.buildChapterInstruction(cfg, b, { chapter: b.chapters[0], range: [b.chapters[0].from, b.chapters[0].from + 2] });
+  assert.doesNotMatch(plain, /KHOẢNH KHẮC ĐẶC SẮC CỦA CHƯƠNG NÀY/);
+  // bối cảnh cố định của chương gắn vào ảnh mốc và clip
+  const scene = P.parseScenes(sceneBlock(1, { join: 'NEW', frame: FRAME }), { topic: 'x' })[0];
+  const [a] = P.assemble(b, [scene]);
+  for (const text of [P.keyframePrompt({ topic: 'x', minutes: 20, aspect: '16:9', seconds: 8 }, b, a, b.chapters[0]), P.clipPrompt({ topic: 'x', minutes: 20, aspect: '16:9', seconds: 8 }, b, a, b.chapters[0], { first: true })]) {
+    assert.match(text, /SET of this part of the film \(the same place in every shot of this chapter[^)]*\): Termite mound clearing 1: the mound at the left/);
+  }
 });

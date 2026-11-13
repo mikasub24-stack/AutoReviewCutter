@@ -754,7 +754,7 @@ function pruneWildStories(){
 async function writeWildNotes(storyId,meta){
   const draft=await readWildDraft(storyId);
   if(!draft?.bible||!Array.isArray(draft.scenes))return;
-  const config=wildPlan.options({topic:meta.topic,minutes:meta.minutes,lang:meta.lang,aspect:meta.aspect});
+  const config=wildPlan.options({topic:meta.topic,signature:meta.signature,minutes:meta.minutes,lang:meta.lang,aspect:meta.aspect});
   const text=wildPlan.notesText(config,draft.bible,wildPlan.assemble(draft.bible,draft.scenes),{builtAt:new Date().toLocaleString('vi-VN')});
   await fs.writeFile(path.join(wildFolder(settings.output,storyId),'ghi-chu-dang-video.txt'),text,'utf8').catch(()=>{});
 }
@@ -794,7 +794,7 @@ async function buildWildStories({auto=false}={}){
 async function runWild(storyId){
   const meta=settings.wildStories?.[storyId];
   if(!meta)return;
-  const input={topic:meta.topic,minutes:meta.minutes,lang:meta.lang,aspect:meta.aspect};
+  const input={topic:meta.topic,signature:meta.signature,minutes:meta.minutes,lang:meta.lang,aspect:meta.aspect};
   wildState={busy:true,phase:'write',progress:'Muse đang lập kịch bản…',error:'',storyId};notify();
   try{
     const draft=await readWildDraft(storyId);
@@ -1215,7 +1215,7 @@ app.whenReady().then(async () => {
         const ready=voiceService?.status()?.ready||{};
         if(engine==='edge'&&!ready.edge)throw Error('Chưa cài giọng Microsoft (miễn phí). Bấm «Cài giọng miễn phí» ở mục Giọng thuyết minh, đợi cài xong rồi làm phim.');
         storyId=await freeStoryId(wildPlan.storyIdBase(config),{output:settings.output,jobs:queue.jobs,folderOf:wildFolder,fallback:'DV-phim'});
-        meta=all[storyId]={topic:config.topic,minutes:config.minutes,lang:config.lang,aspect:config.aspect,voice,sfx:data?.sfx==='low'?'low':'mid',auto:true,status:'writing',name:config.topic,createdAt:Date.now()};
+        meta=all[storyId]={topic:config.topic,signature:config.signature,minutes:config.minutes,lang:config.lang,aspect:config.aspect,voice,sfx:data?.sfx==='low'?'low':'mid',auto:true,status:'writing',name:config.topic,createdAt:Date.now()};
         for(const id of Object.keys(all).slice(0,Math.max(0,Object.keys(all).length-40)))delete all[id];
       }
       await fs.mkdir(wildFolder(settings.output,storyId),{recursive:true});

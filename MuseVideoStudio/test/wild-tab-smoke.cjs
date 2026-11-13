@@ -101,12 +101,13 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
 
     // 4) Gõ tên rồi tạo: một lệnh duy nhất với đủ lựa chọn; tiến độ viết kịch bản hiện ngay, có nút Dừng viết.
     await page.fill('#wildTopic', 'Cầy mangut và rắn hổ mang');
+    await page.fill('#wildSignature', 'điệu múa tán tỉnh; xây tổ');
     await page.selectOption('#wildSfx', 'low');
     await page.click('#wildCreate');
     await page.waitForSelector('#wildRuns .restoreRun');
     const made = await calls('wildMake');
     assert.equal(made.length, 1);
-    assert.deepEqual(made[0].data, { topic: 'Cầy mangut và rắn hổ mang', minutes: 20, lang: 'vi', aspect: '16:9', sfx: 'low', voice: { engine: 'edge', voice: 'vi-VN-HoaiMyNeural', tempo: 1, volume: 1 } });
+    assert.deepEqual(made[0].data, { topic: 'Cầy mangut và rắn hổ mang', signature: 'điệu múa tán tỉnh; xây tổ', minutes: 20, lang: 'vi', aspect: '16:9', sfx: 'low', voice: { engine: 'edge', voice: 'vi-VN-HoaiMyNeural', tempo: 1, volume: 1 } });
     assert.match(await page.locator('#wildRuns .restoreRunText').first().textContent(), /Viết kịch bản 3\/14/);
     assert.match(await page.locator('#wildRunHint').textContent(), /Đang viết kịch bản · 20\/130 cảnh/);
     assert.equal(await page.locator('#wildCreate').isDisabled(), true, 'đang làm phim thì không tạo thêm');
@@ -194,6 +195,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.equal(await page.locator('#wildPanel').isVisible(), false);
     await page.click('#navWild');
     assert.equal(await page.locator('#wildTopic').inputValue(), 'Cầy mangut và rắn hổ mang');
+    assert.equal(await page.locator('#wildSignature').inputValue(), 'điệu múa tán tỉnh; xây tổ', 'ô khoảnh khắc đặc sắc được nhớ');
 
     // 11) Giao diện tiếng Anh: nhãn tĩnh được dịch.
     await page.evaluate(() => localStorage.setItem('testLang', 'en'));
