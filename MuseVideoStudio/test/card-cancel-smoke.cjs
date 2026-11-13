@@ -146,6 +146,16 @@ const root=path.resolve(__dirname,'../src');
     assert.deepEqual(await page2.evaluate(()=>window.calls.filter(c=>c.name==='restoreExclude').map(c=>c.data)),[{storyId:'S1',number:1,exclude:true},{storyId:'S1',number:2,exclude:false}]);
     await page2.evaluate(()=>{window.s.active=true;window.push();});
     assert.equal(await ex('r1').isDisabled(),true,'đang chạy hàng đợi thì khóa nút');
+    // Tiếng Anh: nhãn được dịch một lần và KHÔNG bị đặt lại mỗi lần cập nhật (đặt lại sẽ bắt bộ dịch dịch lại hàng trăm thẻ liên tục; CI Windows từng kẹt vì vậy).
+    await page2.evaluate(()=>window.studioI18n.setLanguage('en'));
+    await page2.waitForFunction(()=>[...document.querySelectorAll('[data-job-id=r1] .cardActions button')].some(b=>b.textContent.trim()==='Leave out of video'));
+    const mutations=await page2.evaluate(async()=>{
+      const btn=[...document.querySelectorAll('[data-job-id=r1] .cardActions button')].find(b=>b.textContent.trim()==='Leave out of video');
+      let n=0;const mo=new MutationObserver(list=>{n+=list.length;});mo.observe(btn,{childList:true,characterData:true,subtree:true,attributes:false});
+      for(let i=0;i<5;i++){window.push();await new Promise(r=>setTimeout(r,30));}
+      await new Promise(r=>setTimeout(r,100));mo.disconnect();return n;
+    });
+    assert.equal(mutations,0,'nhãn nút không bị ghi lại khi cập nhật');
     assert.deepEqual(errors2,[]);
     await page2.close();
     await page.screenshot({path:process.env.MUSE_UI_SCREENSHOT||path.join(require('node:os').tmpdir(),'muse-card-cancel.png')});

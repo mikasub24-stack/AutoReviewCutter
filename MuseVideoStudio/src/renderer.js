@@ -223,7 +223,13 @@ function updateCard(row,job,index){
   row.otherBtn.hidden=job.status!=='running'||!(Number(state.settings.accountCount)>1);row.otherBtn.disabled=row.cancelBtn.disabled;
   row.upload.hidden=photo||job.kind==='image'||job.status==='completed';row.upload.disabled=Boolean(state.stopping||state.merging||state.packaging);
   const rmeta=job.kind==='restore'&&job.phase==='clip'?state.restore?.stories?.[job.storyId]:null,left=Boolean(rmeta&&(rmeta.excluded||[]).map(Number).includes(Number(job.number)));
-  row.exclude.hidden=!(rmeta&&job.status==='completed');text(row.exclude,left?'Đưa lại vào video':'Bỏ khỏi video');row.exclude.disabled=Boolean(state.active||state.starting||state.stopping||state.merging||state.packaging||state.restore?.busy);
+  // Chỉ thẻ cảnh dọn nhà mới đụng tới nút này; nhãn chỉ đặt lại khi đổi trạng thái (đặt lại mỗi lần cập nhật sẽ bắt bộ dịch dịch lại hàng trăm thẻ liên tục).
+  const showExclude=Boolean(rmeta&&job.status==='completed');
+  if(row.exclude.hidden===showExclude)row.exclude.hidden=!showExclude;
+  if(showExclude){
+    if(row.excludeLeft!==left){row.excludeLeft=left;row.exclude.textContent=left?'Đưa lại vào video':'Bỏ khỏi video';}
+    row.exclude.disabled=Boolean(state.active||state.starting||state.stopping||state.merging||state.packaging||state.restore?.busy);
+  }
   if(left){row.fileLine.hidden=false;text(row.fileLine,(job.output?'✓ '+job.output.split(/[\\/]/).pop():'')+' · đang bỏ khỏi video');}
   row.regenerate.hidden=job.status!=='completed';row.regenerate.disabled=Boolean(state.active||state.starting||state.stopping||state.testing||state.merging||state.packaging);
   const recoverable=['failed','interrupted'].includes(job.status)&&Boolean(job.mayHaveSubmitted||job.submittedAt||job.resultReadyAt);
