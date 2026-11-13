@@ -2,7 +2,7 @@
 const pw = (() => { try { return require('playwright-core'); } catch { return require('playwright'); } })();
 const http = require('http'), fs = require('fs/promises'), path = require('path'), assert = require('assert/strict');
 (async () => {
-  const files = { '/assets/muse-studio.svg': 'assets/muse-studio.svg', '/assets/zalo-qr.jpg': 'assets/zalo-qr.jpg', '/': 'index.html', '/style.css': 'style.css', '/renderer.js': 'renderer.js', '/ui-i18n.js': 'ui-i18n.js', '/script-planner.js': 'script-planner.js', '/prompt-import.js': 'prompt-import.js', '/reference-map.js': 'reference-map.js', '/story-plan.js': 'story-plan.js', '/story-ui.js': 'story-ui.js', '/restore-plan.js': 'restore-plan.js', '/restore-ui.js': 'restore-ui.js' };
+  const files = { '/assets/muse-studio.svg': 'assets/muse-studio.svg', '/assets/zalo-qr.jpg': 'assets/zalo-qr.jpg', '/': 'index.html', '/style.css': 'style.css', '/renderer.js': 'renderer.js', '/ui-i18n.js': 'ui-i18n.js', '/script-planner.js': 'script-planner.js', '/prompt-import.js': 'prompt-import.js', '/reference-map.js': 'reference-map.js', '/story-plan.js': 'story-plan.js', '/story-ui.js': 'story-ui.js', '/restore-plan.js': 'restore-plan.js', '/restore-ui.js': 'restore-ui.js', '/wild-plan.js': 'wild-plan.js', '/wild-ui.js': 'wild-ui.js' };
   const server = http.createServer(async (req, res) => {
     const name = files[req.url];
     if (!name) { res.writeHead(404); return res.end(); }
@@ -17,7 +17,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.addInitScript(() => {
       localStorage.setItem('museStudio.language', localStorage.getItem('testLang') || 'vi');
       const s = {
-        version: '1.8.6', active: false, paused: true, jobs: [],
+        version: '1.9.0', active: false, paused: true, jobs: [],
         license: { status: 'active', plan: 'short', longTerm: false, device: 'TESTDEVICE', expiresAt: Date.now() + 86400000 * 30, message: 'Đã kích hoạt key.' },
         story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: false, clone: false }, platform: 'win32', edgeVoices: [], clones: [] } },
         restore: { busy: false, progress: '', error: '', storyId: '', stories: {} },

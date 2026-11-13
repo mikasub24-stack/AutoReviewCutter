@@ -44,7 +44,7 @@ jobs:
           set "CHROMIUM_PATH=C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
           if not exist "%CHROMIUM_PATH%" set "CHROMIUM_PATH=C:\Program Files\Microsoft\Edge\Application\msedge.exe"
           set "MUSE_TRACKER_VIDEO_FIXTURE=test\fixtures\solid-blue.webm"
-          for %%T in (ten-sessions-smoke scene-flow-smoke muse-tracker-smoke browser-probe-smoke cards-smoke muse-image-smoke image-tab-smoke story-tab-smoke story-analyze-smoke story-ad-smoke ui-smoke) do (
+          for %%T in (ten-sessions-smoke scene-flow-smoke muse-tracker-smoke browser-probe-smoke cards-smoke muse-image-smoke image-tab-smoke story-tab-smoke story-analyze-smoke story-ad-smoke wild-tab-smoke ui-smoke) do (
             node test/%%T.cjs >> installer-test.log 2>&1
             if errorlevel 1 (type installer-test.log & exit /b 1)
           )

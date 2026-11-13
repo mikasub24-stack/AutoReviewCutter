@@ -28,7 +28,7 @@ const safeStorage = {
   }
 };
 
-async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, domTimeoutMs=20000, logoutResponse=1,closeResponse=1,closeGate } = {}) {
+async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, longTerm, wildWriterFactory, domTimeoutMs=20000, logoutResponse=1,closeResponse=1,closeGate } = {}) {
   const handlers = new Map(), sessions = new Map(), windows = [], errors = [], notices = [];
   const lifecycle = [],updates=[];
   let loaded, quit;
@@ -101,6 +101,8 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
     require: name => {
       if(name === 'electron') return electron;
       if(name==='./license.cjs' && licenseGate){const real=localRequire(name);return{...real,createLicense:async options=>{const manager=await real.createLicense(options),ensure=manager.ensureAllowed;manager.ensureAllowed=async()=>{licenseGate.entered();await licenseGate.wait;return ensure();};return manager;}};}
+      if(name==='./license.cjs' && longTerm){const real=localRequire(name);return{...real,createLicense:async options=>{const manager=await real.createLicense(options);manager.requireLongTerm=async()=>manager.ensureAllowed();return manager;}};}
+      if(name==='./wild-write.cjs' && wildWriterFactory)return{createWildWriter:wildWriterFactory};
       if(name === './electron-network-check.cjs') return {checkElectronNetwork:networkProbe || (async()=>({ip:'203.0.113.9',countryCode:'US',countryName:'United States',observedAt:new Date().toISOString()}))};
       if(name === './external-browser.cjs' && externalLauncher) return {launchExternalBrowser:externalLauncher};
       if(name === './browser-discovery.cjs' && browserResolver) return {resolveBrowser:browserResolver};
@@ -825,4 +827,80 @@ test('story writer handler passes the tip fields through (tip mode asks for a ti
     assert.equal(app.invoke('state').story.analyze?.busy||false,false,'không treo trạng thái bận');
     await app.stop();
   }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
+// ---- Tab «Động vật hoang dã»: Muse (giả) viết kịch bản → việc vào hàng đợi riêng → dựng phim thật bằng FFmpeg.
+const wildFfmpeg = require('node:child_process').spawnSync('ffmpeg', ['-version']).status === 0 && require('node:child_process').spawnSync('ffprobe', ['-version']).status === 0;
+const wildPlanModule = require('../src/wild-plan.js');
+test('tab Động vật hoang dã: chỉ gói Năm / Vĩnh viễn; thiếu tên hoặc thư mục thì không làm gì', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'muse-wild-guard-'));
+  let app;
+  try {
+    await fs.writeFile(path.join(dir, 'studio.json'), JSON.stringify({ configVersion: 2, settings: { output: dir, accountCount: 1 } }));
+    app = await boot(dir);
+    await assert.rejects(app.invoke('wildMake', { topic: 'Cầy mangut' }), /gói Năm|Vĩnh viễn/i);
+    assert.deepEqual(Object.keys(app.invoke('state').wild || {}).includes('stories'), true);
+    assert.equal(Object.keys((await app.invoke('state')).wild.stories).length, 0, 'không lưu gì khi bị khóa');
+    await app.stop();
+  } finally { if (app && !app.lifecycle.includes('quit')) await app.stop(); await fs.rm(dir, { recursive: true, force: true }); }
+});
+
+test('tab Động vật hoang dã: viết kịch bản → 130 cảnh + ảnh vào hàng đợi riêng, thư mục DongVat → dựng phim và ghi chú', { skip: !wildFfmpeg && 'cần ffmpeg + ffprobe', timeout: 180000 }, async () => {
+  const { fakeMuse } = require('./fixtures/wild-fake-muse.cjs');
+  const { createWildWriter } = require('../src/wild-write.cjs');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'muse-wild-run-'));
+  let app;
+  try {
+    await fs.writeFile(path.join(dir, 'studio.json'), JSON.stringify({ configVersion: 2, settings: { output: dir, accountCount: 1, cooldownSeconds: 0 } }));
+    const fake = fakeMuse();
+    app = await boot(dir, { longTerm: true, wildWriterFactory: options => createWildWriter({ ...options, ask: fake.ask, delay: async () => {} }) });
+    await assert.rejects(app.invoke('wildMake', { topic: '   ' }), /Nhập tên con vật/);
+    await assert.rejects(app.invoke('wildMake', { topic: 'Cầy mangut', voice: { engine: 'edge', voice: '' } }), /Chọn giọng thuyết minh/);
+    await assert.rejects(app.invoke('wildMake', { topic: 'Cầy mangut', voice: { engine: 'edge', voice: 'vi-VN-HoaiMyNeural' } }), /Chưa cài giọng Microsoft/);
+    assert.equal(fake.log.bible, 0, 'lỗi đầu vào thì chưa gửi gì cho Muse');
+
+    const made = await app.invoke('wildMake', { topic: 'Cầy mangut', minutes: 20, lang: 'vi', aspect: '16:9', voice: { engine: 'none' } });
+    assert.equal(made.storyId, 'DV-Cay-mangut');
+    await assert.rejects(app.invoke('wildMake', { topic: 'Sư tử', voice: { engine: 'none' } }), /Đang làm phim|Hàng đợi đang chạy/);
+    await until(() => app.invoke('state').wild.stories['DV-Cay-mangut']?.status === 'queued', 20000);
+    await until(() => { const s = app.invoke('state'); return !s.starting && !s.active; }, 90000);   // viết xong thì tự chạy hàng đợi (ở đây không có Muse thật nên dừng ngay); chờ hết hẳn để việc tự dựng phim sau hàng đợi không đụng nút «Dựng phim» của test
+    await new Promise(r => setTimeout(r, 150));
+    const state = await app.invoke('state');
+    const mine = state.jobs.filter(j => j.kind === 'wild');
+    assert.equal(state.jobs.length, mine.length, 'không có việc của tab khác');
+    const clips = mine.filter(j => j.phase === 'clip'), images = mine.filter(j => j.phase === 'image');
+    assert.equal(clips.length, 130);
+    assert.ok(images.length >= 3 + 1 + 1, 'ảnh nhân vật, ảnh mốc, ảnh bìa');
+    assert.ok(mine.every(j => j.storyId === 'DV-Cay-mangut' && j.status !== undefined));
+    assert.equal(clips[1].needs[0].number, 1, 'cảnh nối tiếp chờ cảnh trước');
+    assert.equal(state.wild.stories['DV-Cay-mangut'].name, 'Cầy mangut');
+    assert.equal(state.wild.stories['DV-Cay-mangut'].sceneCount, 130);
+    const draft = JSON.parse(await fs.readFile(path.join(dir, 'DongVat', 'DV-Cay-mangut', 'kich-ban.json'), 'utf8'));
+    assert.equal(draft.final, true);
+    assert.equal(draft.scenes.length, 130);
+    assert.equal(fake.log.bible, 1);
+
+    // Clip làm tay: mỗi cảnh một file 1 giây rồi báo đã xong; dựng phim thật.
+    const folder = path.join(dir, 'DongVat', 'DV-Cay-mangut');
+    await fs.mkdir(folder, { recursive: true });
+    const sample = path.join(dir, 'mau.mp4');
+    await require('../src/merge.cjs').command('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=320x180:rate=30:duration=1', '-pix_fmt', 'yuv420p', sample], 60000);
+    for (const job of clips) { const file = path.join(folder, String(job.number).padStart(3, '0') + '.mp4'); await fs.copyFile(sample, file); Object.assign(job, { status: 'completed', output: file }); }
+    for (const job of images) Object.assign(job, { status: 'completed', output: sample });
+    const built = await app.invoke('wildBuild', { storyId: 'DV-Cay-mangut' });
+    assert.ok(built);
+    await until(() => app.invoke('state').wild.stories['DV-Cay-mangut']?.status === 'built', 150000);
+    const done = (await app.invoke('state')).wild;
+    assert.equal(done.error, '');
+    const out = done.stories['DV-Cay-mangut'].output;
+    assert.ok(out.startsWith(folder), 'video nằm trong thư mục DongVat của phim');
+    const probe = require('node:child_process').spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', out]);
+    assert.ok(Math.abs(Number(String(probe.stdout).trim()) - 130) < 3, 'phim dài đúng tổng 130 clip × 1 giây');
+    const notes = await fs.readFile(path.join(folder, 'ghi-chu-dang-video.txt'), 'utf8');
+    assert.match(notes, /SỰ THẬT MÀ PHIM DÙNG/);
+    assert.match(notes, /nội dung bị thay đổi hoặc tổng hợp/);
+    // tab Kể chuyện không bị đụng tới
+    await assert.rejects(fs.access(path.join(dir, 'KeChuyen')));
+    await app.stop();
+  } finally { if (app && !app.lifecycle.includes('quit')) await app.stop(); await fs.rm(dir, { recursive: true, force: true }); }
 });

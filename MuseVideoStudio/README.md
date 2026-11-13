@@ -142,6 +142,16 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.0
+
+- **Tab mới «☘ Động vật hoang dã» (riêng, không dính các tab khác, nằm dưới «Dọn nhà · Sinh tồn»).** Chỉ cần nhập tên chủ đề (vd «Cầy mangut và rắn hổ mang»), chọn độ dài 15 / 20 / 25 phút, ngôn ngữ, tỉ lệ khung, giọng đọc; tool tự làm hết: Muse viết «bộ phim» (tên, loài, sự thật sinh học, dàn nhân vật có mô tả hình dáng cố định, các chương) → viết từng chương theo đoạn ≤ 10 cảnh (mỗi đoạn biết 3 cảnh trước) → tạo ảnh chân dung nhân vật + ảnh mở đầu cảnh mới + từng clip → tự đọc lời thuyết minh bằng giọng Microsoft (edge-tts) → ghép MP4 có tiếng thú / môi trường nền nhỏ dần dưới giọng đọc.
+- **Cảnh liền mạch:** cảnh «NỐI TIẾP» bắt đầu từ khung hình CUỐI THẬT của clip trước; cảnh «MỚI» bắt đầu từ ảnh riêng tạo từ chân dung nhân vật; tối đa 5 cảnh nối tiếp liền nhau rồi đổi góc để hình không trôi. Clip 8 giây (phim 15 phút) hoặc 10 giây (20 và 25 phút): 122 / 130 / 163 cảnh.
+- **Nội dung đúng tập tính:** săn mồi, bảo vệ con, mùa vụ… viết như phim tài liệu thật, không máu me, không người, không chữ trên hình. Thư mục ra: `output/DongVat/<tên phim>` kèm `kich-ban.json` (kịch bản, viết dở thì «Viết tiếp») và `ghi-chu-dang-video.txt` (tiêu đề, mô tả, nhắc bật khai báo nội dung chỉnh sửa/tổng hợp của YouTube).
+- Dùng chung hàng đợi, nhiều tài khoản, tự thử lại và tự chạy tiếp khi hết lượt như tab Dọn nhà. Chỉ gói Năm / Vĩnh viễn.
+- **Thẻ cảnh đang CHỜ cũng có nút «Dừng cảnh này»** (trước chỉ cảnh đang chạy mới có): cảnh thành «Đã dừng», hàng đợi bỏ qua nó, các cảnh khác chạy tiếp; sửa prompt rồi bấm «Gửi lại prompt» để tạo lại sau. Với tab chạy chuỗi (Dọn nhà, Động vật hoang dã) các cảnh nối sau cảnh đã dừng sẽ chờ cho tới khi cảnh đó xong.
+- **Sửa lỗi nền:** hàm tự chạy tiếp khi hết lượt của tab Dọn nhà trước đây không bao giờ chạy (lỗi «handlers is not defined» bị nuốt im); giờ chạy thật. Đây là thay đổi hành vi: tab Dọn nhà giờ TỰ chạy tiếp khi hết lượt.
+- CHƯA thử với Muse thật, clip thật, giọng thật và trên Windows: đã thử bằng Muse giả + ffmpeg thật (ghép 130 cảnh), kiểm thử giao diện bằng Chromium. Phim 20–25 phút cần ~130–163 clip nên chạy nhiều giờ. Video làm bằng AI: nhớ bật khai báo nội dung tổng hợp/chỉnh sửa khi đăng YouTube.
+
 ## Update 1.8.6
 
 - **Tab Dọn nhà · Sinh tồn: bớt «lùi trạng thái» giữa các đoạn.** Ảnh mốc đầu mỗi đoạn do Muse vẽ lại từ ảnh gốc nên hay quên việc đã xong (đã sơn rồi mà tường vẫn bong, đã lát sàn mà dây điện vẫn hở, lắp cửa sổ trong căn phòng còn trần trụi). Giờ ảnh mốc dặn rõ trạng thái hiện tại theo các bước đã xong: tường trát phẳng, đã sơn sạch không bong tróc, sàn đã lát mới, cửa mới, dây điện đã giấu và đèn đã bật, bếp đã lắp, nhà đã có nội thất.

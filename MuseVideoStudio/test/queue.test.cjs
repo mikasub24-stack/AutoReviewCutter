@@ -441,6 +441,22 @@ test('cancelJob từ chối cảnh không đang chạy; «Dừng» toàn hàng �
   await q.stop(); await running;
   assert.equal(q.paused, true); assert.deepEqual(q.jobs.map(j => j.status), ['interrupted', 'pending']);
 });
+test('holdJob: dừng cảnh đang chờ → «Đã dừng», hàng đợi bỏ qua, các cảnh khác chạy; sửa prompt + gửi lại thì chạy lại sau', async () => {
+  const ran = [];
+  const q = new Queue({ ...base, run: async j => { ran.push(j.prompt); return '/out/' + j.prompt + '.mp4'; } });
+  await q.add([{ prompt: 'a' }, { prompt: 'b' }, { prompt: 'c' }]);
+  const b = q.jobs[1];
+  await q.holdJob(b.id);
+  assert.equal(b.status, 'interrupted'); assert.match(b.error, /Đã dừng/);
+  await assert.rejects(q.holdJob(b.id), /Chỉ dừng được cảnh đang chờ/);
+  await q.start();
+  assert.deepEqual(ran, ['a', 'c'], 'cảnh đã dừng không chạy');
+  assert.deepEqual(q.jobs.map(j => j.status), ['completed', 'interrupted', 'completed']);
+  await q.editPrompt(b.id, 'b sửa'); await q.retry(b.id);
+  await q.start();
+  assert.deepEqual(ran, ['a', 'c', 'b sửa']); assert.equal(b.status, 'completed');
+  await assert.rejects(q.holdJob(b.id), /Chỉ dừng được cảnh đang chờ/);
+});
 test('10 trình duyệt chạy song song: dừng / tạo lại MỘT cảnh kẹt không ảnh hưởng 9 tab còn lại', async () => {
   const slotsSeen = new Set(); let stuckSlot = -1;
   const q = new Queue({ ...base, concurrency: 10, run: async (j, slot, signal) => {

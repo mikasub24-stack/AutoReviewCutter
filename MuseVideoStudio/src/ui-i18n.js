@@ -475,6 +475,8 @@ Video trước|Previous video
 Tạo lại|Regenerate
 Tạo lại cảnh này; giữ video cũ.|Regenerate this scene; keep the previous video.
 Dừng cảnh này|Stop this scene
+Dừng cảnh này (chưa chạy)? Cảnh thành «Đã dừng» để bạn sửa prompt rồi bấm «Gửi lại prompt» tạo lại sau. Các cảnh khác vẫn chạy tiếp.|Stop this scene (not started yet)? It becomes “Stopped” so you can edit its prompt and press “Resend prompt” to regenerate it later. Other scenes keep running.
+Đã dừng cảnh này. Sửa prompt (nếu cần) rồi bấm «Gửi lại prompt» để tạo lại.|Scene stopped. Edit the prompt if needed, then press “Resend prompt” to regenerate it.
 Tạo lại ngay|Restart now
 Thử TK khác|Try another account
 Bấm dừng cảnh này trong Muse rồi gửi lại với prompt mới ngay? Nếu Muse đang tạo dở thì phần đó bị bỏ.|Stop this scene in Muse and resend it with the new prompt now? Anything Muse is still generating for it is discarded.
@@ -691,6 +693,21 @@ Bước nào cũng cần prompt ảnh.|Every step needs an image prompt.
 ⚠ Prompt ảnh quá ngắn, dễ ra ảnh sai. Mô tả rõ vật gì, ở đâu, tay đang làm gì.|⚠ Image prompt too short; the picture may come out wrong. Say what object, where, and what the hands are doing.
 Dọn nhà · Sinh tồn|House cleanup · Survival
 Dọn nhà · Sinh tồn · Phục hồi|House cleanup · Survival · Restoration
+Động vật hoang dã|Wildlife
+Gõ tên con vật → tự viết kịch bản, quay, thuyết minh và dựng phim|Type an animal name → the tool writes, films, narrates and edits the movie
+Làm phim mới|New movie
+Chỉ cần gõ tên con vật hoặc chủ đề. Muse tự viết kịch bản phim tài liệu (tập tính thật, săn mồi, bảo vệ con non), tự tạo ảnh và clip nối tiếp liền mạch, tự thuyết minh kể chuyện rồi dựng thành một video hoàn chỉnh.|Just type an animal or a topic. Muse writes a documentary script (real behavior, hunting, protecting the young), creates connected pictures and clips, narrates the story itself and edits everything into one finished video.
+Tên con vật hoặc chủ đề|Animal or topic
+Độ dài phim|Movie length
+Ngôn ngữ thuyết minh|Narration language
+Tiếng thiên nhiên nền|Background nature sound
+Vừa (nghe rõ tiếng thú, gió, côn trùng)|Medium (animals, wind and insects clearly audible)
+Nhỏ (giọng kể nổi hơn)|Low (the narration stands out more)
+Giọng thuyết minh|Narrator voice
+Khi đăng lên YouTube hãy bật mục «nội dung bị thay đổi hoặc tổng hợp». Sau khi dựng xong, tool ghi sẵn file ghi chú gồm các sự thật phim đã dùng để bạn tự kiểm tra lại.|When you upload to YouTube, turn on the “altered or synthetic content” disclosure. After the build the tool writes a notes file with the facts the movie used so you can check them again.
+Làm phim tự động|Make the movie automatically
+Danh sách cảnh phim động vật hoang dã|Wildlife movie scene list
+Sẵn sàng cho phim động vật hoang dã mới|Ready for a new wildlife movie
 Một ảnh → video liền mạch, tự dựng xong|One photo → seamless video, edited automatically
 Cần gói Năm hoặc Vĩnh viễn|Year or Lifetime plan required
 Nhập key|Enter key
@@ -754,7 +771,7 @@ Mở Flow để đăng nhập Google|Open Flow to sign in to Google
   function t(value){
     const raw=String(value??'');if(language==='vi')return raw;
     const key=norm(raw);if(dictionary[key])return raw.replace(key,dictionary[key]);
-    const decorated=key.match(/^([▶■▱▦▧✎⌂↗⚙✓＋+\s]*)(.*?)([＋▾\s]*)$/u);
+    const decorated=key.match(/^([▶■▱▦▧✎⌂☘↗⚙✓＋+\s]*)(.*?)([＋▾\s]*)$/u);
     if(decorated&&dictionary[decorated[2]])return decorated[1]+dictionary[decorated[2]]+decorated[3];
     const photoRetry=key.match(/^Chưa lưu được ảnh · giữ đúng kết quả và thử lại: (.+)$/);if(photoRetry)return 'Image not saved yet · Retrying the same result: '+t(photoRetry[1]);
     const retry=key.match(/^Chưa lưu được video · giữ đúng kết quả và thử tải lại: (.+)$/);if(retry)return 'Video not saved yet · Retrying the same result: '+t(retry[1]);

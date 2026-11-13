@@ -9,7 +9,9 @@ function abortable(promise,signal){
     Promise.resolve(promise).then(v=>{cleanup();resolve(v);},e=>{cleanup();reject(e);});
   });
 }
-const kindOf=k=>k==='image'?'image':k==='story'?'story':k==='restore'?'restore':'video';
+const kindOf=k=>k==='image'?'image':k==='story'?'story':k==='restore'?'restore':k==='wild'?'wild':'video';
+// Hai tab chạy chuỗi cảnh nối khung cuối (Dọn nhà · Sinh tồn, Động vật hoang dã) dùng chung luật hết hạn mức / chạy song song theo chuỗi.
+const chained=j=>j.kind==='restore'||j.kind==='wild';
 // Tab «Dọn nhà · Sinh tồn» (kind 'restore'): cảnh k chỉ chạy sau cảnh k-1, và ảnh đầu của nó là KHUNG CUỐI THẬT của cảnh k-1.
 //   needs   = [{phase,number}]            những việc cùng truyện phải xong trước
 //   refList = [{file}|{phase,number,part}] ảnh đính kèm: tệp có sẵn, ảnh đã lưu của việc đó, hoặc khung cuối (part:'lastFrame') của clip đó
@@ -80,6 +82,15 @@ class Queue {
     await this.publish();
     return true;
   }
+  // Dừng một cảnh CHƯA chạy (đang chờ trong hàng đợi) để sửa prompt / ảnh rồi tạo lại sau: thành «Đã dừng», hàng đợi bỏ qua nó, các cảnh khác chạy tiếp.
+  async holdJob(id){
+    const j=this.jobs.find(x=>x.id===id);
+    if(!j||j.status!=='pending')throw Error('Chỉ dừng được cảnh đang chờ. Cảnh đang chạy dùng «Dừng cảnh này».');
+    if(j.mayHaveSubmitted||j.submittedAt||j.resultReadyAt)throw Error('Cảnh này đã gửi tới Muse, hãy bấm «Dừng cảnh này» khi nó chạy.');
+    j.status='interrupted';j.stage='interrupted';j.error='Đã dừng cảnh này. Sửa prompt (nếu cần) rồi bấm «Gửi lại prompt» để tạo lại.';j.stageMessage=j.error;
+    await this.publish();
+    return true;
+  }
   async retry(id){const j=this.jobs.find(x=>x.id===id);if(!j||!['failed','interrupted'].includes(j.status))throw Error('Chỉ chạy lại tác vụ lỗi hoặc bị gián đoạn.');delete j.resumeMode;resetRunFields(j);j.status='pending';await this.publish();}
   async remove(id){if(this.jobs.find(j=>j.id===id)?.status==='running')throw Error('Dừng tác vụ trước khi xóa.');this.jobs=this.jobs.filter(j=>j.id!==id);await this.publish();}
   async clearPending(kind){this.jobs=this.jobs.filter(j=>(kind&&j.kind!==kind)||j.status!=='pending'||j.mayHaveSubmitted);await this.publish();}
@@ -95,7 +106,7 @@ class Queue {
   async clearAll(kind){await this.stop();this.jobs=kind?this.jobs.filter(j=>j.kind!==kind):[];await this.publish();}
   async applyReferences(files){
     if(!Array.isArray(files)||files.some(x=>typeof x!=='string'||!x))throw Error('Ảnh tham chiếu không hợp lệ.');
-    for(const j of this.jobs)if(j.kind!=='story'&&j.kind!=='restore'&&j.status==='pending'&&!j.lockedInput){j.references=[...files];j.image=files[0]||'';}
+    for(const j of this.jobs)if(j.kind!=='story'&&!chained(j)&&j.status==='pending'&&!j.lockedInput){j.references=[...files];j.image=files[0]||'';}
     await this.publish();
   }
   // Clip của chế độ Mẹo vặt (dependsOn:'image') chỉ chạy sau khi ảnh cùng số cảnh trong cùng truyện đã lưu xong.
@@ -191,7 +202,7 @@ class Queue {
           if(cancel.mode==='other'&&from)job.avoidAccounts=[...new Set([...(job.avoidAccounts||[]),from])];
         }
         else{job.status='interrupted';job.stage='interrupted';job.error='Đã dừng cảnh này. Bấm «Tìm / tải video đã tạo» để lấy kết quả nếu Muse đã làm xong, hoặc «Gửi lại prompt».';job.stageMessage=job.error;}
-      }else if(job.kind==='restore'&&Number(job.account)>0&&!controller.signal.aborted&&error?.name!=='AbortError'&&QUOTA.test(error?.message||'')&&(job.quotaMoves||0)<QUOTA_MAX_MOVES){
+      }else if(chained(job)&&Number(job.account)>0&&!controller.signal.aborted&&error?.name!=='AbortError'&&QUOTA.test(error?.message||'')&&(job.quotaMoves||0)<QUOTA_MAX_MOVES){
         // Tài khoản hết hạn mức: nghỉ tài khoản đó, đưa cảnh về «đang chờ» để tài khoản khác nhận. Hết mọi tài khoản thì tạm dừng (main tự chạy lại khi có tài khoản hết nghỉ).
         const from=Number(job.account),why=error.message;
         this.exhausted.set(from,Date.now()+QUOTA_REST_MS);
@@ -225,7 +236,7 @@ class Queue {
   }
   start(kind){
     if(this.active)return Promise.resolve();
-    this.kind=kind==='image'||kind==='video'||kind==='story'||kind==='restore'?kind:null;
+    this.kind=kind==='image'||kind==='video'||kind==='story'||kind==='restore'||kind==='wild'?kind:null;
     if(!Number.isInteger(this.concurrency)||this.concurrency<1)throw Error('Số tác vụ chạy đồng thời phải là số nguyên dương.');
     this.paused=false;this.active=true;
     this.runningPromise=(async()=>{
@@ -233,8 +244,8 @@ class Queue {
         while(!this.paused){
           let job=null,waiting=false,resting=false;
           for(const x of this.jobs){
-            if(x.status!=='pending'||(this.kind&&x.kind!==this.kind)||!(!x.resumeMode||this.concurrency===1||x.account===slot+1||!x.account||(x.kind==='restore'&&this.isExhausted(x.account)))||this.avoids(x,slot))continue;
-            if(x.kind==='restore'&&this.concurrency>1&&this.isExhausted(slot+1)&&!this.allExhausted()){resting=true;continue;}
+            if(x.status!=='pending'||(this.kind&&x.kind!==this.kind)||!(!x.resumeMode||this.concurrency===1||x.account===slot+1||!x.account||(chained(x)&&this.isExhausted(x.account)))||this.avoids(x,slot))continue;
+            if(chained(x)&&this.concurrency>1&&this.isExhausted(slot+1)&&!this.allExhausted()){resting=true;continue;}
             const gate=this.gate(x);
             if(gate==='ready'){job=x;break;}
             if(gate==='wait')waiting=true;

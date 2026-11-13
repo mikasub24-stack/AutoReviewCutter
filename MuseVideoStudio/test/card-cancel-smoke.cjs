@@ -26,7 +26,10 @@ const root=path.resolve(__dirname,'../src');
     const btn=(id,label)=>page.locator(`[data-job-id=${id}] .previewActions button`).filter({hasText:label});
     // chỉ cảnh ĐANG CHẠY có 2 nút; cảnh xong / đang chờ thì không
     for(const id of ['stuck','busy']){assert.equal(await btn(id,/^Dừng cảnh này$/).isVisible(),true,id);assert.equal(await btn(id,/^Tạo lại ngay$/).isVisible(),true,id);}
-    for(const id of ['done','next']){assert.equal(await btn(id,/^Dừng cảnh này$/).isVisible(),false,id);assert.equal(await btn(id,/^Tạo lại ngay$/).isVisible(),false,id);}
+    assert.equal(await btn('done',/^Dừng cảnh này$/).isVisible(),false);
+    for(const id of ['done','next'])assert.equal(await btn(id,/^Tạo lại ngay$/).isVisible(),false,id);
+    // cảnh ĐANG CHỜ (chưa chạy) cũng có «Dừng cảnh này» để giữ lại sửa / tạo lại sau; không có «Tạo lại ngay»
+    assert.equal(await btn('next',/^Dừng cảnh này$/).isVisible(),true);
     if(process.env.MUSE_CARD_SHOT)await page.locator('#jobs').screenshot({path:process.env.MUSE_CARD_SHOT});
     // từ chối xác nhận -> không gửi lệnh
     accept=false;await btn('stuck',/^Dừng cảnh này$/).click();
@@ -43,6 +46,19 @@ const root=path.resolve(__dirname,'../src');
     await btn('stuck',/^Thử TK khác$/).click();
     assert.deepEqual(await page.evaluate(()=>window.calls.filter(c=>c.name==='cancelJob').pop().data),{id:'stuck',mode:'other'});
     assert.equal(dialogs.length,4);
+    // dừng cảnh đang chờ: hỏi xác nhận, gọi holdJob với id (không gọi cancelJob)
+    const cancels=()=>page.evaluate(()=>window.calls.filter(c=>c.name==='cancelJob').length);
+    const cancelsBefore=await cancels();
+    accept=false;await btn('next',/^Dừng cảnh này$/).click();
+    assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='holdJob').length),0,'từ chối xác nhận thì không gửi lệnh');
+    accept=true;await btn('next',/^Dừng cảnh này$/).click();
+    assert.deepEqual(await page.evaluate(()=>window.calls.filter(c=>c.name==='holdJob').map(c=>c.data)),['next']);
+    assert.equal(await cancels(),cancelsBefore,'cảnh chờ không đi qua cancelJob');
+    // cảnh đã dừng: hiện «Gửi lại prompt» để tạo lại sau, hết nút Dừng
+    await page.evaluate(()=>{Object.assign(window.s.jobs[3],{status:'interrupted',stage:'interrupted',error:'Đã dừng cảnh này.'});window.push();});
+    await page.waitForFunction(()=>![...document.querySelectorAll('[data-job-id=next] .previewActions button')].some(b=>/^Dừng cảnh này$/.test(b.textContent)&&!b.hidden));
+    assert.equal(await page.locator('[data-job-id=next] button').filter({hasText:/^Gửi lại prompt$/}).first().isVisible(),true);
+    await page.evaluate(()=>{Object.assign(window.s.jobs[3],{status:'pending',stage:'',error:''});window.push();});
     await page.evaluate(()=>{window.s.settings.accountCount=1;window.push();});
     await page.waitForFunction(()=>![...document.querySelectorAll('[data-job-id=stuck] .previewActions button')].some(b=>/Thử TK khác/.test(b.textContent)&&!b.hidden));
     await page.evaluate(()=>{window.s.settings.accountCount=2;window.push();});

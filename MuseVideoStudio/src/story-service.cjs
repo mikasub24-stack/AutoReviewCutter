@@ -9,9 +9,9 @@ const MAX_PNG = 8 * 1024 * 1024;
 const MAX_CHUNKS = 40;
 
 // Cảnh của một truyện, xếp theo số cảnh (không theo thứ tự xong khi chạy nhiều luồng).
-function storyJobs(jobs, storyId) {
+function storyJobs(jobs, storyId, kind = 'story') {
   // Việc «ảnh» của chế độ Mẹo vặt không phải clip: bỏ ra để chỉ ghép các clip.
-  return (jobs || []).filter(j => j.kind === 'story' && j.phase !== 'image' && (!storyId || j.storyId === storyId))
+  return (jobs || []).filter(j => j.kind === kind && j.phase !== 'image' && (!storyId || j.storyId === storyId))
     .sort((a, b) => (a.order || 0) - (b.order || 0));
 }
 function storyFolder(output, storyId) {
@@ -19,19 +19,20 @@ function storyFolder(output, storyId) {
 }
 
 // Mã truyện chưa dùng, bắt đầu bằng base (tên không dấu lấy từ tiêu đề): thêm -2, -3… khi trùng truyện đang có trong hàng đợi hoặc thư mục đã có trên đĩa.
-async function freeStoryId(base, { output = '', jobs = [] } = {}) {
-  const root = String(base || '').replace(/[^\w-]/g, '').slice(0, 40).replace(/^-+|-+$/g, '') || 'Truyen';
+async function freeStoryId(base, { output = '', jobs = [], folderOf = storyFolder, fallback = 'Truyen' } = {}) {
+  const root = String(base || '').replace(/[^\w-]/g, '').slice(0, 40).replace(/^-+|-+$/g, '') || fallback;
   const used = new Set((jobs || []).map(j => j.storyId).filter(Boolean));
   for (let n = 1; n <= 999; n++) {
     const id = n === 1 ? root : `${root}-${n}`;
     if (used.has(id)) continue;
-    if (output) { try { await fs.access(storyFolder(output, id)); continue; } catch { /* chưa có thư mục: dùng được */ } }
+    if (output) { try { await fs.access(folderOf(output, id)); continue; } catch { /* chưa có thư mục: dùng được */ } }
     return id;
   }
   return `${root}-${Date.now().toString(36)}`;
 }
 
-function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async () => {}, notify = () => {}, userDataDir }) {
+// `kind` / `folderOf` / `runName`: tab khác (Động vật hoang dã) dùng lại cùng bộ làm giọng + ghép, nhưng việc, thư mục và thư mục tạm riêng.
+function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async () => {}, notify = () => {}, userDataDir, kind = 'story', folderOf = storyFolder, runName = 'story-run' }) {
   const state = { busy: false, progress: '', error: '', output: '', srt: '', notes: [], storyId: '' };
   let prepared = null, controller = null;
 
@@ -39,7 +40,7 @@ function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async
   function status() { return { busy: state.busy, progress: state.progress, error: state.error, output: state.output, srt: state.srt, notes: state.notes, storyId: state.storyId }; }
 
   function pick(storyId) {
-    const jobs = storyJobs(getJobs(), storyId);
+    const jobs = storyJobs(getJobs(), storyId, kind);
     if (!jobs.length) throw Error('Chưa có cảnh nào của truyện này trong hàng đợi.');
     const missing = jobs.filter(j => j.status !== 'completed' || !j.output).map(j => j.number || j.order || '?');
     if (missing.length) throw Error(`Còn ${missing.length} cảnh chưa có clip (cảnh ${missing.slice(0, 12).join(', ')}${missing.length > 12 ? '…' : ''}). Chạy hàng đợi cho xong rồi xuất.`);
@@ -61,8 +62,8 @@ function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async
       const jobs = pick(storyId);
       const settings = getSettings();
       if (!settings.output) throw Error('Chọn thư mục lưu video trước.');
-      const dir = path.join(userDataDir, 'story-run', randomUUID().slice(0, 8));
-      await fs.rm(path.join(userDataDir, 'story-run'), { recursive: true, force: true }).catch(() => {});
+      const dir = path.join(userDataDir, runName, randomUUID().slice(0, 8));
+      await fs.rm(path.join(userDataDir, runName), { recursive: true, force: true }).catch(() => {});
       await fs.mkdir(dir, { recursive: true });
       let voices = [];
       if (engine !== 'none') {
@@ -105,7 +106,7 @@ function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async
         }
         parts.push({ clip: scene.clip, voice: scene.voice, chunks });
       }
-      const folder = storyFolder(settings.output, prepared.storyId);
+      const folder = folderOf(settings.output, prepared.storyId);
       const result = await assembleStory({ scenes: parts, dir: folder, name: String(name || prepared.storyId || 'Ke-chuyen'), ffmpeg: settings.ffmpeg, aspect, subtitles: Boolean(subtitles), srt: Boolean(srt), sfx, onProgress: say, signal });
       Object.assign(state, { output: result.output, srt: result.srt, notes: result.notes, storyId: prepared.storyId });
       await fs.rm(prepared.dir, { recursive: true, force: true }).catch(() => {});
