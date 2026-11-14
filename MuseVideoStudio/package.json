@@ -1,6 +1,6 @@
 {
   "name": "muse-video-studio",
-  "version": "1.9.4",
+  "version": "1.9.5",
   "private": true,
   "description": "Windows desktop queue for Muse image-to-video workflows",
   "main": "src/main.cjs",

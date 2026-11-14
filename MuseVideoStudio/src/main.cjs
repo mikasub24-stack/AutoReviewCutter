@@ -1037,7 +1037,7 @@ app.whenReady().then(async () => {
     // includeDone: cảnh đã xong cũng được đổi prompt (video đã có giữ nguyên) để lần «Tạo lại» sau gửi đúng prompt mới (có câu kiểu hình).
     storyRelock: async data => {
       if(stopping||merging||packaging)throw Error('Chờ xử lý hiện tại hoàn tất.');
-      const id=String(data?.storyId||'').replace(/[^\w-]/g,''),form=String(data?.form||''),refLook=String(data?.refLook||''),includeDone=Boolean(data?.includeDone);
+      const id=String(data?.storyId||'').replace(/[^\w-]/g,''),form=String(data?.form||''),refLook=String(data?.refLook||''),character=String(data?.character||''),includeDone=Boolean(data?.includeDone);
       if(!id)throw Error('Chọn truyện cần gắn khóa.');
       const storyPlan=require('./story-plan.js');
       const scope=queue.jobs.filter(j=>j.kind==='story'&&j.storyId===id&&!j.phase&&j.storyMode!=='ad');
@@ -1047,7 +1047,7 @@ app.whenReady().then(async () => {
         if(!(['pending','failed','interrupted'].includes(job.status)||(done&&includeDone))){skipped++;continue;}
         const reference=Boolean(job.image)||(job.references||[]).length>0;
         let next;
-        try{next=storyPlan.refreshPrompt(job.prompt,{reference,form,refLook,aspect:job.aspect||''});}catch{continue;}
+        try{next=storyPlan.refreshPrompt(job.prompt,{reference,form,refLook,character,aspect:job.aspect||''});}catch{continue;}
         if(!next||next===job.prompt)continue;
         if(done)await queue.restylePrompt(job.id,next);else await queue.editPrompt(job.id,next);changed++;
       }

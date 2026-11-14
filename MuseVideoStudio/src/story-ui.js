@@ -954,16 +954,18 @@
   function relockNeeded(story) {
     if (!story || isAd() || isTip() || !plan().hasShapeLock) return 0;
     const wantStyle = Boolean(refLook) && !$('storyForm').value.trim();   // biết kiểu ảnh mà prompt chưa có câu kiểu hình
+    const character = $('storyCharacter').value.trim();                   // có mô tả «Nhân vật chính» mà prompt chưa có dòng nhân vật chính (đúng chữ hiện tại)
+    const lacksNarrator = prompt => Boolean(character) && !['vi', 'en'].some(l => String(prompt || '').includes(plan().narratorLine({ character }, l)));
     return (state?.jobs || []).filter(j => j.kind === 'story' && j.storyId === story.id && !j.phase && j.storyMode !== 'ad'
-      && ['pending', 'failed', 'interrupted', 'completed'].includes(j.status) && (j.image || (j.references || []).length)
-      && (!plan().hasShapeLock(j.prompt) || (wantStyle && !plan().hasStyleLine(j.prompt)))).length;
+      && ['pending', 'failed', 'interrupted', 'completed'].includes(j.status)
+      && ((((j.image || (j.references || []).length)) && (!plan().hasShapeLock(j.prompt) || (wantStyle && !plan().hasStyleLine(j.prompt)))) || lacksNarrator(j.prompt))).length;
   }
   async function relockQueued() {
     const story = currentStory(); if (!story) return;
     const need = relockNeeded(story);
     if (!need) return toast('Các cảnh chưa xong đã có câu khóa rồi.');
-    if (!confirm(`Gắn câu khóa hình dạng nhân vật${refLook ? ' và câu kiểu hình (' + (plan().LOOKS?.[refLook]?.label || refLook) + ')' : ''} vào prompt của ${need} cảnh trong truyện ${story.id}? Chỉ sửa prompt, video đã tạo xong giữ nguyên: cảnh nào ra sai kiểu thì bấm «Tạo lại» để gửi prompt mới. Cảnh bị lỗi hoặc bị gián đoạn cần bấm «Gửi lại prompt».`)) return;
-    const result = await call('storyRelock', { storyId: story.id, form: $('storyForm').value, refLook, includeDone: true });
+    if (!confirm(`Gắn câu khóa hình dạng nhân vật${refLook ? ' và câu kiểu hình (' + (plan().LOOKS?.[refLook]?.label || refLook) + ')' : ''}${$('storyCharacter').value.trim() ? ' và dòng NHÂN VẬT CHÍNH cố định (người dẫn chuyện y hệt ở mọi cảnh)' : ''} vào prompt của ${need} cảnh trong truyện ${story.id}? Chỉ sửa prompt, video đã tạo xong giữ nguyên: cảnh nào ra sai kiểu thì bấm «Tạo lại» để gửi prompt mới. Cảnh bị lỗi hoặc bị gián đoạn cần bấm «Gửi lại prompt».`)) return;
+    const result = await call('storyRelock', { storyId: story.id, form: $('storyForm').value, refLook, character: $('storyCharacter').value, includeDone: true });
     if (!result) return;
     render(result);
     const r = result.relocked || {};
@@ -1278,7 +1280,7 @@
     $('storyStatus').textContent = line;
     const need = relockNeeded(story);
     $('storyRelock').hidden = !need;
-    if (need) $('storyRelock').textContent = `Gắn khóa kiểu hình cho ${need} cảnh`;
+    if (need) $('storyRelock').textContent = `Gắn khóa kiểu hình${$('storyCharacter').value.trim() ? ' + nhân vật chính' : ''} cho ${need} cảnh`;
     // Xem video đã xuất ngay trong app. Đang xuất thì gỡ khung phát để lần sau nạp lại file mới (kể cả khi trùng tên).
     const video = $('storyVideo'), videoFile = !busy && s.output ? s.output : '';
     if (videoFile !== lastVideo) {

@@ -1582,3 +1582,57 @@ test('kiểu hình 2D: bản tiếng Anh, prompt xuống dòng sau câu tỉ l�
   const prompts = sp.planStory(storyLong, { seconds: 10, aspect: '16:9', reference: true, refLook: 'flat2d' });
   for (const scene of prompts) assert.match(scene.prompt, /KIỂU HÌNH \(bắt buộc/, 'cảnh tự ghép cũng có câu kiểu hình');
 });
+
+const NARRATOR = 'Người Việt Nam, nam khoảng 50 tuổi, da ngăm, tóc đen ngắn, áo sơ mi xanh lá nhạt tay dài, quần tối màu';
+
+test('nhân vật chính: app gắn nguyên văn mô tả vào đầu MỌI prompt, ngay sau câu kiểu hình', () => {
+  const cfg = { reference: true, aspect: '16:9', refLook: 'flat2d', character: NARRATOR };
+  const raw = 'Video khung NGANG 16:9 (widescreen).\nNgười dẫn chuyện – theo ảnh tham chiếu; nam trung niên, áo sơ mi đơn giản – đứng trước bản đồ, tay chỉ lên.\n' + AUDIO;
+  const out = sp.refreshPrompt(raw, cfg);
+  const lines = out.split('\n');
+  assert.match(lines[0], /^Video khung NGANG 16:9/);
+  assert.match(lines[1], /^KIỂU HÌNH \(bắt buộc/);
+  assert.match(lines[2], /^NHÂN VẬT CHÍNH \(cố định, y hệt ở MỌI cảnh/);
+  assert.ok(lines[2].includes(NARRATOR), 'giữ nguyên văn mô tả của người dùng');
+  assert.match(lines[2], /không thành người nước ngoài/);
+  assert.ok(sp.hasNarratorLine(out) && !sp.hasNarratorLine(raw));
+  assert.equal(out.split('\n').filter(l => /^NHÂN VẬT CHÍNH \(cố định/.test(l)).length, 1);
+  assert.equal(sp.refreshPrompt(out, cfg), out, 'chạy lại không đổi, không nhân đôi');
+  // câu khóa hình dạng nói rõ nhân vật chính là ngoại lệ (không được khác như người phụ)
+  assert.match(out, /Ngoại lệ: nhân vật chính \/ người dẫn chuyện KHÔNG được khác giữa các cảnh/);
+  // đổi mô tả: dòng cũ bị thay, không còn mô tả cũ
+  const changed = sp.refreshPrompt(out, { ...cfg, character: 'Người Việt Nam, nữ 30 tuổi, tóc buộc đuôi, áo dài trắng' });
+  assert.ok(!changed.includes('nam khoảng 50 tuổi') && changed.includes('áo dài trắng'));
+  assert.equal(changed.split('\n').filter(l => /^NHÂN VẬT CHÍNH \(cố định/.test(l)).length, 1);
+  // xóa mô tả: gỡ dòng và gỡ mệnh đề ngoại lệ
+  const none = sp.refreshPrompt(out, { ...cfg, character: '' });
+  assert.ok(!sp.hasNarratorLine(none) && !/Ngoại lệ/.test(none));
+});
+
+test('nhân vật chính: không ảnh tham chiếu vẫn có dòng; quảng cáo và mẹo thì không', () => {
+  const raw = 'Video khung NGANG 16:9 (widescreen).\nNgười dẫn chuyện đứng trước bản đồ.\n' + AUDIO;
+  const noRef = sp.refreshPrompt(raw, { reference: false, aspect: '16:9', character: NARRATOR });
+  assert.ok(sp.hasNarratorLine(noRef) && !/KIỂU HÌNH|KHÓA HÌNH/.test(noRef));
+  assert.match(noRef.split('\n')[1], /^NHÂN VẬT CHÍNH \(cố định/, 'ngay sau câu tỉ lệ khi chưa có câu kiểu hình');
+  assert.ok(!sp.hasNarratorLine(sp.refreshPrompt(raw, { reference: false, aspect: '16:9', character: NARRATOR, ad: { product: 'Bình Aqua' } })));
+  assert.equal(sp.narratorLine({ character: NARRATOR, tip: true }), '');
+  assert.equal(sp.narratorLine({ character: '   ' }), '');
+});
+
+test('nhân vật chính: cảnh tự ghép có dòng, bản tiếng Anh dùng câu tiếng Anh, và lời dặn Muse nói người dẫn chuyện cố định + người Việt', () => {
+  const cfg = { seconds: 10, aspect: '16:9', reference: true, refLook: 'flat2d', character: NARRATOR };
+  for (const scene of sp.planStory(storyLong, cfg)) {
+    assert.ok(sp.hasNarratorLine(scene.prompt), 'cảnh tự ghép cũng có dòng nhân vật chính');
+    assert.ok(scene.prompt.indexOf('KIỂU HÌNH') < scene.prompt.indexOf('NHÂN VẬT CHÍNH') && scene.prompt.indexOf('NHÂN VẬT CHÍNH') < scene.prompt.indexOf('KHÓA HÌNH DẠNG'));
+  }
+  const en = sp.refreshPrompt('Horizontal 16:9 widescreen video.\nThe old man walks along the river with a heavy bag and looks at the sky.\n' + AUDIO, { reference: true, aspect: '16:9', refLook: 'flat2d', character: NARRATOR });
+  assert.match(en, /^MAIN CHARACTER \(fixed, identical in EVERY scene/m);
+  assert.doesNotMatch(en, /NHÂN VẬT CHÍNH \(cố định/);
+  assert.equal(sp.refreshPrompt(en, { reference: true, aspect: '16:9', refLook: 'flat2d', character: NARRATOR }), en);
+  const ask = sp.buildSceneInstruction ? sp.buildSceneInstruction : null;
+  const rule = sp.buildUnderstandInstruction(storyLong, sp.options(cfg), { marker: 'abc123' });
+  assert.match(rule, /NGƯỜI DẪN CHUYỆN và nhân vật chính KHÔNG thuộc các nhân vật «được khác»/);
+  assert.match(rule, /người dẫn chuyện mặc định là người Việt Nam/);
+  assert.match(rule, /Không ghi «theo ảnh tham chiếu» cho người không có trong ảnh/);
+  void ask;
+});
