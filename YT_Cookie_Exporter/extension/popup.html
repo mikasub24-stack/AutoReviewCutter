@@ -1,0 +1,70 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  .grp{background:#171a24;border:1px solid #2c3142;border-radius:8px;padding:6px 8px;margin-top:6px}
+  .grp .top{display:flex;align-items:center;gap:6px}
+  .gname{flex:1;padding:4px 6px;background:#10131a;color:#e8ebf3;border:1px solid #2c3142;border-radius:6px;min-width:0}
+  .gpv{margin-top:4px;font-size:10.5px;color:#c9cee0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .gpv div{overflow:hidden;text-overflow:ellipsis}
+  .gwarn{margin-top:3px;font-size:11px;color:#fbbf24}
+  #groups{max-height:260px;overflow:auto}
+  *{box-sizing:border-box}
+  body{width:420px;margin:0;padding:14px;background:#14161c;color:#e8ebf3;font:13px Segoe UI,Arial,sans-serif}
+  h1{font-size:15px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center}
+  #time{font-size:11px;color:#8a92a8;font-weight:normal}
+  .site{background:#1f2330;border:1px solid #2c3142;border-radius:8px;padding:8px 10px;margin-bottom:8px}
+  .top{display:flex;align-items:center;gap:8px}
+  .dot{width:10px;height:10px;border-radius:50%;flex:none}
+  .name{font-weight:600;flex:1}
+  .count{background:#2f3547;border-radius:10px;padding:1px 8px;font-size:12px}
+  .badge{font-size:11px;margin-top:5px;padding:2px 8px;border-radius:10px;display:inline-block}
+  .ok{background:#143d2e;color:#34d399}.bad{background:#40281a;color:#fbbf24}.none{background:#2f3547;color:#8a92a8}
+  .chips{margin-top:5px;display:flex;flex-wrap:wrap;gap:4px}
+  .chip{font-size:10.5px;padding:1px 6px;border-radius:4px;background:#2a2f40;color:#8a92a8}
+  .chip.on{background:#143d2e;color:#34d399}
+  button{width:100%;padding:9px;margin-top:6px;border:0;border-radius:6px;background:#5b8cff;color:#fff;font-size:13px;font-weight:600;cursor:pointer}
+  button.sec{background:#2f3547;color:#e8ebf3}button.warn{background:#fbbf24;color:#10131a}
+  button.mini{width:auto;padding:3px 10px;margin:0 0 0 auto;font-size:11px}
+  button:disabled{opacity:.45;cursor:default}
+  a{color:#7aa2ff;cursor:pointer;font-size:11px;text-decoration:underline}
+  small{display:block;margin-top:10px;color:#f87171;font-size:11px}
+  input[type=checkbox]{accent-color:#5b8cff;width:15px;height:15px}
+  .scan b{display:block;margin-bottom:4px}
+  .muted{color:#8a92a8;font-size:11px}
+  #preview div{font-size:11px;color:#c9cee0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:1px 0}
+  .row2{display:flex;gap:6px}.row2 button{margin-top:6px}
+  label.chk{display:flex;gap:6px;align-items:center;margin:6px 0;font-size:12px}
+</style></head>
+<body>
+  <h1>🍪 Cookie Exporter 2.3 <span id="time"></span></h1>
+  <div id="sites"></div>
+  <div class="site scan">
+    <b>📜 Quét TẬP của một BỘ (Douyin / TikTok / Bilibili / YouTube)</b>
+    <span class="muted">Mở trang của bộ (trang bộ sưu tập, hoặc 1 tập có bảng chọn tập bên cạnh) rồi bấm quét. Mặc định gom danh sách đang chọn thành một bộ. Ảnh bìa khác nhau hoặc số tập quay lại 1 không làm tách bộ. Cách xếp thứ tự tập được giữ nguyên.</span>
+    <div class="row2"><button id="scan">🔍 Quét trang này</button><button id="stopscan" class="sec" style="width:90px">■ Dừng</button></div>
+    <div id="scanInfo" class="muted" style="margin-top:6px"></div>
+    <div id="metaInfo" class="muted" style="margin-top:3px;color:#7aa2ff"></div>
+    <div class="row2"><button id="getmix" class="sec">📚 Lấy các bộ (合集) của tài khoản này</button><button id="mixdiag" class="sec" style="width:130px">Copy chẩn đoán</button></div>
+    <div id="mixInfo" class="muted" style="margin-top:3px;color:#34d399"></div>
+    <div id="coverInfo" class="muted" style="margin-top:3px;color:#f0abfc"></div>
+    <select id="cluster" style="width:100%;margin-top:6px;padding:6px;background:#2f3547;color:#e8ebf3;border:0;border-radius:6px"></select>
+    <input id="flt" placeholder="Lọc theo tên nhận dạng của bộ (không bắt buộc), vd: tên phim" style="width:100%;margin-top:6px;padding:6px;background:#10131a;color:#e8ebf3;border:1px solid #2c3142;border-radius:6px">
+    <label class="chk"><input type="checkbox" id="split"> Chỉ tách khi Douyin có mã bộ riêng (mặc định: gom 1 bộ)</label>
+    <label class="chk"><input type="checkbox" id="takemerged"> Tải cả tập gộp (合集) — đặt tên “Gộp 01-06”</label>
+    <label class="chk"><input type="checkbox" id="takead"> Tải cả quảng cáo / trailer (预告, 抢先看…) — đặt tên “Trailer 01”</label>
+    <label class="chk"><input type="checkbox" id="showtitle"> Kèm tiêu đề tập gốc vào tên file</label>
+    <label class="chk"><input type="checkbox" id="rev" checked> Nếu không có số tập: đảo thứ tự (trang liệt kê mới → cũ)</label>
+    <div id="startn" class="muted"></div>
+    <div id="groups"></div>
+    <div id="totals" class="muted" style="margin:6px 0 2px"></div>
+    <div class="row2" style="align-items:center"><button id="getdirect" class="warn" disabled>⚡ Lấy link tải trực tiếp (Douyin)</button><button id="stopdirect" class="sec" style="width:70px;display:none">■ Dừng</button></div>
+    <div id="directInfo" class="muted"></div>
+    <div class="row2"><button id="cplinks" disabled>📋 Copy link + tên tập</button></div>
+    <div class="row2"><button id="cpplain" class="sec" disabled>Copy chỉ link</button><button id="dllinks" class="sec" disabled>⬇ links.txt</button></div>
+  </div>
+  <button id="reload" class="sec">🔄 Tải lại cookie</button>
+  <button id="dl" disabled>⬇ Tải cookies.txt</button>
+  <button id="cp" class="sec" disabled>📋 Copy vào clipboard</button>
+  <small>Cookie = quyền đăng nhập của bạn. Không gửi file cho người khác.</small>
+  <script src="popup.js"></script>
+</body></html>

@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "YT Cookie Exporter",
+  "version": "2.3.0",
+  "description": "Xuất cookie YouTube / Google / Douyin / TikTok / Bilibili; gom đúng bộ, giữ thứ tự tập và lấy link đúng video. Xử lý cục bộ.",
+  "permissions": [
+    "cookies",
+    "scripting",
+    "activeTab",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://*.google.com/*"
+  ],
+  "optional_host_permissions": [
+    "*://*.douyin.com/*",
+    "*://*.iesdouyin.com/*",
+    "*://*.tiktok.com/*",
+    "*://*.bilibili.com/*",
+    "*://*.douyinpic.com/*",
+    "*://*.byteimg.com/*",
+    "*://*.douyinstatic.com/*",
+    "*://*.pstatp.com/*",
+    "*://*.bytecdn.cn/*",
+    "*://*.tiktokcdn.com/*",
+    "*://*.hdslb.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Xuất cookie"
+  },
+  "background": {
+    "service_worker": "bg.js"
+  }
+}

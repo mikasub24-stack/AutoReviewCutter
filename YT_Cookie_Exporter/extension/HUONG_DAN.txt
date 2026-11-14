@@ -1,0 +1,161 @@
+BAN 2.3.0 - SUA GOM SAI 1 BO THANH 3-4 BO
+
+CAP NHAT
+1. Giai nen ZIP nay. Chep de 6 file trong thu muc YT_Cookie_Exporter vao thu muc extension cu.
+2. Mo chrome://extensions (Coc Coc: coccoc://extensions), bam Reload / Tai lai extension.
+3. F5 tai lai tab Douyin, mo extension va bam Quet trang nay.
+4. Mac dinh GOM 1 BO. Khong tach vi anh bia khac mau/khac canh, ten mo ta khac nhau hay so tap quay ve 1.
+5. Giu cach xep thu tu tap hien tai. Neu dung: bam Lay link tai truc tiep, xong Copy link + ten tap hoac links.txt.
+6. Chi tick Chi tach khi Douyin co ma bo rieng neu kenh that su co nhieu bo.
+
+Video trung so tap nhung khac link duoc GIU, them Video ID vao ten de tranh ghi de. Tap gop / trailer van theo hai tuy chon cu.
+Anh bia chi de xem truoc, khong duoc dung de khang dinh thuoc bo nao. Ban nay KHONG them OCR hoac doi cach doc so tap tren bia.
+Link truc tiep chi duoc chap nhan khi gan dung ID video can tai; link cache cu se duoc lay lai de tranh nham video de xuat.
+Khong sua chu ky URL media. Neu trang khong cung cap du lieu dung ID, extension bao chua lay duoc thay vi tra link video khac.
+Cookie YouTube, Douyin, Bilibili, Google va TikTok van xuat nhu cu. Khong gui cookie cho nguoi khac.
+
+Da kiem tra bang du lieu mo phong + trinh duyet Chromium. Moi truong sua code khong truy cap truc tiep Douyin, nen chua doi chieu day du kenh tren may ban.
+
+LICH SU / HUONG DAN CAC BAN CU (tham khao):
+
+CAP NHAT EXTENSION (v1.1)
+1. Ghi de file moi vao thu muc YT_Cookie_Exporter.
+2. Vao chrome://extensions (Edge: edge://extensions) -> bam nut RELOAD (mui ten xoay) cua extension.
+3. Mo extension: moi trang (YouTube, Google, Douyin, TikTok) hien rieng so cookie + trang thai.
+   - Trang nao hien "Chua cap quyen" -> bam "Cap quyen" (Douyin/TikTok can cap 1 lan).
+4. DOUYIN: mo douyin.com -> xem 1 video (giai captcha neu co) -> mo extension -> bam "Tai lai cookie".
+   Khi hien "Du cookie chong bot" (ttwid + s_v_web_id) thi bam "Tai cookies.txt".
+5. Tich/bo tich tung trang de chon xuat. Bam "Tai lai cookie" bat cu luc nao de cap nhat.
+
+QUET DANH SACH VIDEO (v1.2)
+1. Reload extension (chrome://extensions) vi co them quyen "scripting" / "activeTab".
+2. Mo trang ca nhan / bo suu tap Douyin (dang dang nhap), giu tab do mo.
+3. Bam icon extension -> "Quet trang nay". Extension tu cuon xuong cho den het danh sach.
+4. Xem muc "Tap 1 ... Tap N" o phan xem truoc. Trang ca nhan thuong liet ke MOI -> CU nen de tich "Dao thu tu";
+   bo suu tap thuong da dung thu tu tap nen extension tu bo tich. Neu sai thi tu tich/bo tich.
+5. Bam "Copy link" hoac "Tai links.txt", roi vao YT Downloader bam "Them hang loat".
+LUU Y: video GHIM (置顶) luon nam dau trang ca nhan, co the lech thu tu -> xem phan xem truoc va xoa/chinh tay.
+
+QUET THEO BO (v1.3) - KHONG QUET TOAN BO TRANG NUA
+1. Reload extension (chrome://extensions) de nhan ban 1.3 (them quyen Bilibili: bam "Cap quyen Bilibili" neu muon xuat cookie Bilibili).
+2. Mo trang CUA BO: trang bo suu tap (collection) hoac 1 tap co bang "chon tap" ben canh. Bam icon -> "Quet trang nay".
+3. Extension gom link theo TUNG DANH SACH tren trang (bang tap cua bo, cot de xuat, luoi video...) va theo ma bo (mix_id).
+   O "chon danh sach" tu chon danh sach dung nhat (nhieu tap co "第N集 / Tap N / EP N" nhat). Neu sai thi chon lai trong o do.
+4. Co the nhap "Ten nhan dang cua bo" vao o loc de chi giu cac tap co ten do.
+5. Neu ten co so tap -> tu xep dung Tap 1 -> N (bo trung). Khong co so tap -> dung thu tu trang (co tich dao nguoc).
+6. O "Mau ten goi y" = "Ten bo - Tap {n}" -> bam Copy, dan vao muc "Mau ten" trong YT Downloader (Hang loat);
+   dong "Bat dau tu" nhap theo so tap dau extension bao.
+7. Bam "Copy link" -> trong tool: "Hang loat" -> dan -> Them.
+BILIBILI: ho tro link /video/BV..., /bangumi/play/ep.., danh sach tap (hop tuyen tap), Bilibili nhieu phan (P1,P2: dan 1 link, tool tu liet ke het).
+Dang nhap Bilibili trong trinh duyet roi xuat cookie de tai chat luong cao (1080p+).
+
+v1.4 - NHAN BIET TAP, BO TAP GOP / QUANG CAO, DAT TEN DUNG THU TU
+1. Reload extension, mo trang ca nhan / bo suu tap, bam "Quet trang nay".
+2. Extension doc duoc so tap ca dang chu Han: 第一集, 第十六集, 十一集, 二十集... va Tap 7 / EP 7 / P7.
+3. Tu BO: tap gop (合集, 1-6合集...), quang cao/trailer (预告, 抢先看, 先行...), video ghim khong phai tap. Danh sach bi bo hien mau do o phan xem truoc.
+4. Sap Tap 1 -> N dung thu tu va bao "Thieu tap: ..." neu co tap chua quet duoc.
+5. O "Ten bo": tu doan tu 《ten phim》 trong tieu de (neu co), ban co the sua. Ten file se la "Ten bo - Tap 01".
+6. Bam "Copy link + ten tap" (moi dong: link <TAB> ten tap), vao YT Downloader -> "Hang loat" -> dan -> Them:
+   tool dung dung ten tung tap, dung thu tu (khong can dien Mau ten / Bat dau tu).
+   "Copy chi link" = chi link, tu dat ten bang Mau ten nhu cu.
+
+v1.5 - NHIEU BO TREN 1 TAI KHOAN, CHON TAI TAP GOP / QUANG CAO
+- Tai khoan co nhieu bo: extension tu CHIA KHUNG thanh tung bo (theo ten bo ghi truoc "第N集", hoac khi so tap quay ve 1).
+  Moi bo la mot khung rieng: o tich (co lay bo nay hay khong), o "Ten bo" tu sua, so tap, canh bao thieu tap.
+  Muon lay bo nao thi tich bo do; "Sap copy N link tu M bo" o duoi.
+- Tap gop (合集): mac dinh KHONG tai; tich "Tai ca tap gop" thi tap gop cung duoc dua vao dung bo cua no va dat ten "Ten bo - Gop 01-06"
+  (sap sau cac tap thuong, so tap thuong van giu nguyen thu tu 01, 02...).
+- Quang cao / trailer: mac dinh khong tai; tich "Tai ca quang cao" -> them khung "Quang cao / trailer", ten "Ten bo - Trailer 01".
+- Neu tool chia sai bo (vd 2 bo bi gop lam 1), bo tich "Tu chia thanh nhieu bo" roi chon lai, hoac quet tung trang bo rieng.
+
+v1.6 - Douyin báo "Fresh cookies": bấm "⚡ Lấy link tải trực tiếp (Douyin)" trong popup (extension tự mở từng tập trong nền, trình duyệt đã đăng nhập, lấy link video). Xong bấm "Copy link + tên tập" rồi dán vào "Hàng loạt" của tool. Link trực tiếp hết hạn sau ~2 giờ. Cập nhật: giải nén đè, vào chrome://extensions bấm Reload.
+
+v1.7 - SUA GOM BO SAI / BAO THIEU TAP SAI
+- Ten video tren trang ca nhan Douyin hay dinh them luot thich ("2.9万"), thoi luong (01:23), ngay dang, "置顶" vao dau ten
+  -> truoc day tap 1 bi coi la bo khac ("2.9万【ten bo】"), cac tap con lai bi bao thieu tap 1. Gio extension loc het cac phan nay.
+- Nhan dien bo bang "khoa" da chuan hoa (bo ngoac, dau cau, hashtag, so luot thich) nen 【ten bo】, 《ten bo》, "ten bo" la CUNG 1 bo.
+- Tap khong ghi ten bo (chi "第N集") duoc gan vao bo co tap lien ke (N-1 / N+1) thay vi tach rieng.
+- Quet cuon trang kien nhan hon (doi them truoc khi dung) de du tap khi mang cham.
+Cap nhat: giai nen de len thu muc cu, vao chrome://extensions bam Reload, roi mo lai trang va bam "Quet trang nay".
+
+v1.8 - NHAN DIEN TAP GOP CHUAN HON
+- Nhan ra tap gop khi ten ghi khoang tap o nhieu dang: 第1集-第16集, 第一集到第十六集, 1-16集, 第1至16集, EP1-16, Tap 1-16, 全16集, 共16集, 16集全, 大结局, 一口气看完, 完整版...
+  (truoc day dang "第1集-第16集" bi hieu nham la TAP 1 va bi tai nhu 1 tap thuong).
+- Doc them THOI LUONG video tren the video: video dai bat thuong (>= 2.5 lan do dai tap thuong, it nhat +4 phut) bi coi la tap gop du ten khong ghi 合集.
+  Chu thich o khung bo se ghi ro: "tap gop (dai 40:00, tap thuong ~2:47)".
+- Neu trung so tap (tap that va tap gop cung "tap 1") thi giu video NGAN hon la tap that.
+- Khung bo hien danh sach tap gop bi bo (khoang tap + ten) de ban kiem tra. Mac dinh KHONG tai tap gop.
+Cap nhat: giai nen de len thu muc cu, vao chrome://extensions bam Reload, mo lai trang va bam "Quet trang nay".
+
+v1.9 - DOC DU LIEU "BO" CUA DOUYIN (khong phu thuoc ten tap / anh bia)
+CACH DUNG
+1. chrome://extensions -> bam RELOAD extension. (Extension tu dang ky them 1 script nho chay tren douyin.com; khong can cap them quyen
+   neu da cap quyen Douyin truoc do. Neu chua cap: mo extension -> bam "Cap quyen Douyin".)
+2. QUAN TRONG: tai lai trang Douyin (F5) SAU KHI reload extension, roi moi bam "Quet trang nay".
+3. Dong chu xanh duoi nut quet cho biet ket qua:
+   - "Du lieu Douyin: N video da biet • X/Y video trong danh sach nay co thong tin bo (Z bo)"  => dang dung du lieu that cua Douyin.
+   - "Chua doc duoc du lieu bo ..." => bam F5 roi quet lai. Neu van vay, extension quay ve doan theo ten tap nhu cu (v1.8).
+CO GI MOI
+- Gom theo MA BO (mix_id) cua Douyin: moi bo la 1 nhom, ten bo lay dung ten bo Douyin. Khong con tron bo nay sang bo kia.
+- So tap lay theo "tap thu may trong bo" do Douyin ghi => van dung khi tieu de khong ghi so tap (chi ghi o anh bia).
+- Biet TONG SO TAP cua bo => bao chinh xac: "thieu tap 5, 9" (thieu giua) va "chua quet toi tap 61-80" (chua cuon het).
+- Tap gop (vd 1-16) duoc nhan ra ke ca khi nam trong bo; so thu tu no chiem khong bi tinh la "thieu tap". Do dai bat thuong
+  duoc so rieng trong tung bo (bo tap 15 phut khong bi nham voi bo tap 1 phut).
+- Neu so tap trong ten khac so tap Douyin: dung so cua Douyin va ghi chu so luong tap lech.
+- Video khong co so tap va khong thuoc bo nao: khong bi mat am tham nua, gom vao nhom "Chua ro bo" (MAC DINH KHONG TAI, tich neu muon).
+  Neu co 《ten phim》 chung hoac hashtag chung (>= 3 video) thi tu gom thanh bo, danh so theo thoi gian dang (cu -> moi) - nho kiem tra lai.
+LUU Y
+- Du lieu nay lay tu chinh cac phan hoi trang Douyin tai ve khi ban cuon; extension khong tu goi API, khong gui gi ra ngoai.
+- Douyin co the doi cau truc du lieu; neu mot ngay nao do khong con thay dong xanh "X/Y video co thong tin bo" thi bao lai de sua.
+
+v2.0 - LAY CAC BO (合集) CUA TAI KHOAN DOUYIN TU DONG, DUNG TEN BO + DUNG THU TU TAP
+VAN DE CU: trang ca nhan Douyin (tab 作品) chi liet ke video, tieu de KHONG ghi ten bo / so tap (so tap nam tren anh bia) nen khong doan dung bo.
+CACH MOI: khi quet trang ca nhan (douyin.com/user/...) hoac trang bo (douyin.com/collection/...), extension TU goi chinh API ma trang Douyin dung cho tab 合集
+(danh sach bo + tung tap cua bo), bang trinh duyet cua ban (da dang nhap, trang tu ky ten). Goi cham 0,5-1 giay/lan, tu dung neu bi loi.
+CACH DUNG
+1. chrome://extensions -> bam RELOAD extension (Coc Coc: coccoc://extensions). Mo trang ca nhan Douyin, bam F5 mot lan.
+2. Bam icon extension -> "Quet trang nay". Dong xanh "Da lay N bo • M tap theo dung thu tu cua Douyin" hien ra sau vai giay;
+   o chon danh sach tu chuyen sang "Cac bo (合集) cua tai khoan", moi bo la 1 khung (ten bo that, tap 1 -> N, bao thieu tap).
+   Co the bam rieng nut "Lay cac bo (合集) cua tai khoan nay" de lay lai.
+3. Tap gop (大合集 / 1-6集) mac dinh KHONG tai (tich "Tai ca tap gop" neu can). Tich bo nao thi tai bo do roi "Copy link + ten tap".
+4. Neu bao "Khong lay duoc bo nao": dong chu vang ghi ly do (vd Douyin tra ve rong = bi chan chong bot). Bam "Copy chan doan" va gui lai de sua.
+   Luc do tool van dung cach du phong: neu ten/so tap khong co thi TACH THEO DOT DANG (video cung bo thuong dang lien nhau, giua 2 bo cach nhau lau hon)
+   -> ten "Dot 01-11 19h28"; day chi la doan, kiem tra lai truoc khi tai.
+Cap nhat: giai nen de len thu muc cu, Reload extension, F5 trang Douyin.
+
+v2.0.1 - CHAN DOAN SAU + BO GOM THEO THE LOAI
+- Nut "Copy chan doan": tren trang ca nhan Douyin tu bam lan luot tab con 合集 -> 短剧 -> 作品 (khoang 8 giay, de Douyin tu tai du lieu cua no),
+  roi copy toan bo thong tin (cac API Douyin da goi, hinh dang du lieu tra ve, ket qua lay bo) vao clipboard. Dan het vao chat de duoc sua dung.
+- Hashtag chung cua > 1/3 so video (vd #逆袭) khong con bi coi la ten bo.
+
+v2.0.2 - SUA LOI "HTTP 403 Blocked by ArgusSecurityPlugin Sign Invalid" KHI LAY BO
+- Douyin chi chap nhan API da duoc SDK chong bot cua trang KY TEN. fetch tu extension khong duoc ky -> 403. Gio uu tien gui bang XHR (SDK ky cho XHR cua trang), that bai moi thu fetch.
+- O chon danh sach tu chon danh sach tot nhat (truoc do co luc dinh vao danh sach nho 8 video dau tien thay duoc).
+
+v2.1.0 - DOI CACH LAY BO: KHONG GOI API NUA, TU BAM TAB + MO TUNG BO (SUA LOI 403)
+LY DO: Douyin chan MOI loi goi API tu extension (403 "Sign Invalid", ca XHR lan fetch). Chi nhung yeu cau do CHINH TRANG Douyin gui moi duoc chap nhan.
+CACH MOI (extension chi "xem" nhung gi trang tu tai ve, khong tu goi gi):
+1. Khi bam "Quet trang nay" tren trang ca nhan: extension TU bam tab 合集 roi 短剧 (cuon vai lan) de trang tu tai danh sach bo (~12 giay, dung bam gi tren trang luc do),
+   roi quay lai tab 作品 de cuon danh sach video nhu truoc.
+2. Moi bo tim thay (douyin.com/collection/ID) duoc mo trong 1 CUA SO NHO (khong chiem ban phim, tu dong dong): trang bo tu tai cac tap theo thu tu cua Douyin.
+   Tab an cua Chrome bi tam dung do hoa nen khong cuon duoc -> phai la cua so nho that; co the hien ra o goc man hinh vai chuc giay, KHONG dong tay.
+   Tu 2 bo cung luc, toi da 80 bo. Dong xanh hien "Dang mo tung bo ... x/y bo • z tap".
+3. Xong: dong xanh "Da lay N bo • M tap theo dung thu tu cua Douyin"; o chon danh sach tu chuyen sang "Cac bo (合集) cua tai khoan".
+   Moi bo 1 khung: ten bo that, tap 1 -> N. Neu API tra tap moi nhat truoc, tool tu dao lai (dua vao thoi gian dang).
+4. Co the dong popup trong luc dang lay; mo lai popup tren cung trang ca nhan se thay ket qua (luu trong may). Nut "Dung" de dung.
+5. Neu bao "Khong thay bo nao": tai khoan khong co bo o tab 合集 / 短剧 (hoac Douyin doi giao dien) -> bam "Copy chan doan" gui lai
+   (chan doan gio gom: danh sach tab / link bo that tren trang, bo nao loi va vi sao).
+6. Neu bao "x bo loi: trang bo khong tai ra tap nao": mo thu 1 bo bang tay xem co tap khong; F5 trang ca nhan roi quet lai.
+Cap nhat: giai nen de len thu muc cu, chrome://extensions -> Reload extension, F5 trang Douyin (can cap quyen Douyin neu chua).
+
+v2.2.0 - TACH BO THEO ANH BIA (khong con gom theo ngay dang)
+- BO han viec gom theo "dot dang" (Dot dd-mm). Video cung ngay khong con bi coi la cung bo.
+- Cac tap cung 1 bo co ANH BIA giong nhau (cung nen + ten bo), chi khac so tap. Tool tai anh bia (nho) cua tung video, so sanh: cung bo giong 86-99%, khac bo chi ~20-35%
+  (do tren anh bia that). Nhom anh bia giong nhau = 1 bo. Doc so bang OCR tren anh bia cach dieu bi sai nhieu nen KHONG doc so:
+  so tap = thu tu DANG (cu -> moi) trong tung bo, moi bo danh tu 1. Trong khung moi bo co o anh bia nho de ban doi chieu voi so tren anh bia.
+- Ten bo: lay tu tap gop cua chinh bo do (tieu de co 《ten bo》 / 大合集); khong co thi "Bo 1", "Bo 2"... (sua ten trong o ten bo).
+- Tap gop (大合集) gan vao bo co anh bia giong nhat va mac dinh khong tai.
+- Video le co anh bia khac nhau (vd moi tap 1 canh khac, chi khac chu "第N集") khong gom duoc -> nhom "Chua ro bo".
+- Lan dau quet se hoi them quyen doc anh bia (douyinpic.com...) - bam Cho phep. Anh bia chi doc tren may ban, khong gui di dau.
+- Luu y: neu nguoi lam dung CHUNG 1 mau anh bia cho nhieu bo (chi khac chu), cac bo do co the bi gop - xem o anh bia nho de kiem tra.
+- Van uu tien "合集 / 短剧" that cua Douyin neu tai khoan co (v2.1). Dong 🖼 duoi nut quet cho biet doc duoc bao nhieu anh bia / bao nhieu bo.

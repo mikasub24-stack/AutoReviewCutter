@@ -1,0 +1,66 @@
+name: Cookie Exporter ZIP
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/extension-douyin-series]
+    paths: ['YT_Cookie_Exporter/**', '.github/workflows/cookie-exporter-release.yml']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate source and exact ZIP
+        run: |
+          node --check YT_Cookie_Exporter/extension/popup.js
+          node --check YT_Cookie_Exporter/extension/bg.js
+          node --check YT_Cookie_Exporter/extension/hook.js
+          node --test YT_Cookie_Exporter/tests/*.test.cjs
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile,json,hashlib,shutil
+          root=Path('YT_Cookie_Exporter')
+          package=root/'package/YT_Cookie_Exporter-2.3.0-Sua-Gom-Bo.zip'
+          with zipfile.ZipFile(package) as z:
+              assert z.testzip() is None
+              assert len(z.namelist())==6
+              for f in (root/'extension').iterdir():
+                  assert f.is_file()
+                  assert z.read('YT_Cookie_Exporter/'+f.name)==f.read_bytes(),f.name
+              assert json.loads(z.read('YT_Cookie_Exporter/manifest.json'))['version']=='2.3.0'
+          report=json.loads((root/'package/KIEM_TRA_2.3.0.json').read_text())
+          assert hashlib.sha256(package.read_bytes()).hexdigest()==report['sha256']
+          out=Path('dist-cookie');out.mkdir()
+          shutil.copy2(package,out/package.name)
+          shutil.copy2(root/'package/KIEM_TRA_2.3.0.json',out/'KIEM_TRA_2.3.0.json')
+          (out/'SHA256SUMS.txt').write_text('\n'.join(hashlib.sha256(f.read_bytes()).hexdigest()+'  '+f.name for f in sorted(out.iterdir()))+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YT-Cookie-Exporter-2.3.0
+          path: dist-cookie/*
+          if-no-files-found: error
+      - name: Publish direct ZIP download
+        run: |
+          tag='cookie-exporter-v2.3.0-douyin-fix'
+          cat > "$RUNNER_TEMP/cookie-notes.md" <<'NOTES'
+          ZIP sửa gom nhầm một bộ Douyin thành nhiều bộ theo ảnh bìa. Mặc định gom 1 bộ, giữ cách xếp thứ tự tập hiện tại. Xuất cookie YouTube/Douyin/Bilibili/Google/TikTok giữ nguyên quyền và mã xử lý. Link trực tiếp phải khớp ID tập, không lấy nhầm clip đề xuất.
+
+          Tải YT_Cookie_Exporter-2.3.0-Sua-Gom-Bo.zip. Giải nén, chép đè 6 file vào thư mục extension cũ, bấm Reload extension rồi F5 trang Douyin và quét lại.
+
+          17 kiểm tra Node và giao diện Chromium với Chrome API mô phỏng đã qua. Chưa đối chiếu trực tiếp kênh Douyin trong môi trường phát triển. Không có cookie tài khoản trong ZIP.
+          NOTES
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft > "$RUNNER_TEMP/cookie-existing.json" 2>/dev/null; then
+            python -c "import json; assert json.load(open('$RUNNER_TEMP/cookie-existing.json'))['isDraft'], 'Never overwrite a published release'"
+          else
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --title 'YT Cookie Exporter 2.3.0 - Sửa gom bộ Douyin' --notes-file "$RUNNER_TEMP/cookie-notes.md"
+          fi
+          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" dist-cookie/* --clobber
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease

@@ -1,0 +1,13 @@
+{
+  "version": "2.3.0",
+  "node_tests_passed": 17,
+  "browser_ui_fixture_passed": true,
+  "extension_installation_exercised": false,
+  "live_douyin_tested": false,
+  "live_blocker": "Cloud outbound policy denies www.douyin.com",
+  "cookies_source_unchanged": true,
+  "permissions_unchanged": true,
+  "file": "YT_Cookie_Exporter-2.3.0-Sua-Gom-Bo.zip",
+  "bytes": 42914,
+  "sha256": "b3ff0b894a0dd1b613ffdb4eadd9b3116b956211dc536f99a80ed91272edb903"
+}
