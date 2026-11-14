@@ -522,9 +522,15 @@
   }
 
   /* ---------- thêm vào hàng đợi ---------- */
+  let lastNewId = '';
   function newStoryId() {
     const d = new Date(), p = n => String(n).padStart(2, '0');
-    return `Truyen-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+    const base = `Truyen-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+    // Hai lượt trong cùng một giây (máy nhanh / làm lại ngay) không được trùng mã: trùng thì hai truyện dồn chung một thư mục và một nhóm trong hàng đợi.
+    const used = new Set([lastNewId, ...(state?.jobs || []).map(j => j.storyId)]);
+    let id = base, n = 1;
+    while (used.has(id)) id = `${base}-${++n}`;
+    return (lastNewId = id);
   }
   /* Tên video / thư mục lấy theo tiêu đề truyện (không còn «Truyen-ngàygiờ»): ô «Tên video» nếu có gõ; chế độ có ô chủ đề thì lấy chủ đề; còn lại lấy dòng đầu kịch bản. */
   const titleOfScript = text => {
