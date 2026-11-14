@@ -36,8 +36,11 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title('H3 Studio · Làm phim AI bằng tiếng Việt · ' + VERSION)
-        self.geometry('1180x820')
-        self.minsize(960, 680)
+        self.short_screen = self.winfo_screenheight() < 900
+        width = min(1180, self.winfo_screenwidth() - 48)
+        height = min(820, self.winfo_screenheight() - 110)
+        self.geometry(f'{width}x{height}+12+12')
+        self.minsize(900, 620)
         self.configure(bg=BG)
         try:
             self.iconbitmap(str(ROOT / 'icon.ico'))
@@ -110,7 +113,7 @@ class App(tk.Tk):
         top = self.panel(self.work)
         top.pack(fill='x', pady=(12, 8))
         self.label(top, '01   CÂU CHUYỆN CỦA BẠN', True).pack(fill='x', pady=(0, 8))
-        self.idea = self.text(top, 3)
+        self.idea = self.text(top, 2 if self.short_screen else 3)
         self.idea.pack(fill='x')
         controls = tk.Frame(top, bg=CARD)
         controls.pack(fill='x', pady=(10, 0))
@@ -144,12 +147,15 @@ class App(tk.Tk):
         row.pack(fill='x', pady=(8, 0))
         self.button(row, 'Tạo cảnh chọn', self.generate_selected).pack(side='left')
         self.button(row, 'Thêm clip', self.import_clip).pack(side='right')
-        self.preview = tk.Label(right, text='Cảnh hoàn thành sẽ hiện tại đây\n\nẢnh tham chiếu cố định · Tiếng nói từ H3',
-                                bg=FIELD, fg=MUTED, font=('Segoe UI', 12), height=7)
-        self.preview.pack(fill='both', expand=True, pady=(0, 8))
+        preview_frame = tk.Frame(right, bg=FIELD, height=90 if self.short_screen else 170)
+        preview_frame.pack(fill='both', expand=True, pady=(0, 8))
+        preview_frame.pack_propagate(False)
+        self.preview = tk.Label(preview_frame, text='Cảnh hoàn thành sẽ hiện tại đây\n\nẢnh tham chiếu cố định · Tiếng nói từ H3',
+                                bg=FIELD, fg=MUTED, font=('Segoe UI', 11))
+        self.preview.pack(fill='both', expand=True)
         self.scene_title = self.label(right, 'Chọn cảnh để chỉnh mô tả và lời thoại', True)
         self.scene_title.pack(fill='x')
-        self.prompt = self.text(right, 3)
+        self.prompt = self.text(right, 2 if self.short_screen else 3)
         self.prompt.pack(fill='x', pady=5)
         self.dialogue = self.text(right, 2)
         self.dialogue.pack(fill='x', pady=5)
@@ -158,7 +164,7 @@ class App(tk.Tk):
         self.button(row, 'Lưu chỉnh sửa', self.save_scene).pack(side='left')
         self.button(row, 'Xem clip cảnh', self.watch_scene).pack(side='left', padx=6)
         self.button(row, 'Tạo lại cảnh', self.redo_scene).pack(side='right')
-        bottom = tk.Frame(self.work, bg=BG)
+        bottom = self.bottom = tk.Frame(self.work, bg=BG)
         bottom.pack(fill='x', pady=10)
         self.button(bottom, 'Tiếp tục tạo cảnh', self.continue_project, True).pack(side='left')
         self.button(bottom, 'Ghép & xuất MP4', self.export).pack(side='left', padx=7)
@@ -334,7 +340,7 @@ class App(tk.Tk):
             subprocess.run([ffmpeg_exe(), '-y', '-ss', '0.2', '-i', str(path), '-frames:v', '1', '-vf', 'scale=600:-1', str(target)],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=12, creationflags=NO_WINDOW)
             with Image.open(target) as im:
-                im.thumbnail((650, 220))
+                im.thumbnail((max(100, self.preview.winfo_width() - 12), max(60, self.preview.winfo_height() - 12)))
                 self.photo = ImageTk.PhotoImage(im.copy())
             self.preview.configure(image=self.photo, text='')
         except Exception:
@@ -629,6 +635,10 @@ def main():
             try:
                 assert app.tabs.index('end') == 3
                 assert app.tree.winfo_exists()
+                assert app.dialogue.winfo_height() >= 30, 'Dialogue editor clipped'
+                assert app.preview.winfo_height() >= 50, 'Scene preview clipped'
+                for button in app.bottom.winfo_children():
+                    assert button.winfo_rooty() + button.winfo_height() < app.winfo_screenheight() - 30, 'Export controls below screen'
                 preview = os.environ.get('H3_UI_PREVIEW')
                 if preview:
                     from PIL import ImageGrab
