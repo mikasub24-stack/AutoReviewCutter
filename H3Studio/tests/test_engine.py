@@ -140,6 +140,37 @@ class EngineTests(unittest.TestCase):
         http2 = FakeHttp()
         with self.assertRaisesRegex(ValueError, 'mất phản hồi'): self.runner(http2).run(p)
         self.assertEqual(http2.submissions, 0)
+    def test_progress_reports_real_stages_and_cloud_state(self):
+        p = self.project(); events = []
+        Runner({}, {'rh_key': 'TEST_ONLY'}, emit=lambda *a: events.append(a), http=FakeHttp()).run(p)
+        phases = [(value['id'], value['state']) for kind, value in events if kind == 'phase']
+        self.assertIn(('connect', 'done'), phases)
+        self.assertIn(('assets', 'done'), phases)
+        self.assertIn(('video', 'done'), phases)
+        self.assertTrue(any(kind == 'cloud' and value['state'] == 'SUCCESS' for kind, value in events))
+        self.assertEqual([value for kind, value in events if kind == 'scene'], [1])
+
+    def test_selected_scene_progress_does_not_claim_entire_film_done(self):
+        p = self.project(); p.data['scenes'].append(dict(p.data['scenes'][0], id=2, title='Second'))
+        events = []
+        Runner({}, {'rh_key': 'TEST_ONLY'}, emit=lambda *a: events.append(a), http=FakeHttp()).run(p, selected=1)
+        video_phases = [value for kind, value in events if kind == 'phase' and value['id'] == 'video']
+        self.assertEqual(video_phases[-1]['state'], 'partial')
+        self.assertIn('1/2', video_phases[-1]['detail'])
+
+    def test_html_download_does_not_advance_completed_scene_count(self):
+        p = self.project(); events = []; http = FakeHttp()
+        def html(url, path):
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            Path(path).write_bytes(b'<html>not a video' + b' ' * 100)
+        http.download = html
+        runner = Runner({}, {'rh_key': 'TEST_ONLY'}, emit=lambda *a: events.append(a), http=http)
+        with self.assertRaisesRegex(ValueError, 'MP4'):
+            runner.run(p)
+        self.assertFalse(any(kind == 'scene' for kind, _ in events))
+        self.assertNotIn('file', p.data['jobs']['1'])
+        self.assertIn('task_id', p.data['jobs']['1'])
+
     def test_endpoint_change_cannot_duplicate_job(self):
         p = self.project()
         p.data['jobs']['1'] = {'task_id': 'old', 'provider': 'RunningHub', 'base': 'https://other.example'}

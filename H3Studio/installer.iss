@@ -1,12 +1,12 @@
 [Setup]
 AppId={{9E26F86F-12DD-4A73-9EBB-2EC45BFF2C62}
 AppName=H3 Studio
-AppVersion=0.1.2
+AppVersion=0.2.0
 DefaultDirName={localappdata}\Programs\H3 Studio
 DefaultGroupName=H3 Studio
 PrivilegesRequired=lowest
 OutputDir=..\dist-h3
-OutputBaseFilename=H3Studio-0.1.2-Setup
+OutputBaseFilename=H3Studio-0.2.0-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 import uuid
 
-VERSION = '0.1.2'
+VERSION = '0.2.0'
 APP_HOME = Path(os.environ.get('LOCALAPPDATA', Path.home() / '.local/share')) / 'H3Studio'
 ROOT = Path(__file__).resolve().parent
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
@@ -270,6 +270,7 @@ class Runner:
             raise Stopped('Đã dừng chờ tại máy. Tác vụ đã gửi được lưu; tiếp tục sẽ kiểm tra lại, không gửi trùng.')
 
     def plan(self, idea, minutes, language, style, ratio):
+        self.emit('phase', {'id': 'script', 'state': 'running', 'detail': 'Đang viết kịch bản, chia cảnh và lời thoại.'})
         base = validate_url(self.settings['llm_url'])
         key = self.secrets.get('llm_key', '')
         if not key:
@@ -291,7 +292,9 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
                     response_format={'type': 'json_object'}, max_tokens=min(30000, max(4000, target * 35)))
         result = self.http.json(base + '/chat/completions', body, key)
         try:
-            return validate_plan(parse_json_text(result['choices'][0]['message']['content']))
+            plan = validate_plan(parse_json_text(result['choices'][0]['message']['content']))
+            self.emit('phase', {'id': 'script', 'state': 'done', 'detail': f'Đã lập {len(plan["scenes"])} cảnh, {len(plan["characters"])} nhân vật.'})
+            return plan
         except (KeyError, IndexError, TypeError, json.JSONDecodeError) as e:
             raise ValueError('AI chưa trả kịch bản JSON hợp lệ. Thử đổi model có hỗ trợ JSON.') from e
 
@@ -313,6 +316,7 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
         return path
 
     def ensure_assets(self, project):
+        self.emit('phase', {'id': 'assets', 'state': 'running', 'detail': 'Chuẩn bị ảnh nhân vật và bối cảnh để giữ tham chiếu giữa các cảnh.'})
         for ch in project.data['characters']:
             key = 'character:' + ch['name']
             if key in project.data['assets'] and project.file(project.data['assets'][key]).exists():
@@ -335,12 +339,15 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
             project.save()
             self.emit('assets', None)
 
+        self.emit('phase', {'id': 'assets', 'state': 'done', 'detail': 'Ảnh tham chiếu của dự án đã sẵn sàng.'})
+
     def backend(self):
         if self.settings['provider'] == 'RunningHub':
             return validate_url(self.settings['rh_url']), self.secrets.get('rh_key', '')
         return validate_url(self.settings['comfy_url'], local=True), ''
 
     def preflight(self):
+        self.emit('phase', {'id': 'connect', 'state': 'running', 'detail': 'Kiểm tra quyền kết nối trước khi gửi tác vụ.'})
         base, key = self.backend()
         if self.settings['provider'] == 'RunningHub':
             if not key:
@@ -349,6 +356,7 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
                             {'apiKey': key, 'workflowId': self.settings['workflow_id']}, key))
             if not isinstance(data, dict) or not data.get('prompt'):
                 raise ValueError('Tài khoản chưa đọc được workflow RunningHub đã chọn.')
+            self.emit('phase', {'id': 'connect', 'state': 'done', 'detail': 'Đọc được workflow qua API; cần chạy thử để xác nhận inference.'})
             return 'Đã đọc workflow qua RunningHub. Chưa sinh video, chưa xác nhận model trên GPU hoặc giá chạy.'
         info = self.http.json(base + '/object_info')
         required = ['MiniMaxH3ReferenceToVideo', 'CreateVideo', 'VAEDecodeAudio']
@@ -359,6 +367,7 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
             choices = info.get(node, {}).get('input', {}).get('required', {}).get(field, [[]])[0]
             if self.settings[configured] not in choices:
                 raise ValueError('ComfyUI chưa có model: ' + self.settings[configured])
+        self.emit('phase', {'id': 'connect', 'state': 'done', 'detail': 'ComfyUI có node H3 và hai model đã chọn.'})
         return 'ComfyUI có node H3 và model đã chọn. Tạo thử một cảnh để kiểm tra inference.'
 
     def upload(self, path):
@@ -418,6 +427,7 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
         if provider == 'RunningHub':
             req = {'apiKey': key, 'taskId': task}
             status = str(unpack_rh(self.http.json(base + '/task/openapi/status', req, key))).lower()
+            self.emit('cloud', {'task_id': task, 'state': status.upper(), 'provider': provider})
             if status in ('failed', 'failure', 'cancelled', 'canceled'):
                 raise TaskFailed('Tác vụ H3 lỗi hoặc đã bị hủy. Xem chi tiết trong RunningHub; app không tự gửi lại để tránh tính phí trùng.')
             if status == 'success':
@@ -432,8 +442,10 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
             return None
         history = self.http.json(base + '/history/' + urllib.parse.quote(task, safe=''))
         if task not in history:
+            self.emit('cloud', {'task_id': task, 'state': 'WAITING', 'provider': provider})
             return None
         item = history[task]
+        self.emit('cloud', {'task_id': task, 'state': item.get('status', {}).get('status_str', 'RUNNING').upper(), 'provider': provider})
         if item.get('status', {}).get('status_str') == 'error':
             raise TaskFailed('ComfyUI báo lỗi inference. Xem console ComfyUI; app giữ ID, không tự chạy lại.')
         output = item.get('outputs', {}).get('14', {})
@@ -449,6 +461,7 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
     def run(self, project, selected=None):
         self.preflight()
         self.ensure_assets(project)
+        self.emit('phase', {'id': 'video', 'state': 'running', 'detail': 'Tạo từng cảnh bằng H3. Cloud không luôn cung cấp phần trăm tiến độ.'})
         for scene in project.data['scenes']:
             if selected is not None and scene['id'] != selected:
                 continue
@@ -468,12 +481,14 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
                 # Persist intent first: a lost submit response must not trigger automatic duplicate billing.
                 if job.get('submit_uncertain'):
                     raise ValueError('Lần gửi trước mất phản hồi. Kiểm tra lịch sử cloud và nhập task ID trong project.json trước khi tiếp tục; không tự gửi trùng.')
-                job = {'provider': self.settings['provider'], 'base': base, 'seed': seed, 'submit_uncertain': True}
+                job = {'provider': self.settings['provider'], 'base': base, 'seed': seed, 'submit_uncertain': True, 'started_at': time.time()}
                 project.data['jobs'][key] = job
                 project.save()
                 task = self.submit(graph)
-                job.update(task_id=task, submit_uncertain=False)
+                job.update(task_id=task, submit_uncertain=False, state='SUBMITTED')
                 project.save()
+                self.emit('job', {'scene': scene['id'], 'task_id': task, 'state': 'SUBMITTED'})
+            self.emit('job', {'scene': scene['id'], 'task_id': job['task_id'], 'state': job.get('state', 'WAITING')})
             start = time.monotonic()
             while True:
                 self.http.check()
@@ -489,6 +504,7 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
                 if time.monotonic() - start > 7200:
                     raise ValueError('Đã chờ 2 giờ. Task ID được giữ; bấm Tiếp tục để kiểm tra, không tạo lại.')
                 self.pause(5)
+            self.emit('status', f'Cảnh {key}: H3 đã hoàn tất, đang tải MP4 về dự án…')
             relative = f'clips/canh-{scene["id"]:04}-{uuid.uuid4().hex[:10]}.mp4'
             destination = project.file(relative)
             if url.startswith('http://') and self.settings['provider'] == 'ComfyUI':
@@ -496,11 +512,16 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
                 self.download_local(url, destination)
             else:
                 self.http.download(url, destination)
-            if destination.stat().st_size < 32:
-                raise ValueError('Video đầu ra quá nhỏ; giữ task ID để lấy lại.')
+            with destination.open('rb') as result_file:
+                header = result_file.read(16)
+            if destination.stat().st_size < 32 or header[4:8] != b'ftyp':
+                raise ValueError('Kết quả chưa phải MP4 hợp lệ; giữ task ID để lấy lại, không tính là cảnh hoàn tất.')
             job['file'] = relative
+            job['state'] = 'DOWNLOADED'
             project.save()
             self.emit('scene', scene['id'])
+        ready = sum(bool(project.data['jobs'].get(str(s['id']), {}).get('file')) for s in project.data['scenes'])
+        self.emit('phase', {'id': 'video', 'state': 'done' if ready == len(project.data['scenes']) else 'partial', 'detail': f'{ready}/{len(project.data["scenes"])} cảnh có clip.'})
         self.emit('status', 'Các cảnh đã sẵn sàng. Chọn Ghép & xuất MP4 để hoàn thiện.')
 
     def download_local(self, url, destination):
@@ -526,6 +547,7 @@ def transcribe(project, settings, secrets, stop=None, emit=None, http=None):
         raise ValueError('Nhập API key nhận dạng âm thanh ở Kết nối để tạo phụ đề từ giọng nói thực.')
     if not project.data.get('output'):
         raise ValueError('Ghép phim trước khi nhận dạng phụ đề.')
+    emit('phase', {'id': 'subtitles', 'state': 'running', 'detail': 'Nhận dạng lời nói từ âm thanh thực, tạo phụ đề SRT.'})
     emit('status', 'Nhận dạng lời nói thực để tạo phụ đề…')
     audio = project.folder / 'edit' / 'nhan-dang.mp3'
     audio.parent.mkdir(exist_ok=True)
@@ -539,6 +561,7 @@ def transcribe(project, settings, secrets, stop=None, emit=None, http=None):
     target.write_text(result, encoding='utf-8')
     project.data['subtitles'] = target.name
     project.save()
+    emit('phase', {'id': 'subtitles', 'state': 'done', 'detail': 'Đã có SRT từ lời nói thực. Có thể sửa lại trước khi xuất.'})
     emit('status', 'Đã có phụ đề từ âm thanh thực. Có thể sửa phu-de.srt rồi xuất lại phim.')
     return target
 
@@ -570,13 +593,16 @@ def run_process(args, stop, cwd=None):
             raise RuntimeError('FFmpeg chưa xuất được video: ' + err.decode('utf-8', 'replace')[-1400:])
 
 
-def render(project, stop=None, emit=None):
+def render(project, stop=None, emit=None, final=True):
     stop = stop or threading.Event()
     emit = emit or (lambda *a: None)
     width, height = dimensions(project.data['resolution'], project.data['ratio'])
     work = project.folder / 'edit'
     work.mkdir(exist_ok=True)
     normalized = []
+    if final and not project.data.get('subtitles'):
+        emit('phase', {'id': 'subtitles', 'state': 'skipped', 'detail': 'Chưa có phụ đề đã lưu; vẫn xuất được MP4.'})
+    emit('phase', {'id': 'edit', 'state': 'running', 'detail': 'Chuẩn hóa hình, cân tiếng nói và dựng theo thứ tự kịch bản.'})
     for scene in project.data['scenes']:
         source = project.data['jobs'].get(str(scene['id']), {}).get('file')
         if not source or not project.file(source).is_file():
@@ -597,6 +623,10 @@ def render(project, stop=None, emit=None):
                      '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p',
                      '-af', 'loudnorm=I=-16:TP=-1.5:LRA=9', '-c:a', 'aac', '-ar', '48000', '-ac', '2', '-shortest', str(target)], stop)
         normalized.append(target)
+        emit('render_count', {'done': len(normalized), 'total': len(project.data['scenes'])})
+    emit('phase', {'id': 'edit', 'state': 'done', 'detail': f'Đã chuẩn hóa {len(normalized)} cảnh.'})
+    if final:
+        emit('phase', {'id': 'export', 'state': 'running', 'detail': 'Ghép MP4, trộn nhạc nếu có và gắn phụ đề nếu đã tạo.'})
     # All clips use the same format; concatenation preserves dialogue timing and avoids repeating fades.
     playlist = work / 'concat.txt'
     playlist.write_text('\n'.join("file '" + p.name + "'" for p in normalized), encoding='utf-8')
@@ -626,5 +656,9 @@ def render(project, stop=None, emit=None):
     os.replace(tmp, result)
     project.data['output'] = str(result.relative_to(project.folder))
     project.save()
-    emit('status', 'Đã xuất MP4. Bạn có thể xem hoặc Lưu như.')
+    if final:
+        emit('phase', {'id': 'export', 'state': 'done', 'detail': 'MP4 hoàn chỉnh đã sẵn sàng. Bấm Xem phim hoặc Lưu như.'})
+        emit('status', 'Đã xuất MP4. Bạn có thể xem hoặc Lưu như.')
+    else:
+        emit('status', 'Đã có bản ghép để nhận dạng lời nói; đang chuẩn bị phụ đề.')
     return result

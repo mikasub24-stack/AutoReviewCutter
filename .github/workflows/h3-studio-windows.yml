@@ -52,7 +52,7 @@ jobs:
           $env:H3_UI_PREVIEW = Join-Path (Get-Location) 'dist-h3/UI-Preview.png'
           python H3Studio/app.py --smoke-test
           if ($LASTEXITCODE) { throw 'Source GUI smoke failed' }
-          python -m nuitka --standalone --msvc=latest --jobs=3 --enable-plugin=tk-inter --include-package=PIL --windows-console-mode=disable --windows-icon-from-ico=H3Studio/icon.ico --output-filename=H3Studio.exe --output-dir=H3Studio/compiled --include-data-files=H3Studio/icon.ico=icon.ico --include-data-dir=H3Studio/vendor=vendor --company-name='H3 Studio contributors' --product-name='H3 Studio' --file-description='H3 Studio - AI short film production' --file-version=0.1.2.0 --product-version=0.1.2 --assume-yes-for-downloads H3Studio/app.py 2>&1 | Tee-Object -Variable nativeLog
+          python -m nuitka --standalone --msvc=latest --jobs=3 --enable-plugin=tk-inter --include-package=PIL --windows-console-mode=disable --windows-icon-from-ico=H3Studio/icon.ico --output-filename=H3Studio.exe --output-dir=H3Studio/compiled --include-data-files=H3Studio/icon.ico=icon.ico --include-data-dir=H3Studio/vendor=vendor --company-name='H3 Studio contributors' --product-name='H3 Studio' --file-description='H3 Studio - AI short film production' --file-version=0.2.0.0 --product-version=0.2.0 --assume-yes-for-downloads H3Studio/app.py 2>&1 | Tee-Object -Variable nativeLog
           if ($LASTEXITCODE) { throw ('Native compilation failed: ' + (($nativeLog | Select-Object -Last 45) -join "`n")) }
           $native = @(Get-ChildItem H3Studio/compiled -Directory -Filter '*.dist')
           if ($native.Count -ne 1) { throw 'Expected one standalone distribution' }
@@ -65,39 +65,39 @@ jobs:
           & 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe' H3Studio/installer.iss
           if ($LASTEXITCODE) { throw 'Installer compilation failed' }
           $install = Join-Path $env:RUNNER_TEMP 'H3-installed'
-          $p = Start-Process dist-h3/H3Studio-0.1.2-Setup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
+          $p = Start-Process dist-h3/H3Studio-0.2.0-Setup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
           if ($p.ExitCode) { throw 'Installation test failed' }
           $p = Start-Process "$install/H3Studio.exe" -ArgumentList '--smoke-test' -Wait -PassThru
           if ($p.ExitCode) { throw 'Installed GUI smoke failed' }
           & ./VocalStudio/scripts/scan-windows.ps1 -RuntimeDirectory H3Studio/build/H3Studio -PackageDirectory dist-h3
-          & git archive '--format=zip' '--output=dist-h3/H3Studio-0.1.2-Source.zip' HEAD H3Studio .github/workflows/h3-studio-windows.yml VocalStudio/scripts/scan-windows.ps1
+          & git archive '--format=zip' '--output=dist-h3/H3Studio-0.2.0-Source.zip' HEAD H3Studio .github/workflows/h3-studio-windows.yml VocalStudio/scripts/scan-windows.ps1
           if ($LASTEXITCODE) { throw 'Source archive failed' }
           @{
-            version='0.1.2'; sourceCommit=$env:GITHUB_SHA; engineTests='passed'; sourceGuiSmoke='passed'; packagedGuiSmoke='passed'; installedGuiSmoke='passed'; liveH3InferenceTested=$false; actualRunningHubPriceVerified=$false; publisherSigned=$false
+            version='0.2.0'; sourceCommit=$env:GITHUB_SHA; engineTests='passed'; sourceGuiSmoke='passed'; packagedGuiSmoke='passed'; installedGuiSmoke='passed'; liveH3InferenceTested=$false; actualRunningHubPriceVerified=$false; publisherSigned=$false
           } | ConvertTo-Json | Set-Content dist-h3/BuildReport.json -Encoding utf8
           Get-ChildItem dist-h3 -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $_.Name } | Set-Content dist-h3/SHA256SUMS.txt -Encoding utf8
       - uses: actions/upload-artifact@v4
         with:
-          name: H3Studio-0.1.2-Windows
+          name: H3Studio-0.2.0-Windows
           path: dist-h3/*
           if-no-files-found: error
       - name: Publish direct installer link
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $tag = 'h3-studio-v0.1.2'
+          $tag = 'h3-studio-v0.2.0'
           @'
-          App Windows tiếng Việt: kịch bản Anh/Việt qua API, ảnh nhân vật tham chiếu, H3 qua RunningHub/ComfyUI, task ID được lưu để tiếp tục, xem từng cảnh, nhạc nền hạ dưới tiếng nói, ghép và Lưu như MP4.
+          App Windows tiếng Việt có màn hình tiến trình 7 bước, số cảnh/ảnh thực, thời gian phiên, trạng thái cloud và task ID, nhật ký có thể lưu, hướng dẫn quy trình trong app. Kịch bản Anh/Việt qua API, ảnh nhân vật tham chiếu, H3 qua RunningHub/ComfyUI, task ID được lưu để tiếp tục, xem từng cảnh, nhạc nền hạ dưới tiếng nói, ghép và Lưu như MP4.
 
           Cần API key/quyền model/số dư cloud hoặc server ComfyUI có sẵn. Không có model GPU trong bộ cài. Kiểm tra kết nối RunningHub chỉ xác nhận đọc workflow. Chưa thử sinh H3 thật, chưa xác nhận graph chạy trên tài khoản RunningHub, chưa benchmark chất lượng/giọng Việt hoặc giá 27 tệ/5 phút. Phụ đề AI cần API âm thanh riêng, nhận dạng từ âm thanh thực; cần xem lại kết quả.
 
-          Tải H3Studio-0.1.2-Setup.exe, cài rồi mở Kết nối. Nên thử 10 giây trước. Dừng chờ không hủy tác vụ cloud; task ID được giữ và app không tự gửi trùng. Bộ cài chưa ký số; kết quả Defender không bảo đảm trình duyệt chấp nhận file.
+          Tải H3Studio-0.2.0-Setup.exe, cài rồi mở Kết nối. Nên thử 10 giây trước. Dừng chờ không hủy tác vụ cloud; task ID được giữ và app không tự gửi trùng. Bộ cài chưa ký số; kết quả Defender không bảo đảm trình duyệt chấp nhận file.
           '@ | Set-Content "$env:RUNNER_TEMP/h3-notes.md" -Encoding utf8
           $existing = & gh release view $tag --repo $env:GITHUB_REPOSITORY --json isDraft 2>$null
           if ($LASTEXITCODE -eq 0) {
             if (!(($existing | ConvertFrom-Json).isDraft)) { throw 'Never overwrite a published release' }
           } else {
-            & gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title 'H3 Studio 0.1.2 - Windows tiếng Việt' --notes-file "$env:RUNNER_TEMP/h3-notes.md"
+            & gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title 'H3 Studio 0.2.0 - Windows tiếng Việt' --notes-file "$env:RUNNER_TEMP/h3-notes.md"
             if ($LASTEXITCODE) { throw 'Release creation failed' }
           }
           & gh release upload $tag --repo $env:GITHUB_REPOSITORY dist-h3/* --clobber

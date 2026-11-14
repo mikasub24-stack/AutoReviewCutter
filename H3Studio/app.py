@@ -7,12 +7,14 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import webbrowser
 
 from engine import APP_HOME, ROOT, VERSION, Project, Runner, Stopped, render, transcribe, validate_plan
 import settings as config
+from progress_ui import ProgressUI, PHASES
 
 BG = '#0b1020'
 CARD = '#141e32'
@@ -32,7 +34,7 @@ def open_file(path):
         subprocess.Popen(['xdg-open', path])
 
 
-class App(tk.Tk):
+class App(ProgressUI, tk.Tk):
     def __init__(self):
         super().__init__()
         self.title('H3 Studio · Làm phim AI bằng tiếng Việt · ' + VERSION)
@@ -64,6 +66,7 @@ class App(tk.Tk):
         style.configure('Treeview', background=FIELD, foreground=INK, fieldbackground=FIELD, rowheight=32, borderwidth=0)
         style.configure('Treeview.Heading', background=CARD, foreground=MUTED)
         style.map('Treeview', background=[('selected', '#244d58')])
+        style.configure('Film.Horizontal.TProgressbar', background=ACCENT, troughcolor=FIELD, bordercolor=FIELD, lightcolor=ACCENT, darkcolor=ACCENT, thickness=8)
         style.configure('TCombobox', fieldbackground=FIELD, foreground=INK, arrowcolor=ACCENT)
         style.map('TCombobox', fieldbackground=[('readonly', FIELD)], foreground=[('readonly', INK)])
         head = tk.Frame(self, bg=BG)
@@ -75,14 +78,20 @@ class App(tk.Tk):
         self.tabs = ttk.Notebook(self)
         self.tabs.pack(fill='both', expand=True, padx=20, pady=4)
         self.work = tk.Frame(self.tabs, bg=BG)
+        self.monitor = tk.Frame(self.tabs, bg=BG)
+        self.guide = tk.Frame(self.tabs, bg=BG)
         self.cast = tk.Frame(self.tabs, bg=BG)
         self.connections = tk.Frame(self.tabs, bg=BG)
         self.tabs.add(self.work, text='  Dựng phim  ')
+        self.tabs.add(self.monitor, text='  Tiến trình & nhật ký  ')
         self.tabs.add(self.cast, text='  Nhân vật & tham chiếu  ')
         self.tabs.add(self.connections, text='  Kết nối  ')
+        self.tabs.add(self.guide, text='  Quy trình / cách dùng  ')
         self.build_workspace()
         self.build_cast()
         self.build_connections()
+        self.build_progress()
+        self.build_guide()
         foot = tk.Frame(self, bg=BG)
         foot.pack(side='bottom', before=self.tabs, fill='x', padx=22, pady=(6, 14))
         self.footer = foot
@@ -115,7 +124,12 @@ class App(tk.Tk):
         self.work.columnconfigure(0, weight=1)
         top = self.panel(self.work)
         top.grid(row=0, column=0, sticky='ew', pady=(12, 8))
-        self.label(top, '01   CÂU CHUYỆN CỦA BẠN', True).pack(fill='x', pady=(0, 8))
+        story_header = tk.Frame(top, bg=CARD)
+        story_header.pack(fill='x', pady=(0, 8))
+        self.label(story_header, '01   Ý TƯỞNG → KỊCH BẢN → THAM CHIẾU → TẠO CẢNH → XUẤT PHIM', True).pack(side='left')
+        help_link = tk.Label(story_header, text='Cách dùng →', bg=CARD, fg=ACCENT, font=('Segoe UI', 10), cursor='hand2')
+        help_link.pack(side='right')
+        help_link.bind('<Button-1>', lambda e: self.tabs.select(self.guide))
         self.idea = self.text(top, 2 if self.short_screen else 3)
         self.idea.pack(fill='x')
         controls = tk.Frame(top, bg=CARD)
@@ -266,6 +280,7 @@ class App(tk.Tk):
         self.dialogue.delete('1.0', 'end')
         self.preview.configure(image='', text='Cảnh hoàn thành sẽ hiện tại đây')
         self.refresh()
+        self.reset_progress_view()
 
     def open_project(self):
         if self.busy:
@@ -289,11 +304,13 @@ class App(tk.Tk):
             self.idea.insert('1.0', self.project.data.get('idea', self.project.data['title']))
             self.selected = self.editing_scene = None
             self.refresh()
+            self.restore_progress_view()
             self.status.set('Đã mở dự án; task ID và các cảnh hoàn tất được giữ.')
         except Exception as e:
             messagebox.showerror('Chưa mở được', str(e))
 
     def refresh(self):
+        self.update_progress()
         selected = self.tree.selection()
         self.tree.delete(*self.tree.get_children())
         self.cast_tree.delete(*self.cast_tree.get_children())
@@ -346,6 +363,11 @@ class App(tk.Tk):
                 im.thumbnail((max(100, self.preview.winfo_width() - 12), max(60, self.preview.winfo_height() - 12)))
                 self.photo = ImageTk.PhotoImage(im.copy())
             self.preview.configure(image=self.photo, text='')
+            if hasattr(self, 'monitor_thumb'):
+                with Image.open(target) as im:
+                    im.thumbnail((180, 74))
+                    self.monitor_photo = ImageTk.PhotoImage(im.copy())
+                self.monitor_thumb.configure(image=self.monitor_photo, text='')
         except Exception:
             self.preview.configure(image='', text='Clip đã sẵn sàng · Bấm Xem clip cảnh')
 
@@ -370,12 +392,22 @@ class App(tk.Tk):
         if self.busy:
             return
         self.busy = True
+        self.monitor_started = time.monotonic()
+        self.monitor_last_elapsed = 0
+        self.monitor_title.set('ĐANG CHẠY · Chuẩn bị thực hiện yêu cầu')
+        self.tabs.select(self.monitor)
+        resolution = self.project.data['resolution'] if self.project else self.resolution.get()
+        ratio = self.project.data['ratio'] if self.project else self.ratio.get()
+        connection_detail = f'Video: {self.preferences["provider"]} · H3 Ref2VA · {resolution} · {ratio}.'
+        self.monitor_cloud.set(connection_detail)
+        self.append_journal(connection_detail)
+        self.append_journal('Bắt đầu thao tác. ' + ('Dự án: ' + self.project.data['title'] if self.project else 'Đang chuẩn bị dự án mới.'))
         self.stop.clear()
         def worker():
             try:
                 action()
             except Stopped as e:
-                self.events.put(('status', str(e)))
+                self.events.put(('paused', str(e)))
             except Exception as e:
                 self.events.put(('error', str(e)))
             finally:
@@ -409,6 +441,7 @@ class App(tk.Tk):
             if complete:
                 run.preflight()  # Do not spend on planning when H3 credentials are missing.
             self.events.put(('status', 'AI đang viết kịch bản và chia cảnh…'))
+            self.events.put(('log', f'Yêu cầu: {minutes:g} phút · {language} · {style} · {ratio} · {resolution}'))
             plan = run.plan(idea, minutes, language, style, ratio)
             plan.update(idea=idea, ratio=ratio, resolution=resolution, language=language, style=style)
             self.project = Project(Path(folder) / ('H3-' + uuid_short()), plan)
@@ -517,10 +550,12 @@ class App(tk.Tk):
 
     def finish_film(self, project):
         emit = lambda *a: self.events.put(a)
-        render(project, self.stop, emit)
         if self.secrets.get('asr_key') and not project.data.get('subtitles'):
+            render(project, self.stop, emit, final=False)
             transcribe(project, self.preferences, self.secrets, self.stop, emit)
-            render(project, self.stop, emit)
+        elif not project.data.get('subtitles'):
+            emit('phase', {'id': 'subtitles', 'state': 'skipped', 'detail': 'Chưa bật API phụ đề. Bạn vẫn có thể xuất MP4 và tạo phụ đề sau.'})
+        render(project, self.stop, emit)
 
     def subtitle(self):
         if self.project and not self.busy:
@@ -528,7 +563,7 @@ class App(tk.Tk):
             project = self.project
             def action():
                 if not project.data.get('output'):
-                    render(project, self.stop, lambda *a: self.events.put(a))
+                    render(project, self.stop, lambda *a: self.events.put(a), final=False)
                 transcribe(project, self.preferences, self.secrets, self.stop, lambda *a: self.events.put(a))
                 render(project, self.stop, lambda *a: self.events.put(a))
             self.launch(action)
@@ -591,6 +626,7 @@ class App(tk.Tk):
 
     def stop_work(self):
         self.stop.set()
+        self.append_journal('Bạn bấm Dừng chờ. Không đồng nghĩa hủy task đã gửi trên cloud.')
         self.status.set('Đang dừng chờ tại máy. Task cloud đã gửi có thể còn chạy; ID vẫn được lưu để tiếp tục.')
 
     def poll_events(self):
@@ -599,15 +635,48 @@ class App(tk.Tk):
                 kind, value = self.events.get_nowait()
                 if kind == 'status':
                     self.status.set(value)
-                elif kind == 'error':
+                    self.monitor_detail.set(value)
+                    if 'giây chờ' not in value and value != self.last_journal_status:
+                        self.append_journal(value)
+                        self.last_journal_status = value
+                elif kind == 'phase':
+                    self.set_phase(value)
+                elif kind == 'cloud':
+                    self.handle_cloud(value)
+                elif kind == 'job':
+                    self.monitor_scene = value['scene']
+                    self.monitor_task = value['task_id']
+                    marker = (value['scene'], value['task_id'])
+                    if marker != getattr(self, 'last_job_marker', None):
+                        self.append_journal(f'Cảnh {value["scene"]}: theo dõi task {value["task_id"]}; không gửi lại task đã có.')
+                        self.last_job_marker = marker
+                    self.update_progress()
+                elif kind == 'render_count':
+                    self.monitor_render.set(f'Dựng & âm lượng: {value["done"]}/{value["total"]} cảnh đã chuẩn hóa')
+                    self.append_journal(self.monitor_render.get())
+                elif kind == 'log':
+                    self.append_journal(value)
+                elif kind in ('error', 'paused'):
                     self.status.set(value)
-                    messagebox.showerror('Chưa hoàn tất', value)
+                    self.monitor_detail.set(value)
+                    self.monitor_title.set('CẦN KIỂM TRA · Xem nhật ký bên dưới' if kind == 'error' else 'ĐÃ DỪNG CHỜ · Task cloud có thể vẫn đang chạy')
+                    active = next((key for key, *_ in reversed(PHASES) if self.phase_states.get(key) == 'running'), None)
+                    if active:
+                        self.set_phase({'id': active, 'state': 'error' if kind == 'error' else 'paused', 'detail': value})
+                    self.append_journal(('LỖI: ' if kind == 'error' else 'DỪNG: ') + value)
+                    if kind == 'error':
+                        messagebox.showerror('Chưa hoàn tất · Có chi tiết trong Nhật ký', value)
                 elif kind in ('scene', 'project', 'assets'):
                     self.refresh()
+                    if kind == 'project' and self.project:
+                        self.append_journal(f'Đã lưu dự án {self.project.data["title"]}: {len(self.project.data["scenes"])} cảnh.')
                     if kind == 'scene':
+                        self.append_journal(f'✓ Cảnh {value} đã có clip trên máy. Bấm đúp ở danh sách để xem.')
                         self.tree.selection_set(str(value)); self.select_scene()
                 elif kind == 'idle':
                     self.busy = False
+                    if not any(state in ('error', 'paused', 'running') for state in self.phase_states.values()) and self.phase_states.get('export') != 'done':
+                        self.monitor_title.set('ĐÃ XONG THAO TÁC · Có thể chọn bước tiếp theo')
                     self.refresh()
         except queue.Empty:
             pass
@@ -640,7 +709,7 @@ def main():
                 test_image.put(ACCENT, to=(0, 0, 320, 180))
                 app.preview.configure(image=test_image)
                 app.update_idletasks()
-                assert app.tabs.index('end') == 3
+                assert app.tabs.index('end') == 5
                 assert app.tree.winfo_exists()
                 assert app.dialogue.winfo_height() >= 30, 'Dialogue editor clipped'
                 assert app.preview.winfo_height() >= 50, 'Scene preview clipped'
@@ -651,6 +720,10 @@ def main():
                     assert button.winfo_rooty() + button.winfo_height() < min(app.winfo_screenheight() - 30, app.winfo_rooty() + app.winfo_height()), 'Export controls below screen'
                 app.preview.configure(image='')
                 app.update_idletasks()
+                app.tabs.select(app.monitor)
+                app.update_idletasks()
+                assert app.journal.winfo_ismapped() and app.journal.winfo_height() >= 60, 'Journal hidden or too short'
+                assert app.progress_tree.winfo_ismapped() and app.progress_tree.winfo_height() >= 60, 'Progress scene list hidden or too short'
                 preview = os.environ.get('H3_UI_PREVIEW')
                 if preview:
                     from PIL import ImageGrab
