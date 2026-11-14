@@ -219,13 +219,16 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
 
     // Kiểu ảnh tự nhận (máy chính trả 'flat2d'): dòng thông tin dưới nút chọn ảnh nói rõ kiểu, và hỏi lại đúng ảnh đầu tiên; không nhận ra thì không có dòng đó.
     {
-      await page.evaluate(() => { window.refLook = 'flat2d'; });
+      // «Hình dạng chuẩn» gõ tay thắng kiểu tự nhận, nên bỏ ô đó trong lúc thử rồi trả lại.
+      const typedForm = await page.locator('#storyForm').inputValue();
+      await page.evaluate(() => { const f = document.getElementById('storyPanel'); f.open = true; const form = document.getElementById('storyForm'); form.value = ''; form.dispatchEvent(new Event('input', { bubbles: true })); window.refLook = 'flat2d'; });
       await page.locator('#storyRefs').click();
       await page.waitForFunction(() => /Kiểu ảnh: hoạt hình 2D phẳng/.test(document.getElementById('storyRefInfo').textContent));
       assert.deepEqual((await called('storyRefLook')).at(-1).data, { file: 'C:\\Refs\\mai.png' });
       await page.evaluate(() => { window.refLook = ''; });
       await page.locator('#storyRefs').click();
       await page.waitForFunction(() => !/Kiểu ảnh:/.test(document.getElementById('storyRefInfo').textContent) && /mai\.png/.test(document.getElementById('storyRefInfo').textContent));
+      await page.locator('#storyForm').fill(typedForm);
     }
 
     // Hiểu kịch bản: đối chiếu lời với kịch bản gốc, sửa một chạm, soát từng cảnh, giới hạn 10 giây, đa ngôn ngữ.
