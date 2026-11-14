@@ -192,8 +192,10 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     // Hàng đợi có sẵn từ bản cũ: cảnh CHƯA xong có ảnh nhân vật mà prompt không có câu khóa → hiện nút «Gắn khóa», bấm là gắn cho đúng truyện đang chọn.
     {
       // Ô «Nhân vật chính» có chữ thì nút «Gắn khóa» còn đếm cả dòng nhân vật chính (kiểm riêng ở dưới): bỏ chữ trong lúc thử phần khóa hình dạng rồi trả lại.
+      // Sau «Tạo clip» khung nhập kịch bản bị ẩn: đặt giá trị trực tiếp (fill() của Playwright đòi ô phải đang hiện).
+      const setChar = v => page.evaluate(x => { document.getElementById('storyCharacter').value = x; }, v);
       const typedChar = await page.locator('#storyCharacter').inputValue();
-      await page.locator('#storyCharacter').fill('');
+      await setChar('');
       await page.evaluate(() => {
         const base = { kind: 'story', storyId: 'Truyen-OLD', stage: 'pending', voiceover: '', output: '', image: 'C:\\Refs\\mai.png', references: ['C:\\Refs\\mai.png'] };
         window.s.jobs.push(
@@ -216,11 +218,11 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       assert.match(await page.locator('#toast').textContent(), /Đã gắn khóa vào 3 cảnh/);
       assert.equal(await page.evaluate(() => window.s.jobs.filter(j => j.storyId === 'Truyen-OLD' && /KHÓA HÌNH DẠNG/.test(j.prompt)).map(j => j.id).join()), 'old1,old2,old3');
       // Có mô tả «Nhân vật chính»: cảnh thiếu dòng NHÂN VẬT CHÍNH cố định cũng được đếm (kể cả cảnh không có ảnh), nút đổi nhãn và gửi kèm mô tả.
-      await page.locator('#storyCharacter').fill('Chú bộ đội Việt Nam dẫn chuyện, mũ cối xanh lá có sao vàng');
+      await setChar('Chú bộ đội Việt Nam dẫn chuyện, mũ cối xanh lá có sao vàng');
       await page.evaluate(() => window.push());
       await page.waitForFunction(() => /nhân vật chính/.test(document.getElementById('storyRelock').textContent));
       assert.match(await page.locator('#storyRelock').textContent(), /^Gắn khóa kiểu hình \+ nhân vật chính cho 4 cảnh$/);
-      await page.locator('#storyCharacter').fill(typedChar);
+      await setChar(typedChar);
       // dọn: các cảnh giả này không được lẫn vào phần kiểm thử phía sau
       await page.evaluate(() => { window.s.jobs = window.s.jobs.filter(j => j.storyId !== 'Truyen-OLD'); window.push(); });
       await page.waitForFunction(() => ![...document.getElementById('storyPick').options].some(o => o.value === 'Truyen-OLD'));
