@@ -50,7 +50,7 @@
     subOutW: ['subOutW', '16'], subShadow: ['subShadow', 'none'], subGlow: ['subGlow', '#00d0ff'], subBoxColor: ['subBoxColor', '#000000'], subBoxOp: ['subBoxOp', '55']
   };
   const CHECKS = { subOn: ['subOn', true], subSrt: ['subSrt', false], subBox: ['subBox', false], autoExport: ['autoExport', true], subBold: ['subBold', true], subItalic: ['subItalic', false], subCaps: ['subCaps', false] };
-  let saved = {}, scenes = [], refs = [], analyzing = false, writing = false, exporting = false, listening = false, voiceSignature = '', windowsAsked = false, lastStory = '', lastVideo = '';
+  let saved = {}, scenes = [], refs = [], refLook = '', analyzing = false, writing = false, exporting = false, listening = false, voiceSignature = '', windowsAsked = false, lastStory = '', lastVideo = '';
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { saved = {}; }
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch { /* không lưu được thì bỏ qua */ } };
 
@@ -121,7 +121,7 @@
   // Mẹo vặt: mỗi ảnh/clip dài tối đa «Mỗi ảnh chuyển động» giây (ô chọn); các chế độ khác dùng mức tối đa của Muse.
   const capSeconds = () => (isTip() ? Number($('tipSecs').value) || plan().MAX_SECONDS : plan().MAX_SECONDS);
   const tipFields = () => ({ tipTitle: $('tipTitle').value, tipMinutes: Number($('tipMinutes').value), tipLanguage: $('tipLanguage').value, tipMotion: $('tipMotion').value, tipPrompt: $('tipPrompt').value, tipKind: KIND_OF[mode] || 'tip', ...(isHist() ? { histLook: $('tipLook').value } : {}) });
-  const options = () => ({ seconds: capSeconds(), reference: refs.length > 0 && !isTip(), aspect: $('storyAspect').value, style: $('storyStyle').value, character: $('storyCharacter').value, form: $('storyForm').value, ...(isAd() ? { ad: adFields() } : {}), ...(isTip() ? { tip: true, ...tipFields() } : {}) });
+  const options = () => ({ seconds: capSeconds(), reference: refs.length > 0 && !isTip(), refLook, aspect: $('storyAspect').value, style: $('storyStyle').value, character: $('storyCharacter').value, form: $('storyForm').value, ...(isAd() ? { ad: adFields() } : {}), ...(isTip() ? { tip: true, ...tipFields() } : {}) });
   const plan = () => window.storyPlan;
   const autoOn = () => isPlant() && $('tipAuto').checked;   // Cây trồng: gõ tên cây, bấm một nút là chạy hết đến khi xuất MP4
   const dims = aspect => aspect === '9:16' ? [1080, 1920] : aspect === '1:1' ? [1080, 1080] : [1920, 1080];
@@ -321,9 +321,22 @@
     renderScenes();
     $('storyInfo').textContent = refs.length || $('storyForm').value.trim() ? `Đã gắn câu khóa hình dạng nhân vật vào ${changed} cảnh theo ảnh / hình dạng hiện tại.` : `Đã gỡ câu khóa hình dạng nhân vật khỏi ${changed} cảnh (không còn ảnh tham chiếu).`;
   }
+  // Kiểu hình của ảnh tham chiếu đầu tiên (app nhận từ điểm ảnh, máy chính làm). Biết kiểu thì câu kiểu hình được viết thẳng vào đầu mọi prompt, nên cảnh trong phòng
+  // không còn bị mô hình bỏ qua ảnh mà vẽ người thật. Đổi ảnh / đổi kiểu thì gắn lại ở mọi cảnh đang soạn (relockDrafts).
+  let lookSeq = 0;
+  async function detectLook() {
+    const seq = ++lookSeq, first = refs[0] || '';
+    const next = first && !isAd() && !isTip() ? (await call('storyRefLook', { file: first })) || '' : '';
+    if (seq !== lookSeq || next === refLook) return;
+    refLook = next;
+    refInfo();
+    relockDrafts();
+    renderAnalyze();
+  }
   function refsChanged() {
     refInfo();
     relockDrafts();
+    detectLook();
     if (refs.length) autoAd(60);
     else if (isAd() && autoSnap && scenes.length && sceneSig() === autoSnap) { clearTimeout(autoTimer); scenes = []; autoSnap = ''; renderScenes(); }
   }
@@ -499,7 +512,7 @@
     clearTimeout(autoTimer);
     mode = next; saved.mode = mode; persist();
     const space = spaces[mode] || {};
-    scenes = space.scenes || []; resume = space.resume || null; understood = space.understood || null; autoSnap = space.autoSnap || ''; refs = space.refs || [];
+    scenes = space.scenes || []; resume = space.resume || null; understood = space.understood || null; autoSnap = space.autoSnap || ''; refs = space.refs || []; refLook = ''; detectLook();
     loadModeFields();
     applyMode(false);
     renderScenes();
@@ -510,7 +523,8 @@
   /* ---------- ảnh nhân vật ---------- */
   function refInfo() {
     if (isTip() && !isHist()) { $('storyRefInfo').textContent = ''; return; }
-    $('storyRefInfo').textContent = refs.length ? `Ảnh ${isAd() ? 'sản phẩm' : 'nhân vật'}: ${refs.map(baseName).join(', ')} — gắn vào mọi cảnh.` : isAd() ? 'Chưa chọn ảnh sản phẩm. Nên thêm ảnh rõ nét để sản phẩm trong video giống thật.' : 'Chưa chọn ảnh nhân vật.';
+    const look = refLook && plan().LOOKS?.[refLook] && !$('storyForm').value.trim() ? ` Kiểu ảnh: ${plan().LOOKS[refLook].label} — app ghi kiểu này vào đầu mọi prompt (kể cả cảnh trong phòng).` : '';
+    $('storyRefInfo').textContent = refs.length ? `Ảnh ${isAd() ? 'sản phẩm' : 'nhân vật'}: ${refs.map(baseName).join(', ')} — gắn vào mọi cảnh.${look}` : isAd() ? 'Chưa chọn ảnh sản phẩm. Nên thêm ảnh rõ nét để sản phẩm trong video giống thật.' : 'Chưa chọn ảnh nhân vật.';
   }
   async function pasteRefs(event) {
     const files = [...(event.clipboardData?.files || event.dataTransfer?.files || [])].filter(f => f.type.startsWith('image/'));
@@ -939,15 +953,17 @@
   // Cảnh CHƯA xong của truyện đang chọn có ảnh nhân vật đính kèm mà prompt thiếu câu khóa hình dạng (đã thêm vào hàng đợi trước khi có bản sửa này, hoặc ảnh gắn sau khi chia cảnh).
   function relockNeeded(story) {
     if (!story || isAd() || isTip() || !plan().hasShapeLock) return 0;
+    const wantStyle = Boolean(refLook) && !$('storyForm').value.trim();   // biết kiểu ảnh mà prompt chưa có câu kiểu hình
     return (state?.jobs || []).filter(j => j.kind === 'story' && j.storyId === story.id && !j.phase && j.storyMode !== 'ad'
-      && ['pending', 'failed', 'interrupted'].includes(j.status) && (j.image || (j.references || []).length) && !plan().hasShapeLock(j.prompt)).length;
+      && ['pending', 'failed', 'interrupted', 'completed'].includes(j.status) && (j.image || (j.references || []).length)
+      && (!plan().hasShapeLock(j.prompt) || (wantStyle && !plan().hasStyleLine(j.prompt)))).length;
   }
   async function relockQueued() {
     const story = currentStory(); if (!story) return;
     const need = relockNeeded(story);
     if (!need) return toast('Các cảnh chưa xong đã có câu khóa rồi.');
-    if (!confirm(`Gắn câu «KHÓA HÌNH DẠNG NHÂN VẬT» vào prompt của ${need} cảnh chưa xong trong truyện ${story.id}? Chỉ thêm một dòng vào prompt, cảnh đã tạo xong không bị đụng tới. Cảnh bị lỗi hoặc bị gián đoạn cần bấm «Gửi lại prompt».`)) return;
-    const result = await call('storyRelock', { storyId: story.id, form: $('storyForm').value });
+    if (!confirm(`Gắn câu khóa hình dạng nhân vật${refLook ? ' và câu kiểu hình (' + (plan().LOOKS?.[refLook]?.label || refLook) + ')' : ''} vào prompt của ${need} cảnh trong truyện ${story.id}? Chỉ sửa prompt, video đã tạo xong giữ nguyên: cảnh nào ra sai kiểu thì bấm «Tạo lại» để gửi prompt mới. Cảnh bị lỗi hoặc bị gián đoạn cần bấm «Gửi lại prompt».`)) return;
+    const result = await call('storyRelock', { storyId: story.id, form: $('storyForm').value, refLook, includeDone: true });
     if (!result) return;
     render(result);
     const r = result.relocked || {};
@@ -1262,7 +1278,7 @@
     $('storyStatus').textContent = line;
     const need = relockNeeded(story);
     $('storyRelock').hidden = !need;
-    if (need) $('storyRelock').textContent = `Gắn khóa ảnh nhân vật cho ${need} cảnh chưa xong`;
+    if (need) $('storyRelock').textContent = `Gắn khóa kiểu hình cho ${need} cảnh`;
     // Xem video đã xuất ngay trong app. Đang xuất thì gỡ khung phát để lần sau nạp lại file mới (kể cả khi trùng tên).
     const video = $('storyVideo'), videoFile = !busy && s.output ? s.output : '';
     if (videoFile !== lastVideo) {

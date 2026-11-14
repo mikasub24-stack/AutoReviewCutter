@@ -354,6 +354,36 @@ test('storyRelock gắn khóa hình dạng vào cảnh CHƯA xong có ảnh nhâ
   }finally{await fs.rm(dir,{recursive:true,force:true});}
 });
 
+test('storyRelock với kiểu hình 2D + includeDone: cảnh xong đổi prompt (video giữ nguyên, prompt đã khóa đổi theo) để «Tạo lại» gửi prompt mới',{timeout:8000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-restyle-'));
+  const AUDIO='Audio: no speech, no dialogue, no singing, no narration, no mumbling, no murmuring, no whispering, no humming, no laughing out loud, no human voice or vocal sound of any kind, and no music, no sound effects, no ambient noise - the video must be completely silent with no audio at all.';
+  const prompt=n=>`Video khung NGANG 16:9 (widescreen).\nKhung hình ngang 16:9, cảnh số ${n}, người dẫn chuyện đứng bên bàn chỉ vào bản đồ.\n${AUDIO}`;
+  const base={kind:'story',storyId:'Truyen-A',image:'/refs/nv.png',references:['/refs/nv.png'],error:''};
+  const lockedOf=p=>({prompt:p,promptHash:'h',references:[{path:'/x.png',sha256:'s',name:'nv.png'}],lockedAt:'2026-01-01T00:00:00.000Z'});
+  const seed=[
+    {...base,id:'done',prompt:prompt(1),status:'completed',order:1,output:'/o/1.mp4',lockedInput:lockedOf(prompt(1))},
+    {...base,id:'pend',prompt:prompt(2),status:'pending',order:2,output:''}
+  ];
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({settings:{output:dir},configVersion:2,jobs:seed}));
+  try{
+    const app=await boot(dir);
+    const plain=await app.invoke('storyRelock',{storyId:'Truyen-A',form:'',refLook:'flat2d'});
+    const plainJobs=Object.fromEntries(plain.jobs.map(j=>[j.id,j]));
+    assert.equal(plainJobs.done.prompt,prompt(1),'không includeDone: cảnh xong giữ nguyên');
+    assert.match(plainJobs.pend.prompt,/^KIỂU HÌNH \(bắt buộc/m,'cảnh chờ nhận câu kiểu hình');
+    const result=await app.invoke('storyRelock',{storyId:'Truyen-A',form:'',refLook:'flat2d',includeDone:true});
+    const after=Object.fromEntries(result.jobs.map(j=>[j.id,j]));
+    assert.equal(after.done.status,'completed');assert.equal(after.done.output,'/o/1.mp4','video đã có giữ nguyên');
+    assert.match(after.done.prompt,/^KIỂU HÌNH \(bắt buộc/m);assert.match(after.done.prompt,/^KHÓA HÌNH DẠNG NHÂN VẬT[^\n]*hoạt hình 2D phẳng/m);
+    assert.equal(after.done.lockedInput.prompt,after.done.prompt,'prompt đã khóa đổi theo, «Tạo lại» gửi bản mới');
+    assert.equal(after.done.lockedInput.references.length,1,'ảnh tham chiếu đã khóa giữ nguyên');
+    assert.equal(JSON.stringify(result.relocked),JSON.stringify({changed:1,skipped:0,total:2}));
+    const again=await app.invoke('storyRelock',{storyId:'Truyen-A',form:'',refLook:'flat2d',includeDone:true});
+    assert.equal(again.relocked.changed,0,'chạy lại không đổi gì');
+    await app.stop();
+  }finally{await fs.rm(dir,{recursive:true,force:true});}
+});
+
 test('xóa cảnh / truyện kể chuyện khỏi danh sách thì file trong KeChuyen vào Thùng rác; cảnh khác tab và file ngoài KeChuyen không bị đụng',{timeout:8000},async()=>{
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-trash-'));
   const root=path.join(dir,'KeChuyen'),A=path.join(root,'Truyen-A'),B=path.join(root,'Truyen-B'),D=path.join(root,'Truyen-D');

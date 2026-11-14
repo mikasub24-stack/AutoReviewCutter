@@ -82,6 +82,17 @@ class Queue {
     await this.publish();
     return true;
   }
+  // Cảnh ĐÃ XONG: đổi prompt (cả bản đã khóa, ảnh tham chiếu giữ nguyên) nhưng KHÔNG đụng video đã có; lần «Tạo lại» sau gửi prompt mới.
+  async restylePrompt(id,prompt){
+    const job=this.jobs.find(j=>j.id===id);
+    if(!job)throw Error('Không tìm thấy cảnh này.');
+    if(job.status!=='completed')throw Error('Chỉ đổi prompt của cảnh đã xong bằng cách này.');
+    const text=checkPrompt(prompt);
+    if(text===job.prompt)return false;
+    applyPrompt(job,text);
+    await this.publish();
+    return true;
+  }
   // Dừng một cảnh CHƯA chạy (đang chờ trong hàng đợi) để sửa prompt / ảnh rồi tạo lại sau: thành «Đã dừng», hàng đợi bỏ qua nó, các cảnh khác chạy tiếp.
   async holdJob(id){
     const j=this.jobs.find(x=>x.id===id);

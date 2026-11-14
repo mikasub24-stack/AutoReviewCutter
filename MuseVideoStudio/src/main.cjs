@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, session, safeStorage, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, session, safeStorage, Menu, nativeImage } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { Queue,stoppedError,abortable } = require('./queue.cjs');
@@ -920,6 +920,8 @@ app.whenReady().then(async () => {
       await save();notify();return snapshot();
     },
     storyFreeId:async data=>freeStoryId(String(data?.base||''),{output:settings.output,jobs:queue.jobs}),
+    // Kiểu hình của ảnh tham chiếu đầu tiên ('flat2d' hoặc ''): app viết thẳng kiểu đó vào đầu mọi prompt kể chuyện (xem ref-look.cjs).
+    storyRefLook:async data=>{const file=String(data?.file||'');if(!file)return '';try{await fs.access(file);}catch{return '';}return require('./ref-look.cjs').lookOfFile(nativeImage,file);},
     storyReveal:async()=>{const out=storyService.status().output;if(out)shell.showItemInFolder(out);return true;},
     // «Tải video»: hộp «Lưu như…» để chọn nơi lưu một bản sao MP4 (kèm .srt cùng tên nếu có và chưa có file trùng).
     storySave:async()=>{
@@ -1032,20 +1034,22 @@ app.whenReady().then(async () => {
     // Kể chuyện thường: gắn lại câu «KHÓA HÌNH DẠNG NHÂN VẬT» vào prompt các cảnh CHƯA xong của một truyện (đang chờ / lỗi / bị gián đoạn) mà prompt thiếu câu đó.
     // Câu khóa chỉ được thêm lúc chia cảnh; ảnh nhân vật gắn sau đó thì ảnh vẫn gửi kèm nhưng prompt không nhắc, nên clip lúc 2D lúc người thật.
     // Mỗi cảnh tự biết có ảnh tham chiếu hay không (job.references); cảnh quảng cáo, mẹo, lịch sử không đụng tới.
+    // includeDone: cảnh đã xong cũng được đổi prompt (video đã có giữ nguyên) để lần «Tạo lại» sau gửi đúng prompt mới (có câu kiểu hình).
     storyRelock: async data => {
       if(stopping||merging||packaging)throw Error('Chờ xử lý hiện tại hoàn tất.');
-      const id=String(data?.storyId||'').replace(/[^\w-]/g,''),form=String(data?.form||'');
+      const id=String(data?.storyId||'').replace(/[^\w-]/g,''),form=String(data?.form||''),refLook=String(data?.refLook||''),includeDone=Boolean(data?.includeDone);
       if(!id)throw Error('Chọn truyện cần gắn khóa.');
       const storyPlan=require('./story-plan.js');
       const scope=queue.jobs.filter(j=>j.kind==='story'&&j.storyId===id&&!j.phase&&j.storyMode!=='ad');
       let changed=0,skipped=0;
       for(const job of scope){
-        if(!['pending','failed','interrupted'].includes(job.status)){skipped++;continue;}
+        const done=job.status==='completed';
+        if(!(['pending','failed','interrupted'].includes(job.status)||(done&&includeDone))){skipped++;continue;}
         const reference=Boolean(job.image)||(job.references||[]).length>0;
         let next;
-        try{next=storyPlan.refreshPrompt(job.prompt,{reference,form,aspect:job.aspect||''});}catch{continue;}
+        try{next=storyPlan.refreshPrompt(job.prompt,{reference,form,refLook,aspect:job.aspect||''});}catch{continue;}
         if(!next||next===job.prompt)continue;
-        await queue.editPrompt(job.id,next);changed++;
+        if(done)await queue.restylePrompt(job.id,next);else await queue.editPrompt(job.id,next);changed++;
       }
       return {...snapshot(),relocked:{changed,skipped,total:scope.length}};
     },

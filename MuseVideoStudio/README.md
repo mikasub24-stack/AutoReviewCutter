@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.4
+
+- **Kể chuyện: app tự nhận kiểu hình của ảnh tham chiếu và ghi thẳng vào ĐẦU mọi prompt.** Phát hiện từ 145 clip thật: ảnh tham chiếu chỉ là ảnh đính kèm, mô hình chỉ dùng nó khi cảnh có thứ khớp với ảnh (rừng, xe tải, lính…); cảnh trong phòng (bàn bản đồ, lịch, kệ sách) không khớp nên bị bỏ qua và ra người thật. Nay ảnh kiểu «hoạt hình 2D phẳng» (nét viền đậm, màu phẳng, như tờ sticker) được nhận ra từ điểm ảnh ngay trên máy (`src/ref-look.cjs`), và mọi prompt có thêm dòng «KIỂU HÌNH (bắt buộc, giống ảnh tham chiếu đính kèm): hoạt hình 2D phẳng… KHÔNG người thật, KHÔNG ảnh chụp… kể cả cảnh trong phòng» đứng ngay sau câu tỉ lệ khung. Câu khóa hình dạng cũng bỏ các ví dụ «là người thật thì…» khi đã biết kiểu. Lời dặn Muse lúc chia cảnh cấm các từ gợi ảnh thật («ánh sáng tự nhiên», «ảnh chụp», «điện ảnh»…). Ô «Hình dạng chuẩn» gõ tay vẫn được ưu tiên hơn kiểu tự nhận. Dòng thông tin dưới nút chọn ảnh hiện «Kiểu ảnh: hoạt hình 2D phẳng».
+- **«Tạo lại» giờ gửi được prompt mới.** Trước đây cảnh đã xong giữ prompt đã khóa, nên «Tạo lại» gửi lại đúng prompt cũ dù đã sửa. Nút «Gắn khóa kiểu hình cho N cảnh» (mục Giọng, phụ đề & xuất MP4) nay cũng đổi prompt của cảnh ĐÃ XONG (video đã có giữ nguyên, ảnh tham chiếu đã khóa giữ nguyên); cảnh nào ra sai kiểu thì bấm «Tạo lại».
+- Giới hạn: chỉ nhận ra loại 2D phẳng. Ảnh kiểu khác (ảnh chụp, tranh chi tiết, 3D) không bị gắn dòng kiểu hình, câu khóa chung như cũ. Ngưỡng nhận chỉ đo trên một tờ sticker thật. CHƯA thử với Muse thật: không bảo đảm cảnh trong phòng sẽ ra 2D; cảnh lệch thì «Tạo lại».
+
 ## Update 1.9.3
 
 - **Kể chuyện: câu «KHÓA HÌNH DẠNG NHÂN VẬT» luôn có trong prompt khi đã gắn ảnh nhân vật.** Trước đây câu khóa chỉ được thêm lúc Muse chia cảnh, theo ảnh đang có khi đó. Ảnh nhân vật gắn hoặc đổi SAU khi chia cảnh (hoặc ô «Hình dạng nhân vật chuẩn» gõ sau) thì ảnh vẫn gửi kèm nhưng prompt không nhắc tới ảnh, nên clip lúc ra 2D lúc ra người thật. Giờ: (1) đổi / bỏ ảnh nhân vật hoặc đổi hình dạng chuẩn thì các cảnh đang soạn tự gắn lại (hoặc gỡ) đúng một dòng khóa, phần bạn đã sửa tay giữ nguyên; (2) lúc bấm «Tạo ảnh + clip» / «Thêm vào hàng đợi» câu khóa được chốt lại một lần nữa.

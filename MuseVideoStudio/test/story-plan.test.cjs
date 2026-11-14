@@ -1542,3 +1542,43 @@ test('refreshPrompt: không biết tỉ lệ thì không tự thêm câu tỉ l�
   assert.ok(!/Tỷ lệ khung hình|khung NGANG|khung DỌC|khung VUÔNG/.test(out));
   assert.match(out, /KHÓA HÌNH DẠNG NHÂN VẬT/);
 });
+
+test('kiểu hình 2D phẳng nhận từ ảnh: câu kiểu hình ngay sau câu tỉ lệ, gỡ / gắn lại không nhân đôi, không còn ví dụ «người thật» trong câu khóa', () => {
+  const raw = 'Video khung NGANG 16:9 (widescreen). Khung hình ngang 16:9, trong một căn phòng đơn giản, ánh sáng tự nhiên. Người dẫn chuyện đứng bên bàn.\n' + AUDIO;
+  const flat = { reference: true, aspect: '16:9', refLook: 'flat2d' };
+  const out = sp.refreshPrompt(raw, flat);
+  const lines = out.split('\n');
+  assert.equal(lines[0], 'Video khung NGANG 16:9 (widescreen).');
+  assert.match(lines[1], /^KIỂU HÌNH \(bắt buộc, giống ảnh tham chiếu đính kèm\): hoạt hình 2D phẳng/);
+  assert.match(lines[1], /KHÔNG người thật, KHÔNG ảnh chụp, KHÔNG 3D.*kể cả cảnh trong phòng/);
+  assert.match(lines[2], /^Khung hình ngang 16:9, trong một căn phòng/);
+  const lock = lines.find(l => /^KHÓA HÌNH DẠNG NHÂN VẬT/.test(l));
+  assert.match(lock, /hoạt hình 2D phẳng/);
+  assert.doesNotMatch(lock, /người thật|người que/, 'câu khóa không gợi «người thật»');
+  assert.equal(sp.refreshPrompt(out, flat), out, 'chạy lại không đổi');
+  assert.equal(out.split('\n').filter(l => /^KIỂU HÌNH/.test(l)).length, 1);
+  assert.ok(sp.hasStyleLine(out) && !sp.hasStyleLine(raw));
+  // không nhận ra kiểu (hoặc người dùng tự gõ hình dạng chuẩn): đúng như trước, không có câu kiểu hình
+  const plain = sp.refreshPrompt(out, { reference: true, aspect: '16:9' });
+  assert.ok(!/KIỂU HÌNH/.test(plain) && /người thật/.test(plain), 'không có kiểu → câu khóa chung như cũ');
+  const typed = sp.refreshPrompt(out, { reference: true, aspect: '16:9', refLook: 'flat2d', form: 'người que' });
+  assert.ok(!/KIỂU HÌNH/.test(typed) && /hình dạng chuẩn: người que/.test(typed), 'hình dạng gõ tay thắng kiểu tự nhận');
+  // bỏ ảnh thì gỡ cả câu kiểu hình
+  assert.ok(!/KIỂU HÌNH|KHÓA HÌNH/.test(sp.refreshPrompt(out, { reference: false, aspect: '16:9', refLook: 'flat2d' })));
+  // kiểu lạ không có trong danh sách bị bỏ
+  assert.equal(sp.options({ reference: true, refLook: 'abc' }).look, '');
+  assert.equal(sp.options({ reference: false, refLook: 'flat2d' }).look, '');
+});
+
+test('kiểu hình 2D: bản tiếng Anh, prompt xuống dòng sau câu tỉ lệ, và lời dặn Muse cấm từ chân thực', () => {
+  const english = 'Horizontal 16:9 widescreen video.\nThe old man walks along the river with a heavy bag and looks at the sky.\n' + AUDIO;
+  const out = sp.refreshPrompt(english, { reference: true, aspect: '16:9', refLook: 'flat2d' });
+  const lines = out.split('\n');
+  assert.equal(lines[0], 'Horizontal 16:9 widescreen video.');
+  assert.match(lines[1], /^VISUAL STYLE \(mandatory, same as the attached reference image\): flat 2D cartoon/);
+  assert.match(out, /CHARACTER SHAPE LOCK \(mandatory\): use the character style in the attached reference image as the standard — flat 2D cartoon/);
+  assert.doesNotMatch(out, /if it is a real person/);
+  assert.equal(sp.refreshPrompt(out, { reference: true, aspect: '16:9', refLook: 'flat2d' }), out);
+  const prompts = sp.planStory(storyLong, { seconds: 10, aspect: '16:9', reference: true, refLook: 'flat2d' });
+  for (const scene of prompts) assert.match(scene.prompt, /KIỂU HÌNH \(bắt buộc/, 'cảnh tự ghép cũng có câu kiểu hình');
+});

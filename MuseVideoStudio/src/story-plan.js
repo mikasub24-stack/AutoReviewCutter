@@ -204,7 +204,7 @@
     if (!ASPECTS.includes(aspect)) throw Error('Chọn tỷ lệ 16:9, 9:16 hoặc 1:1.');
     const ad = adOptions(input.ad);
     const tip = Boolean(input.tip) && !ad;
-    return { seconds, aspect, style: String(input.style || '').trim(), character: String(input.character || '').trim(), form: String(input.form || '').trim().slice(0, 200), reference: Boolean(input.reference), ad, tip, ...(tip ? tipOptions(input) : {}) };
+    return { seconds, aspect, style: String(input.style || '').trim(), character: String(input.character || '').trim(), form: String(input.form || '').trim().slice(0, 200), reference: Boolean(input.reference), look: Boolean(input.reference) && !String(input.form || '').trim() ? knownLook(input.refLook) : '', ad, tip, ...(tip ? tipOptions(input) : {}) };
   }
 
   /* Mẹo vặt viết từ TIÊU ĐỀ: độ dài video, ngôn ngữ lời đọc. Số giây mỗi ảnh/clip chính là `seconds` của tùy chọn chung. */
@@ -360,10 +360,39 @@
   /* Khóa hình dạng nhân vật: nhân vật chuẩn (ảnh tham chiếu và/hoặc kiểu người dùng mô tả) quyết định hình dạng của MỌI nhân vật;
      người khác chỉ được khác màu/kiểu quần áo, giới tính, tóc, phụ kiện. Câu khóa do app tự gắn vào MỌI prompt, không phụ thuộc Muse viết gì. */
   const isLocked = config => !config.ad && !config.tip && Boolean(config.reference || config.form);
+  /* Kiểu hình của ảnh tham chiếu (app tự nhận từ điểm ảnh, xem ref-look.cjs). Ảnh tham chiếu chỉ là ảnh đính kèm: mô hình video dùng nó khi cảnh có thứ khớp với ảnh
+     và bỏ qua khi không khớp (cảnh trong phòng ra người thật). Nên biết kiểu rồi thì app viết thẳng vào ĐẦU mọi prompt, kèm danh sách điều cấm. */
+  const LOOKS = {
+    flat2d: {
+      label: 'hoạt hình 2D phẳng',
+      vi: 'hoạt hình 2D phẳng như tranh vẽ sticker: nét viền đen đậm, tô màu phẳng, gần như không đổ bóng, nhân vật đơn giản đầu to mắt tròn',
+      en: 'flat 2D cartoon like a sticker illustration: bold dark outlines, flat color fills, almost no shading, simple characters with big heads and round eyes',
+      notVi: 'KHÔNG người thật, KHÔNG ảnh chụp, KHÔNG 3D, KHÔNG phong cách chân thực hay điện ảnh, kể cả cảnh trong phòng',
+      notEn: 'NO real people, NO photographs, NO 3D, NO realistic or cinematic look, even for indoor scenes'
+    }
+  };
+  const knownLook = value => (typeof value === 'string' && Object.prototype.hasOwnProperty.call(LOOKS, value) ? value : '');
+  const lookOf = config => (isLocked(config) ? knownLook(config.look) : '');
+  const STYLE_LINE = /^(?:KIỂU HÌNH \(bắt buộc|VISUAL STYLE \(mandatory)/;
+  function styleLine(config, language = 'vi') {
+    const look = lookOf(config);
+    if (!look) return '';
+    const l = LOOKS[look];
+    return language !== 'vi'
+      ? `VISUAL STYLE (mandatory, same as the attached reference image): ${l.en}. EVERY scene and EVERY character, including the narrator and background people, is drawn in exactly this style. ${l.notEn}.`
+      : `KIỂU HÌNH (bắt buộc, giống ảnh tham chiếu đính kèm): ${l.vi}. MỌI cảnh và MỌI nhân vật, kể cả người dẫn chuyện và người phụ, đều vẽ đúng kiểu này. ${l.notVi}.`;
+  }
+  const styleBoth = config => [styleLine(config, 'vi'), styleLine(config, 'en')].filter(Boolean);
   // Câu khóa do app tự thêm vào prompt: viết cùng ngôn ngữ với truyện (tiếng Việt khi truyện tiếng Việt, còn lại tiếng Anh)
   // để prompt gửi mô hình video không bị lẫn hai thứ tiếng.
   function lockLine(config, language = 'vi') {
     if (!isLocked(config)) return '';
+    const look = lookOf(config);
+    if (look && !config.form) {
+      return language !== 'vi'
+        ? `CHARACTER SHAPE LOCK (mandatory): use the character style in the attached reference image as the standard — ${LOOKS[look].en}. EVERY character in the scene, including background people, must have the same body shape and proportions, head and face style, art style and level of detail as the standard; they may differ only in clothing color and style, gender, hair or fur, accessories, height, and species if the story says so. Do not switch to a different drawing style.`
+        : `KHÓA HÌNH DẠNG NHÂN VẬT (bắt buộc): lấy kiểu nhân vật trong ảnh tham chiếu làm chuẩn — ${LOOKS[look].vi}. MỌI nhân vật trong cảnh, kể cả người phụ, phải CÙNG hình dạng, tỉ lệ cơ thể, kiểu đầu và mặt, kiểu vẽ và độ chi tiết với chuẩn; chỉ được khác màu và kiểu quần áo, giới tính, kiểu tóc hoặc bộ lông, phụ kiện, chiều cao, và loài nếu câu chuyện nói rõ. Không đổi sang kiểu vẽ khác.`;
+    }
     if (language !== 'vi') {
       return `CHARACTER SHAPE LOCK (mandatory): use ${config.reference ? 'the character in the attached reference image' : 'the character style described below'} as the standard${config.form ? ` — standard shape: ${config.form}` : ''}. EVERY character in the scene, including background people, must have the same body shape and proportions, head and face style, art style, level of realism and level of detail as the standard character (if the standard is a stick figure, everyone is a stick figure; if it is a real person, everyone is a real person; if it is a cartoon animal, everyone is drawn in that same cartoon style); they may differ only in clothing color and style, gender, hair or fur, accessories, height, and species if the story says so. Do not switch to a different drawing style or level of realism than the standard character.`;
     }
@@ -465,6 +494,7 @@
     const look = ad ? (adPick(AD_LOOK, ad.look)?.prompt || '').replace(/^phong cách /, '') : '';
     return [
       `Tạo video ${ad ? 'quảng cáo sản phẩm ' : ''}dài ${seconds} giây, tỷ lệ ${config.aspect}, thể hiện đúng cảnh dưới đây.`,
+      ...(styleLine(config, 'vi') ? [styleLine(config, 'vi')] : []),
       '',
       visual ? 'HÌNH ẢNH THEO KỊCH BẢN (làm đúng như mô tả):' : '',
       visual || '',
@@ -818,7 +848,7 @@
   }
 
 
-  const lockRule = config => `KHÓA HÌNH DẠNG: ${config.reference ? 'nhân vật trong ảnh tham chiếu' : 'nhân vật chuẩn do người dùng mô tả'}${config.form ? ` (hình dạng chuẩn: ${config.form})` : ''} là CHUẨN HÌNH DẠNG của MỌI nhân vật. Mọi nhân vật khác, kể cả người phụ, phải CÙNG hình dạng, tỉ lệ cơ thể, kiểu đầu và mặt, kiểu vẽ, độ chân thực và độ chi tiết (ví dụ chuẩn là người que thì mọi người đều là người que; là người thật thì mọi người đều là người thật; là con vật hoạt hình thì mọi nhân vật đều cùng kiểu hoạt hình đó); chỉ khác màu và kiểu quần áo, giới tính, kiểu tóc hoặc bộ lông, phụ kiện, chiều cao, và loài nếu câu chuyện nói rõ. Vì vậy mỗi nhân vật khác chỉ được mô tả phần ĐƯỢC KHÁC đó, theo đúng kiểu của nhân vật chuẩn; KHÔNG thêm chi tiết làm lệch kiểu (ví dụ không tả da, cơ bắp, nét mặt thật cho nhân vật hoạt hình; không tả nét vẽ hoạt hình cho người thật). Nhân vật chuẩn đóng vai chính của bài (bài nói/bình luận thì đóng vai kiểu người mà bài đang nói tới); các vai còn lại do nhân vật khác cùng hình dạng đóng. App tự thêm câu khóa hình dạng vào cuối mỗi PROMPT nên bạn không cần chép lại, nhưng mô tả nhân vật phải hợp kiểu đó.`;
+  const lockRule = config => `KHÓA HÌNH DẠNG: ${config.reference ? 'nhân vật trong ảnh tham chiếu' : 'nhân vật chuẩn do người dùng mô tả'}${config.form ? ` (hình dạng chuẩn: ${config.form})` : ''} là CHUẨN HÌNH DẠNG của MỌI nhân vật. Mọi nhân vật khác, kể cả người phụ, phải CÙNG hình dạng, tỉ lệ cơ thể, kiểu đầu và mặt, kiểu vẽ, độ chân thực và độ chi tiết (ví dụ chuẩn là người que thì mọi người đều là người que; là người thật thì mọi người đều là người thật; là con vật hoạt hình thì mọi nhân vật đều cùng kiểu hoạt hình đó); chỉ khác màu và kiểu quần áo, giới tính, kiểu tóc hoặc bộ lông, phụ kiện, chiều cao, và loài nếu câu chuyện nói rõ. Vì vậy mỗi nhân vật khác chỉ được mô tả phần ĐƯỢC KHÁC đó, theo đúng kiểu của nhân vật chuẩn; KHÔNG thêm chi tiết làm lệch kiểu (ví dụ không tả da, cơ bắp, nét mặt thật cho nhân vật hoạt hình; không tả nét vẽ hoạt hình cho người thật). Nhân vật chuẩn đóng vai chính của bài (bài nói/bình luận thì đóng vai kiểu người mà bài đang nói tới); các vai còn lại do nhân vật khác cùng hình dạng đóng. App tự thêm câu khóa hình dạng vào cuối mỗi PROMPT nên bạn không cần chép lại, nhưng mô tả nhân vật phải hợp kiểu đó.${lookOf(config) && !config.form ? ` Kiểu hình của ảnh tham chiếu: ${LOOKS[lookOf(config)].vi}. MỌI cảnh, kể cả cảnh trong phòng, phải viết theo đúng kiểu này: không dùng các từ như «ánh sáng tự nhiên», «ảnh chụp», «chân thực», «điện ảnh», «người thật», «phim tài liệu»; app tự thêm câu kiểu hình vào đầu mỗi PROMPT.` : ''}`;
 
   // Chat Muse dùng chung một cuộc trò chuyện nên có thể còn truyện/yêu cầu cũ ở phía trên: dặn Muse không để lẫn vào.
   const FRESH = 'Cuộc trò chuyện này có thể còn truyện hoặc yêu cầu khác ở phía trên: BỎ QUA hết, chỉ làm với nội dung bên dưới, không lấy nhân vật hay chi tiết nào từ chỗ khác.';
@@ -1125,7 +1155,7 @@
         else if (count(image) < 30) w.push('Prompt ảnh quá ngắn, dễ ra ảnh sai. Mô tả rõ vật gì, ở đâu, tay đang làm gì.');
       }
       if (!prompt.trim()) w.push('Chưa có prompt: cảnh này sẽ không tạo được.');
-      else if (count(prompt.replace(NO_SPEECH, '').replace(tipStartLine('vi'), '').replace(tipStartLine('en'), '').replace(lockLine(config, 'vi'), '').replace(lockLine(config, 'en'), '').replace(aspectLine(config, 'vi'), '').replace(aspectLine(config, 'en'), '').replace(ratioLead(config, 'vi'), '').replace(ratioLead(config, 'en'), '').trim()) < 40) w.push('Prompt quá ngắn, dễ ra hình sai. Mô tả rõ ai, ở đâu, làm gì, nét mặt.');
+      else if (count(prompt.replace(NO_SPEECH, '').replace(tipStartLine('vi'), '').replace(tipStartLine('en'), '').replace(lockLine(config, 'vi'), '').replace(lockLine(config, 'en'), '').replace(styleLine(config, 'vi'), '').replace(styleLine(config, 'en'), '').replace(aspectLine(config, 'vi'), '').replace(aspectLine(config, 'en'), '').replace(ratioLead(config, 'vi'), '').replace(ratioLead(config, 'en'), '').trim()) < 40) w.push('Prompt quá ngắn, dễ ra hình sai. Mô tả rõ ai, ở đâu, làm gì, nét mặt.');
       if (prompt.trim() && !/no speech/i.test(prompt)) w.push('Prompt thiếu câu «no speech» — nhân vật có thể bị nói.');
       if (WEAPON.test(prompt) && HANDLING.test(prompt)) w.push('Prompt có cảnh người cầm / ngắm / bắn súng hoặc đạn: Muse thường từ chối («blocked by policy») và mỗi lần thử đều tốn lượt. Nên thay bằng bản vẽ kỹ thuật, sơ đồ so sánh hoặc người dẫn chuyện giới thiệu bằng lời.');
       if (POLITICAL.test(prompt) && !EMPTY_SEAT.test(prompt)) w.push('Prompt có người giữ chức vụ chính trị (tổng thống, thủ tướng, vua…): chức danh gắn với một nước hay mốc thời gian là chỉ đích danh một người thật, Muse thường từ chối («blocked by policy») dù không ghi tên, và mỗi lần thử đều tốn lượt. Nên bỏ người đó khỏi hình: dùng bàn làm việc trống, tập hồ sơ, micro trên bục, đài phát thanh, lá cờ hoặc đám đông nhìn từ phía sau, để nhân vật chuẩn phản ứng bằng nét mặt.');
@@ -1154,7 +1184,18 @@
   const ensureNoSpeech = prompt => (/no speech/i.test(prompt) ? prompt : prompt + '\n' + NO_SPEECH);
   // Prompt Muse viết + câu khóa hình dạng (nếu có) + câu cấm tiếng ở cuối.
   function finalPrompt(prompt, config, language = 'vi') {
-    return withRatioLead(finalPromptBody(prompt, config, language), config, language, 'video');
+    return withStyleLine(withRatioLead(finalPromptBody(prompt, config, language), config, language, 'video'), config, language);
+  }
+  // Câu kiểu hình đứng NGAY SAU câu tỉ lệ ở đầu prompt (không thì ở dòng đầu): mô hình video chú ý phần đầu nhất. Đã có câu kiểu hình (bản vi hoặc en) thì giữ nguyên.
+  function withStyleLine(text, config, language = 'vi') {
+    const style = styleLine(config, language);
+    if (!style || !text || styleBoth(config).some(line => text.includes(line))) return text;
+    const lead = ratioLead(config, language, 'video'), other = ratioLead(config, language !== 'vi' ? 'vi' : 'en', 'video');
+    const nl = text.indexOf('\n'), line = nl < 0 ? text : text.slice(0, nl), rest = nl < 0 ? '' : text.slice(nl + 1);
+    for (const sentence of [lead, other]) {
+      if (sentence && line.startsWith(sentence)) return sentence + '\n' + style + '\n' + (line.slice(sentence.length).trim() ? line.slice(sentence.length).trim() + (rest ? '\n' + rest : '') : rest);
+    }
+    return style + '\n' + text;
   }
   function finalPromptBody(prompt, config, language = 'vi') {
     const lock = lockLine(config, language), text = String(prompt || '').trim();
@@ -1172,6 +1213,7 @@
   // (ảnh vẫn gửi kèm nên lúc ra 2D, lúc ra người thật). refreshPrompt gắn lại khóa theo ảnh / hình dạng HIỆN TẠI: gỡ câu khóa cũ (mọi biến thể) rồi gắn câu mới,
   // giữ nguyên phần còn lại của prompt. Dùng cho chế độ Kể chuyện thường (không phải quảng cáo, mẹo, cây, lịch sử).
   const LOCK_LINE = /^(?:KHÓA HÌNH DẠNG NHÂN VẬT \(bắt buộc\):|CHARACTER SHAPE LOCK \(mandatory\):)/;
+  const hasStyleLine = prompt => String(prompt || '').split('\n').some(line => STYLE_LINE.test(line.trim()));
   const hasShapeLock = prompt => String(prompt || '').split('\n').some(line => LOCK_LINE.test(line.trim()));
   // Tỉ lệ khung đã có trong prompt (câu đầu «Video khung NGANG 16:9…» hoặc bản tiếng Anh): giữ đúng tỉ lệ đó, không thêm câu tỉ lệ khác.
   const aspectOfPrompt = text => ASPECTS.find(a => Object.values(RATIO_LEAD.video).some(set => text.includes(set[a]))) || '';
@@ -1179,7 +1221,7 @@
     const text = String(prompt || '').trim(), found = aspectOfPrompt(text);
     const config = { ...options({ ...input, aspect: found || input.aspect }), aspect: found || input.aspect || '' };   // không biết tỉ lệ thì không thêm câu tỉ lệ (tránh ghi nhầm 16:9 vào cảnh dọc)
     if (!text || config.ad || config.tip) return text;
-    const body = text.split('\n').filter(line => !LOCK_LINE.test(line.trim())).join('\n').trim();
+    const body = text.split('\n').filter(line => !LOCK_LINE.test(line.trim()) && !STYLE_LINE.test(line.trim())).join('\n').trim();
     // Dòng «Audio:» là câu cấm tiếng cố định bằng tiếng Anh: bỏ ra khi nhận ngôn ngữ, không thì cảnh tiếng Việt ngắn bị coi là tiếng Anh.
     const spoken = body.split('\n').filter(line => !/^Audio:/i.test(line.trim())).join('\n');
     return finalPrompt(body, config, promptLanguage(spoken));
@@ -1354,5 +1396,5 @@
     return entries.map((entry, index) => `${index + 1}\n${srtTime(entry.start)} --> ${srtTime(entry.end)}\n${entry.text}\n`).join('\n');
   }
 
-  return { refreshPrompt, hasShapeLock, isLocked, setRate, ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, stripStepLabels, TIP_MINUTES, PLANT_MINUTES, HIST_MINUTES, TIP_SECS, tipPlan, tipParts, buildTipScriptInstruction, tipScriptFromReply, tipTrim, tipCheck, tipFix, MAX_SECONDS, MIN_SECONDS, sceneSeconds, sceneFloor, shortRuns, shortFix, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, lockLine, buildMuseInstruction, buildUnderstandInstruction, parseUnderstanding, understandRanges, understandingText, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, motionIssues, stripBeatTags, tipImagePrompt, finalImagePrompt, tipStartLine, subtitleChunks, srtTime, toSrt };
+  return { refreshPrompt, hasShapeLock, hasStyleLine, isLocked, styleLine, knownLook, LOOKS, setRate, ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, stripStepLabels, TIP_MINUTES, PLANT_MINUTES, HIST_MINUTES, TIP_SECS, tipPlan, tipParts, buildTipScriptInstruction, tipScriptFromReply, tipTrim, tipCheck, tipFix, MAX_SECONDS, MIN_SECONDS, sceneSeconds, sceneFloor, shortRuns, shortFix, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, lockLine, buildMuseInstruction, buildUnderstandInstruction, parseUnderstanding, understandRanges, understandingText, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, motionIssues, stripBeatTags, tipImagePrompt, finalImagePrompt, tipStartLine, subtitleChunks, srtTime, toSrt };
 });
