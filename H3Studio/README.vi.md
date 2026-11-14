@@ -1,13 +1,13 @@
-# H3 Studio 0.1.1
+# H3 Studio 0.1.2
 
 App Windows tiếng Việt để viết kịch bản bằng API tương thích OpenAI, tạo ảnh nhân vật và bối cảnh,
 gửi cảnh đến MiniMax H3 qua RunningHub hoặc ComfyUI có sẵn, xem clip và xuất MP4.
 
-Bản 0.1.1 tự vừa màn hình 768px và giữ hàng nút xuất phim luôn nhìn thấy.
+Bản 0.1.2 tự vừa màn hình 768px và giữ hàng nút xuất phim luôn nhìn thấy.
 
 ## Cài và bắt đầu
 
-Chạy H3Studio-0.1.1-Setup.exe, mở **Kết nối**, nhập API của bạn rồi **Lưu kết nối**.
+Chạy H3Studio-0.1.2-Setup.exe, mở **Kết nối**, nhập API của bạn rồi **Lưu kết nối**.
 Không gửi API key lên chat. Windows lưu key bằng DPAPI của tài khoản hiện tại;
 project.json không chứa key. Các API cloud có thể tính phí riêng.
 

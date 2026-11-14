@@ -84,7 +84,8 @@ class App(tk.Tk):
         self.build_cast()
         self.build_connections()
         foot = tk.Frame(self, bg=BG)
-        foot.pack(fill='x', padx=22, pady=(6, 14))
+        foot.pack(side='bottom', before=self.tabs, fill='x', padx=22, pady=(6, 14))
+        self.footer = foot
         self.status = tk.StringVar(value='Nhập ý tưởng → kết nối AI → tạo thử một cảnh trước khi làm cả phim.')
         tk.Label(foot, textvariable=self.status, anchor='w', bg=BG, fg=MUTED, wraplength=850, justify='left').pack(side='left', fill='x', expand=True)
         self.button(foot, 'Dừng chờ', self.stop_work, danger=True).pack(side='right')
@@ -110,8 +111,10 @@ class App(tk.Tk):
         return tk.Frame(parent, bg=CARD, padx=14, pady=12)
 
     def build_workspace(self):
+        self.work.rowconfigure(1, weight=1)
+        self.work.columnconfigure(0, weight=1)
         top = self.panel(self.work)
-        top.pack(fill='x', pady=(12, 8))
+        top.grid(row=0, column=0, sticky='ew', pady=(12, 8))
         self.label(top, '01   CÂU CHUYỆN CỦA BẠN', True).pack(fill='x', pady=(0, 8))
         self.idea = self.text(top, 2 if self.short_screen else 3)
         self.idea.pack(fill='x')
@@ -129,14 +132,14 @@ class App(tk.Tk):
         self.button(controls, 'Tạo toàn bộ phim', self.all_in_one, True).pack(side='right')
         self.button(controls, 'Lập kịch bản', self.plan_only).pack(side='right', padx=6)
         middle = tk.PanedWindow(self.work, orient='horizontal', bg=BG, sashwidth=8, bd=0)
-        middle.pack(fill='both', expand=True, pady=4)
+        middle.grid(row=1, column=0, sticky='nsew', pady=4)
         left = self.panel(middle)
         right = self.panel(middle)
         middle.add(left, width=310, minsize=260)
         middle.add(right, minsize=480)
         self.summary = tk.StringVar(value='02   CÁC CẢNH · Chưa có dự án')
         tk.Label(left, textvariable=self.summary, fg=ACCENT, bg=CARD, font=('Segoe UI', 10, 'bold'), anchor='w').pack(fill='x', pady=(0, 8))
-        self.tree = ttk.Treeview(left, columns=('state',), show='tree headings', selectmode='browse')
+        self.tree = ttk.Treeview(left, columns=('state',), show='tree headings', selectmode='browse', height=3)
         self.tree.heading('#0', text='Cảnh')
         self.tree.heading('state', text='Trạng thái')
         self.tree.column('#0', width=150)
@@ -144,10 +147,10 @@ class App(tk.Tk):
         self.tree.pack(fill='both', expand=True)
         self.tree.bind('<<TreeviewSelect>>', self.select_scene)
         row = tk.Frame(left, bg=CARD)
-        row.pack(fill='x', pady=(8, 0))
+        row.pack(side='bottom', before=self.tree, fill='x', pady=(8, 0))
         self.button(row, 'Tạo cảnh chọn', self.generate_selected).pack(side='left')
         self.button(row, 'Thêm clip', self.import_clip).pack(side='right')
-        preview_frame = tk.Frame(right, bg=FIELD, height=90 if self.short_screen else 170)
+        preview_frame = tk.Frame(right, bg=FIELD, height=60 if self.short_screen else 170)
         preview_frame.pack(fill='both', expand=True, pady=(0, 8))
         preview_frame.pack_propagate(False)
         self.preview = tk.Label(preview_frame, text='Cảnh hoàn thành sẽ hiện tại đây\n\nẢnh tham chiếu cố định · Tiếng nói từ H3',
@@ -155,9 +158,9 @@ class App(tk.Tk):
         self.preview.pack(fill='both', expand=True)
         self.scene_title = self.label(right, 'Chọn cảnh để chỉnh mô tả và lời thoại', True)
         self.scene_title.pack(fill='x')
-        self.prompt = self.text(right, 2 if self.short_screen else 3)
+        self.prompt = self.text(right, 1 if self.short_screen else 3)
         self.prompt.pack(fill='x', pady=5)
-        self.dialogue = self.text(right, 2)
+        self.dialogue = self.text(right, 1 if self.short_screen else 2)
         self.dialogue.pack(fill='x', pady=5)
         row = tk.Frame(right, bg=CARD)
         row.pack(fill='x')
@@ -165,7 +168,7 @@ class App(tk.Tk):
         self.button(row, 'Xem clip cảnh', self.watch_scene).pack(side='left', padx=6)
         self.button(row, 'Tạo lại cảnh', self.redo_scene).pack(side='right')
         bottom = self.bottom = tk.Frame(self.work, bg=BG)
-        bottom.pack(fill='x', pady=10)
+        bottom.grid(row=2, column=0, sticky='ew', pady=10)
         self.button(bottom, 'Tiếp tục tạo cảnh', self.continue_project, True).pack(side='left')
         self.button(bottom, 'Ghép & xuất MP4', self.export).pack(side='left', padx=7)
         self.button(bottom, 'Nhạc nền', self.choose_music).pack(side='left')
@@ -633,12 +636,21 @@ def main():
     if '--smoke-test' in sys.argv:
         def finish():
             try:
+                test_image = tk.PhotoImage(master=app, width=320, height=180)
+                test_image.put(ACCENT, to=(0, 0, 320, 180))
+                app.preview.configure(image=test_image)
+                app.update_idletasks()
                 assert app.tabs.index('end') == 3
                 assert app.tree.winfo_exists()
                 assert app.dialogue.winfo_height() >= 30, 'Dialogue editor clipped'
                 assert app.preview.winfo_height() >= 50, 'Scene preview clipped'
+                assert app.footer.winfo_ismapped(), 'Footer hidden'
+                assert app.bottom.winfo_ismapped(), 'Export bar hidden'
                 for button in app.bottom.winfo_children():
-                    assert button.winfo_rooty() + button.winfo_height() < app.winfo_screenheight() - 30, 'Export controls below screen'
+                    assert button.winfo_ismapped(), 'Export control hidden'
+                    assert button.winfo_rooty() + button.winfo_height() < min(app.winfo_screenheight() - 30, app.winfo_rooty() + app.winfo_height()), 'Export controls below screen'
+                app.preview.configure(image='')
+                app.update_idletasks()
                 preview = os.environ.get('H3_UI_PREVIEW')
                 if preview:
                     from PIL import ImageGrab

@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 import uuid
 
-VERSION = '0.1.1'
+VERSION = '0.1.2'
 APP_HOME = Path(os.environ.get('LOCALAPPDATA', Path.home() / '.local/share')) / 'H3Studio'
 ROOT = Path(__file__).resolve().parent
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
