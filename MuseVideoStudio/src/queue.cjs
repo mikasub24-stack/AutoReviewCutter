@@ -290,13 +290,33 @@ class Queue {
     })();
     return this.runningPromise;
   }
+  // «Tạo lại» KHI CẢ LÔ ĐANG CHẠY: không dừng lô, chỉ xếp cảnh này về «đang chờ» (đứng trước các cảnh chưa chạy) để worker rảnh nhặt ngay.
+  // Cảnh đã xong giữ video cũ trong previousOutputs; cảnh lỗi / bị gián đoạn gửi lại như «Tiếp tục» (resubmit); cả hai chạy lại trên đúng tab tài khoản cũ.
+  async requeue(id){
+    const job=this.jobs.find(item=>item.id===id);
+    if(!job)throw Error('Không tìm thấy cảnh này.');
+    if(job.status==='completed'&&job.output){
+      job.previousOutputs=[...new Set([...(job.previousOutputs||[]),job.output])];
+      job.previousOutput=job.output;
+      if(job.dependsOn==='image'||job.refList?.length){job.mayHaveSubmitted=false;job.lockedInput&&delete job.lockedInput;}
+      job.output='';job.lastFrame='';
+    }else if(!['failed','interrupted'].includes(job.status))throw Error('Chỉ tạo lại cảnh đã hoàn thành, bị lỗi hoặc bị gián đoạn.');
+    job.resumeMode='resubmit';job.error='';
+    Object.assign(job,{status:'pending',stage:'pending',stageMessage:'',progress:null,downloadProgress:null});
+    await this.publish();
+  }
+  // Cảnh đã xong (sai tham chiếu, sai hình…) hoặc bị lỗi / bị gián đoạn đều tạo lại được; video cũ của cảnh đã xong được giữ (previousOutputs).
   regenerate(id){
     if(this.active)throw Error('Chờ hoặc dừng tác vụ hiện tại trước khi tạo lại.');
     const job=this.jobs.find(item=>item.id===id);
-    if(!job||job.status!=='completed'||!job.output)throw Error('Chỉ tạo lại cảnh đã hoàn thành.');
-    job.previousOutputs=[...new Set([...(job.previousOutputs||[]),job.output])];
-    job.previousOutput=job.output;job.resumeMode='resubmit';
-    if(job.dependsOn==='image'||job.refList?.length){job.mayHaveSubmitted=false;job.lockedInput&&delete job.lockedInput;this.attachImage(job);}
+    const broken=Boolean(job)&&['failed','interrupted'].includes(job.status);
+    if(!job||!(broken||(job.status==='completed'&&job.output)))throw Error('Chỉ tạo lại cảnh đã hoàn thành, bị lỗi hoặc bị gián đoạn.');
+    if(broken){job.resumeMode='resubmit';job.error='';this.attachImage(job);}
+    else{
+      job.previousOutputs=[...new Set([...(job.previousOutputs||[]),job.output])];
+      job.previousOutput=job.output;job.resumeMode='resubmit';
+      if(job.dependsOn==='image'||job.refList?.length){job.mayHaveSubmitted=false;job.lockedInput&&delete job.lockedInput;this.attachImage(job);}
+    }
     this.paused=false;this.active=true;
     this.runningPromise=(async()=>{
       try{await this.executeJob(job,(item,signal)=>this.run(item,Math.max(0,Number(item.account||1)-1),signal),false);if(job.status==='completed')delete job.resumeMode;}

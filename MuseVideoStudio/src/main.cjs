@@ -944,15 +944,28 @@ app.whenReady().then(async () => {
       invalidateOutputs();queue.recover(id,(job,signal)=>runJob(job,0,signal,{recover:true})).catch(e=>dialog.showErrorBox(ui('Lấy video đã tạo','Recover existing video'),e.message)).finally(notify);return snapshot();
     },
     regenerate: async id=>{
-      if(accountOperationBusy()||resettingAccounts.size)throw Error('Chờ hoặc dừng tác vụ hiện tại trước khi tạo lại.');
-      const job=queue.jobs.find(j=>j.id===id);if(!job||job.status!=='completed'||!job.output)throw Error('Chỉ tạo lại cảnh đã hoàn thành.');
+      const job=queue.jobs.find(j=>j.id===id);
+      const broken=Boolean(job)&&['failed','interrupted'].includes(job.status);
+      if(!job||!(broken||(job.status==='completed'&&job.output)))throw Error('Chỉ tạo lại cảnh đã xong, bị lỗi hoặc bị gián đoạn.');
+      if(resettingAccounts.size||stopping||merging||packaging||starting||testing||(!queue.active&&accountOperationBusy()))throw Error('Chờ hoặc dừng tác vụ hiện tại trước khi tạo lại.');
       const index=Math.max(0,Number(job.account||1)-1);validAccount(index);
+      // Cảnh dọn nhà đã loại khỏi video mà được tạo lại: bản mới là bản người dùng muốn dùng, đưa lại vào video.
+      const reinclude=async()=>{const em=job.kind==='restore'?settings.restoreStories?.[job.storyId]:null;if(em?.excluded?.length){em.excluded=em.excluded.filter(n=>Number(n)!==Number(job.number));await save();}};
+      // Cả lô đang chạy: không bắt người dùng dừng lô. Xếp lại đúng cảnh này, worker rảnh (đúng tab tài khoản cũ) nhặt ngay.
+      if(queue.active){
+        if(queue.kind&&job.kind!==queue.kind)throw Error('Hàng đợi đang chạy loại việc khác. Chờ xong hoặc dừng rồi tạo lại cảnh này.');
+        if(Number(job.account||0)>settings.accountCount)throw Error('Cảnh này gắn với tài khoản '+job.account+'. Chọn đủ tài khoản trước khi tạo lại.');
+        await reinclude();
+        if(job.kind==='video')invalidateOutputs();
+        await queue.requeue(id);
+        if(broken)browsers.get(index)?.releasePage?.(id);
+        return snapshot();
+      }
       const epoch=runEpoch;starting=true;notify();
       try{
         await licenseManager.ensureAllowed();await openMuse(index);
         if(epoch!==runEpoch||flushingQuit||stopping)return snapshot();
-        // Cảnh dọn nhà đã loại khỏi video mà được tạo lại: bản mới là bản người dùng muốn dùng, đưa lại vào video.
-        {const em=job.kind==='restore'?settings.restoreStories?.[job.storyId]:null;if(em?.excluded?.length){em.excluded=em.excluded.filter(n=>Number(n)!==Number(job.number));await save();}}
+        await reinclude();
         if(job.kind==='video')invalidateOutputs();queue.regenerate(id).catch(e=>dialog.showErrorBox(ui('Tạo lại','Regenerate'),e.message)).finally(notify);
       }finally{starting=false;notify();}
       return snapshot();

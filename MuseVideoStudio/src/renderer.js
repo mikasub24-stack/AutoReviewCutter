@@ -135,7 +135,11 @@ function makeCard(id){
     }
     render(await call('remove',j.id));
   });
-  row.regenerate=action('Tạo lại',async()=>render(await call('regenerate',row.job.id)));
+  row.regenerate=action('Tạo lại',async()=>{
+    const j=row.job;   // cảnh lỗi đã gửi tới Muse thì có thể ra video trùng: hỏi như «Gửi lại prompt»
+    if(['failed','interrupted'].includes(j.status)&&(j.mayHaveSubmitted||j.submittedAt||j.resultReadyAt)&&!confirm('Kiểm tra Muse trước. Gửi lại prompt có thể tạo video trùng nếu tác vụ trước đã gửi.'))return;
+    render(await call('regenerate',j.id));
+  });
   row.regenerate.title='Tạo lại cảnh này; giữ video cũ.';
   row.exclude=action('Bỏ khỏi video',async()=>{const j=row.job,meta=state.restore?.stories?.[j.storyId],out=(meta?.excluded||[]).map(Number).includes(Number(j.number));render(await call('restoreExclude',{storyId:j.storyId,number:j.number,exclude:!out}));});
   row.exclude.title='Cảnh sai đồ vật hoặc hành động? Loại cảnh này khỏi video (không xóa clip), rồi bấm «Dựng lại video» ở phần Dọn nhà. Bấm lần nữa để đưa lại.';
@@ -239,7 +243,7 @@ function updateCard(row,job,index){
     row.exclude.disabled=Boolean(state.active||state.starting||state.stopping||state.merging||state.packaging||state.restore?.busy);
   }
   if(left){row.fileLine.hidden=false;text(row.fileLine,(job.output?'✓ '+job.output.split(/[\\/]/).pop():'')+' · đang bỏ khỏi video');}
-  row.regenerate.hidden=job.status!=='completed';row.regenerate.disabled=Boolean(state.active||state.starting||state.stopping||state.testing||state.merging||state.packaging);
+  row.regenerate.hidden=!['completed','failed','interrupted'].includes(job.status);row.regenerate.disabled=Boolean(state.starting||state.stopping||state.testing||state.merging||state.packaging);   // lô đang chạy vẫn bấm được: cảnh được xếp chạy lại
   const recoverable=['failed','interrupted'].includes(job.status)&&Boolean(job.mayHaveSubmitted||job.submittedAt||job.resultReadyAt);
   row.recover.hidden=!recoverable;row.recover.disabled=Boolean(state.active||state.starting||state.stopping||state.merging||state.packaging);
   row.retry.hidden=!['failed','interrupted'].includes(job.status);row.remove.hidden=job.status==='running';row.edit.hidden=job.kind==='story'||job.kind==='restore'||job.kind==='wild'||job.status!=='pending'||Boolean(job.lockedInput);row.retry.disabled=Boolean(state.active||state.starting||state.stopping);

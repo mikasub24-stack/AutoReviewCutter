@@ -683,3 +683,28 @@ test('xoay vòng ô rảnh: đoạn khác đã xong mà một chuỗi còn dài 
     assert.ok(at(dep) < 0 || at(dep) < at(j), `cảnh ${j.number} chạy sau việc nó cần`);
   }
 });
+
+test('Tạo lại cảnh lỗi chạy riêng cảnh đó, không đụng cảnh đang chờ', async () => {
+  const ran = [];
+  const q = new Queue({ save: async () => {}, jobs: [{ id: 'bad', status: 'failed', prompt: 'P', error: 'x', number: 1 }, { id: 'stopped', status: 'interrupted', prompt: 'S', number: 2 }, { id: 'later', status: 'pending', prompt: 'L', number: 3 }], run: async job => { ran.push(job.id); return job.id + '.mp4'; } });
+  await q.regenerate('bad'); await q.regenerate('stopped');
+  assert.deepEqual(ran, ['bad', 'stopped']);
+  assert.deepEqual(q.jobs.map(j => j.status), ['completed', 'completed', 'pending']);
+  assert.throws(() => q.regenerate('later'), /Chỉ tạo lại/);
+});
+test('requeue khi cả lô đang chạy: cảnh đã xong / cảnh lỗi được nhặt chạy lại, video cũ được giữ', async () => {
+  let release; const gate = new Promise(r => release = r), ran = [];
+  const q = new Queue({ save: async () => {}, jobs: [
+    { id: 'done', status: 'completed', prompt: 'A', number: 1, output: '001.mp4' },
+    { id: 'bad', status: 'failed', prompt: 'B', number: 2, error: 'lỗi' },
+    { id: 'busy', status: 'pending', prompt: 'C', number: 3 }], run: async job => { ran.push(job.id); if (job.id === 'busy') await gate; return job.id === 'done' ? '001 (2).mp4' : job.id + '.mp4'; } });
+  const batch = q.start(); await new Promise(r => setTimeout(r, 30));
+  assert.equal(q.jobs[2].status, 'running');
+  await q.requeue('done'); await q.requeue('bad');
+  assert.deepEqual([q.jobs[0].status, q.jobs[0].output, q.jobs[0].previousOutput, q.jobs[1].status], ['pending', '', '001.mp4', 'pending']);
+  await assert.rejects(() => q.requeue('busy'), /Chỉ tạo lại/);
+  release(); await batch;
+  assert.deepEqual(ran, ['busy', 'done', 'bad']);
+  assert.deepEqual(q.jobs.map(j => j.status), ['completed', 'completed', 'completed']);
+  assert.equal(q.jobs[0].output, '001 (2).mp4'); assert.deepEqual(q.jobs[0].previousOutputs, ['001.mp4']);
+});

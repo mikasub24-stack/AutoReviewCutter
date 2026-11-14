@@ -26,12 +26,16 @@ assert.equal(await page.locator('#jobs .card').first().getAttribute('data-job-id
 assert.match(await page.locator('[data-job-id=scene-1] .stageName').textContent(),/Đã tải xong/);
 assert.equal(await page.locator('#jobs .card[data-status=running]').count(),4);
 await page.locator('#openOutput').click();assert.ok(await page.evaluate(()=>window.calls.some(c=>c.name==='openOutput')));
-assert.equal(await page.locator('[data-job-id=scene-1] button').filter({hasText:/^Tạo lại$/}).isDisabled(),true);
+// Lô đang chạy (s.active) vẫn bấm «Tạo lại» được: cảnh sai tham chiếu được xếp chạy lại, không phải dừng cả lô.
+assert.equal(await page.locator('[data-job-id=scene-1] button').filter({hasText:/^Tạo lại$/}).isEnabled(),true);
 await page.evaluate(()=>{window.s.active=false;window.push();});
 const redo=page.locator('[data-job-id=scene-1] button').filter({hasText:/^Tạo lại$/});assert.equal(await redo.isEnabled(),true);await redo.click();
 assert.equal(await page.evaluate(()=>window.calls.find(c=>c.name==='regenerate').data),'scene-1');
 await page.evaluate(()=>{Object.assign(window.s.jobs[0],{status:'failed',output:'',previousOutput:'C:/Videos/001.mp4'});window.push();});
 assert.equal(await page.locator('[data-job-id=scene-1] video').getAttribute('src'),'file:///C:/Videos/001.mp4');
 assert.equal(await page.locator('[data-job-id=scene-1] .mediaLabel').textContent(),'Video trước');
+assert.equal(await page.locator('[data-job-id=scene-1] button').filter({hasText:/^Tạo lại$/}).isVisible(),true,'cảnh lỗi cũng có nút «Tạo lại»');
+await page.evaluate(()=>{Object.assign(window.s.jobs[0],{status:'interrupted'});window.push();});
+assert.equal(await page.locator('[data-job-id=scene-1] button').filter({hasText:/^Tạo lại$/}).isVisible(),true,'cảnh bị gián đoạn cũng có nút «Tạo lại»');
 assert.equal(await page.locator('[data-job-id=scene-1] button').filter({hasText:'Mở vị trí video'}).isVisible(),true);
 await page.screenshot({path:process.env.MUSE_UI_SCREENSHOT||path.join(require('node:os').tmpdir(),'muse-inline-queue.png'),fullPage:true});assert.deepEqual(errors,[]);console.log('PASS: keyed card/video identity, observed-only progress, download bytes, elapsed time, local file URL, recovery IPC and parallel/settings defaults. Mock bridge; no Muse requests.');}finally{await browser.close();server.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
