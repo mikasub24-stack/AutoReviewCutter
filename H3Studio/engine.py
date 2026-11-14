@@ -32,6 +32,10 @@ class Stopped(Exception):
     pass
 
 
+class TaskFailed(ValueError):
+    pass
+
+
 def atomic_json(path, data):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -415,7 +419,7 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
             req = {'apiKey': key, 'taskId': task}
             status = str(unpack_rh(self.http.json(base + '/task/openapi/status', req, key))).lower()
             if status in ('failed', 'failure', 'cancelled', 'canceled'):
-                raise ValueError('Tác vụ H3 lỗi hoặc đã bị hủy. Xem chi tiết trong RunningHub; app không tự gửi lại để tránh tính phí trùng.')
+                raise TaskFailed('Tác vụ H3 lỗi hoặc đã bị hủy. Xem chi tiết trong RunningHub; app không tự gửi lại để tránh tính phí trùng.')
             if status == 'success':
                 outputs = unpack_rh(self.http.json(base + '/task/openapi/outputs', req, key))
                 videos = [o for o in outputs if o.get('fileType', '').lower() == 'mp4']
@@ -431,7 +435,7 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
             return None
         item = history[task]
         if item.get('status', {}).get('status_str') == 'error':
-            raise ValueError('ComfyUI báo lỗi inference. Xem console ComfyUI; app giữ ID, không tự chạy lại.')
+            raise TaskFailed('ComfyUI báo lỗi inference. Xem console ComfyUI; app giữ ID, không tự chạy lại.')
         output = item.get('outputs', {}).get('14', {})
         for values in output.values():
             if isinstance(values, list):
@@ -474,7 +478,12 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
             while True:
                 self.http.check()
                 self.emit('status', f'Cảnh {key}/{len(project.data["scenes"])} · Cloud đang xử lý · {round(time.monotonic()-start)} giây chờ')
-                url = self.poll(job['task_id'], job['provider'], job['base'])
+                try:
+                    url = self.poll(job['task_id'], job['provider'], job['base'])
+                except TaskFailed:
+                    job['status'] = 'failed'
+                    project.save()
+                    raise
                 if url:
                     break
                 if time.monotonic() - start > 7200:

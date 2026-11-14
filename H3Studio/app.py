@@ -297,7 +297,7 @@ class App(tk.Tk):
             job = data['jobs'].get(str(scene['id']), {})
             ready = bool(job.get('file') and self.project.file(job['file']).exists())
             done += ready
-            state = '✓ Có clip' if ready else ('Đã gửi' if job.get('task_id') else ('Cần kiểm tra' if job.get('submit_uncertain') else 'Chưa tạo'))
+            state = '✓ Có clip' if ready else ('Lỗi · tạo lại' if job.get('status') == 'failed' else ('Đã gửi' if job.get('task_id') else ('Cần kiểm tra' if job.get('submit_uncertain') else 'Chưa tạo')))
             self.tree.insert('', 'end', iid=str(scene['id']), text=f'{scene["id"]:02} · {scene["title"][:25]}', values=(state,))
         self.summary.set(f'02   CÁC CẢNH · {done}/{len(data["scenes"])} · {round(sum(s["seconds"] for s in data["scenes"]))} giây dự kiến')
         for ch in data['characters']:
@@ -449,7 +449,7 @@ class App(tk.Tk):
         if not self.project or self.selected is None or self.busy:
             return
         job = self.project.data['jobs'].get(str(self.selected), {})
-        if job.get('task_id') and not job.get('file'):
+        if job.get('task_id') and not job.get('file') and job.get('status') != 'failed':
             messagebox.showinfo('Tác vụ đã gửi', 'Cảnh còn task cloud chưa lấy được kết quả. Kiểm tra tác vụ đó trước; không gửi trùng.'); return
         if not messagebox.askyesno('Tạo lại cảnh', 'Tạo phiên bản mới có thể tính phí thêm. Clip cũ sẽ được giữ trong thư mục dự án. Tiếp tục?'):
             return
@@ -464,7 +464,7 @@ class App(tk.Tk):
         if not self.project or self.selected is None or self.busy:
             return
         job = self.project.data['jobs'].get(str(self.selected), {})
-        if job.get('task_id') and not job.get('file'):
+        if job.get('task_id') and not job.get('file') and job.get('status') != 'failed':
             self.status.set('Cảnh đang có tác vụ cloud. Kiểm tra kết quả trước khi thay bằng clip khác.'); return
         source = filedialog.askopenfilename(filetypes=[('Video MP4', '*.mp4')])
         if not source:

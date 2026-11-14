@@ -155,6 +155,7 @@ class EngineTests(unittest.TestCase):
         p = self.project()
         with self.assertRaises(ValueError): self.runner(http).run(p)
         self.assertEqual(http.submissions, 1)
+        self.assertEqual(p.data['jobs']['1']['status'], 'failed')
         with self.assertRaises(ValueError): self.runner(http).run(p)
         self.assertEqual(http.submissions, 1)
     def test_stop_is_responsive_while_waiting(self):
