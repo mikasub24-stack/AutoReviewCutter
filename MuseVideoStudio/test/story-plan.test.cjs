@@ -1495,3 +1495,50 @@ test('cây trồng: lời đọc tiến triển TỪ TỪ, mỗi bước chỉ t
   const tip = sp.buildTipScriptInstruction({ ...plantBase, tipKind: 'tip', tipTitle: 'Mẹo rửa rau' }, { marker: 'ab12cd' });
   assert.ok(!tip.includes('TIẾN TRÌNH PHẢI TỪ TỪ'), 'mẹo vặt không dính');
 });
+
+// Câu khóa hình dạng chỉ được gắn lúc chia cảnh. Ảnh nhân vật gắn / đổi sau đó thì ảnh vẫn gửi kèm nhưng prompt không nhắc, nên clip lúc 2D lúc người thật.
+const AUDIO = 'Audio: no speech, no dialogue, no singing, no narration, no mumbling, no murmuring, no whispering, no humming, no laughing out loud, no human voice or vocal sound of any kind, and no music, no sound effects, no ambient noise - the video must be completely silent with no audio at all. Characters may still open their mouths, laugh, gossip, shout and show every facial expression and gesture visually so that the spoken lines are clearly expressed, but with no sound whatsoever.';
+const NO_LOCK = 'Video khung NGANG 16:9 (widescreen).\nKhung hình ngang 16:9, trong một căn phòng đơn giản vào ban ngày, người dẫn chuyện đứng bên bàn chỉ tay vào bản đồ.\n0–2 giây: anh chỉ bản đồ.\n' + AUDIO;
+
+test('refreshPrompt: prompt không có khóa mà có ảnh nhân vật thì gắn khóa trước dòng Audio, giữ nguyên phần còn lại', () => {
+  assert.equal(sp.hasShapeLock(NO_LOCK), false);
+  const out = sp.refreshPrompt(NO_LOCK, { reference: true, aspect: '16:9' });
+  assert.equal(sp.hasShapeLock(out), true);
+  const lines = out.split('\n');
+  assert.match(lines.find(l => /^KHÓA HÌNH DẠNG NHÂN VẬT/.test(l)), /ảnh tham chiếu/);
+  assert.ok(lines.findIndex(l => /^KHÓA/.test(l)) < lines.findIndex(l => /^Audio:/.test(l)), 'khóa nằm trước dòng Audio');
+  assert.equal(lines[0], 'Video khung NGANG 16:9 (widescreen).');
+  assert.equal(lines.filter(l => /16:9/.test(l) && /^Video khung/.test(l)).length, 1, 'không thêm câu tỉ lệ thứ hai');
+  assert.ok(out.includes('0–2 giây: anh chỉ bản đồ.'));
+  assert.ok(out.includes(AUDIO));
+});
+
+test('refreshPrompt: chạy lại không đổi gì; bỏ ảnh thì gỡ khóa và trở về đúng prompt ban đầu; hình dạng chuẩn gõ tay vẫn tạo khóa', () => {
+  const locked = sp.refreshPrompt(NO_LOCK, { reference: true });
+  assert.equal(sp.refreshPrompt(locked, { reference: true }), locked, 'idempotent');
+  assert.equal(locked.split('\n').filter(l => /^KHÓA/.test(l)).length, 1, 'chỉ một dòng khóa');
+  assert.equal(sp.refreshPrompt(locked, { reference: false }), NO_LOCK, 'bỏ ảnh: gỡ khóa');
+  const byForm = sp.refreshPrompt(NO_LOCK, { reference: false, form: 'người que' });
+  assert.match(byForm, /^KHÓA HÌNH DẠNG NHÂN VẬT[^\n]*người que/m);
+  assert.doesNotMatch(byForm, /ảnh tham chiếu/);
+  assert.equal(sp.refreshPrompt(byForm, { reference: true, form: 'người que' }).split('\n').filter(l => /^KHÓA/.test(l)).length, 1, 'đổi từ hình dạng sang ảnh vẫn một dòng');
+});
+
+test('refreshPrompt: giữ tỉ lệ dọc đã có, nhận đúng ngôn ngữ dù dòng Audio bằng tiếng Anh, không đụng quảng cáo / mẹo', () => {
+  const vertical = 'Video khung DỌC 9:16 (toàn màn hình điện thoại).\nCảnh trong bếp, bà Mai nấu cơm.\n' + AUDIO;
+  const out = sp.refreshPrompt(vertical, { reference: true, aspect: '16:9' });
+  assert.ok(!/16:9|NGANG/.test(out), 'không chèn tỉ lệ ngang vào cảnh dọc');
+  assert.match(out, /KHÓA HÌNH DẠNG NHÂN VẬT/, 'cảnh tiếng Việt ngắn vẫn dùng câu khóa tiếng Việt');
+  const english = 'Horizontal 16:9 widescreen video.\nThe old man walks along the river with a heavy bag and looks at the sky.\n' + AUDIO;
+  assert.match(sp.refreshPrompt(english, { reference: true }), /CHARACTER SHAPE LOCK \(mandatory\)/);
+  assert.equal(sp.refreshPrompt(NO_LOCK, { reference: true, ad: { product: 'Kem dưỡng' } }), NO_LOCK.trim(), 'quảng cáo không gắn khóa nhân vật');
+  assert.equal(sp.refreshPrompt(NO_LOCK, { reference: true, tip: true }), NO_LOCK.trim(), 'mẹo vặt không gắn khóa nhân vật');
+  assert.equal(sp.refreshPrompt('', { reference: true }), '');
+});
+
+test('refreshPrompt: không biết tỉ lệ thì không tự thêm câu tỉ lệ', () => {
+  const bare = 'Bà Mai nấu cơm trong bếp.\n' + AUDIO;
+  const out = sp.refreshPrompt(bare, { reference: true });
+  assert.ok(!/Tỷ lệ khung hình|khung NGANG|khung DỌC|khung VUÔNG/.test(out));
+  assert.match(out, /KHÓA HÌNH DẠNG NHÂN VẬT/);
+});

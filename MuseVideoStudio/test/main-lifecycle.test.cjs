@@ -29,7 +29,7 @@ const safeStorage = {
 };
 
 async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, longTerm, wildWriterFactory, domTimeoutMs=20000, logoutResponse=1,closeResponse=1,closeGate } = {}) {
-  const handlers = new Map(), sessions = new Map(), windows = [], errors = [], notices = [];
+  const handlers = new Map(), sessions = new Map(), windows = [], errors = [], notices = [], trashed = [];
   const lifecycle = [],updates=[];
   let loaded, quit;
   const loadedPromise = new Promise(resolve => { loaded = resolve; });
@@ -94,7 +94,7 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
   };
   const electron = { app, BrowserWindow, safeStorage, dialog,Menu:{setApplicationMenu:value=>{lifecycle.push(value===null?'menu-removed':'menu-set');}},
     session: { fromPartition: accountSession },
-    shell: { showItemInFolder() {}, openPath: async () => '', openExternal: async()=>{} },
+    shell: { showItemInFolder() {}, openPath: async () => '', openExternal: async()=>{}, trashItem: async target => { trashed.push(target); } },
     ipcMain: { handle: (name, handler) => handlers.set(name, handler) }
   };
   const context = vm.createContext({
@@ -115,7 +115,7 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
   else await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(errors, []);
 
-  return { app,handlers, sessions, windows, lifecycle, notices, errors,updates,
+  return { app,handlers, sessions, windows, lifecycle, notices, errors,updates,trashed,
     invoke: (name, data, sender = windows[0]?.webContents) => {
       return handlers.get(`studio:${name}`)({ sender }, data);
     },
@@ -310,6 +310,81 @@ test('stop IPC interrupts a waiting browser job without sending another prompt',
  await app.invoke('settings',{...app.invoke('state').settings,requireUSA:false,output:dir,accountCount:1,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'original complete scene'},{prompt:'next scene'}]);await app.invoke('start');await waiting;
  const stopped=await app.invoke('stop');assert.equal(stopped.active,false);assert.deepEqual(Array.from(stopped.jobs,j=>j.status),['interrupted','pending']);assert.equal(submitted,0);await app.invoke('clearPending');assert.equal(app.invoke('state').jobs.length,1);await app.invoke('clearList');assert.equal(app.invoke('state').jobs.length,0);await app.stop();
  }finally{await fs.rm(dir,{recursive:true,force:true});}
+});
+
+test('storyRelock gắn khóa hình dạng vào cảnh CHƯA xong có ảnh nhân vật, không đụng cảnh xong / quảng cáo / mẹo / không ảnh',{timeout:8000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-relock-'));
+  const AUDIO='Audio: no speech, no dialogue, no singing, no narration, no mumbling, no murmuring, no whispering, no humming, no laughing out loud, no human voice or vocal sound of any kind, and no music, no sound effects, no ambient noise - the video must be completely silent with no audio at all. Characters may still open their mouths, laugh, gossip, shout and show every facial expression and gesture visually so that the spoken lines are clearly expressed, but with no sound whatsoever.';
+  const prompt=n=>`Video khung NGANG 16:9 (widescreen).\nKhung hình ngang 16:9, cảnh số ${n}, người dẫn chuyện đứng bên bàn chỉ vào bản đồ.\n${AUDIO}`;
+  const base={kind:'story',storyId:'Truyen-A',image:'/refs/nv.png',references:['/refs/nv.png'],error:'',output:''};
+  const seed=[
+    {...base,id:'pending-ref',prompt:prompt(1),status:'pending',order:1},
+    {...base,id:'failed-ref',prompt:prompt(2),status:'failed',order:2,error:'Muse báo lỗi'},
+    {...base,id:'done-ref',prompt:prompt(3),status:'completed',order:3,output:'/o/3.mp4'},
+    {...base,id:'no-ref',prompt:prompt(4),status:'pending',order:4,image:'',references:[]},
+    {...base,id:'ad-ref',prompt:prompt(5),status:'pending',order:5,storyMode:'ad'},
+    {...base,id:'tip-clip',prompt:prompt(6),status:'pending',order:6,phase:'clip',dependsOn:'image'},
+    {...base,id:'other-story',prompt:prompt(7),status:'pending',order:7,storyId:'Truyen-B'}
+  ];
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({settings:{output:dir},configVersion:2,jobs:seed}));
+  try{
+    const app=await boot(dir);
+    const before=Object.fromEntries(app.invoke('state').jobs.map(j=>[j.id,j.prompt]));
+    const result=await app.invoke('storyRelock',{storyId:'Truyen-A',form:''});
+    const after=Object.fromEntries(result.jobs.map(j=>[j.id,j]));
+    const locked=id=>/^KHÓA HÌNH DẠNG NHÂN VẬT \(bắt buộc\):/m.test(after[id].prompt);
+    assert.equal(locked('pending-ref'),true,'cảnh chờ có ảnh được gắn khóa');
+    assert.equal(locked('failed-ref'),true,'cảnh lỗi có ảnh được gắn khóa');
+    assert.match(after['failed-ref'].error,/Đã sửa prompt/,'cảnh lỗi báo cần gửi lại prompt');
+    assert.equal(after['failed-ref'].status,'failed');
+    for(const id of ['done-ref','no-ref','ad-ref','tip-clip','other-story'])assert.equal(after[id].prompt,before[id],id+' giữ nguyên');
+    assert.equal(JSON.stringify(result.relocked),JSON.stringify({changed:2,skipped:1,total:4}));
+    assert.ok(after['pending-ref'].prompt.includes(AUDIO)&&after['pending-ref'].prompt.startsWith('Video khung NGANG 16:9 (widescreen).'),'phần còn lại của prompt giữ nguyên');
+    assert.equal(after['pending-ref'].prompt.split('\n').filter(l=>/^KHÓA/.test(l)).length,1);
+    const again=await app.invoke('storyRelock',{storyId:'Truyen-A',form:''});
+    assert.equal(again.relocked.changed,0,'chạy lại không đổi gì');
+    await assert.rejects(()=>app.invoke('storyRelock',{storyId:''}),/Chọn truyện/);
+    // add() nhớ cảnh quảng cáo để lần sau không gắn nhầm
+    const added=await app.invoke('add',[{kind:'story',storyId:'Truyen-C',storyMode:'ad',prompt:prompt(8),image:'/refs/sp.png'},{kind:'story',storyId:'Truyen-C',prompt:prompt(9),image:'/refs/nv.png'}]);
+    const ads=added.jobs.filter(j=>j.storyId==='Truyen-C');
+    assert.equal(JSON.stringify(ads.map(j=>j.storyMode||'')),JSON.stringify(['ad','']));
+    const adResult=await app.invoke('storyRelock',{storyId:'Truyen-C',form:''});
+    assert.equal(adResult.relocked.total,1,'cảnh quảng cáo không nằm trong phạm vi');
+    await app.stop();
+  }finally{await fs.rm(dir,{recursive:true,force:true});}
+});
+
+test('xóa cảnh / truyện kể chuyện khỏi danh sách thì file trong KeChuyen vào Thùng rác; cảnh khác tab và file ngoài KeChuyen không bị đụng',{timeout:8000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-trash-'));
+  const root=path.join(dir,'KeChuyen'),A=path.join(root,'Truyen-A'),B=path.join(root,'Truyen-B'),D=path.join(root,'Truyen-D');
+  for(const folder of [A,B,D])await fs.mkdir(folder,{recursive:true});
+  await fs.writeFile(path.join(dir,'ngoai.mp4'),'x');
+  for(const file of [path.join(A,'001.mp4'),path.join(A,'002.mp4'),path.join(B,'001.mp4'),path.join(D,'002.mp4')])await fs.writeFile(file,'clip');
+  const job=(id,kind,storyId,output,order)=>({id,kind,storyId,status:'completed',stage:'completed',prompt:'p '+id,output,order,references:[],image:''});
+  const seed=[
+    job('a1','story','Truyen-A',path.join(A,'001.mp4'),1),job('a2','story','Truyen-A',path.join(A,'002.mp4'),2),
+    job('b1','story','Truyen-B',path.join(B,'001.mp4'),3),
+    job('d1','story','Truyen-D',path.join(dir,'ngoai.mp4'),4),job('d2','story','Truyen-D',path.join(D,'002.mp4'),5),
+    job('v1','video','',path.join(dir,'ngoai.mp4'),6)
+  ];
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({settings:{output:dir},configVersion:2,jobs:seed}));
+  try{
+    const app=await boot(dir);
+    await app.invoke('remove','a1');
+    assert.equal(JSON.stringify(app.trashed),JSON.stringify([path.join(A,'001.mp4')]),'cảnh không phải cuối: chỉ clip của cảnh vào Thùng rác');
+    await app.invoke('remove','a2');
+    assert.equal(JSON.stringify(app.trashed.slice(1)),JSON.stringify([A]),'cảnh cuối: cả thư mục truyện vào Thùng rác (không lẻ từng file)');
+    const before=app.trashed.length;
+    await app.invoke('remove','d1');
+    assert.equal(app.trashed.length,before,'file nằm ngoài KeChuyen không bao giờ bị đụng');
+    await app.invoke('remove','v1');
+    assert.equal(app.trashed.length,before,'cảnh của tab khác không bị xóa file');
+    const cleared=await app.invoke('clearList',{kind:'story'});
+    assert.equal(JSON.stringify(app.trashed.slice(before).sort()),JSON.stringify([B,D].sort()),'xóa danh sách kể chuyện: thư mục các truyện còn lại vào Thùng rác');
+    assert.equal(cleared.jobs.filter(j=>j.kind==='story').length,0);
+    assert.equal(await fs.readFile(path.join(dir,'ngoai.mp4'),'utf8'),'x','file ngoài KeChuyen còn nguyên');
+    await app.stop();
+  }finally{await fs.rm(dir,{recursive:true,force:true});}
 });
 
 function fixtureMp4(){

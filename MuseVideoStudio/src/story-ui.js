@@ -302,8 +302,28 @@
     }, delay);
   }
   // Đổi ảnh sản phẩm: tạo lại cảnh; bỏ ảnh thì xóa các cảnh tự tạo chưa sửa.
+  // Kể chuyện thường: câu khóa hình dạng chỉ được gắn lúc chia cảnh. Đổi ảnh nhân vật / hình dạng chuẩn SAU đó thì gắn lại (hoặc gỡ) câu khóa ở mọi cảnh đang soạn,
+  // không thì prompt không nhắc ảnh tham chiếu và Muse vẽ lúc 2D lúc người thật. Chỉ sửa đúng dòng khóa, phần còn lại của prompt (kể cả chỗ bạn đã sửa) giữ nguyên.
+  function relockScenes() {
+    if (isTip() || isAd() || !scenes.length || !plan().refreshPrompt) return 0;
+    const opts = options();
+    let changed = 0;
+    for (const scene of scenes) {
+      let next = scene.prompt;
+      try { next = plan().refreshPrompt(scene.prompt, opts); } catch { continue; }
+      if (next && next !== scene.prompt) { scene.prompt = next; changed++; }
+    }
+    return changed;
+  }
+  function relockDrafts() {
+    const changed = relockScenes();
+    if (!changed) return;
+    renderScenes();
+    $('storyInfo').textContent = refs.length || $('storyForm').value.trim() ? `Đã gắn câu khóa hình dạng nhân vật vào ${changed} cảnh theo ảnh / hình dạng hiện tại.` : `Đã gỡ câu khóa hình dạng nhân vật khỏi ${changed} cảnh (không còn ảnh tham chiếu).`;
+  }
   function refsChanged() {
     refInfo();
+    relockDrafts();
     if (refs.length) autoAd(60);
     else if (isAd() && autoSnap && scenes.length && sceneSig() === autoSnap) { clearTimeout(autoTimer); scenes = []; autoSnap = ''; renderScenes(); }
   }
@@ -545,6 +565,7 @@
         : `Thêm ${scenes.length} cảnh và chạy toàn bộ clip kể chuyện đang chờ? Tạo video có thể dùng credit Muse. Tool gửi nguyên prompt đã xem, cùng ảnh ${isAd() ? 'sản phẩm' : 'nhân vật'}.`;
       if (!opts.auto && !confirm(question)) return;   // chạy tự động: bạn đã bấm «Làm tự động» (số lượt Muse hiện sẵn dưới ô độ dài) nên không hỏi lại
     }
+    relockScenes();   // chốt lần cuối: prompt gửi Muse luôn có câu khóa khi đang có ảnh nhân vật (kể cả ảnh gắn sau khi chia cảnh)
     const aspectNow = $('storyAspect').value;
     const title = storyTitle(), slug = slugTitle(title);
     const free = slug ? await call('storyFreeId', { base: slug }) : null;
@@ -909,6 +930,23 @@
     return list.find(g => g.id === picked) || list.at(-1) || null;
   }
   // Thêm truyện mới thì bỏ truyện cũ đã tạo xong và đã xuất MP4 khỏi hàng đợi. Truyện cũ chưa xuất MP4 được giữ lại (xóa là mất khả năng ghép trong app).
+  // Cảnh CHƯA xong của truyện đang chọn có ảnh nhân vật đính kèm mà prompt thiếu câu khóa hình dạng (đã thêm vào hàng đợi trước khi có bản sửa này, hoặc ảnh gắn sau khi chia cảnh).
+  function relockNeeded(story) {
+    if (!story || isAd() || isTip() || !plan().hasShapeLock) return 0;
+    return (state?.jobs || []).filter(j => j.kind === 'story' && j.storyId === story.id && !j.phase && j.storyMode !== 'ad'
+      && ['pending', 'failed', 'interrupted'].includes(j.status) && (j.image || (j.references || []).length) && !plan().hasShapeLock(j.prompt)).length;
+  }
+  async function relockQueued() {
+    const story = currentStory(); if (!story) return;
+    const need = relockNeeded(story);
+    if (!need) return toast('Các cảnh chưa xong đã có câu khóa rồi.');
+    if (!confirm(`Gắn câu «KHÓA HÌNH DẠNG NHÂN VẬT» vào prompt của ${need} cảnh chưa xong trong truyện ${story.id}? Chỉ thêm một dòng vào prompt, cảnh đã tạo xong không bị đụng tới. Cảnh bị lỗi hoặc bị gián đoạn cần bấm «Gửi lại prompt».`)) return;
+    const result = await call('storyRelock', { storyId: story.id, form: $('storyForm').value });
+    if (!result) return;
+    render(result);
+    const r = result.relocked || {};
+    toast(r.changed ? `Đã gắn khóa vào ${r.changed} cảnh.` : 'Không có cảnh nào cần gắn thêm.');
+  }
   async function clearOldStories(keepId) {
     const old = groups().filter(g => g.id !== keepId && g.total > 0 && g.done === g.total);
     const exported = g => exportedOk.has(g.id) || Boolean(state?.story?.output && state.story.storyId === g.id);
@@ -1027,10 +1065,16 @@
     if (r.phase === 'done') return 'Xong: MP4 đã xuất';
     return r.msg || 'Đã dừng';
   }
+  // Chỉ MỘT thanh tiến trình hiện cùng lúc (trước đây «Làm tự động», khung «Tạo clip / ghép video» và thanh trong mục xuất MP4 cùng chạy, chiếm cả màn hình).
+  // Ưu tiên: thanh «Làm tự động» (có chữ lý do khi dừng) > khung dưới ô truyện (luôn thấy dù mục xuất MP4 đang thu gọn) > thanh trong mục xuất MP4. Mỗi thanh vẫn cập nhật số liệu của nó.
+  function syncBars() {
+    const bars = ['autoRun', 'storyDone', 'runProgress'].map($), first = bars.find(b => b.dataset.want === '1');
+    for (const b of bars) b.hidden = b !== first;
+  }
   function renderAutoRun() {
     const box = $('autoRun'), r = autoRun;
-    box.hidden = !(r && autoOn());
-    if (box.hidden) return;
+    box.dataset.want = r && autoOn() ? '1' : ''; syncBars();
+    if (!box.dataset.want) return;
     const stuck = r.phase === 'stopped' || r.phase === 'error', p = autoPercent(r);
     if (!stuck) r.pct = r.phase === 'done' ? 100 : Math.max(r.pct || 0, p);   // thanh chỉ tiến, không lùi
     $('autoFill').style.width = (r.pct || 0) + '%'; $('autoBar').setAttribute('aria-valuenow', String(r.pct || 0));
@@ -1139,7 +1183,7 @@
   }
   function renderRun() {
     const info = $('autoExport').checked ? runInfo() : null, box = $('runProgress');
-    box.hidden = !info;
+    box.dataset.want = info ? '1' : ''; syncBars();
     const running = Boolean(info && !info.stuck && !info.done);
     $('storyExport').hidden = running; $('storyStatus').hidden = running;
     if (!info) return;
@@ -1160,7 +1204,7 @@
       else if (s.output && (!s.storyId || s.storyId === story.id)) kind = 'ready';
       else kind = 'todo';
     }
-    box.hidden = !kind;
+    box.dataset.want = kind ? '1' : ''; syncBars();
     if (!kind) return;
     const live = Boolean(state.active || state.starting);
     let pct = 0, title = '', text = '';
@@ -1210,6 +1254,9 @@
     else if (story) line = `${story.total} cảnh đã sẵn sàng. Chọn giọng, phụ đề rồi bấm Xuất MP4.`;
     else line = 'Chưa có clip kể chuyện. Chia cảnh và bấm Tạo clip trước.';
     $('storyStatus').textContent = line;
+    const need = relockNeeded(story);
+    $('storyRelock').hidden = !need;
+    if (need) $('storyRelock').textContent = `Gắn khóa ảnh nhân vật cho ${need} cảnh chưa xong`;
     // Xem video đã xuất ngay trong app. Đang xuất thì gỡ khung phát để lần sau nạp lại file mới (kể cả khi trùng tên).
     const video = $('storyVideo'), videoFile = !busy && s.output ? s.output : '';
     if (videoFile !== lastVideo) {
@@ -1236,6 +1283,7 @@
   $('storyRefPaste').onpaste = pasteRefs; $('storyRefPaste').ondragover = e => e.preventDefault(); $('storyRefPaste').ondrop = pasteRefs;
   $('storyCommit').onclick = () => commit(false); $('storyCreate').onclick = () => commit(true);
   $('storyExport').onclick = () => exportVideo();
+  $('storyRelock').onclick = relockQueued;
   $('storyStop').onclick = async () => { const r = await call('storyCancel'); if (r) render(r); };
   $('storyOpen').onclick = () => call('storyReveal');
   $('storySave').onclick = async () => { const r = await call('storySave'); if (r && r.file) toast('Đã lưu video: ' + r.file); };
@@ -1244,6 +1292,7 @@
   $('storyAspect').addEventListener('change', drawPreview);
   for (const id of ['adLength', 'storyAspect']) $(id).addEventListener('change', () => autoAd());
   for (const id of ['adProduct', 'storyStyle', 'storyCharacter']) $(id).addEventListener('input', () => autoAd(500));
+  $('storyForm').addEventListener('change', relockDrafts);
   $('adMore').addEventListener('toggle', () => $('storyCompose').classList.toggle('adOpen', $('adMore').open));
   showSubLevels(); buildStyleChips(); loadUserFonts();
   renderChips(); applyMode(true); renderScenes(); drawPreview();

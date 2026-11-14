@@ -17,7 +17,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.addInitScript(() => {
       localStorage.setItem('museStudio.language', localStorage.getItem('testLang') || 'vi');
       const s = {
-        version: '1.9.2', active: false, paused: true, jobs: [],
+        version: '1.9.3', active: false, paused: true, jobs: [],
         license: { status: 'active', plan: 'short', longTerm: false, device: 'TESTDEVICE', expiresAt: Date.now() + 86400000 * 30, message: 'Đã kích hoạt key.' },
         story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: false, clone: false }, platform: 'win32', edgeVoices: [], clones: [] } },
         restore: { busy: false, progress: '', error: '', storyId: '', stories: {} },

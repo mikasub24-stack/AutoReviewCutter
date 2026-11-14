@@ -214,6 +214,10 @@ Tên truyện|Story name
 Truyện|Story
 Tự edit: cảnh nào lời đọc ngắn hơn clip thì cắt phần thừa; lời dài hơn clip thì giữ khung cuối cho đọc hết. Prompt đã dặn Muse tạo video im lặng, không âm thanh (nhân vật vẫn há miệng, cười, mấp máy trên hình); giọng đọc do app thêm.|Auto edit: if a scene's narration is shorter than its clip, the extra footage is cut; if it is longer, the last frame is held so it can finish. Prompts tell Muse to make the video silent with no audio (characters still open their mouths, laugh and mouth words on screen); the narration is added by the app.
 Xuất MP4|Export MP4
+Gắn khóa ảnh nhân vật|Lock to character image
+Các cảnh này có ảnh nhân vật nhưng prompt chưa nhắc tới ảnh. Thêm một dòng khóa hình dạng để Muse bám đúng kiểu vẽ của ảnh.|These scenes have a character image but the prompt does not mention it. Adding a shape-lock line makes Muse follow the drawing style of the image.
+Các cảnh chưa xong đã có câu khóa rồi.|The unfinished scenes already have the lock line.
+Không có cảnh nào cần gắn thêm.|No scenes needed the lock.
 Clip đã xong hết, chưa ghép thành video hoàn chỉnh|All clips are done, but the final video has not been assembled yet
 Đang ghép video hoàn chỉnh…|Assembling the final video…
 Đang tạo clip kể chuyện…|Creating story clips…
@@ -540,6 +544,8 @@ Nhấn Ctrl+C để sao chép mã máy.|Press Ctrl+C to copy your device ID.
 Đã lưu thông tin cấu trúc chat. Tệp không chứa cookie hay nội dung prompt.|Chat diagnostics saved. The file contains no cookies or prompt content.
 Xóa tất cả tác vụ đang chờ? Các clip đã tải vẫn giữ nguyên.|Clear all pending scenes? Saved clips are preserved.
 Dừng và xóa toàn bộ danh sách tác vụ? File video đã tải không bị xóa. Tác vụ đã gửi có thể còn chạy trên Muse.|Stop and clear the entire queue? Saved videos are preserved. Submitted tasks may still be running in Muse.
+Dừng và xóa toàn bộ danh sách clip kể chuyện? Thư mục KeChuyen của các truyện này (clip, ảnh, video ghép) cũng được chuyển vào Thùng rác. Tác vụ đã gửi có thể còn chạy trên Muse.|Stop and clear all story clips? The KeChuyen folders of these stories (clips, images, final video) are also moved to the Recycle Bin. Submitted tasks may still be running in Muse.
+Xóa cảnh này? Clip đã tải của cảnh cũng được chuyển vào Thùng rác.|Delete this scene? Its downloaded clip is also moved to the Recycle Bin.
 Kiểm tra Muse trước. Gửi lại prompt có thể tạo video trùng nếu tác vụ trước đã gửi.|Check Muse first. Resubmitting may create a duplicate if the original prompt was accepted.
 Muse còn xử lý · chờ hoàn tất trước khi gửi đúng cảnh cũ|Muse is still working · Waiting before resubmitting this scene
 Cảnh cũ chưa có bằng chứng gửi ảnh/prompt · bắt đầu gửi đúng cảnh|No verified legacy submission · Sending the exact scene and references
@@ -799,6 +805,11 @@ Mở Flow để đăng nhập Google|Open Flow to sign in to Google
       [/^Hàng đợi đã dừng, còn (\d+) cảnh chưa xong\. Chạy tiếp hàng đợi rồi bấm Xuất MP4\.$/,m=>'The queue stopped with '+m[1]+' scene(s) unfinished. Resume the queue, then click Export MP4.'],
       [/^Hàng đợi đã dừng, còn (\d+) cảnh chưa xong nên chưa tự xuất MP4\. .*$/,m=>'The queue stopped with '+m[1]+' scene(s) unfinished, so the MP4 was not exported automatically. Click “Continue” to carry on.'],
       [/^Tài khoản (\d+)$/,m=>'Account '+m[1]],
+      [/^Đây là cảnh cuối của truyện (.+)\. Xóa sẽ chuyển cả thư mục KeChuyen\/(.+) \(clip, ảnh, video ghép\) vào Thùng rác\. Tiếp tục\?$/,m=>'This is the last scene of story '+m[1]+'. Deleting it moves the whole KeChuyen/'+m[2]+' folder (clips, images, final video) to the Recycle Bin. Continue?'],
+      [/^Gắn khóa ảnh nhân vật cho (\d+) cảnh chưa xong$/,m=>'Lock '+m[1]+' unfinished scene(s) to the character image'],
+      [/^Đã gắn câu khóa hình dạng nhân vật vào (\d+) cảnh theo ảnh \/ hình dạng hiện tại\.$/,m=>'Added the character shape lock to '+m[1]+' scene(s) based on the current image / shape.'],
+      [/^Đã gỡ câu khóa hình dạng nhân vật khỏi (\d+) cảnh \(không còn ảnh tham chiếu\)\.$/,m=>'Removed the character shape lock from '+m[1]+' scene(s) (no reference image any more).'],
+      [/^Đã gắn khóa vào (\d+) cảnh\.$/,m=>'Added the lock to '+m[1]+' scene(s).'],
       [/^Đã lưu video: (.+)$/,m=>'Video saved: '+m[1]],
       [/^(✓ .+) · đang bỏ khỏi video$/,m=>m[1]+' · left out of the video'],
       [/^· đang bỏ khỏi video$/,()=>'· left out of the video'],

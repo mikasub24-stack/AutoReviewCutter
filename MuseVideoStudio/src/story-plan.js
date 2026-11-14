@@ -1168,6 +1168,23 @@
     return ensureNoSpeech(text + '\n' + extra.join('\n'));
   }
 
+  // Câu khóa hình dạng chỉ được gắn LÚC CHIA CẢNH theo ảnh nhân vật đang có khi đó. Ảnh đính kèm hoặc đổi SAU khi chia cảnh thì prompt vẫn không có khóa
+  // (ảnh vẫn gửi kèm nên lúc ra 2D, lúc ra người thật). refreshPrompt gắn lại khóa theo ảnh / hình dạng HIỆN TẠI: gỡ câu khóa cũ (mọi biến thể) rồi gắn câu mới,
+  // giữ nguyên phần còn lại của prompt. Dùng cho chế độ Kể chuyện thường (không phải quảng cáo, mẹo, cây, lịch sử).
+  const LOCK_LINE = /^(?:KHÓA HÌNH DẠNG NHÂN VẬT \(bắt buộc\):|CHARACTER SHAPE LOCK \(mandatory\):)/;
+  const hasShapeLock = prompt => String(prompt || '').split('\n').some(line => LOCK_LINE.test(line.trim()));
+  // Tỉ lệ khung đã có trong prompt (câu đầu «Video khung NGANG 16:9…» hoặc bản tiếng Anh): giữ đúng tỉ lệ đó, không thêm câu tỉ lệ khác.
+  const aspectOfPrompt = text => ASPECTS.find(a => Object.values(RATIO_LEAD.video).some(set => text.includes(set[a]))) || '';
+  function refreshPrompt(prompt, input = {}) {
+    const text = String(prompt || '').trim(), found = aspectOfPrompt(text);
+    const config = { ...options({ ...input, aspect: found || input.aspect }), aspect: found || input.aspect || '' };   // không biết tỉ lệ thì không thêm câu tỉ lệ (tránh ghi nhầm 16:9 vào cảnh dọc)
+    if (!text || config.ad || config.tip) return text;
+    const body = text.split('\n').filter(line => !LOCK_LINE.test(line.trim())).join('\n').trim();
+    // Dòng «Audio:» là câu cấm tiếng cố định bằng tiếng Anh: bỏ ra khi nhận ngôn ngữ, không thì cảnh tiếng Việt ngắn bị coi là tiếng Anh.
+    const spoken = body.split('\n').filter(line => !/^Audio:/i.test(line.trim())).join('\n');
+    return finalPrompt(body, config, promptLanguage(spoken));
+  }
+
   // Tách trả lời của Muse: {scenes: [{title, units: [đầu, cuối] | null, voiceover, prompt}], cast, done}.
   // Hiểu cả khuôn «CÂU: 1-3» (chuẩn) lẫn khuôn cũ «LỜI: …».
   function parseReply(reply, input = {}) {
@@ -1337,5 +1354,5 @@
     return entries.map((entry, index) => `${index + 1}\n${srtTime(entry.start)} --> ${srtTime(entry.end)}\n${entry.text}\n`).join('\n');
   }
 
-  return { setRate, ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, stripStepLabels, TIP_MINUTES, PLANT_MINUTES, HIST_MINUTES, TIP_SECS, tipPlan, tipParts, buildTipScriptInstruction, tipScriptFromReply, tipTrim, tipCheck, tipFix, MAX_SECONDS, MIN_SECONDS, sceneSeconds, sceneFloor, shortRuns, shortFix, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, lockLine, buildMuseInstruction, buildUnderstandInstruction, parseUnderstanding, understandRanges, understandingText, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, motionIssues, stripBeatTags, tipImagePrompt, finalImagePrompt, tipStartLine, subtitleChunks, srtTime, toSrt };
+  return { refreshPrompt, hasShapeLock, isLocked, setRate, ASPECTS, AD_CAMERA, AD_LOOK, AD_TONE, AD_LENGTHS, AD_TEMPLATES, adShotPlan, planAdShots, AD_MAX_CAMERA, adOptions, buildAdScriptInstruction, scriptFromReply, stripStepLabels, TIP_MINUTES, PLANT_MINUTES, HIST_MINUTES, TIP_SECS, tipPlan, tipParts, buildTipScriptInstruction, tipScriptFromReply, tipTrim, tipCheck, tipFix, MAX_SECONDS, MIN_SECONDS, sceneSeconds, sceneFloor, shortRuns, shortFix, NO_SPEECH, CHARS_PER_SECOND, options, detectLanguage, charsPerSecond, estimateSeconds, speechText, storyText, storyUnits, groupRanges, splitSentences, scriptVoice, scenePrompt, planStory, lockLine, buildMuseInstruction, buildUnderstandInstruction, parseUnderstanding, understandRanges, understandingText, parseReply, parseMuseReply, assembleScenes, scenesFromReply, checkAgainstScript, alignToScript, lintScenes, motionIssues, stripBeatTags, tipImagePrompt, finalImagePrompt, tipStartLine, subtitleChunks, srtTime, toSrt };
 });

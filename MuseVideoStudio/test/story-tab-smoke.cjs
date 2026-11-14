@@ -56,6 +56,11 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
           if (name === 'storyAddFont') return window.fontPayload || null;
           if (name === 'storyClearDone') { const ids = new Set(data.ids); s.jobs = s.jobs.filter(j => !(j.kind === 'story' && ids.has(j.storyId) && s.jobs.filter(x => x.storyId === j.storyId).every(x => x.status === 'completed'))); }
           if (name === 'images') return ['C:\\Refs\\mai.png'];
+          if (name === 'storyRelock') {
+            let changed = 0;
+            for (const j of s.jobs) if (j.kind === 'story' && j.storyId === data.storyId && !j.phase && j.storyMode !== 'ad' && (j.image || (j.references || []).length) && ['pending', 'failed', 'interrupted'].includes(j.status) && !/^KHÓA HÌNH DẠNG NHÂN VẬT/m.test(j.prompt)) { j.prompt += '\nKHÓA HÌNH DẠNG NHÂN VẬT (bắt buộc): mock'; changed++; }
+            return { ...structuredClone(s), relocked: { changed, skipped: 0, total: changed } };
+          }
           if (name === 'add') s.jobs.push(...data.map(j => ({ ...j, id: String(++id), status: 'pending', stage: 'pending', order: s.jobs.filter(x => x.kind === 'story').length + 1 })));
           if (name === 'start') { s.active = true; s.paused = false; }
           if (name === 'storyRefreshVoices') { const vv = s.story.voice; vv.edgeVoices.push({ id: 'fr-CA-SylvieNeural', lang: 'fr', language: 'Tiếng Pháp', name: 'Sylvie (nữ) · fr-CA' }); vv.catalog = { live: true, count: vv.edgeVoices.length, at: 1, busy: false, error: '' }; }
@@ -108,6 +113,19 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.match(await page.locator('#storyScenes .draftRow textarea').nth(1).inputValue(), /Audio: no speech, no dialogue/);
     await page.locator('#storyRefs').click();
     assert.match(await page.locator('#storyRefInfo').textContent(), /mai\.png/);
+    // Ảnh nhân vật gắn SAU khi chia cảnh: prompt các cảnh tự có câu khóa theo ảnh (không thì ảnh gửi kèm nhưng prompt không nhắc, clip lúc 2D lúc người thật).
+    const lockOf = async n => (await page.locator('#storyScenes .draftRow textarea').nth(n).inputValue()).split('\n').filter(l => /^KHÓA HÌNH DẠNG NHÂN VẬT/.test(l));
+    for (const n of [1, 3]) { const lock = await lockOf(n); assert.equal(lock.length, 1, 'ô prompt ' + n + ' có đúng một câu khóa'); assert.match(lock[0], /ảnh tham chiếu/, 'khóa theo ảnh tham chiếu'); assert.match(lock[0], /người que, đầu tròn trắng/, 'kèm hình dạng chuẩn đã gõ'); }
+    assert.match(await page.locator('#storyInfo').textContent(), /Đã gắn câu khóa hình dạng nhân vật vào 2 cảnh/);
+    // Bỏ ảnh thì gỡ phần «ảnh tham chiếu» khỏi khóa; chọn lại ảnh thì có lại (vẫn một dòng).
+    await page.locator('#storyRefsClear').click();
+    assert.doesNotMatch((await lockOf(1))[0], /ảnh tham chiếu/); assert.equal((await lockOf(1)).length, 1);
+    await page.locator('#storyRefs').click();
+    assert.match((await lockOf(1))[0], /ảnh tham chiếu/); assert.equal((await lockOf(1)).length, 1);
+    // Prompt đã sửa tay giữ nguyên, chỉ dòng khóa đổi.
+    await page.locator('#storyScenes .draftRow textarea').nth(1).evaluate(t => { t.value = 'SỬA TAY: ' + t.value; t.dispatchEvent(new Event('input', { bubbles: true })); });
+    await page.locator('#storyRefsClear').click(); await page.locator('#storyRefs').click();
+    assert.match(await page.locator('#storyScenes .draftRow textarea').nth(1).inputValue(), /^SỬA TAY: /);
 
     // Dán thủ công (dự phòng): yêu cầu có câu đánh số; trả lời theo số câu → lời lấy NGUYÊN VĂN từ truyện.
     await page.locator('#storyMuse summary').click();
@@ -153,6 +171,9 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(names.current, 'Ngày xưa có một cô bé tên Mai sống ở làng ven sông', 'ô «Tên video» để trống: lấy tiêu đề từ kịch bản');
     assert.equal(await page.evaluate(() => { const box = document.getElementById('storyName'); box.value = 'Cô bé Mai'; const t = window.storyUi.storyTitle(); box.value = ''; return t; }), 'Cô bé Mai', 'ô «Tên video» đã gõ thì dùng đúng tên đó');
 
+    // Lúc thêm vào hàng đợi câu khóa được chốt lại: dù ô prompt bị xóa mất dòng khóa thì prompt gửi đi vẫn có (ảnh nhân vật đang gắn).
+    await page.locator('#storyScenes .draftRow textarea').nth(3).evaluate(t => { t.value = t.value.split('\n').filter(l => !/^KHÓA HÌNH DẠNG/.test(l)).join('\n'); t.dispatchEvent(new Event('input', { bubbles: true })); });
+    assert.equal((await lockOf(3)).length, 0, 'ô prompt đã mất dòng khóa trước khi bấm tạo');
     await page.locator('#storyCreate').click();
     await page.waitForFunction(() => window.calls.some(c => c.name === 'start'));
     const add = (await called('add')).at(-1).data;
@@ -161,9 +182,39 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.deepEqual(add.map(j => j.voiceover), ['Ngày xưa có một cô bé tên Mai sống ở làng ven sông. Mỗi sáng Mai dậy sớm ra bến đón đò.', 'Một hôm có chú cá vàng nhảy lên thuyền. Mai thả cá về sông và cá hứa sẽ giúp cô một điều ước.']);
     assert.ok(add.every(j => j.references.length === 1 && j.references[0] === 'C:\\Refs\\mai.png' && j.image === 'C:\\Refs\\mai.png'));
     assert.ok(add.every(j => !/\[\s*câu/i.test(j.prompt)), 'thẻ [câu N] bị bỏ trước khi gửi tạo video');
+    assert.ok(add.every(j => /^KHÓA HÌNH DẠNG NHÂN VẬT \(bắt buộc\):[^\n]*ảnh tham chiếu/m.test(j.prompt)), 'mọi cảnh thêm vào hàng đợi đều có câu khóa theo ảnh');
+    assert.ok(add.every(j => j.prompt.split('\n').filter(l => /^KHÓA HÌNH DẠNG/.test(l)).length === 1), 'chỉ một câu khóa mỗi cảnh');
     assert.match(add[1].prompt, /0–5 giây: Mai thả cá về sông\.\n5–10 giây: Cá vàng nhảy lên thuyền\./);
     assert.deepEqual((await called('start')).at(-1).data, { kind: 'story' });
     assert.equal(await page.locator('#storyScenes .draftRow').count(), 0);
+
+    // Hàng đợi có sẵn từ bản cũ: cảnh CHƯA xong có ảnh nhân vật mà prompt không có câu khóa → hiện nút «Gắn khóa», bấm là gắn cho đúng truyện đang chọn.
+    {
+      await page.evaluate(() => {
+        const base = { kind: 'story', storyId: 'Truyen-OLD', stage: 'pending', voiceover: '', output: '', image: 'C:\\Refs\\mai.png', references: ['C:\\Refs\\mai.png'] };
+        window.s.jobs.push(
+          { ...base, id: 'old1', status: 'pending', order: 91, number: 1, title: 'Cảnh 1', prompt: 'Video khung NGANG 16:9 (widescreen).\nCảnh cũ một.' },
+          { ...base, id: 'old2', status: 'failed', order: 92, number: 2, title: 'Cảnh 2', prompt: 'Video khung NGANG 16:9 (widescreen).\nCảnh cũ hai.' },
+          { ...base, id: 'old3', status: 'completed', order: 93, number: 3, title: 'Cảnh 3', prompt: 'Video khung NGANG 16:9 (widescreen).\nCảnh cũ ba đã xong.', output: 'C:\\Videos\\KeChuyen\\Truyen-OLD\\003.mp4' },
+          { ...base, id: 'old4', status: 'pending', order: 94, number: 4, title: 'Cảnh 4', prompt: 'Video khung NGANG 16:9 (widescreen).\nCảnh không ảnh.', image: '', references: [] },
+          { ...base, id: 'oldad', storyMode: 'ad', status: 'pending', order: 95, number: 5, title: 'Cảnh 5', prompt: 'Video khung NGANG 16:9 (widescreen).\nCảnh quảng cáo.' });
+        window.push();
+      });
+      await page.waitForFunction(() => [...document.getElementById('storyPick').options].some(o => o.value === 'Truyen-OLD'));
+      await page.locator('#storyOutput').evaluate(d => { d.open = true; });
+      await page.locator('#storyPick').selectOption('Truyen-OLD'); await page.evaluate(() => window.push());
+      await page.waitForFunction(() => !document.getElementById('storyRelock').hidden);
+      assert.match(await page.locator('#storyRelock').textContent(), /^Gắn khóa ảnh nhân vật cho 2 cảnh chưa xong$/, 'chỉ đếm cảnh chưa xong, có ảnh, không phải quảng cáo');
+      await page.locator('#storyRelock').click();
+      await page.waitForFunction(() => window.calls.some(c => c.name === 'storyRelock'));
+      assert.deepEqual((await called('storyRelock')).at(-1).data, { storyId: 'Truyen-OLD', form: 'người que, đầu tròn trắng' });
+      await page.waitForFunction(() => document.getElementById('storyRelock').hidden);
+      assert.match(await page.locator('#toast').textContent(), /Đã gắn khóa vào 2 cảnh/);
+      assert.equal(await page.evaluate(() => window.s.jobs.filter(j => j.storyId === 'Truyen-OLD' && /KHÓA HÌNH DẠNG/.test(j.prompt)).map(j => j.id).join()), 'old1,old2');
+      // dọn: các cảnh giả này không được lẫn vào phần kiểm thử phía sau
+      await page.evaluate(() => { window.s.jobs = window.s.jobs.filter(j => j.storyId !== 'Truyen-OLD'); window.push(); });
+      await page.waitForFunction(() => ![...document.getElementById('storyPick').options].some(o => o.value === 'Truyen-OLD'));
+    }
 
     // Hiểu kịch bản: đối chiếu lời với kịch bản gốc, sửa một chạm, soát từng cảnh, giới hạn 10 giây, đa ngôn ngữ.
     await page.evaluate(() => { document.getElementById('storyPanel').open = true; document.getElementById('storyMuse').open = true; });
@@ -682,6 +733,7 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
           await page.evaluate(() => { window.s.jobs.filter(j => j.kind === 'story' && j.phase === 'image').forEach(j => { j.status = 'completed'; }); window.push(); });
           await page.waitForFunction(() => /\(2\/4\)/.test(document.getElementById('autoLabel').textContent));
           assert.equal(await page.locator('#autoPct').textContent(), '58%');
+          assert.equal(await page.evaluate(() => ['autoRun', 'storyDone', 'runProgress'].filter(id => !document.getElementById(id).hidden).join()), 'autoRun', 'chạy tự động: chỉ thanh «Làm tự động», không thêm thanh thứ hai');
           assert.equal((await called('storyBuild')).length, builds0, 'chưa xong clip thì chưa xuất');
           // Clip xong hết → tự xuất MP4 đúng lượt, đúng tỉ lệ đã chọn, các cảnh đúng thứ tự (đồng bộ lời đọc ↔ clip).
           await page.evaluate(() => { window.s.active = false; window.s.jobs.filter(j => j.kind === 'story' && j.phase).forEach(j => { j.status = 'completed'; j.output = 'C:\\Videos\\Cay\\' + j.number + (j.phase === 'image' ? '.png' : '.mp4'); }); window.push(); });
@@ -1019,7 +1071,10 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       await page.locator('#modeStory').click(); await setAuto(true);
       await page.evaluate(() => { window.s.active = true; window.push(); });
       await addGroup('Truyen-BAR', 'pending'); await nap(300);
-      assert.equal(await page.locator('#runProgress').isVisible(), true, 'có thanh % khi đang tạo clip');
+      const bars = () => page.evaluate(() => ['autoRun', 'storyDone', 'runProgress'].filter(id => !document.getElementById(id).hidden).join());
+      assert.equal(await bars(), 'storyDone', 'chỉ MỘT thanh tiến trình khi đang tạo clip (không chạy cùng lúc 2–3 thanh)');
+      assert.equal(await page.locator('#runProgress').isVisible(), false, 'thanh trong mục xuất MP4 nhường cho khung dưới ô truyện');
+      assert.equal(await page.locator('#sdPct').textContent(), '0%');
       assert.equal(await page.locator('#runPct').textContent(), '0%');
       assert.match(await page.locator('#runLabel').textContent(), /Creating clips 0\/2/);
       assert.equal(await page.locator('#storyExport').isVisible(), false, 'ẩn nút xuất tay khi tự động đang chạy');
@@ -1042,6 +1097,8 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       await finish('Truyen-BAR');
       await page.waitForFunction(() => /Done: Truyen-1\.mp4/.test(document.getElementById('runLabel').textContent));
       assert.equal(await page.locator('#runPct').textContent(), '100%');
+      assert.equal(await bars(), 'storyDone', 'xong cũng chỉ một thanh');
+      assert.equal(await page.locator('#sdPct').textContent(), '100%');
       assert.equal(await page.locator('#storyExport').isVisible(), true, 'xong thì hiện lại nút (xuất lại nếu muốn)');
       // Cây trồng + Lịch sử (ảnh rồi clip, cùng một lượt): xong ảnh chưa xuất, xong hết clip mới tự đọc + edit + xuất, không cần «Làm tự động».
       for (const [btn, sid] of [['#modePlant', 'Cay-TAY'], ['#modeHist', 'Su-TAY']]) {

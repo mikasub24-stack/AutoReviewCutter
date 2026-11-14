@@ -126,7 +126,15 @@ function makeCard(id){
   row.retry=action('Gửi lại prompt',async()=>{if(confirm('Kiểm tra Muse trước. Gửi lại prompt có thể tạo video trùng nếu tác vụ trước đã gửi.'))render(await call('retry',row.job.id));});
   row.upload=el('button','secondary','Tải video lên');row.upload.onclick=async()=>{if(row.job.status==='running'&&!confirm('Cảnh này đang chờ Muse. Chọn video sẽ dừng cảnh ở Muse và dùng video bạn chọn thay thế. Tiếp tục?'))return;render(await call('attachVideo',{id:row.job.id}));};
   row.upload.title='Tự thêm video cho cảnh này (đã tạo ở nơi khác): chọn file MP4 / WebM, tool đặt tên theo số cảnh và coi cảnh là đã xong.';
-  row.remove=action('Xóa',async()=>render(await call('remove',row.job.id)));
+  row.remove=action('Xóa',async()=>{
+    const j=row.job;
+    if(j.kind==='story'){   // Kể chuyện: xóa cảnh thì clip đã tải của cảnh vào Thùng rác; xóa cảnh cuối thì cả thư mục truyện (clip, ảnh, video ghép).
+      const last=!(state?.jobs||[]).some(x=>x.kind==='story'&&x.storyId===j.storyId&&x.id!==j.id);
+      if(last&&!confirm('Đây là cảnh cuối của truyện '+j.storyId+'. Xóa sẽ chuyển cả thư mục KeChuyen/'+j.storyId+' (clip, ảnh, video ghép) vào Thùng rác. Tiếp tục?'))return;
+      if(!last&&j.output&&!confirm('Xóa cảnh này? Clip đã tải của cảnh cũng được chuyển vào Thùng rác.'))return;
+    }
+    render(await call('remove',j.id));
+  });
   row.regenerate=action('Tạo lại',async()=>render(await call('regenerate',row.job.id)));
   row.regenerate.title='Tạo lại cảnh này; giữ video cũ.';
   row.exclude=action('Bỏ khỏi video',async()=>{const j=row.job,meta=state.restore?.stories?.[j.storyId],out=(meta?.excluded||[]).map(Number).includes(Number(j.number));render(await call('restoreExclude',{storyId:j.storyId,number:j.number,exclude:!out}));});
@@ -345,7 +353,7 @@ $('logoutAccount').onclick=async()=>render(await call('logoutAccount',Number($('
 $('testBrowsers').onclick=async()=>render(await call('testBrowsers'));
 $('start').onclick=async()=>render(await call('start',{kind:mode}));$('pause').onclick=async()=>render(await call('stop'));
 $('clearPending').onclick=async()=>{if(confirm('Xóa tất cả tác vụ đang chờ? Các clip đã tải vẫn giữ nguyên.'))render(await call('clearPending',{kind:mode}));};
-$('clearList').onclick=async()=>{if(confirm('Dừng và xóa toàn bộ danh sách tác vụ? File video đã tải không bị xóa. Tác vụ đã gửi có thể còn chạy trên Muse.'))render(await call('clearList',{kind:mode}));};
+$('clearList').onclick=async()=>{if(confirm(isStory()?'Dừng và xóa toàn bộ danh sách clip kể chuyện? Thư mục KeChuyen của các truyện này (clip, ảnh, video ghép) cũng được chuyển vào Thùng rác. Tác vụ đã gửi có thể còn chạy trên Muse.':'Dừng và xóa toàn bộ danh sách tác vụ? File video đã tải không bị xóa. Tác vụ đã gửi có thể còn chạy trên Muse.'))render(await call('clearList',{kind:mode}));};
 $('folder').onclick=async()=>render(await call('folder'));$('export').onclick=()=>call('export');
 $('configure').onclick=()=>{for(const name of ['composer','fileInput','submit','stopSelector','video','image','attachmentReadySelector','messageSelector','timeoutMinutes','accountCount','ffmpeg','browserChoice','browserPath','dispatchMode','cooldownSeconds'])$('settingsForm').elements.namedItem(name).value=state.settings[name]??(name==='image'?'img':name==='dispatchMode'?'parallel':name==='cooldownSeconds'?3:'');$('settingsForm').elements.namedItem('finishAction').value=state.settings.autoMerge?'merge':state.settings.autoPackage?'package':'keep';$('settingsDialog').showModal();};
 $('closeSettings').onclick=()=>$('settingsDialog').close();$('settingsForm').onsubmit=async e=>{e.preventDefault();const result=await call('settings',Object.fromEntries(new FormData(e.target)));if(result){render(result);$('settingsDialog').close();toast('Đã lưu cấu hình.');}};
