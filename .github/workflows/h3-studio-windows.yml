@@ -1,0 +1,106 @@
+name: H3 Studio Windows
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/h3-studio]
+    paths: ['H3Studio/**', '.github/workflows/h3-studio-windows.yml']
+permissions:
+  contents: write
+concurrency:
+  group: h3-studio-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 40
+    env:
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: utf-8
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Build and test Windows installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force dist-h3 | Out-Null
+          Start-Transcript -Path "$env:RUNNER_TEMP/h3-build.log" | Out-Null
+          trap {
+            $detail = (Get-Content "$env:RUNNER_TEMP/h3-build.log" -Tail 65) -join "`n"
+            $detail += ($_ | Out-String) + $_.ScriptStackTrace
+            Write-Host ('::error title=H3 Windows build::' + $detail.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A'))
+            exit 1
+          }
+          python -m venv .venv-h3
+          $env:PATH = (Join-Path (Get-Location) '.venv-h3/Scripts') + [IO.Path]::PathSeparator + $env:PATH
+          python -m pip install --require-hashes --only-binary=:all: -r H3Studio/requirements-windows.lock
+          if ($LASTEXITCODE) { throw 'Pinned dependency installation failed' }
+          python -m pip install --require-hashes --no-build-isolation --no-deps -r H3Studio/compiler-windows.lock
+          if ($LASTEXITCODE) { throw 'Native compiler installation failed' }
+          New-Item -ItemType Directory -Force H3Studio/runtime | Out-Null
+          $encoder = python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
+          Copy-Item $encoder H3Studio/runtime/ffmpeg.exe
+          & H3Studio/runtime/ffmpeg.exe -version 2>&1 | Out-File H3Studio/runtime/FFMPEG-BUILD.txt -Encoding utf8
+          Copy-Item H3Studio/vendor/FFmpeg-LICENSE.txt H3Studio/runtime/
+          python H3Studio/build_assets.py
+          if ($LASTEXITCODE) { throw 'Icon generation failed' }
+          python -m unittest discover -s H3Studio/tests -v
+          if ($LASTEXITCODE) { throw 'Engine tests failed' }
+          $env:H3_UI_PREVIEW = Join-Path (Get-Location) 'dist-h3/UI-Preview.png'
+          python H3Studio/app.py --smoke-test
+          if ($LASTEXITCODE) { throw 'Source GUI smoke failed' }
+          python -m nuitka --standalone --msvc=latest --jobs=3 --enable-plugin=tk-inter --include-package=PIL --windows-console-mode=disable --windows-icon-from-ico=H3Studio/icon.ico --output-filename=H3Studio.exe --output-dir=H3Studio/compiled --include-data-files=H3Studio/icon.ico=icon.ico --include-data-dir=H3Studio/vendor=vendor --company-name='H3 Studio contributors' --product-name='H3 Studio' --file-description='H3 Studio - AI short film production' --file-version=0.1.0.0 --product-version=0.1.0 --assume-yes-for-downloads H3Studio/app.py 2>&1 | Tee-Object -Variable nativeLog
+          if ($LASTEXITCODE) { throw ('Native compilation failed: ' + (($nativeLog | Select-Object -Last 45) -join "`n")) }
+          $native = @(Get-ChildItem H3Studio/compiled -Directory -Filter '*.dist')
+          if ($native.Count -ne 1) { throw 'Expected one standalone distribution' }
+          New-Item -ItemType Directory -Force H3Studio/build/H3Studio | Out-Null
+          Copy-Item (Join-Path $native[0].FullName '*') H3Studio/build/H3Studio/ -Recurse -Force
+          Copy-Item H3Studio/runtime H3Studio/build/H3Studio/runtime -Recurse -Force
+          Copy-Item H3Studio/README.vi.md,H3Studio/THIRD-PARTY.md H3Studio/build/H3Studio/
+          $p = Start-Process H3Studio/build/H3Studio/H3Studio.exe -ArgumentList '--smoke-test' -Wait -PassThru
+          if ($p.ExitCode) { throw 'Packaged GUI smoke failed' }
+          & 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe' H3Studio/installer.iss
+          if ($LASTEXITCODE) { throw 'Installer compilation failed' }
+          $install = Join-Path $env:RUNNER_TEMP 'H3-installed'
+          $p = Start-Process dist-h3/H3Studio-0.1.0-Setup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$install") -Wait -PassThru
+          if ($p.ExitCode) { throw 'Installation test failed' }
+          $p = Start-Process "$install/H3Studio.exe" -ArgumentList '--smoke-test' -Wait -PassThru
+          if ($p.ExitCode) { throw 'Installed GUI smoke failed' }
+          & ./VocalStudio/scripts/scan-windows.ps1 -RuntimeDirectory H3Studio/build/H3Studio -PackageDirectory dist-h3
+          & git archive '--format=zip' '--output=dist-h3/H3Studio-0.1.0-Source.zip' HEAD H3Studio .github/workflows/h3-studio-windows.yml VocalStudio/scripts/scan-windows.ps1
+          if ($LASTEXITCODE) { throw 'Source archive failed' }
+          @{
+            version='0.1.0'; sourceCommit=$env:GITHUB_SHA; engineTests='passed'; sourceGuiSmoke='passed'; packagedGuiSmoke='passed'; installedGuiSmoke='passed'; liveH3InferenceTested=$false; actualRunningHubPriceVerified=$false; publisherSigned=$false
+          } | ConvertTo-Json | Set-Content dist-h3/BuildReport.json -Encoding utf8
+          Get-ChildItem dist-h3 -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $_.Name } | Set-Content dist-h3/SHA256SUMS.txt -Encoding utf8
+      - uses: actions/upload-artifact@v4
+        with:
+          name: H3Studio-0.1.0-Windows
+          path: dist-h3/*
+          if-no-files-found: error
+      - name: Publish direct installer link
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = 'h3-studio-v0.1.0'
+          @'
+          App Windows tiếng Việt: kịch bản Anh/Việt qua API, ảnh nhân vật tham chiếu, H3 qua RunningHub/ComfyUI, task ID được lưu để tiếp tục, xem từng cảnh, nhạc nền hạ dưới tiếng nói, ghép và Lưu như MP4.
+
+          Cần API key/quyền model/số dư cloud hoặc server ComfyUI có sẵn. Không có model GPU trong bộ cài. Kiểm tra kết nối RunningHub chỉ xác nhận đọc workflow. Chưa thử sinh H3 thật, chưa xác nhận graph chạy trên tài khoản RunningHub, chưa benchmark chất lượng/giọng Việt hoặc giá 27 tệ/5 phút. Phụ đề AI cần API âm thanh riêng, nhận dạng từ âm thanh thực; cần xem lại kết quả.
+
+          Tải H3Studio-0.1.0-Setup.exe, cài rồi mở Kết nối. Nên thử 10 giây trước. Dừng chờ không hủy tác vụ cloud; task ID được giữ và app không tự gửi trùng. Bộ cài chưa ký số; kết quả Defender không bảo đảm trình duyệt chấp nhận file.
+          '@ | Set-Content "$env:RUNNER_TEMP/h3-notes.md" -Encoding utf8
+          $existing = & gh release view $tag --repo $env:GITHUB_REPOSITORY --json isDraft 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            if (!(($existing | ConvertFrom-Json).isDraft)) { throw 'Never overwrite a published release' }
+          } else {
+            & gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title 'H3 Studio 0.1.0 - Windows tiếng Việt' --notes-file "$env:RUNNER_TEMP/h3-notes.md"
+            if ($LASTEXITCODE) { throw 'Release creation failed' }
+          }
+          & gh release upload $tag --repo $env:GITHUB_REPOSITORY dist-h3/* --clobber
+          if ($LASTEXITCODE) { throw 'Release upload failed' }
+          & gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --prerelease
+          if ($LASTEXITCODE) { throw 'Release publication failed' }
