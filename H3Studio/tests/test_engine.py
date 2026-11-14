@@ -86,6 +86,18 @@ class EngineTests(unittest.TestCase):
         self.assertLess(graph['5']['inputs']['width'], graph['5']['inputs']['height'])
         self.assertEqual(graph['5']['inputs']['length'] % 17, 5)
         self.assertEqual(graph['6']['inputs']['noise_seed'], 7)
+    def test_location_reference_is_repeated_in_scene(self):
+        p = self.project()
+        p.data['locations'] = [{'name': 'Room', 'prompt': 'empty room'}]
+        scene = p.data['scenes'][0]
+        scene['location'] = 'Room'
+        asset = self.root / 'room.png'; asset.write_bytes(b'room')
+        p.asset('location:Room', asset)
+        prepared, images, audio = self.runner().refs(scene, p)
+        self.assertEqual(len(images), 2)
+        self.assertIn('<Picture 2>', prepared['prompt'])
+        self.assertIn('setting, architecture', prepared['prompt'])
+
     def test_url_credentials_rejected(self):
         with self.assertRaises(ValueError): validate_url('https://user:pass@example.com')
         with self.assertRaises(ValueError): validate_url('http://example.com')

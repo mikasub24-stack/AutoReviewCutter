@@ -149,6 +149,14 @@ def validate_plan(plan):
     characters = plan.setdefault('characters', [])
     if not isinstance(characters, list) or len(characters) > 7:
         raise ValueError('Mỗi dự án tối đa 7 nhân vật chính.')
+    locations = plan.setdefault('locations', [])
+    if not isinstance(locations, list) or len(locations) > 30:
+        raise ValueError('Tối đa 30 bối cảnh trong một dự án.')
+    location_names = set()
+    for location in locations:
+        if not isinstance(location, dict) or not isinstance(location.get('name'), str) or not location['name'].strip() or location['name'] in location_names or not isinstance(location.get('prompt'), str):
+            raise ValueError('Bối cảnh cần tên riêng và mô tả hình ảnh.')
+        location_names.add(location['name'])
     names = set()
     for ch in characters:
         if not isinstance(ch, dict) or not isinstance(ch.get('name'), str) or not ch['name'].strip() or ch['name'] in names:
@@ -166,6 +174,8 @@ def validate_plan(plan):
         if not isinstance(cast, list) or not set(cast).issubset(names):
             raise ValueError(f'Cảnh {i}: nhân vật chưa có trong danh sách.')
         scene.update(id=i, seconds=seconds, characters=cast)
+        if scene.get('location') and scene['location'] not in location_names:
+            raise ValueError(f'Cảnh {i}: bối cảnh chưa có trong danh sách.')
         scene.setdefault('title', f'Cảnh {i:02}')
         scene.setdefault('dialogue', '')
         scene.setdefault('continuity', '')
@@ -263,9 +273,10 @@ class Runner:
         target = round(float(minutes) * 60)
         if not 5 <= target <= 1200:
             raise ValueError('Chọn thời lượng từ 5 giây đến 20 phút.')
-        system = '''You are a short-film director. Return ONLY a JSON object with title, characters, scenes.
+        system = '''You are a short-film director. Return ONLY a JSON object with title, characters, locations, scenes.
 characters: array (max 7) of {name, description, voice}; description is an English full-body character design prompt including face, age, outfit and shoes. voice is a fixed voice description.
-scenes: ordered array of {title, seconds, prompt, dialogue, characters:[character names], continuity}.
+locations: array of {name, prompt}; prompt is an English environment reference image prompt, empty of all people, consistent architectural layout and lighting in the chosen style. Reuse one location for shots in the same setting.
+scenes: ordered array of {title, seconds, prompt, dialogue, characters:[character names], location:location name, continuity}.
 Each scene must be 4 to 15 seconds, contain one clear action or short dialogue, and logically follow the previous ending.
 Use dialogue with exact speaker names, distinguish spoken lines, internal monologue (no mouth movement), and voiceover.
 Video prompt in English, dialogue in the requested language. No music or generated text/subtitles. Vary shot sizes, keep lighting and geography within a scene. Stable outfits and faces. Do not claim perfect continuity.
@@ -305,6 +316,17 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
             self.emit('status', 'Tạo ảnh tham chiếu: ' + ch['name'])
             name = 'assets/' + uuid.uuid4().hex + '.png'
             self.image(ch['description'] + '. Character reference sheet: full body front view, neutral expression, plain white background. Keep hands and shoes visible. No text.', project.file(name))
+            project.data['assets'][key] = name
+            project.save()
+            self.emit('assets', None)
+
+        for location in project.data.get('locations', []):
+            key = 'location:' + location['name']
+            if key in project.data['assets'] and project.file(project.data['assets'][key]).exists():
+                continue
+            self.emit('status', 'Tạo ảnh bối cảnh: ' + location['name'])
+            name = 'assets/' + uuid.uuid4().hex + '.png'
+            self.image(location['prompt'] + '. Empty environment reference. No people, no text, no watermark.', project.file(name))
             project.data['assets'][key] = name
             project.save()
             self.emit('assets', None)
@@ -365,6 +387,10 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
             if voice and len(audio) < 3:
                 audio.append(self.upload(project.file(voice)))
                 descriptions.append(f'<Audio {len(audio)}> is the voice reference for {name}.')
+        location_ref = project.data['assets'].get('location:' + scene.get('location', ''))
+        if location_ref:
+            images.append(self.upload(project.file(location_ref)))
+            descriptions.append(f'<Picture {len(images)}> defines the setting, architecture and lighting. Preserve this location layout.')
         scene_copy = copy.deepcopy(scene)
         scene_copy['prompt'] = '\n'.join(descriptions) + '\n' + scene['prompt'] + '\nContinuity: ' + scene['continuity'] + '\nDialogue (preserve words and speaker): ' + scene['dialogue'] + '\nNo subtitles, no text overlays, no background music.'
         return scene_copy, images, audio

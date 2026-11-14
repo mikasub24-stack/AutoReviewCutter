@@ -1,6 +1,6 @@
 # H3 Studio 0.1.0
 
-App Windows tiếng Việt để viết kịch bản bằng API tương thích OpenAI, tạo ảnh nhân vật,
+App Windows tiếng Việt để viết kịch bản bằng API tương thích OpenAI, tạo ảnh nhân vật và bối cảnh,
 gửi cảnh đến MiniMax H3 qua RunningHub hoặc ComfyUI có sẵn, xem clip và xuất MP4.
 
 ## Cài và bắt đầu

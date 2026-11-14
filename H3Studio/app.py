@@ -169,14 +169,14 @@ class App(tk.Tk):
         self.button(bottom, 'Thư mục', lambda: self.project and open_file(self.project.folder)).pack(side='right')
 
     def build_cast(self):
-        self.label(self.cast, 'Nhân vật được lưu trong dự án và dùng lại ở từng cảnh. Có thể mở dự án cũ để dùng lại ảnh.', True).pack(fill='x', pady=15)
+        self.label(self.cast, 'Nhân vật và bối cảnh được lưu trong dự án, dùng lại ở các cảnh tương ứng.', True).pack(fill='x', pady=15)
         self.cast_tree = ttk.Treeview(self.cast, columns=('image', 'voice'), show='tree headings', height=10)
         for key, text in [('#0', 'Nhân vật'), ('image', 'Ảnh tham chiếu'), ('voice', 'Âm thanh tham chiếu')]:
             self.cast_tree.heading(key, text=text)
         self.cast_tree.pack(fill='x', pady=8)
         row = tk.Frame(self.cast, bg=BG)
         row.pack(fill='x', pady=8)
-        self.button(row, 'Chọn ảnh nhân vật', lambda: self.choose_asset('character')).pack(side='left')
+        self.button(row, 'Chọn ảnh tham chiếu', lambda: self.choose_asset('character')).pack(side='left')
         self.button(row, 'Chọn giọng tham chiếu', lambda: self.choose_asset('voice')).pack(side='left', padx=8)
         self.button(row, 'AI tạo ảnh còn thiếu', self.make_assets).pack(side='left')
         self.button(row, 'Xem ảnh', self.view_asset).pack(side='left', padx=8)
@@ -301,7 +301,10 @@ class App(tk.Tk):
             self.tree.insert('', 'end', iid=str(scene['id']), text=f'{scene["id"]:02} · {scene["title"][:25]}', values=(state,))
         self.summary.set(f'02   CÁC CẢNH · {done}/{len(data["scenes"])} · {round(sum(s["seconds"] for s in data["scenes"]))} giây dự kiến')
         for ch in data['characters']:
-            self.cast_tree.insert('', 'end', iid=ch['name'], text=ch['name'], values=('✓ Đã có' if data['assets'].get('character:' + ch['name']) else 'Chưa có', '✓ Đã có' if data['assets'].get('voice:' + ch['name']) else 'H3 tự tạo'))
+            self.cast_tree.insert('', 'end', iid='character:' + ch['name'], text=ch['name'], values=('✓ Đã có' if data['assets'].get('character:' + ch['name']) else 'Chưa có', '✓ Đã có' if data['assets'].get('voice:' + ch['name']) else 'H3 tự tạo'))
+        for location in data.get('locations', []):
+            key = 'location:' + location['name']
+            self.cast_tree.insert('', 'end', iid=key, text='Bối cảnh · ' + location['name'], values=('✓ Đã có' if data['assets'].get(key) else 'Chưa có', '—'))
         if selected and self.tree.exists(selected[0]):
             self.tree.selection_set(selected[0])
 
@@ -484,8 +487,13 @@ class App(tk.Tk):
     def choose_asset(self, kind):
         if not self.project or self.busy or not self.cast_tree.selection():
             return
-        name = self.cast_tree.selection()[0]
-        types = [('Ảnh', '*.png *.jpg *.jpeg *.webp')] if kind == 'character' else [('Âm thanh', '*.wav *.mp3')]
+        selected_key = self.cast_tree.selection()[0]
+        category, name = selected_key.split(':', 1)
+        if kind == 'voice' and category == 'location':
+            return
+        if category == 'location':
+            kind = 'location'
+        types = [('Ảnh', '*.png *.jpg *.jpeg *.webp')] if kind in ('character', 'location') else [('Âm thanh', '*.wav *.mp3')]
         path = filedialog.askopenfilename(filetypes=types)
         if path:
             self.project.asset(kind + ':' + name, path)
@@ -494,7 +502,7 @@ class App(tk.Tk):
 
     def view_asset(self):
         if self.project and self.cast_tree.selection():
-            relative = self.project.data['assets'].get('character:' + self.cast_tree.selection()[0])
+            relative = self.project.data['assets'].get(self.cast_tree.selection()[0])
             if relative:
                 open_file(self.project.file(relative))
 
