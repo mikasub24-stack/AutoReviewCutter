@@ -56,6 +56,14 @@ class EngineTests(unittest.TestCase):
         return p
     def runner(self, http=None):
         return Runner({}, {'rh_key': 'TEST_ONLY'}, http=http or FakeHttp())
+    @unittest.skipUnless(os.name == 'nt', 'Windows DPAPI only')
+    def test_windows_dpapi_roundtrip(self):
+        import settings
+        secret = b'LOCAL_TEST_KEY_ONLY'
+        protected = settings.protect(secret)
+        self.assertNotIn(secret, protected)
+        self.assertEqual(settings.protect(protected, True), secret)
+
     def test_project_roundtrip(self):
         p = self.project()
         p.data['jobs']['1'] = {'task_id': 'old'}; p.save()
@@ -92,6 +100,16 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(Project(p.folder).data['jobs']['1']['task_id'], 'existing-task')
         runner.run(p)
         self.assertEqual(http.submissions, 1)
+    def test_regeneration_keeps_previous_clip(self):
+        p = self.project(); runner = self.runner()
+        runner.run(p)
+        first = p.data['jobs']['1']['file']
+        old = p.file(first).read_bytes()
+        p.data['jobs'].pop('1')
+        runner.run(p)
+        self.assertNotEqual(first, p.data['jobs']['1']['file'])
+        self.assertEqual(p.file(first).read_bytes(), old)
+
     def test_resume_existing_task_does_not_submit(self):
         p = self.project(); http = FakeHttp()
         p.data['jobs']['1'] = {'task_id': 'old', 'provider': 'RunningHub', 'base': DEFAULTS['rh_url']}; p.save()

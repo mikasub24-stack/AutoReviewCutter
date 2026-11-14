@@ -454,7 +454,7 @@ The user may supply a script; preserve their dialogue and story. Do not invent u
                 if time.monotonic() - start > 7200:
                     raise ValueError('Đã chờ 2 giờ. Task ID được giữ; bấm Tiếp tục để kiểm tra, không tạo lại.')
                 self.pause(5)
-            relative = f'clips/canh-{scene["id"]:04}.mp4'
+            relative = f'clips/canh-{scene["id"]:04}-{uuid.uuid4().hex[:10]}.mp4'
             destination = project.file(relative)
             if url.startswith('http://') and self.settings['provider'] == 'ComfyUI':
                 # Local ComfyUI only, host is validated and response stays in the configured origin.

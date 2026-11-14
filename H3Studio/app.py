@@ -452,6 +452,7 @@ class App(tk.Tk):
             return
         self.project.data['jobs'].pop(str(self.selected), None)
         self.project.data.pop('output', None)
+        self.project.data.pop('subtitles', None)
         self.save_scene()
         self.project.save()
         self.generate_selected()
@@ -471,6 +472,7 @@ class App(tk.Tk):
         shutil.copy2(source, target)
         self.project.data['jobs'][str(self.selected)] = {'file': relative}
         self.project.data.pop('output', None)
+        self.project.data.pop('subtitles', None)
         self.project.save(); self.refresh(); self.select_scene()
 
     def make_assets(self):
@@ -524,6 +526,7 @@ class App(tk.Tk):
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
             self.project.data['music'] = relative
+            self.project.data.pop('output', None)
             self.project.save()
             self.status.set('Đã chọn nhạc; khi ghép phim, nhạc tự hạ dưới tiếng nói.')
 
