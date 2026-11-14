@@ -1636,3 +1636,18 @@ test('nhân vật chính: cảnh tự ghép có dòng, bản tiếng Anh dùng c
   assert.match(rule, /Không ghi «theo ảnh tham chiếu» cho người không có trong ảnh/);
   void ask;
 });
+
+test('nhân vật chính: prompt sửa tay giữ nguyên phần đầu, dòng đặt ngay trước câu khóa hình dạng', () => {
+  const edited = 'SỬA TAY: Video khung NGANG 16:9 (widescreen).\nMai dắt trâu qua cánh đồng.\n' + AUDIO;
+  const cfg = { reference: true, aspect: '16:9', form: 'người que', character: NARRATOR };
+  const out = sp.refreshPrompt(edited, cfg);
+  assert.ok(out.startsWith('SỬA TAY: '), 'phần đầu do người dùng sửa giữ nguyên');
+  const lines = out.split('\n');
+  const at = lines.findIndex(l => /^NHÂN VẬT CHÍNH \(cố định/.test(l));
+  assert.ok(at > 0 && /^KHÓA HÌNH DẠNG NHÂN VẬT/.test(lines[at + 1]), 'dòng nhân vật chính ngay trước câu khóa');
+  assert.equal(sp.refreshPrompt(out, cfg), out);
+  // không có câu khóa (không ảnh, không hình dạng): đặt trước dòng Audio
+  const free = sp.refreshPrompt(edited, { reference: false, aspect: '16:9', character: NARRATOR });
+  const rows = free.split('\n');
+  assert.ok(free.startsWith('SỬA TAY: ') && /^NHÂN VẬT CHÍNH/.test(rows.at(-2)) && /^Audio:/.test(rows.at(-1)));
+});

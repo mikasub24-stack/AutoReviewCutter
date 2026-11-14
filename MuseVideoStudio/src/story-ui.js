@@ -1317,6 +1317,7 @@
   for (const id of ['adLength', 'storyAspect']) $(id).addEventListener('change', () => autoAd());
   for (const id of ['adProduct', 'storyStyle', 'storyCharacter']) $(id).addEventListener('input', () => autoAd(500));
   $('storyForm').addEventListener('change', relockDrafts);
+  $('storyCharacter').addEventListener('change', relockDrafts);   // đổi mô tả nhân vật chính thì dòng NHÂN VẬT CHÍNH ở các cảnh đang soạn đổi theo
   $('adMore').addEventListener('toggle', () => $('storyCompose').classList.toggle('adOpen', $('adMore').open));
   showSubLevels(); buildStyleChips(); loadUserFonts();
   renderChips(); applyMode(true); renderScenes(); drawPreview();

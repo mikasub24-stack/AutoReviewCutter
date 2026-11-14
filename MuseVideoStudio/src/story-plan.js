@@ -1235,7 +1235,11 @@
         return rows.join('\n');
       }
     }
-    return line + '\n' + text;
+    // Prompt người dùng sửa tay (đầu prompt không phải câu tỉ lệ): giữ nguyên phần đầu, đặt dòng ngay trước câu khóa hình dạng, không có thì trước câu «Audio:», không có nữa thì cuối prompt.
+    const gate = rows.findIndex(r => LOCK_LINE.test(r.trim())), audio = rows.findIndex(r => /^Audio:/i.test(r.trim()));
+    const where = gate >= 0 ? gate : audio >= 0 ? audio : rows.length;
+    rows.splice(where, 0, line);
+    return rows.join('\n');
   }
   function finalPromptBody(prompt, config, language = 'vi') {
     const lock = lockLine(config, language), text = String(prompt || '').trim();
