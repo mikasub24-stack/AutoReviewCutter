@@ -56,9 +56,10 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
           if (name === 'storyAddFont') return window.fontPayload || null;
           if (name === 'storyClearDone') { const ids = new Set(data.ids); s.jobs = s.jobs.filter(j => !(j.kind === 'story' && ids.has(j.storyId) && s.jobs.filter(x => x.storyId === j.storyId).every(x => x.status === 'completed'))); }
           if (name === 'images') return ['C:\\Refs\\mai.png'];
+          if (name === 'storyRefLook') return window.refLook || '';
           if (name === 'storyRelock') {
             let changed = 0;
-            for (const j of s.jobs) if (j.kind === 'story' && j.storyId === data.storyId && !j.phase && j.storyMode !== 'ad' && (j.image || (j.references || []).length) && ['pending', 'failed', 'interrupted'].includes(j.status) && !/^KHÓA HÌNH DẠNG NHÂN VẬT/m.test(j.prompt)) { j.prompt += '\nKHÓA HÌNH DẠNG NHÂN VẬT (bắt buộc): mock'; changed++; }
+            for (const j of s.jobs) if (j.kind === 'story' && j.storyId === data.storyId && !j.phase && j.storyMode !== 'ad' && (j.image || (j.references || []).length) && (['pending', 'failed', 'interrupted'].includes(j.status) || (data.includeDone && j.status === 'completed')) && !/^KHÓA HÌNH DẠNG NHÂN VẬT/m.test(j.prompt)) { j.prompt += '\nKHÓA HÌNH DẠNG NHÂN VẬT (bắt buộc): mock'; changed++; }
             return { ...structuredClone(s), relocked: { changed, skipped: 0, total: changed } };
           }
           if (name === 'add') s.jobs.push(...data.map(j => ({ ...j, id: String(++id), status: 'pending', stage: 'pending', order: s.jobs.filter(x => x.kind === 'story').length + 1 })));
@@ -204,16 +205,27 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       await page.locator('#storyOutput').evaluate(d => { d.open = true; });
       await page.locator('#storyPick').selectOption('Truyen-OLD'); await page.evaluate(() => window.push());
       await page.waitForFunction(() => !document.getElementById('storyRelock').hidden);
-      assert.match(await page.locator('#storyRelock').textContent(), /^Gắn khóa ảnh nhân vật cho 2 cảnh chưa xong$/, 'chỉ đếm cảnh chưa xong, có ảnh, không phải quảng cáo');
+      assert.match(await page.locator('#storyRelock').textContent(), /^Gắn khóa kiểu hình cho 3 cảnh$/, 'đếm cảnh có ảnh, không phải quảng cáo (cảnh đã xong cũng đếm để «Tạo lại» gửi prompt mới)');
       await page.locator('#storyRelock').click();
       await page.waitForFunction(() => window.calls.some(c => c.name === 'storyRelock'));
-      assert.deepEqual((await called('storyRelock')).at(-1).data, { storyId: 'Truyen-OLD', form: 'người que, đầu tròn trắng' });
+      assert.deepEqual((await called('storyRelock')).at(-1).data, { storyId: 'Truyen-OLD', form: 'người que, đầu tròn trắng', refLook: '', includeDone: true });
       await page.waitForFunction(() => document.getElementById('storyRelock').hidden);
-      assert.match(await page.locator('#toast').textContent(), /Đã gắn khóa vào 2 cảnh/);
-      assert.equal(await page.evaluate(() => window.s.jobs.filter(j => j.storyId === 'Truyen-OLD' && /KHÓA HÌNH DẠNG/.test(j.prompt)).map(j => j.id).join()), 'old1,old2');
+      assert.match(await page.locator('#toast').textContent(), /Đã gắn khóa vào 3 cảnh/);
+      assert.equal(await page.evaluate(() => window.s.jobs.filter(j => j.storyId === 'Truyen-OLD' && /KHÓA HÌNH DẠNG/.test(j.prompt)).map(j => j.id).join()), 'old1,old2,old3');
       // dọn: các cảnh giả này không được lẫn vào phần kiểm thử phía sau
       await page.evaluate(() => { window.s.jobs = window.s.jobs.filter(j => j.storyId !== 'Truyen-OLD'); window.push(); });
       await page.waitForFunction(() => ![...document.getElementById('storyPick').options].some(o => o.value === 'Truyen-OLD'));
+    }
+
+    // Kiểu ảnh tự nhận (máy chính trả 'flat2d'): dòng thông tin dưới nút chọn ảnh nói rõ kiểu, và hỏi lại đúng ảnh đầu tiên; không nhận ra thì không có dòng đó.
+    {
+      await page.evaluate(() => { window.refLook = 'flat2d'; });
+      await page.locator('#storyRefs').click();
+      await page.waitForFunction(() => /Kiểu ảnh: hoạt hình 2D phẳng/.test(document.getElementById('storyRefInfo').textContent));
+      assert.deepEqual((await called('storyRefLook')).at(-1).data, { file: 'C:\\Refs\\mai.png' });
+      await page.evaluate(() => { window.refLook = ''; });
+      await page.locator('#storyRefs').click();
+      await page.waitForFunction(() => !/Kiểu ảnh:/.test(document.getElementById('storyRefInfo').textContent) && /mai\.png/.test(document.getElementById('storyRefInfo').textContent));
     }
 
     // Hiểu kịch bản: đối chiếu lời với kịch bản gốc, sửa một chạm, soát từng cảnh, giới hạn 10 giây, đa ngôn ngữ.

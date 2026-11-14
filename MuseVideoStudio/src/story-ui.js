@@ -326,7 +326,7 @@
   let lookSeq = 0;
   async function detectLook() {
     const seq = ++lookSeq, first = refs[0] || '';
-    const next = first && !isAd() && !isTip() ? (await call('storyRefLook', { file: first })) || '' : '';
+    const found = first && !isAd() && !isTip() ? await call('storyRefLook', { file: first }) : '', next = typeof found === 'string' ? found : '';
     if (seq !== lookSeq || next === refLook) return;
     refLook = next;
     refInfo();
