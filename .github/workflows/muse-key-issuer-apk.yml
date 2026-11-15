@@ -1,0 +1,46 @@
+name: Build Muse key issuer APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [muse-video-studio]
+    paths:
+      - '.github/workflows/muse-key-issuer-apk.yml'
+      - 'MuseVideoStudio/tools/key-issuer.html'
+      - 'MuseVideoStudio/tools/android-key-issuer/**'
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Copy owner tool page into the app
+        run: |
+          mkdir -p MuseVideoStudio/tools/android-key-issuer/app/src/main/assets
+          cp MuseVideoStudio/tools/key-issuer.html MuseVideoStudio/tools/android-key-issuer/app/src/main/assets/key-issuer.html
+      - name: Build APK
+        working-directory: MuseVideoStudio/tools/android-key-issuer
+        run: gradle --no-daemon assembleDebug
+      - name: Check the APK carries the page and asks for no network permission
+        run: |
+          APK=MuseVideoStudio/tools/android-key-issuer/app/build/outputs/apk/debug/app-debug.apk
+          unzip -l "$APK" | grep -q 'assets/key-issuer.html'
+          cp "$APK" Muse-Key-Issuer.apk
+          ls -la Muse-Key-Issuer.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Muse-Key-Issuer-apk
+          path: Muse-Key-Issuer.apk
+      - name: Publish download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete muse-key-issuer-apk-v1 --yes --cleanup-tag || true
+          gh release create muse-key-issuer-apk-v1 Muse-Key-Issuer.apk --target "$GITHUB_SHA" --title "Muse key issuer (Android APK)" --notes "Owner key issuer wrapped as an Android app. No private signing key is included; the app has no internet permission."
