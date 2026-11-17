@@ -733,6 +733,27 @@ test('Regenerate IPC submits only the selected completed scene and saves a new f
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
 
+test('Regenerate IPC with a chosen account runs the scene on that account (TK 1 instead of its old TK 2) and rejects accounts outside the running browsers',{timeout:8000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-regenerate-acct-'));let app,uploads=0;const sent=[],slots=[];
+ const old=path.join(dir,'001.mp4');await fs.writeFile(old,fixtureMp4());
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,dispatchRevision:1,settings:{output:dir,browserChoice:'chrome',accountCount:2,cooldownSeconds:0},jobs:[{id:'done',number:1,prompt:'Selected original scene',status:'completed',account:2,output:old},{id:'keep',number:2,prompt:'Other completed',status:'completed',output:'keep.mp4'},{id:'pending',number:3,prompt:'Do not send',status:'pending'}]}));
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async({profileDir})=>{slots.push(path.basename(profileDir));let draft='';return{external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',openMuse:async()=>{},show:async()=>{},close:async()=>{},evaluate:async(fn,arg)=>{
+   if(fn.name==='browserStop')return{state:'confirmed'};
+   if(fn.name==='beginTracking'){assert.equal(arg.recover,false);return{};}
+   if(fn.name==='submitPrompt'){sent.push(draft);return{clicked:true};}
+   if(fn.name==='pollTracking')return{ready:true,echoMatched:true,responseMatched:true};
+   if(fn.name==='downloadAction')return{clicked:true};if(arg?.prompt&&!arg?.id)draft=arg.prompt;return null;
+  },captureDownload:async(target,{trigger})=>{await trigger();await fs.writeFile(target,fixtureMp4());}};}});
+  await assert.rejects(async()=>app.invoke('regenerate',{id:'done',account:3}),/Chọn tài khoản từ 1 đến 2/);
+  assert.equal(app.invoke('state').jobs[0].account,2,'bị từ chối thì không đổi TK của cảnh');
+  await app.invoke('regenerate',{id:'done',account:1});await until(()=>!app.invoke('state').active);
+  assert.deepEqual(sent,['Selected original scene']);assert.deepEqual(slots,['account-1']);assert.equal(app.invoke('state').jobs[0].account,1);
+  const jobs=app.invoke('state').jobs;assert.equal(jobs[0].output,path.join(dir,'001 (2).mp4'));assert.equal(jobs[0].previousOutput,old);assert.deepEqual(await fs.readFile(old),fixtureMp4());assert.deepEqual(await fs.readFile(jobs[0].output),fixtureMp4());
+  assert.equal(jobs[1].output,'keep.mp4');assert.equal(jobs[1].status,'completed');assert.equal(jobs[2].status,'pending');await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
 test('image tab saves the replied pictures through the right-click Tải xuống menu under Anh by scene number, waits for Muse to stop generating, and leaves video scenes alone',{timeout:12000},async()=>{
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-image-run-'));
   const picture=seed=>Buffer.concat([Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]),Buffer.alloc(3000,seed)]);

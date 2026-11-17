@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.6
+
+- **Dải «Đang làm:» liệt kê từng cảnh đang chạy** (số cảnh · tài khoản · thời gian đã chạy) ngay dưới phần «Vừa xong». Hàng đợi có hàng trăm thẻ nên trước đây «2 đang làm» không biết là 2 thẻ nào. Bấm một nút trong dải (hoặc bấm chữ «N đang làm») để nhảy tới đúng thẻ, thẻ nháy sáng vài giây; từ đó dùng «Dừng cảnh này», «Tạo lại ngay» hoặc «Thử TK khác». Cảnh chạy quá «Ngưỡng báo Muse chậm» (Kết nối & cài đặt, mặc định 15 phút) có ⚠ và nút đổi màu đỏ.
+- **Chọn tài khoản cho «Thử TK khác» và «Tạo lại».** Thẻ đang chạy có ô «Sang TK: tự chọn / Sang TK n» cạnh nút «Thử TK khác» (không liệt kê TK đang kẹt): chọn TK nào thì cảnh dừng ở TK cũ rồi gửi đúng sang TK đó, thay vì để hàng đợi tự chọn. Thẻ đã xong / lỗi / bị gián đoạn có ô «Chạy ở TK …» cạnh nút «Tạo lại»: mặc định giữ TK cũ, chọn TK khác thì tạo lại bằng tài khoản đó (mở trình duyệt của TK đó nếu cần). Cảnh đang chờ hiện «sẽ chạy ở TK n» trong dòng thông tin. Chỉ có ô chọn khi «Chạy song song» từ 2 trình duyệt trở lên; chỉ chọn được TK trong số trình duyệt đang chạy song song.
+- Giới hạn: chọn TK đang «nghỉ vì hết lượt» thì cảnh chờ đến khi TK đó hết nghỉ (ô chọn ghi «đang nghỉ»). Chưa thử với Muse thật; đã thử bằng test hàng đợi, vòng đời ứng dụng và trình duyệt giả (`test/card-account-smoke.cjs`).
+
 ## Update 1.9.5
 
 - **Kể chuyện: nhân vật chính / người dẫn chuyện giữ NGUYÊN ở mọi cảnh.** Phát hiện từ 36 clip thật của truyện «Hàng rào điện tử»: ảnh tham chiếu là bảng sticker (lính, xe, máy bay) không có người dẫn chuyện, ô «Nhân vật chính» để trống, nên Muse tự viết lại người dẫn chuyện ở từng cảnh («nam trung niên, áo sơ mi đơn giản») và mỗi cảnh ra một người khác: áo xanh, kem, lam, tóc nâu như người nước ngoài, có cảnh ra người thật. Giờ nếu ô «Nhân vật chính» có chữ, app tự gắn NGUYÊN VĂN mô tả đó thành dòng «NHÂN VẬT CHÍNH (cố định, y hệt ở MỌI cảnh…)» ngay sau dòng kiểu hình ở đầu MỌI prompt (cả cảnh Muse viết lẫn cảnh tự ghép, tiếng Việt lẫn tiếng Anh); câu khóa hình dạng nói rõ nhân vật chính là ngoại lệ, không được đổi áo, tóc, quốc tịch như người phụ.

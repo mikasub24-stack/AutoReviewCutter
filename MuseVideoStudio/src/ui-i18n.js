@@ -486,6 +486,14 @@ Dừng cảnh này (chưa chạy)? Cảnh thành «Đã dừng» để bạn s�
 Đã dừng cảnh này. Sửa prompt (nếu cần) rồi bấm «Gửi lại prompt» để tạo lại.|Scene stopped. Edit the prompt if needed, then press “Resend prompt” to regenerate it.
 Tạo lại ngay|Restart now
 Thử TK khác|Try another account
+Bấm để nhảy tới ô đang làm|Click to jump to the running scenes
+Bấm để nhảy tới thẻ cảnh này.|Click to jump to this scene's card.
+Đang làm:|Processing:
+Sang TK: tự chọn|Move to: any account
+Tài khoản sẽ chạy cảnh này|Account that will run this scene
+Chọn tài khoản sẽ chạy cảnh này. Để mặc định thì tool tự chọn / giữ tài khoản cũ.|Choose the account that will run this scene. Leave the default to let the tool choose / keep the old account.
+Tạo lại cảnh này; giữ video cũ. Chọn TK ở ô bên cạnh nếu muốn chạy bằng tài khoản khác.|Regenerate this scene; the old video is kept. Pick an account in the box next to it to run it on another account.
+Dừng chờ ở tài khoản này và gửi cảnh sang tài khoản khác (khi tài khoản hết lượt tạo video). Chọn TK ở ô bên cạnh, hoặc để «tự chọn».|Stop waiting on this account and send the scene to another account (when this account is out of video generations). Pick an account in the box next to it, or leave “any”.
 Bấm dừng cảnh này trong Muse rồi gửi lại với prompt mới ngay? Nếu Muse đang tạo dở thì phần đó bị bỏ.|Stop this scene in Muse and resend it with the new prompt now? Anything Muse is still generating for it is discarded.
 Gửi lại prompt mới? Nếu prompt cũ đã tạo xong trong Muse thì có thể ra video trùng.|Resend the new prompt? If the old prompt already finished in Muse, you may get a duplicate video.
 ✎ Sửa prompt|✎ Edit prompt
@@ -830,13 +838,18 @@ Mở Flow để đăng nhập Google|Open Flow to sign in to Google
       [/^thấy (\d+) ảnh mới nhưng chưa gắn được vào đúng prompt$/,m=>'found '+m[1]+' new image(s) not yet bound to this prompt'],
       [/^Muse đang tạo ảnh · (\d+)%$/,m=>'Muse is generating the image · '+m[1]+'%'],
       [/^Thêm (\d+) prompt ảnh và chạy toàn bộ tác vụ ảnh đang chờ\?.*$/,m=>'Add '+m[1]+' image prompts and run all pending image tasks? This may use Muse credits. Exact reviewed prompts and scene references will be sent.'],
+      [/^Sang TK (\d+)( \(đang nghỉ\))?$/,m=>'Move to account '+m[1]+(m[2]?' (resting)':'')],
+      [/^Chạy ở TK (\d+)( \(cũ\)| \(đang nghỉ\))?$/,m=>'Run on account '+m[1]+(m[2]===' (cũ)'?' (previous)':m[2]?' (resting)':'')],
+      [/^(⚠ )?#(\d+)(?: · TK (\d+))? · (\d+:\d{2})$/,m=>(m[1]||'')+'#'+m[2]+(m[3]?' · Account '+m[3]:'')+' · '+m[4]],
+      [/^Cảnh này chạy quá (\d+) phút \(ngưỡng báo chậm\)\. Bấm để mở thẻ, rồi chọn «Dừng cảnh này», «Tạo lại ngay» hoặc «Thử TK khác»\.$/,m=>'This scene has run for over '+m[1]+' minutes (slow-warning threshold). Click to open its card, then choose Stop this scene, Restart now or Try another account.'],
+      [/^Bấm dừng cảnh này ở TK (\S+) rồi gửi lại prompt sang TK (\d+)\? Nếu Muse đang tạo dở thì phần đó bị bỏ\.$/,m=>'Stop this scene on account '+m[1]+' and resend the prompt on account '+m[2]+'? Anything Muse is still generating for it is discarded.'],
       [/^(\d+) đang làm$/,m=>m[1]+' processing'],[/^(\d+) đang chờ$/,m=>m[1]+' pending'],[/^(\d+) cảnh dở(?: \/ lỗi)?$/,m=>m[1]+' interrupted / failed'],
       [/^(\d+) trình duyệt · (\d+) ô$/,m=>m[1]+' browsers · '+m[2]+' slots'],
       [/^Mở (\d+) trình duyệt$/,m=>'Open '+m[1]+' browsers'],
       [/^Song song (\d+) trình duyệt · mỗi trình duyệt 1 prompt(.*)$/,m=>'Parallel: '+m[1]+' browsers · 1 prompt each'+m[2].replace(' · Đang nghỉ vì hết hạn mức: TK ',' · Resting (quota reached): account ').replace('đến ','until ').replace('bấm Tiếp tục để thử lại ngay','press Continue to retry now')],
       [/^Trình duyệt (\d+): (.+)$/,m=>'Browser '+m[1]+': '+t(m[2])],
       [/^Đã xử lý (.+)$/,m=>'Elapsed '+m[1]],[/^Đã tải (.+)$/,m=>'Downloaded '+m[1]],
-      [/^(🔒 Đã khóa · )?(\d+) ảnh tham chiếu(.*)$/,m=>(m[1]?'🔒 Locked · ':'')+m[2]+' reference image(s)'+m[3].replace('TK ','Account ')],
+      [/^(🔒 Đã khóa · )?(\d+) ảnh tham chiếu(.*)$/,m=>(m[1]?'🔒 Locked · ':'')+m[2]+' reference image(s)'+m[3].replace('sẽ chạy ở TK ','will run on Account ').replace('TK ','Account ')],
       [/^(\d+) ảnh chung cho toàn bộ prompt\.$/,m=>m[1]+' shared reference image(s) for every prompt.'],
       [/^(\d+) ảnh theo số thứ tự\.$/,m=>m[1]+' numbered reference image(s).'],
       [/^Đã nhận (\d+) prompt hoàn chỉnh(.*?)\. Xem\/sửa hoặc bấm (Tạo video|Tạo ảnh)\.$/,m=>m[1]+' complete prompts loaded'+m[2].replace('mục tiêu','target')+'. Review or click '+(m[3]==='Tạo ảnh'?'Create images':'Create videos')+'.'],

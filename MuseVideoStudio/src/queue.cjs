@@ -165,7 +165,7 @@ class Queue {
     if(job.status==='running')throw Error('Dừng cảnh này trước khi thêm video.');
     if(job.status==='completed')throw Error('Cảnh này đã có video.');
     if(typeof output!=='string'||!output.trim())throw Error('Thiếu đường dẫn video.');
-    delete job.resumeMode;delete job.avoidAccounts;delete job.late;
+    delete job.resumeMode;delete job.avoidAccounts;delete job.wantAccount;delete job.late;
     Object.assign(job,{status:'completed',stage:'completed',stageMessage:'Đã thêm video thủ công',progress:100,downloadProgress:null,error:'',output,outputs:[output],manual:true,finishedAt:new Date().toISOString()});
     await this.publish();
   }
@@ -173,14 +173,15 @@ class Queue {
   //   mode 'again': bỏ lượt chờ này và đưa cảnh về «đang chờ» để gửi lại ngay (worker rảnh sẽ nhặt lại đúng cảnh này, vì cảnh đứng đầu hàng).
   //   mode 'other': như 'again' nhưng gửi sang tài khoản KHÁC (tài khoản hiện tại hết lượt tạo video / lỗi). Cảnh nhớ tài khoản cần tránh trong avoidAccounts;
   //                 khi đã tránh hết mọi tài khoản đang chạy thì bỏ qua danh sách này (thử lại từ đầu).
+  //                 Có account (1…n) thì gửi ĐÚNG tài khoản đó (job.wantAccount) thay vì để hàng đợi tự chọn.
   //   mode 'skip' : bỏ lượt chờ, cảnh thành «bị gián đoạn» (vẫn lấy lại video đã tạo được / gửi lại sau); các cảnh khác chạy tiếp.
   // hold: Promise (vd lệnh bấm Dừng trong Muse) phải xong trước khi trả chỗ cho cảnh kế tiếp. Xong khi cảnh đã rời trạng thái «đang chạy».
-  async cancelJob(id,mode='skip',hold=null,prompt=null){
+  async cancelJob(id,mode='skip',hold=null,prompt=null,account=0){
     const job=this.jobs.find(j=>j.id===id),controller=this.controllers.get(id);
     if(!job||job.status!=='running'||!controller)throw Error('Cảnh này không còn đang chạy.');
     if(this.cancels.has(id))return;
     const next=prompt===null||prompt===undefined?null:checkPrompt(prompt);
-    this.cancels.set(id,{mode:mode==='again'||mode==='other'?mode:'skip',hold:hold||Promise.resolve(),prompt:next});
+    this.cancels.set(id,{mode:mode==='again'||mode==='other'?mode:'skip',hold:hold||Promise.resolve(),prompt:next,account:mode==='other'&&Number.isInteger(account)&&account>0?account:0});
     controller.abort();
     while(this.controllers.has(id))await new Promise(r=>setTimeout(r,20));
   }
@@ -198,7 +199,7 @@ class Queue {
       if(controller.signal.aborted)throw stoppedError();
       const photo=isPhoto(job);
       if(typeof output!=='string'||!output.trim())throw Error(photo?'Chưa xác nhận được tệp ảnh đã lưu.':'Chưa xác nhận được tệp video tải xuống.');
-      job.output=output;job.status='completed';delete job.avoidAccounts;job.stage='completed';job.stageMessage=photo?'Đã lưu ảnh về máy':'Đã tải và lưu video về máy';job.progress=100;
+      job.output=output;job.status='completed';delete job.avoidAccounts;delete job.wantAccount;job.stage='completed';job.stageMessage=photo?'Đã lưu ảnh về máy':'Đã tải và lưu video về máy';job.progress=100;
     } catch(error) {
       const cancel=this.cancels.get(job.id);
       if(cancel){
@@ -211,6 +212,8 @@ class Queue {
           delete job.resumeMode;delete job.late;resetRunFields(job);job.status='pending';
           if(cancel.prompt)applyPrompt(job,cancel.prompt);
           if(cancel.mode==='other'&&from)job.avoidAccounts=[...new Set([...(job.avoidAccounts||[]),from])];
+          // Người dùng chọn đích danh tài khoản: chỉ worker của tài khoản đó nhặt cảnh này (và không bị «tránh» vì lần hỏng trước).
+          if(cancel.mode==='other'&&cancel.account&&cancel.account!==from){job.wantAccount=cancel.account;job.avoidAccounts=(job.avoidAccounts||[]).filter(a=>a!==cancel.account);}
         }
         else{job.status='interrupted';job.stage='interrupted';job.error='Đã dừng cảnh này. Bấm «Tìm / tải video đã tạo» để lấy kết quả nếu Muse đã làm xong, hoặc «Gửi lại prompt».';job.stageMessage=job.error;}
       }else if(chained(job)&&Number(job.account)>0&&!controller.signal.aborted&&error?.name!=='AbortError'&&QUOTA.test(error?.message||'')&&(job.quotaMoves||0)<QUOTA_MAX_MOVES){
@@ -256,6 +259,7 @@ class Queue {
           let job=null,waiting=false,resting=false;
           for(const x of this.jobs){
             if(x.status!=='pending'||(this.kind&&x.kind!==this.kind)||!(!x.resumeMode||this.concurrency===1||x.account===slot+1||!x.account||(chained(x)&&this.isExhausted(x.account)))||this.avoids(x,slot))continue;
+            if(x.wantAccount&&this.concurrency>1&&x.wantAccount<=this.concurrency&&x.wantAccount!==slot+1)continue;   // cảnh đã chọn đích danh tài khoản khác
             if(chained(x)&&this.concurrency>1&&this.isExhausted(slot+1)&&!this.allExhausted()){resting=true;continue;}
             const gate=this.gate(x);
             if(gate==='ready'){job=x;break;}

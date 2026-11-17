@@ -138,18 +138,26 @@ function makeCard(id){
   row.regenerate=action('Tạo lại',async()=>{
     const j=row.job;   // cảnh lỗi đã gửi tới Muse thì có thể ra video trùng: hỏi như «Gửi lại prompt»
     if(['failed','interrupted'].includes(j.status)&&(j.mayHaveSubmitted||j.submittedAt||j.resultReadyAt)&&!confirm('Kiểm tra Muse trước. Gửi lại prompt có thể tạo video trùng nếu tác vụ trước đã gửi.'))return;
-    render(await call('regenerate',j.id));
+    const acc=Number(row.acctSel.value)||0;   // 0 = giữ tài khoản cũ của cảnh
+    render(await call('regenerate',acc&&acc!==(Number(j.account)||1)?{id:j.id,account:acc}:j.id));
   });
-  row.regenerate.title='Tạo lại cảnh này; giữ video cũ.';
+  row.regenerate.title='Tạo lại cảnh này; giữ video cũ. Chọn TK ở ô bên cạnh nếu muốn chạy bằng tài khoản khác.';
   row.exclude=action('Bỏ khỏi video',async()=>{const j=row.job,meta=state.restore?.stories?.[j.storyId],out=(meta?.excluded||[]).map(Number).includes(Number(j.number));render(await call('restoreExclude',{storyId:j.storyId,number:j.number,exclude:!out}));});
   row.exclude.title='Cảnh sai đồ vật hoặc hành động? Loại cảnh này khỏi video (không xóa clip), rồi bấm «Dựng lại video» ở phần Dọn nhà. Bấm lần nữa để đưa lại.';
   row.cancelBtn=action('Dừng cảnh này',async()=>{if(row.job.status==='pending'){if(confirm('Dừng cảnh này (chưa chạy)? Cảnh thành «Đã dừng» để bạn sửa prompt rồi bấm «Gửi lại prompt» tạo lại sau. Các cảnh khác vẫn chạy tiếp.'))render(await call('holdJob',row.job.id));return;}if(confirm('Dừng chờ cảnh này? Các cảnh khác vẫn chạy tiếp. Cảnh này thành «Bị gián đoạn»: sau đó có thể «Tìm / tải video đã tạo» hoặc «Gửi lại prompt».'))render(await call('cancelJob',{id:row.job.id,mode:'skip'}));});
   row.cancelBtn.title='Không chờ cảnh này nữa; tab khác vẫn chạy tiếp.';row.cancelBtn.classList.add('danger');
   row.restartBtn=action('Tạo lại ngay',async()=>{if(confirm('Bấm dừng cảnh này trong Muse rồi gửi lại prompt ngay? Nếu Muse đang tạo dở thì phần đó bị bỏ.'))render(await call('cancelJob',{id:row.job.id,mode:'again'}));});
   row.restartBtn.title='Dừng chờ và gửi lại prompt của cảnh này ngay.';
-  row.otherBtn=action('Thử TK khác',async()=>{if(confirm('Bấm dừng cảnh này ở tài khoản hiện tại rồi gửi lại prompt sang một tài khoản khác? Dùng khi tài khoản này đã hết lượt tạo video. Nếu Muse đang tạo dở thì phần đó bị bỏ.'))render(await call('cancelJob',{id:row.job.id,mode:'other'}));});
-  row.otherBtn.title='Dừng chờ ở tài khoản này và gửi cảnh sang tài khoản khác (khi tài khoản hết lượt tạo video).';
-  const previewActions=el('div','previewActions');previewActions.append(row.cancelBtn,row.restartBtn,row.otherBtn,row.upload);preview.append(previewActions);
+  // Ô chọn tài khoản dùng chung cho «Thử TK khác» (thẻ đang chạy, nằm cạnh nút đó) và «Tạo lại» (các thẻ còn lại); updateCard đặt nó đúng chỗ.
+  row.acctSel=el('select','acctSel');row.acctSel.hidden=true;row.acctSel.setAttribute('aria-label','Tài khoản sẽ chạy cảnh này');
+  row.acctSel.title='Chọn tài khoản sẽ chạy cảnh này. Để mặc định thì tool tự chọn / giữ tài khoản cũ.';
+  row.otherBtn=action('Thử TK khác',async()=>{
+    const acc=Number(row.acctSel.value)||0;
+    const ok=acc?confirm(`Bấm dừng cảnh này ở TK ${row.job.account||'hiện tại'} rồi gửi lại prompt sang TK ${acc}? Nếu Muse đang tạo dở thì phần đó bị bỏ.`):confirm('Bấm dừng cảnh này ở tài khoản hiện tại rồi gửi lại prompt sang một tài khoản khác? Dùng khi tài khoản này đã hết lượt tạo video. Nếu Muse đang tạo dở thì phần đó bị bỏ.');
+    if(ok)render(await call('cancelJob',acc?{id:row.job.id,mode:'other',account:acc}:{id:row.job.id,mode:'other'}));
+  });
+  row.otherBtn.title='Dừng chờ ở tài khoản này và gửi cảnh sang tài khoản khác (khi tài khoản hết lượt tạo video). Chọn TK ở ô bên cạnh, hoặc để «tự chọn».';
+  const previewActions=el('div','previewActions');previewActions.append(row.cancelBtn,row.restartBtn,row.otherBtn,row.upload);preview.append(previewActions);row.previewActions=previewActions;
   row.edit=action('Đưa về sửa',async()=>{const result=await call('remove',row.job.id);if(result){drafts.push({...row.job});$('editorPanel').open=true;renderDrafts();render(result);$('editorPanel').scrollIntoView({block:'nearest'});}});
   body.append(head,title,meta,steps,stage,fileLine,disclosure,source,error,actions);card.append(preview,body);return row;
 }
@@ -203,12 +211,28 @@ function updateMedia(row,job){
     const img=el('img');img.src=image;img.alt='Ảnh tham chiếu';img.onerror=()=>img.replaceWith(el('span','glyph','▧'));row.media.append(img);
   }else row.media.append(el('span','glyph','▷'));
 }
+// Ô chọn tài khoản của thẻ: chỉ dựng lại khi đổi trạng thái / TK của cảnh / số TK / TK đang nghỉ, để không làm mất lựa chọn đang chọn dở mỗi lần Muse báo tiến độ.
+function updateAccountSelect(row,job){
+  const total=Math.max(1,Number(state.settings.accountCount)||1),running=job.status==='running',cur=Number(job.account)||(running?0:1);
+  const resting=Array.isArray(state.resting)?state.resting:[];
+  const show=total>1&&(running?!row.otherBtn.hidden:!row.regenerate.hidden);
+  row.acctSel.hidden=!show;if(!show)return;
+  const host=running?row.previewActions:row.actions;
+  if(row.acctSel.parentNode!==host){if(running)row.otherBtn.after(row.acctSel);else row.regenerate.before(row.acctSel);}
+  row.acctSel.disabled=running?row.cancelBtn.disabled:row.regenerate.disabled;
+  const key=[running?'r':'n',cur,total,resting.join(',')].join('|');if(row.acctKey===key)return;
+  const before=row.acctSel.value;row.acctKey=key;
+  const first=el('option','',running?'Sang TK: tự chọn':`Chạy ở TK ${cur} (cũ)`);first.value='';
+  const options=[first];
+  for(let i=1;i<=total;i++){if(i===cur)continue;const o=el('option','',(running?'Sang TK ':'Chạy ở TK ')+i+(resting.includes(i)?' (đang nghỉ)':''));o.value=String(i);options.push(o);}
+  row.acctSel.replaceChildren(...options);row.acctSel.value=options.some(o=>o.value===before)?before:'';
+}
 function updateCard(row,job,index){
   row.job=job;row.card.dataset.status=job.status;updateMedia(row,job);updateEditor(row,job);
   const displayNumber=Number.isInteger(job.number)&&job.number>0?job.number:job.order||index+1;
   text(row.number,'#'+displayNumber);text(row.title,job.title||`Prompt ${displayNumber}`);row.card.setAttribute('aria-label',`${job.title||'Prompt '+displayNumber} · ${labels[job.status]||job.status}`);
   row.badge.className='badge '+job.status;text(row.badge,labels[job.status]||job.status);text(row.prompt,job.lockedInput?.prompt||job.prompt);
-  text(row.meta,`${job.lockedInput?'🔒 Đã khóa · ':''}${job.references?.length||0} ảnh tham chiếu${job.account?' · TK '+job.account:''}${job.durationSeconds?' · '+job.durationSeconds+'s':''}`);
+  text(row.meta,`${job.lockedInput?'🔒 Đã khóa · ':''}${job.references?.length||0} ảnh tham chiếu${job.account?' · TK '+job.account:''}${job.status==='pending'&&job.wantAccount?' · sẽ chạy ở TK '+job.wantAccount:''}${job.durationSeconds?' · '+job.durationSeconds+'s':''}`);
   const active=job.status==='running';
   const photo=isPhotoJob(job);
   const stageName=job.status==='completed'?(photo?'✓ Đã lưu xong ảnh':'✓ Đã tải xong video'):(photo&&imageStageLabels[job.stage])||stageLabels[job.stage]||labels[job.status]||'Đang chờ';
@@ -247,6 +271,7 @@ function updateCard(row,job,index){
   const recoverable=['failed','interrupted'].includes(job.status)&&Boolean(job.mayHaveSubmitted||job.submittedAt||job.resultReadyAt);
   row.recover.hidden=!recoverable;row.recover.disabled=Boolean(state.active||state.starting||state.stopping||state.merging||state.packaging);
   row.retry.hidden=!['failed','interrupted'].includes(job.status);row.remove.hidden=job.status==='running';row.edit.hidden=job.kind==='story'||job.kind==='restore'||job.kind==='wild'||job.status!=='pending'||Boolean(job.lockedInput);row.retry.disabled=Boolean(state.active||state.starting||state.stopping);
+  updateAccountSelect(row,job);
   row.card.hidden=!(filter==='all'||(filter==='failed'?['failed','interrupted'].includes(job.status):job.status===filter));
 }
 function renderJobs(jobs){
@@ -269,7 +294,34 @@ function renderJobs(jobs){
   }
 }
 
-setInterval(()=>{for(const row of jobCards.values())if(row.job?.status==='running')updateElapsed(row);},1000);
+setInterval(()=>{for(const row of jobCards.values())if(row.job?.status==='running')updateElapsed(row);if(state)renderRunning(jobsOf(state.jobs));},1000);
+
+// Dải «Đang làm»: mỗi cảnh đang chạy một nút (số cảnh · TK · thời gian · bước) giữa hàng trăm thẻ; bấm để nhảy tới đúng thẻ. Quá ngưỡng báo chậm thì có ⚠.
+const runChips=new Map();
+function jumpToJob(id){
+  const row=jobCards.get(id);if(!row)return;
+  manualScrollUntil=Date.now()+10000;   // «Theo cảnh đang chạy» không giật lại ngay
+  const grid=$('jobs');grid.scrollIntoView({block:'nearest'});   // đảm bảo danh sách đang hiện trên màn hình
+  const c=row.card.getBoundingClientRect(),g=grid.getBoundingClientRect();grid.scrollTo({top:grid.scrollTop+c.top-g.top,behavior:'smooth'});   // đầu thẻ lên đầu danh sách (thẻ cao hơn khung nên không căn giữa)
+  row.card.classList.remove('flash');void row.card.offsetWidth;row.card.classList.add('flash');
+  setTimeout(()=>row.card.classList.remove('flash'),2800);
+}
+function renderRunning(jobs){
+  const box=$('runningNow');if(!box)return;
+  const running=jobs.filter(j=>j.status==='running'),ids=new Set(running.map(j=>j.id));
+  for(const [id,chip] of runChips)if(!ids.has(id)){chip.remove();runChips.delete(id);}
+  const limit=Math.max(1,Number(state?.settings?.timeoutMinutes)||15)*60000;
+  running.forEach(j=>{
+    let chip=runChips.get(j.id);
+    if(!chip){chip=el('button','runChip');chip.type='button';chip.onclick=()=>jumpToJob(j.id);runChips.set(j.id,chip);box.append(chip);}
+    const started=timeValue(j.startedAt),ms=started===null?0:Math.max(0,Date.now()-started),sec=Math.floor(ms/1000),slow=started!==null&&ms>limit;
+    const n=Number.isInteger(j.number)&&j.number>0?j.number:j.order||jobs.indexOf(j)+1;
+    text(chip,`${slow?'⚠ ':''}#${n}${j.account?' · TK '+j.account:''} · ${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`);
+    chip.classList.toggle('slow',slow);
+    chip.title=slow?`Cảnh này chạy quá ${Math.round(limit/60000)} phút (ngưỡng báo chậm). Bấm để mở thẻ, rồi chọn «Dừng cảnh này», «Tạo lại ngay» hoặc «Thử TK khác».`:'Bấm để nhảy tới thẻ cảnh này.';
+  });
+  box.hidden=!running.length;
+}
 
 function applyMode(){
   const image=isImage(),restore=isRestore(),story=isStory(),wild=isWild(),folderTab=story||restore||wild;
@@ -338,7 +390,7 @@ function render(next){
   const failed=jobs.filter(j=>['failed','interrupted'].includes(j.status)&&j.error);
   $('queueFailure').hidden=Boolean(state.active||!failed.length);
   $('queueFailureText').textContent=failed.length?`${failed[0].title||'Prompt '+(jobs.indexOf(failed[0])+1)} · ${failed[0].error}`:'';
-  renderJobs(jobs);
+  renderJobs(jobs);renderRunning(jobs);
   try{window.storyUi?.render(state);}catch(e){console.error(e);}
   try{window.restoreUi?.render(state);}catch(e){console.error(e);}
   try{window.wildUi?.render(state);}catch(e){console.error(e);}
@@ -369,6 +421,8 @@ window.studio.onUpdate(render);call('state').then(render);renderDrafts();mapping
 
 $('contactButton').onclick=()=>$('contactDialog').showModal();$('closeContact').onclick=()=>$('contactDialog').close();$('contactDialog').onclick=e=>{if(e.target===$('contactDialog'))$('contactDialog').close();};$('licenseButton').onclick=()=>$('licenseDialog').showModal();$('closeLicense').onclick=()=>$('licenseDialog').close();$('copyDevice').onclick=async()=>{try{await navigator.clipboard.writeText($('deviceCode').value);toast('Đã sao chép mã máy.');}catch{$('deviceCode').select();toast('Nhấn Ctrl+C để sao chép mã máy.');}};$('activateKey').onclick=async()=>{const result=await call('activateKey',$('activationKey').value.trim());if(result){render(result);toast('Đã kích hoạt key.');}};
 
+const jumpFirstRunning=()=>{const j=jobsOf(state?.jobs).find(x=>x.status==='running');if(j)jumpToJob(j.id);};
+$('runningCount').onclick=jumpFirstRunning;$('runningCount').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();jumpFirstRunning();}};
 $('showFailures').onclick=()=>{const job=jobsOf(state.jobs).find(j=>['failed','interrupted'].includes(j.status));const card=jobCards.get(job?.id)?.card,grid=$('jobs');if(card)grid.scrollTo({top:grid.scrollTop+card.getBoundingClientRect().top-grid.getBoundingClientRect().top,behavior:'smooth'});};
 
 $('diagnostics').onclick=async()=>{if(await call('diagnostics',Number($('accountPicker').value)))toast('Đã lưu thông tin cấu trúc chat. Tệp không chứa cookie hay nội dung prompt.');};

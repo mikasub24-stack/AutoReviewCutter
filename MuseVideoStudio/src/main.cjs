@@ -424,7 +424,8 @@ async function runJob(job,worker,signal,{recover=false}={}) {
   const pinned=recover||Boolean(job.resumeMode);
   const rest=isChained(job)?queue.exhaustedAccounts():[];   // tài khoản đang nghỉ vì hết hạn mức thì bỏ qua (nếu còn tài khoản khác)
   const pickNext=()=>{for(let tries=0;tries<settings.accountCount;tries++){const next=nextAccount++%settings.accountCount;if(!(job.avoidAccounts||[]).includes(next+1)&&!rest.includes(next+1))return next;}return nextAccount++%settings.accountCount;};
-  const slot=pinned&&job.account?Number(job.account)-1:settings.dispatchMode==='parallel'?worker:pickNext();
+  const want=Math.trunc(Number(job.wantAccount)||0);delete job.wantAccount;   // «Thử TK khác» có chọn đích danh tài khoản
+  const slot=want>=1&&want<=settings.accountCount?want-1:pinned&&job.account?Number(job.account)-1:settings.dispatchMode==='parallel'?worker:pickNext();
   validAccount(slot);
   const muse=browsers.get(slot),check=()=>{if(signal.aborted)throw stoppedError();},step=p=>abortable(p,signal);
   check();job.account=slot+1;assertMuse(muse);muse.pinPage?.(job.id);
@@ -943,11 +944,16 @@ app.whenReady().then(async () => {
       if(stopping||queue.active||merging||packaging||starting||resettingAccounts.size)throw Error('Chờ xử lý hiện tại hoàn tất.');
       invalidateOutputs();queue.recover(id,(job,signal)=>runJob(job,0,signal,{recover:true})).catch(e=>dialog.showErrorBox(ui('Lấy video đã tạo','Recover existing video'),e.message)).finally(notify);return snapshot();
     },
-    regenerate: async id=>{
+    // data: id (như cũ) hoặc {id, account}: account 1…n = tạo lại ở đúng tài khoản đó thay vì tài khoản cũ của cảnh.
+    regenerate: async data=>{
+      const id=String(data&&typeof data==='object'?data.id:data||''),want=data&&typeof data==='object'?Math.trunc(Number(data.account)||0):0;
       const job=queue.jobs.find(j=>j.id===id);
       const broken=Boolean(job)&&['failed','interrupted'].includes(job.status);
       if(!job||!(broken||(job.status==='completed'&&job.output)))throw Error('Chỉ tạo lại cảnh đã xong, bị lỗi hoặc bị gián đoạn.');
       if(resettingAccounts.size||stopping||merging||packaging||starting||testing||(!queue.active&&accountOperationBusy()))throw Error('Chờ hoặc dừng tác vụ hiện tại trước khi tạo lại.');
+      if(want&&(want<1||want>settings.accountCount))throw Error('Chọn tài khoản từ 1 đến '+settings.accountCount+'. Muốn dùng tài khoản cao hơn, tăng «Chạy song song» trước.');
+      const oldIndex=Math.max(0,Number(job.account||1)-1);
+      if(want&&want!==Number(job.account||0)){job.account=want;delete job.avoidAccounts;delete job.wantAccount;}   // gắn cảnh sang tài khoản được chọn; «tránh» cũ không còn đúng nữa
       const index=Math.max(0,Number(job.account||1)-1);validAccount(index);
       // Cảnh dọn nhà đã loại khỏi video mà được tạo lại: bản mới là bản người dùng muốn dùng, đưa lại vào video.
       const reinclude=async()=>{const em=job.kind==='restore'?settings.restoreStories?.[job.storyId]:null;if(em?.excluded?.length){em.excluded=em.excluded.filter(n=>Number(n)!==Number(job.number));await save();}};
@@ -958,7 +964,7 @@ app.whenReady().then(async () => {
         await reinclude();
         if(job.kind==='video')invalidateOutputs();
         await queue.requeue(id);
-        if(broken)browsers.get(index)?.releasePage?.(id);
+        if(broken)browsers.get(oldIndex)?.releasePage?.(id);
         return snapshot();
       }
       const epoch=runEpoch;starting=true;notify();
@@ -977,9 +983,12 @@ app.whenReady().then(async () => {
       const job=queue.jobs.find(j=>j.id===id);
       if(!job||job.status!=='running')throw Error('Cảnh này không còn đang chạy.');
       if(mode==='other'&&settings.accountCount<2)throw Error('Cần chạy song song từ 2 tài khoản trở lên để chuyển cảnh sang tài khoản khác.');
+      const want=mode==='other'?Math.trunc(Number(data?.account)||0):0;   // 0 = để hàng đợi tự chọn tài khoản khác
+      if(want&&(want<1||want>settings.accountCount))throw Error('Chọn tài khoản từ 1 đến '+settings.accountCount+'.');
+      if(want&&want===Number(job.account))throw Error('Cảnh này đang chạy ở TK '+want+'. Chọn tài khoản khác.');
       if(job.kind==='video')invalidateOutputs();
       const hold=remoteStopJob(job);
-      await queue.cancelJob(id,mode,hold);
+      await queue.cancelJob(id,mode,hold,null,want);
       browsers.get(Number(job.account)-1)?.releasePage?.(id);
       notify();return snapshot();
     },
