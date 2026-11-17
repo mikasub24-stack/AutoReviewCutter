@@ -15,7 +15,7 @@ import urllib.request
 
 from .vendor.abogus import ABogus
 
-SIGNER_VERSION = 'f2-7dab3e2-stdlib-sm3'
+SIGNER_VERSION = 'f2-7dab3e2-get8-stdlib-sm3'
 API_ORIGIN = 'https://www.douyin.com'
 UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 FINGERPRINT = '1920|1080|1920|1080|0|0|0|0|1920|1080|1920|1040|1920|1080|24|24|Win32'
@@ -133,7 +133,7 @@ class DouyinClient:
         self.user_agent = user_agent
         self.jar = load_cookies(cookie_file)
         self.opener = opener or urllib.request.build_opener(ScopedRedirect(), urllib.request.HTTPCookieProcessor(self.jar))
-        self.signer = signer or ABogus(fp=FINGERPRINT, user_agent=user_agent)
+        self.signer = signer or ABogus(fp=FINGERPRINT, user_agent=user_agent, options=[0, 1, 8])
         self.gap = max(0, float(gap))
         self.pace_state = pace_state if pace_state is not None else {"next": 0.0, "lock": threading.Lock()}
         self.last_items = []
@@ -199,6 +199,11 @@ class DouyinClient:
         token = self.cookie('msToken')
         if token:
             data['msToken'] = token
+        # Reuse only identifiers present in this imported session; never fabricate them.
+        verification_fp = self.cookie('s_v_web_id')
+        if verification_fp:
+            data['verifyFp'] = verification_fp
+            data['fp'] = verification_fp
         return data
 
     def request(self, path, extra):
@@ -217,6 +222,15 @@ class DouyinClient:
         self.progress('Đang gọi API Douyin…', {'requests': self.diagnostic['requests'], 'path': path})
         request = urllib.request.Request(url, headers={'User-Agent': self.user_agent, 'Accept': 'application/json',
                     'Referer': API_ORIGIN + '/', 'Accept-Encoding': 'identity', 'Accept-Language': 'zh-CN,zh;q=0.9'})
+        # Check the actual API URL: a cookie for another path/subdomain must not
+        # make a request look authenticated. Never put cookie values in diagnostics.
+        self.jar.add_cookie_header(request)
+        sent_names = {part.strip().partition('=')[0] for part in
+                      (request.get_header('Cookie') or '').split(';') if '=' in part}
+        self.diagnostic.update(cookie_sent_count=len(sent_names),
+                               login_cookie_sent=bool(sent_names & {'sessionid', 'sessionid_ss', 'sid_tt'}),
+                               verification_fp_sent=bool(self.cookie('s_v_web_id')),
+                               signature_method='GET', signature_options=[0, 1, 8])
         try:
             with self.opener.open(request, timeout=20) as response:
                 code = getattr(response, 'status', 200)

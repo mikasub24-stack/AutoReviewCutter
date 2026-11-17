@@ -67,6 +67,41 @@ class ApiTests(unittest.TestCase):
     def client(self, replies):
         transport, signer = Transport(replies), SigningStub()
         return DouyinClient(self.cookies, opener=transport, signer=signer, gap=0), transport, signer
+    def test_production_get_signer_uses_get_options(self):
+        c = DouyinClient(self.cookies, gap=0)
+        self.assertEqual(c.signer.options, [0, 1, 8])
+        from ytdl.douyin_direct.vendor import abogus
+        with patch.object(abogus.time, 'time', return_value=1700000000.0):
+            random.seed(77); actual = c.signer.generate_abogus('aid=6383', '')
+            random.seed(77); expected = ABogus(fp=FINGERPRINT, user_agent=UA, options=[0,1,8]).generate_abogus('aid=6383', '')
+            random.seed(77); wrong_post = ABogus(fp=FINGERPRINT, user_agent=UA, options=[0,1,14]).generate_abogus('aid=6383', '')
+        self.assertEqual(actual, expected)
+        self.assertNotEqual(actual[1], wrong_post[1])
+
+    def test_existing_session_fingerprint_reused_not_generated(self):
+        with self.cookies.open('a') as f:
+            f.write('.douyin.com\tTRUE\t/\tTRUE\t0\ts_v_web_id\tverify_TEST_ONLY\n')
+        c, transport, signer = self.client([{'aweme_detail':record(126)}])
+        c.detail('126')
+        params = urllib.parse.parse_qs(signer.queries[0])
+        self.assertEqual(params['verifyFp'], ['verify_TEST_ONLY'])
+        self.assertEqual(params['fp'], ['verify_TEST_ONLY'])
+        self.assertNotIn('verify_TEST_ONLY', json.dumps(c.diagnostic))
+
+    def test_diagnostic_checks_cookies_actually_sent_without_secrets(self):
+        c, transport, signer = self.client([{'aweme_detail':record(126)}])
+        c.detail('126')
+        self.assertTrue(c.diagnostic['login_cookie_sent'])
+        self.assertEqual(c.diagnostic['cookie_sent_count'], 2)
+        self.assertIn('sessionid=TEST_SESSION', transport.calls[0].get_header('Cookie'))
+        self.assertNotIn('TEST_SESSION', json.dumps(c.diagnostic))
+        self.assertNotIn('TEST_TOKEN', json.dumps(c.diagnostic))
+        self.cookies.write_text('# Netscape HTTP Cookie File\nother.douyin.com\tFALSE\t/\tTRUE\t0\tsessionid\tTEST_SUBDOMAIN\n')
+        c, transport, signer = self.client([{'aweme_detail':record(126)}])
+        c.detail('126')
+        self.assertFalse(c.diagnostic['login_cookie_sent'])
+        self.assertEqual(c.diagnostic['cookie_sent_count'], 0)
+
     def test_uploaded_widget_layout_is_unchanged(self):
         import ast
         source=(Path(__file__).resolve().parents[1]/'ytdl/scantab.py').read_text(encoding='utf-8')
