@@ -413,7 +413,7 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .restoreThumb img { display: block; width: 100%; max-width: 420px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); background: #000; }
 
 /* Dải các cảnh đang làm + ô chọn tài khoản trên thẻ */
-.runningNow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 5px; margin-top: 6px; }
+.runningNow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 5px; margin: 0; }   /* nằm chung hàng với «N đang làm» để không đẩy thẻ xuống */
 .runningNow[hidden] { display: none; }
 .runLabel { color: #8198b7; font-size: 10px; margin-right: 2px; }
 .runChip { padding: 2px 7px; border: 1px solid #6d5a36; border-radius: 6px; background: #2b2619; color: #edc580; font-size: 10px; font-weight: 600; line-height: 1.3; cursor: pointer; }
