@@ -7,7 +7,7 @@ NAME = "Auto Studio"
 SLUG = "AutoStudio"                           # ten tep / thu muc / exe (khong dau cach)
 TAGLINE = "Dịch · Lồng tiếng · Khớp hình"
 SUBTITLE = "Giọng CapCut theo tệp SRT, chèn thẳng vào project, tự căn chỉnh video theo lời đọc"
-VERSION = "2.5.49"
+VERSION = "2.5.50"
 OLD_NAMES = ("CapCutTTS",)                    # ten cu: thu muc du lieu cu duoc chuyen sang ten moi lan dau chay
 TRACK = "TTS_CapCut"                          # ten track audio trong CapCut (giu nguyen de project cu van nhan ra)
 BAK_TAG = ".bak_autostudio_"                     # duoi ban sao luu draft_content.json
@@ -40,6 +40,11 @@ def self_cmd(args=()):
 
 # Lich su phien ban (moi nhat truoc). Hien trong hop thoai 'Có gì mới' va ghi vao README.
 CHANGELOG = [
+    ("2.5.50", [
+        "Sửa thứ tự/tên tập khi tải bộ Douyin: đọc API của bộ thay cho cache bài đăng mới-cũ; lấy số tập gốc hoặc thứ tự playlist Douyin, đặt tên Tập 001, 002…",
+        "Giữ số khi chọn lẻ tập và khi chuyển/sử dụng hàng đợi tải. Cập nhật tên/link cho URL đã có ở trạng thái chờ; giữ nguyên mục tải khác và file đã hoàn tất.",
+        "Giữ nguyên giao diện, lõi tải và bộ ký API 2.5.49 đang hoạt động. Kiểm thử cả luồng bộ → ô tick → chuyển tải → chọn tập → bắt đầu tải bằng dữ liệu mô phỏng.",
+    ]),
     ("2.5.49", [
         "Sửa thiếu lớp ký WebSign: thêm timestamp/x-secsdk-web-signature dựa trên uifid của cookie, thay A-Bogus cũ bằng native bdms 1.0.1.19.",
         "Bổ sung tham số API bài đăng, Chrome 154 / vi, webid từ cookie; giữ nguyên giao diện và quét trực tiếp. Không lưu giá trị capture của người dùng.",

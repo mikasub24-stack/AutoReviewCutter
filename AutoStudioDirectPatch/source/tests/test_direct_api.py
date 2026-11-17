@@ -274,6 +274,98 @@ class ApiTests(unittest.TestCase):
         for raw, expected in [(b'abc','66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0'),(b'abcd'*16,'debe9ff92275b8a138604889c18e5a4d6fdb70e5387e5765293dcba39c0c5732')]:
             self.assertEqual(sm3_hexdigest(raw),expected)
 
+    def test_collection_endpoint_preserves_playlist_not_post_chronology(self):
+        raw=[record(90,title='Không có số',mix='12'),record(3,title='Không có số',mix='12'),record(70,title='Không có số',mix='12')]
+        c, transport, _=self.client([{'aweme_list':raw[:2],'has_more':1,'cursor':2},{'aweme_list':[raw[1],raw[2]],'has_more':0,'cursor':3}])
+        result=c.records('collection','12')
+        items,_=directscan.ordered_items(result,'Tên bộ')
+        self.assertEqual([i['id'] for i in items],['90','3','70'])
+        self.assertEqual([i['episode'] for i in items],[1,2,3])
+        self.assertEqual([i['name'] for i in items],['Tên bộ - Tập 001','Tên bộ - Tập 002','Tên bộ - Tập 003'])
+        self.assertTrue(all(i['episode_source']=='douyin_collection_order' for i in items))
+        self.assertTrue(all('/mix/aweme/' in r.full_url for r in transport.calls))
+
+    def test_collection_native_episode_metadata_controls_numbers(self):
+        rows=[]
+        for index,ep in enumerate([3,1,2],1):
+            r=record(index,title='Không có số',mix='12')
+            r.update(_collection_id='12',_collection_position=index)
+            r['mix_info']['statis']={'current_episode':ep}
+            rows.append(r)
+        items,_=directscan.ordered_items(rows,'Bộ')
+        self.assertEqual([i['id'] for i in items],['2','3','1'])
+        self.assertEqual([i['episode'] for i in items],[1,2,3])
+        self.assertTrue(all(i['episode_source']=='douyin_episode_metadata' for i in items))
+
+    def test_repeated_collection_total_is_not_every_video_episode(self):
+        rows=[]
+        for index in [1,2,3]:
+            r=record(index,title='Không có số',mix='12')
+            r.update(_collection_id='12',_collection_position=index)
+            r['mix_info']['statis']={'current_episode':18}
+            rows.append(r)
+        items,_=directscan.ordered_items(rows,'Bộ')
+        self.assertEqual([i['episode'] for i in items],[1,2,3])
+        self.assertTrue(all(i['episode_source']=='douyin_collection_order' for i in items))
+
+    def test_user_post_unknowns_never_become_collection_numbers(self):
+        rows=[record(99,title='Không có số',mix='12'),record(5,title='Không có số',mix='12')]
+        for r in rows:r['mix_info']['statis']={'current_episode':18}
+        items,_=directscan.ordered_items(rows,'Bộ')
+        self.assertTrue(all(i['episode'] is None for i in items))
+        self.assertTrue(all('Chưa rõ tập' in i['name'] for i in items))
+
+    def test_partial_collection_keeps_received_episode_positions(self):
+        c,_,_=self.client([{'aweme_list':[record(90,title='Không số',mix='12'),record(3,title='Không số',mix='12')],'has_more':1,'cursor':0}])
+        with self.assertRaises(DouyinError):c.records('collection','12')
+        items,_=directscan.ordered_items(c.last_items,'Bộ')
+        self.assertEqual([i['episode'] for i in items],[1,2])
+        self.assertFalse(c.complete)
+
+    def test_collection_selected_episodes_keep_numbers_and_direct_urls(self):
+        rows=[]
+        for index in range(1,19):
+            r=record(index,title='Không số',mix='12');r.update(_collection_id='12',_collection_position=index)
+            r['video']['play_addr']['url_list']=['https://v3.douyinvod.com/%d.mp4?sig=TEST%%2B'%index]
+            rows.append(r)
+        items,_=directscan.ordered_items(rows,'Bộ')
+        from ytdl.bridge import items_lines
+        lines=items_lines([items[1],items[4],items[17]])
+        self.assertEqual([line.split('\t')[1] for line in lines],['Bộ - Tập 002','Bộ - Tập 005','Bộ - Tập 018'])
+        self.assertEqual([line.split('\t')[2] for line in lines],[rows[index]['video']['play_addr']['url_list'][0] for index in (1,4,17)])
+
+    def test_download_reconcile_names_existing_idle_rows_only_and_orders_scope(self):
+        from ytdl.download_order import reconcile
+        from types import SimpleNamespace
+        refresh=[]
+        engine=SimpleNamespace(order=['other1','ep3','ep1','other2','ep2'],lock=threading.Lock(),items={})
+        for iid in engine.order:
+            engine.items[iid]={'url':'https://example.test/'+iid,'title':'Old '+iid,'status':'Chờ','edited':False,'fetching':True}
+        engine.items['ep3']['status']='Đang tải'
+        dl=SimpleNamespace(eng=engine,refresh=refresh.append,rebuild_tree=lambda:None)
+        lines=['https://example.test/ep%d\tBộ - Tập %03d\thttps://cdn.test/%d.mp4'%(ep,ep,ep) for ep in (1,2,3)]
+        self.assertEqual(reconcile(dl,lines),2)
+        self.assertEqual(engine.order,['other1','ep1','ep2','other2','ep3'])
+        self.assertEqual(engine.items['ep1']['title'],'Bộ - Tập 001')
+        self.assertEqual(engine.items['ep2']['title'],'Bộ - Tập 002')
+        self.assertEqual(engine.items['ep3']['title'],'Old ep3')
+        self.assertEqual(engine.items['other1']['title'],'Old other1')
+        self.assertTrue(engine.items['ep1']['edited'])
+        self.assertFalse(engine.items['ep1']['fetching'])
+        self.assertEqual(engine.items['ep2']['direct'],'https://cdn.test/2.mp4')
+        self.assertEqual(refresh,['ep1','ep2'])
+
+    def test_download_reconcile_does_not_touch_completed_or_queued_rows(self):
+        from ytdl.download_order import reconcile
+        from types import SimpleNamespace
+        engine=SimpleNamespace(order=['one','two'],lock=threading.Lock(),items={
+            'one':{'url':'https://example.test/1','title':'Finished','status':'Hoàn tất'},
+            'two':{'url':'https://example.test/2','title':'Queued','status':'Hàng đợi'}})
+        dl=SimpleNamespace(eng=engine,refresh=lambda iid:self.fail('Must not refresh protected download'))
+        self.assertEqual(reconcile(dl,['https://example.test/1\tTập 001','https://example.test/2\tTập 002']),0)
+        self.assertEqual(engine.items['one']['title'],'Finished')
+        self.assertEqual(engine.items['two']['title'],'Queued')
+
     def test_uploaded_widget_layout_is_unchanged(self):
         import ast
         source=(Path(__file__).resolve().parents[1]/'ytdl/scantab.py').read_text(encoding='utf-8')
@@ -477,5 +569,28 @@ def test_detail_owner_contradiction_stops(self):
     self.assertEqual(job.error_kind,'identity_mismatch')
     self.assertEqual(job.direct_count(),0)
 ScannerTests.test_detail_owner_contradiction_stops=test_detail_owner_contradiction_stops
+
+
+def test_collection_fetch_ignores_post_cache_then_reuses_native_order(self):
+    all_transports=[]
+    profile=[record(3,title='Không số',mix='12'),record(2,title='Không số',mix='12'),record(1,title='Không số',mix='12')]
+    playlist=[profile[2],profile[1],profile[0]]
+    def factory(cookie_file,**kwargs):
+        replies=[{'aweme_list':profile,'has_more':0,'max_cursor':0}] if not all_transports else [{'aweme_list':playlist,'has_more':0,'cursor':0}]
+        transport=Transport(replies);all_transports.append(transport)
+        return DouyinClient(cookie_file,opener=transport,signer=SigningStub(),gap=0,**kwargs)
+    service=directscan.Scanner(self.cookies,factory)
+    job=service.submit('https://www.douyin.com/user/OWNER_A',kind='list');service.thread.join(3)
+    self.assertEqual(job.state,'done')
+    group=job.groups[0]
+    for index in range(2):
+        job=service.submit(group['url'],{'group_key':group['key'],'name':group['name'],'merged':True},'scan');service.thread.join(3)
+        self.assertEqual(job.state,'done')
+        self.assertEqual([i['id'] for i in job.items],['1','2','3'])
+        self.assertEqual([i['episode'] for i in job.items],[1,2,3])
+    self.assertIn('/mix/aweme/',all_transports[1].calls[0].full_url)
+    self.assertEqual(len(all_transports[2].calls),0)
+
+ScannerTests.test_collection_fetch_ignores_post_cache_then_reuses_native_order=test_collection_fetch_ignores_post_cache_then_reuses_native_order
 
 if __name__=='__main__':unittest.main(verbosity=2)

@@ -13,7 +13,7 @@ import tabs
 import theme as T
 from theme import Btn, Bar, card, entry as t_entry
 
-from . import bridge, browsers, directscan
+from . import bridge, browsers, directscan, download_order
 from .tab import _place, default_folder
 
 KEY = "ytscan"
@@ -639,6 +639,15 @@ class Page(tk.Frame):
         return types.SimpleNamespace(url=job.url, lines=lines, skipped={}, title=row["g"]["name"], state="done",
                                      direct_count=lambda: sum(1 for ln in lines if ln.count("\t") >= 2))
 
+    def _send_to_download(self, row, lines, quiet=True):
+        count = self.hub.dl.add_scanned(self._job_like(row, lines), save_txt=False, quiet=quiet) or 0
+        download_order.reconcile(self.hub.dl, lines)
+        engine = getattr(self.hub.dl, 'eng', None)
+        if engine is not None:
+            present = {it['url'] for it in engine.items.values()}
+            return len({line.split('\t', 1)[0] for line in lines} & present)
+        return count
+
     def send(self, row, quiet=False):
         if row["state"] not in ("done", "sent", "partial") or row.get("job") is None:
             return 0
@@ -647,7 +656,7 @@ class Page(tk.Frame):
             if not quiet:
                 messagebox.showinfo("Chưa tick video nào", "Bộ này chưa tick video nào để chuyển.", parent=self)
             return 0
-        n = self.hub.dl.add_scanned(self._job_like(row, lines), save_txt=False, quiet=quiet) or 0
+        n = self._send_to_download(row, lines, quiet=quiet)
         row["state"], row["sent_n"] = "sent", n
         self.refresh_row(row)
         if not quiet:
@@ -717,7 +726,7 @@ class Page(tk.Frame):
             lines = self.ticked_lines(r)
             if not lines:
                 continue
-            dl.add_scanned(self._job_like(r, lines), save_txt=False, quiet=True)
+            self._send_to_download(r, lines, quiet=True)
             r["dl_urls"] = {it["url"] for it in self.ticked(r)}
             r["state"], r["sent_n"] = "sent", len(r["dl_urls"])
             n = dl.start_urls(r["dl_urls"])

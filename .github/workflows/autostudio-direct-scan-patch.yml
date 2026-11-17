@@ -31,28 +31,28 @@ jobs:
           if ($LASTEXITCODE) { throw 'ZIP packaging failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: AutoStudio-2.5.49-Direct-Scan-Source-Patch
+          name: AutoStudio-2.5.50-Direct-Scan-Source-Patch
           path: AutoStudioDirectPatch/dist/*
           if-no-files-found: error
       - name: Publish downloadable patch ZIP
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $tag = 'autostudio-v2.5.49-direct-api-patch'
+          $tag = 'autostudio-v2.5.50-direct-api-patch'
           @'
-          Sửa thiếu lớp ký x-secsdk-web-signature: dùng uifid từ cookie, timestamp mới và query chính xác gồm a_bogus. Thay A-Bogus cũ bằng native bdms 1.0.1.19, ghim Evil0ctal/Douyin_TikTok_Download_API commit 3c045e11. Bổ sung tham số bài đăng và Chrome 154 / vi, webid chỉ lấy từ cookie. Giữ nguyên giao diện, không tự mở trình duyệt.
+          Sửa thứ tự và tên tập của bộ Douyin. Khi Lấy link bộ, đọc danh sách trực tiếp từ API /mix/aweme thay cho thứ tự bài đăng mới-cũ trên kênh. Ưu tiên metadata số tập riêng biệt; nếu metadata lặp tổng tập thì dùng thứ tự playlist do API bộ trả. Tên file <Tên bộ> - Tập 001, 002…; chọn tập lẻ giữ nguyên số. URL đã có trong tab tải được cập nhật tên/link ở trạng thái chờ, sắp lại thứ tự riêng các mục của bộ. Không đổi tên file đang tải hoặc đã hoàn tất trên đĩa.
 
-          Đã tính lại ngoại tuyến chữ ký WebSign từ request trình duyệt trả 200 do người dùng cung cấp: khớp chính xác. Định dạng A-Bogus capture cũng giải mã đúng aid=6383, page_id=6241, SDK=1.0.1.0. Không lưu token, uifid, webid, chữ ký hoặc query capture vào nguồn/ZIP. Chưa quét trực tiếp từ môi trường build vì mạng chặn Douyin; không khẳng định đã hết mọi nguyên nhân 403.
+          Giữ nguyên giao diện, lõi tải và bộ ký 2.5.49 đã được người dùng xác nhận quét/tải được. Bản sửa thứ tự 2.5.50 chưa chạy trực tiếp trên môi trường build; kiểm thử dữ liệu mô phỏng và luồng Tk thực với theme/downloader giả lập. Sau cập nhật hãy Quét và Lấy lại bộ trước khi tải.
 
-          Đã kiểm tra 52 trường hợp ngoại tuyến và hợp đồng giao diện bằng theme/downloader mô phỏng. Chưa thử Douyin thật, chưa xác nhận thuật toán ký hiện được máy chủ chấp nhận; không có tự giải CAPTCHA. Có báo cáo và checksum trong release.
+          Đã kiểm tra 61 trường hợp ngoại tuyến và hợp đồng giao diện bằng theme/downloader mô phỏng. Chưa thử Douyin thật, chưa xác nhận thuật toán ký hiện được máy chủ chấp nhận; không có tự giải CAPTCHA. Có báo cáo và checksum trong release.
 
-          Tải AutoStudio_v2.5.49_chi_file_sua.zip, giải nén đè vào bộ mã nguồn 2.5.45 rồi chạy/build lại theo dự án của bạn. Đây không phải EXE; chép .py cạnh EXE đã biên dịch không tự áp dụng bản vá.
+          Tải AutoStudio_v2.5.50_chi_file_sua.zip, giải nén đè vào bộ mã nguồn 2.5.45 rồi chạy/build lại theo dự án của bạn. Đây không phải EXE; chép .py cạnh EXE đã biên dịch không tự áp dụng bản vá.
           '@ | Set-Content "$env:RUNNER_TEMP/scan-patch.md" -Encoding utf8
           $existing = & gh release view $tag --repo $env:GITHUB_REPOSITORY --json isDraft 2>$null
           if ($LASTEXITCODE -eq 0) {
             if (!(($existing | ConvertFrom-Json).isDraft)) { throw 'Never overwrite published patch release' }
           } else {
-            & gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title 'Auto Studio 2.5.49 - Sửa lớp ký WebSign còn thiếu' --notes-file "$env:RUNNER_TEMP/scan-patch.md"
+            & gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title 'Auto Studio 2.5.50 - Đúng thứ tự tập Douyin và tên file tải' --notes-file "$env:RUNNER_TEMP/scan-patch.md"
             if ($LASTEXITCODE) { throw 'Draft creation failed' }
           }
           & gh release upload $tag --repo $env:GITHUB_REPOSITORY AutoStudioDirectPatch/dist/* --clobber

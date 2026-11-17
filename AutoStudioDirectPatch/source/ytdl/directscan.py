@@ -70,15 +70,56 @@ def clean_name(value):
     return re.sub(r'[\\/:*?"<>|\x00-\x1f]+', ' ', str(value)).strip()[:120] or 'Douyin'
 
 
+def collection_numbers(records):
+    """Use native episode metadata when complete/unique, otherwise mix API order.
+
+    Never derive collection numbers from a user-post cache, dates or video IDs.
+    """
+    if not records:
+        return {}, ''
+    mix_ids = {str(r.get('_collection_id') or '') for r in records}
+    if len(mix_ids) != 1 or '' in mix_ids:
+        return {}, ''
+    positions, native = {}, {}
+    for record in records:
+        video_id = str(record.get('aweme_id') or '')
+        position = record.get('_collection_position')
+        if not isinstance(position, int) or isinstance(position, bool) or position <= 0:
+            return {}, ''
+        positions[video_id] = position
+        mix = record.get('mix_info') or {}
+        statis = mix.get('statis') or {}
+        value = statis.get('current_episode')
+        if str(mix.get('mix_id') or '') not in mix_ids:
+            continue
+        if isinstance(value, bool):
+            continue
+        try: number = int(value)
+        except (TypeError, ValueError): continue
+        if str(number) != str(value) or not 1 <= number <= 9999:
+            continue
+        native[video_id] = number
+    # Some responses repeat the playlist's total in current_episode on every clip.
+    # Such metadata is not a per-video position and must never give every file the same name.
+    if len(native) == len(positions) and len(set(native.values())) == len(native):
+        return native, 'douyin_episode_metadata'
+    if len(set(positions.values())) != len(positions):
+        return {}, ''
+    return positions, 'douyin_collection_order'
+
+
 def ordered_items(records, name, options=None):
     options = options or {}
     output, skipped = [], {'merged': 0, 'ads': 0, 'non_video': 0}
+    numbers, ordering_source = collection_numbers(records)
     for record in records:
         video_id = str(record.get('aweme_id') or '')
         if not video_id.isdigit(): continue
         if record.get('images') and not record.get('video'):
             skipped['non_video'] += 1; continue
         ep, kind, suffix = title_info(record.get('desc'))
+        if kind == 'ep' and video_id in numbers:
+            ep = numbers[video_id]
         if kind == 'ads' and not options.get('ads'):
             skipped['ads'] += 1; continue
         if kind == 'merged' and not options.get('merged'):
@@ -87,7 +128,7 @@ def ordered_items(records, name, options=None):
         urls = direct_urls(record)
         output.append({'id': video_id, 'url': 'https://www.douyin.com/video/' + video_id,
                        'name': clean_name(name) + (' - video ' + video_id + ' - ' + suffix if kind == 'merged' else ' - ' + tail), 'direct': urls[0] if urls else '',
-                       'kind': kind, 'thumb': '', 'episode': ep, 'timestamp': record.get('create_time') or 0,
+                       'kind': kind, 'thumb': '', 'episode': ep, 'episode_source': ordering_source if video_id in numbers else ('title' if ep is not None else 'unknown'), 'timestamp': record.get('create_time') or 0,
                        '_record': record})
     duplicates = Counter(it['episode'] for it in output if it['episode'] is not None)
     for item in output:
@@ -120,6 +161,7 @@ def grouped(records, kind, identity, requested_name=''):
                             'cover': '', 'cover_url': cover_url(record), '_records': []}
         buckets[key]['_records'].append(record)
         buckets[key]['n'] += 1
+        buckets[key]['_collection_api_order'] = kind == 'collection' and bool(record.get('_collection_position'))
     counts = Counter(g['name'] for g in buckets.values())
     for key, group in buckets.items():
         if counts[group['name']] > 1:
@@ -239,6 +281,8 @@ class Scanner:
             kind, identity = client.resolve_target(job.url)
             group_key = job.opts.get('group_key', '')
             cached = self._cached(group_key) if job.kind == 'scan' and group_key else None
+            if kind == 'collection' and cached and not cached.get('_collection_api_order'):
+                cached = None  # User-post order is not the collection's displayed episode order.
             if cached:
                 records = list(cached['_records'])
             else:
@@ -304,7 +348,10 @@ class Scanner:
             if client:
                 job.diagnostic = dict(client.diagnostic)
             job.diagnostic.update(error_kind=job.error_kind, state=job.state,
-                                  found=job.found, processed=job.done_n, direct=job.direct_count())
+                                  found=job.found, processed=job.done_n, direct=job.direct_count(),
+                                  numbered=sum(it.get('episode') is not None for it in job.items),
+                                  unknown_episode=sum(it.get('episode') is None for it in job.items),
+                                  episode_sources=sorted({it.get('episode_source', 'unknown') for it in job.items}))
             if job.cancel:
                 job.state = 'cancelled'
             job.updated = time.time()

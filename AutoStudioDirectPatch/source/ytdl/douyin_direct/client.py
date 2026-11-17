@@ -429,6 +429,11 @@ class DouyinClient:
                 if (kind == 'profile' and author and author != identity) or (kind == 'collection' and mix and mix != identity):
                     rejected += 1; continue
                 if video_id not in ids:
+                    if kind == 'collection':
+                        # Preserve playlist order from the mix endpoint, not user-post chronology.
+                        record = dict(record)
+                        record['_collection_id'] = identity
+                        record['_collection_position'] = len(self.last_items) + 1
                     ids.add(video_id); self.last_items.append(record)
             self.diagnostic.update(pages=page+1, accepted=len(self.last_items), rejected=rejected)
             self.progress('Đã đọc %d trang, %d video đúng nguồn.' % (page+1, len(self.last_items)), {'found': len(self.last_items), 'pages': page+1})

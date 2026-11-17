@@ -9,6 +9,7 @@ from pathlib import Path
 import sys
 import tempfile
 import time
+import threading
 import tkinter as tk
 import types
 from unittest.mock import Mock, patch
@@ -44,16 +45,44 @@ with tempfile.TemporaryDirectory() as folder:
     class Download:
         cookie_file=str(cookie)
         folder_var=tk.StringVar(master=root,value=folder)
+        def __init__(self):
+            self.eng=types.SimpleNamespace(order=[],items={},lock=threading.Lock())
+            self.started=[]
         def config_summary(self):return 'Test settings, no actual download'
-        def add_scanned(self,job,**kwargs):self.lines=job.lines;return len(job.lines)
-        def urls_status(self,urls):return {'total':len(urls),'run':0,'wait':0,'pause':0,'err':0,'done':0,'pct':0}
+        def add_scanned(self,job,**kwargs):
+            self.lines=job.lines
+            existing={it['url'] for it in self.eng.items.values()}
+            count=0
+            for line in job.lines:
+                parts=line.split('\t')
+                if parts[0] in existing:continue
+                iid='i%d'%(len(self.eng.items)+1)
+                self.eng.items[iid]={'url':parts[0],'title':parts[1],'direct':parts[2],'status':'Chờ','edited':True,'fetching':False}
+                self.eng.order.append(iid);existing.add(parts[0]);count+=1
+            return count
+        def refresh(self,iid):pass
+        def rebuild_tree(self):pass
+        def start_urls(self,urls):
+            self.started=[self.eng.items[i]['url'] for i in self.eng.order if self.eng.items[i]['url'] in urls and self.eng.items[i]['status']=='Chờ']
+            for it in self.eng.items.values():
+                if it['url'] in self.started:it['status']='Hàng đợi'
+            return len(self.started)
+        def urls_status(self,urls):
+            items=[it for it in self.eng.items.values() if it['url'] in urls]
+            return {'total':len(items),'run':0,'wait':sum(it['status']=='Hàng đợi' for it in items),'pause':0,'err':0,'done':0,'pct':0}
     dl=Download();hub=types.SimpleNamespace(dl=dl,show_dl=lambda:None)
     page=module.Page(root,root,hub);page.pack(fill='both',expand=True);root.update()
     assert page.browser_box.winfo_ismapped()
     assert hasattr(page, "direct")
     transports=[]
     def factory(cookie_file,**kwargs):
-        transport=Transport([{'aweme_list':[record(1),record(2,title='第2集')],'has_more':0,'max_cursor':0}]);transports.append(transport)
+        # User page is newest-first; only the mix endpoint provides the playlist order.
+        episodes=[record(2,title='Không có số trong tiêu đề',mix='12'),record(1,title='Không có số trong tiêu đề',mix='12')]
+        if not transports:
+            reply={'aweme_list':episodes,'has_more':0,'max_cursor':0}
+        else:
+            reply={'aweme_list':list(reversed(episodes)),'has_more':0,'cursor':0}
+        transport=Transport([reply]);transports.append(transport)
         return DouyinClient(cookie_file,opener=transport,signer=SigningStub(),gap=0,**kwargs)
     page.direct=directscan.Scanner(str(cookie),factory)
     def settle():
@@ -70,9 +99,23 @@ with tempfile.TemporaryDirectory() as folder:
         page.fetch_rows(page.rows);settle()
         row=page.rows[0]
         assert row['state']=='done' and len(row['items'])==2
-        assert len(transports[0].calls)==1 and len(transports[1].calls)==0
+        assert len(transports[0].calls)==1 and len(transports[1].calls)==1
+        assert '/mix/aweme/' in transports[1].calls[0].full_url
         assert page.send(row,quiet=True)==2
         assert all(line.count('\t')==2 for line in dl.lines)
+        assert [line.split('\t')[1] for line in dl.lines]==['同一部 - Tập 001','同一部 - Tập 002']
+        # Existing rows must retain new scanned names instead of being discarded as duplicates.
+        dl.eng.order.reverse()
+        for item in dl.eng.items.values():item['title']='Old ID-based name'
+        page.download([row])
+        assert dl.started==['https://www.douyin.com/video/1','https://www.douyin.com/video/2']
+        assert [dl.eng.items[i]['title'] for i in dl.eng.order]==['同一部 - Tập 001','同一部 - Tập 002']
+        # Selecting only episode 2 must not rename it as episode 1.
+        for item in dl.eng.items.values():item['status']='Chờ'
+        row['items'][0]['var'].set(False)
+        page.download([row])
+        assert dl.started==['https://www.douyin.com/video/2']
+        assert dl.lines[0].split('\t')[1]=='同一部 - Tập 002'
         assert browsers.launch.call_count==0
         assert errors==[]
         page.shutdown()

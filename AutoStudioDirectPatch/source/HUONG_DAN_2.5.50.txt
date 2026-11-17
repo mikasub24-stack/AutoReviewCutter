@@ -1,20 +1,28 @@
-AUTO STUDIO 2.5.49 - CHI FILE SUA TAB QUET BO DOUYIN
+AUTO STUDIO 2.5.50 - CHI FILE SUA TAB QUET BO DOUYIN
 
-SUA TU 2.5.48
-- Thay bo ky a_bogus cu bang native bdms.js v1.0.1.19 (page_id 6241).
-- Them lop ky x-secsdk-web-signature va timestamp cho API duoc bao ve.
-  Lay uifid/UIFID_TEMP tu cookie dung phien, khong chep dinh danh mau.
-- Chu ky WebSign bao phu dung query da ma hoa, ke ca a_bogus; gui cung
-  uifid, x-secsdk-web-signature, x-secsdk-web-expire trong headers.
-- Bo sung tham so bai dang, update_version_code, support_h265/dash;
-  dung Chrome 154 / ngon ngu vi; webid chi lay neu cookie co gia tri so.
-- Giu buoc xin msToken da co tu 2.5.48. Khong tu mo trinh duyet.
-- Da doi chieu ngoai tuyen: chu ky WebSign tinh lai KHOP voi request 200
-  nguoi dung cung cap. Dinh dang A-Bogus capture giai ma dung aid/page_id/SDK.
-  KHONG luu token, uifid, webid, chu ky hay query capture vao goi phat hanh.
-- Chua quet song tren may build do mang chan Douyin. Khong khang dinh da het
-  moi nguyen nhan 403; neu con loi, chan doan them has_uifid, websign_added,
-  signature_scheme va denial_reason (chi nhan loi da biet, khong luu body).
+SUA TU 2.5.49
+- Khi Lay link mot bo /collection/, doc danh sach chinh bo do tu API mix/aweme.
+  Khong dung lai thu tu moi-cu cua cache bai dang tren trang kenh.
+- Uu tien so thu tu tap goc khi metadata current_episode cua TAT CA video co
+  gia tri hop le va rieng biet. Neu metadata chi lap lai tong tap, dung thu tu
+  danh sach tu API bo. Khong lay timestamp hay ID de danh so tap cua bo.
+- Dat ten <Ten bo> - Tap 001, Tap 002, ... (chu co dau trong app).
+  Chi tick tap 2/5/18 van giu so 002/005/018, khong danh so lai tu 1.
+- Lay link, luu .txt, Sang the Tai, Tai bo nay va Tai cac bo da lay cung dung
+  mot danh sach co ten va thu tu co dinh. Moi bo co danh sach rieng.
+- URL da co o the Tai: cap nhat ten/direct link cho muc Cho/Tam dung/Loi,
+  sap lai vi tri cua cac URL trong bo, giu cac muc khac o nguyen cho.
+  Khong doi ten file dang tai/da tai xong tren dia, khong sua worker dang chay.
+- Bo sung ytdl/download_order.py; phai chep du file moi nay khi build.
+- Giu nguyen giao dien, core tai va bo ky/API 2.5.49 da duoc nguoi dung xac
+  nhan quet/tai duoc. Chi them thu tu API bo va buoc chuyen danh sach tai.
+
+CACH DUNG SAU CAP NHAT
+1. Tam dung luot tai cu va dong app truoc khi thay nguon/build.
+2. Mo ban moi, Quet kenh va bam Lay lai/Lay link bo can tai.
+3. Kiem tra o tick hien 01,02,...,18 thay cho duoi ID video, roi bam Tai bo nay.
+4. Ten moi ap dung cho luot tai sau cap nhat; tai song song co the hoan tat
+   truoc/sau khac nhau nhung so tap/ten file van giu dung.
 
 YEU CAU DA GIU
 - Giu nguyen giao dien 2.5.45: khong doi bo cuc, nut bam, hang bo, anh bia,
@@ -26,7 +34,7 @@ YEU CAU DA GIU
 
 AP DUNG
 1. Dong Auto Studio; sao luu cac file cu.
-2. Giai nen ZIP nay vao THU MUC MA NGUON Auto Studio 2.5.45 / 2.5.46 / 2.5.47 / 2.5.48 (noi co app.py),
+2. Giai nen ZIP nay vao THU MUC MA NGUON Auto Studio 2.5.45 / 2.5.46 / 2.5.47 / 2.5.48 / 2.5.49 (noi co app.py),
    chap nhan chep de. Phai chep CA cac file moi trong ytdl/douyin_direct/.
 3. Chay bang ma nguon hoac build.bat cua du an nhu binh thuong.
    Day la ban va nguon, khong phai EXE. Chep .py canh EXE da bien dich khong
@@ -43,8 +51,8 @@ PHAN XU LY
   xac ID khi lay chi tiet, khong tron video de xuat / yeu thich.
 - Chi tach nhom khi co mix_id that cua Douyin; khong tu tach bang anh bia /
   ten gan giong. Video khong co mix_id o nhom Bai dang cua kenh.
-- Doc so tap ro trong tieu de (ke ca 吃声亭126集). Khong ro so thi de ten
-  Chua ro tap - video <ID>; khong tu noi so len 159 hay tu suy tap tu mix.cur.
+- Bo /collection/: danh so tu metadata/thu tu API bo nhu tren. Bai dang khong
+  thuoc bo: chi doc so tap ro trong tieu de, khong tu danh so theo ngay/ID.
 - Khi API yeu cau xac minh, han che, sai du lieu hoac loi chu ky: dung hang doi;
   giu ket qua tung trang voi nhan CHUA QUET DU. Khong tu doi cookie, IP hoac
   chuyen sang trinh duyet de thu vuot. Khong co tu giai CAPTCHA.
@@ -57,7 +65,7 @@ so trang/video, phien ban bo ky, session_stage, token_http_status, token_source;
 Neu chay khong duoc, gui file nay de doi chieu. Khong gui cookies.txt.
 
 KIEM CHUNG VA GIOI HAN
-- 52 kiem thu ngoai tuyen + thu hop dong giao dien Tk bang theme/the Tai gia lap.
+- 61 kiem thu ngoai tuyen + thu hop dong giao dien Tk bang theme/the Tai gia lap.
 - Ma tao giao dien cua 6 phan duoc doi chieu voi ban 2.5.45, giu nguyen.
 - CHUA quet Douyin that, CHUA xac nhan bo ky nay duoc Douyin hien tai chap nhan.
   Khong dam bao mo quet la thanh cong; can chay thu tren may va cookie cua ban.
