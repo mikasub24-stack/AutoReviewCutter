@@ -14,7 +14,7 @@ import urllib.request
 from .bridge import Job, Busy, items_lines
 from .douyin_direct.client import (DouyinClient, DouyinError, ScanStopped, direct_urls, cover_url, author_of, SIGNER_VERSION)
 
-STOP_KINDS = {'verification', 'rate_limit', 'access_denied', 'signer', 'non_json', 'api_error', 'identity_mismatch', 'incomplete', 'schema'}
+STOP_KINDS = {'session_http', 'session_network', 'session_token_missing', 'session_redirect', 'session_template', 'verification', 'rate_limit', 'access_denied', 'signer', 'non_json', 'api_error', 'identity_mismatch', 'incomplete', 'schema'}
 DIGITS = dict(zip('零〇一二两兩三四五六七八九', [0, 0, 1, 2, 2, 2, 3, 4, 5, 6, 7, 8, 9]))
 
 
@@ -180,6 +180,7 @@ class Scanner:
         self.cache_at = 0
         self.cooldown_until = 0
         self.cookie_stamp = None
+        self.session_state = {}
         self.pace_state = {"next": 0.0, "lock": threading.Lock()}
 
     def start(self):
@@ -232,8 +233,8 @@ class Scanner:
             stat = Path(self.cookie_file).stat() if Path(self.cookie_file).exists() else None
             stamp = (stat.st_mtime_ns, stat.st_size) if stat else None
             if stamp != self.cookie_stamp:
-                self.cache.clear(); self.cookie_stamp = stamp
-            client = self.client_factory(self.cookie_file, stop=job.stop_event, pace_state=self.pace_state,
+                self.cache.clear(); self.session_state.clear(); self.cookie_stamp = stamp
+            client = self.client_factory(self.cookie_file, stop=job.stop_event, pace_state=self.pace_state, session_state=self.session_state,
                         progress=lambda text, values: self._progress(job, text, values))
             kind, identity = client.resolve_target(job.url)
             group_key = job.opts.get('group_key', '')

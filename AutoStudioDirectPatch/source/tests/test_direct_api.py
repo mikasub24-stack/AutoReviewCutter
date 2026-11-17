@@ -96,11 +96,108 @@ class ApiTests(unittest.TestCase):
         self.assertIn('sessionid=TEST_SESSION', transport.calls[0].get_header('Cookie'))
         self.assertNotIn('TEST_SESSION', json.dumps(c.diagnostic))
         self.assertNotIn('TEST_TOKEN', json.dumps(c.diagnostic))
-        self.cookies.write_text('# Netscape HTTP Cookie File\nother.douyin.com\tFALSE\t/\tTRUE\t0\tsessionid\tTEST_SUBDOMAIN\n')
+        self.cookies.write_text('# Netscape HTTP Cookie File\nother.douyin.com\tFALSE\t/\tTRUE\t0\tsessionid\tTEST_SUBDOMAIN\n.douyin.com\tTRUE\t/\tTRUE\t0\tmsToken\tTEST_SCOPE_TOKEN\n')
         c, transport, signer = self.client([{'aweme_detail':record(126)}])
         c.detail('126')
         self.assertFalse(c.diagnostic['login_cookie_sent'])
-        self.assertEqual(c.diagnostic['cookie_sent_count'], 0)
+        self.assertEqual(c.diagnostic['cookie_sent_count'], 1)
+
+    def _without_token(self):
+        self.cookies.write_text('# Netscape HTTP Cookie File\n.douyin.com\tTRUE\t/\tTRUE\t0\tsessionid\tTEST_SESSION\n')
+
+    def _sdk_response(self, cookie=True, token='TEST_SERVER_TOKEN_' + 'A'*160):
+        from email.message import Message
+        response = Response({})
+        response.headers = Message()
+        response.headers['Content-Type'] = 'application/json'
+        if token:
+            response.headers['Set-Cookie' if cookie else 'X-Ms-Token'] = ('msToken='+token+'; Path=/; Secure; HttpOnly') if cookie else token
+        return response
+
+    def test_sdk_token_cookie_precedes_signing_no_login_cookies_to_sdk(self):
+        self._without_token()
+        api, sdk, signer = Transport([{'aweme_detail':record(126)}]), Transport([self._sdk_response()]), SigningStub()
+        c = DouyinClient(self.cookies, opener=api, session_opener=sdk, signer=signer, gap=0)
+        original = self.cookies.read_bytes()
+        c.detail('126')
+        self.assertEqual(len(sdk.calls),1)
+        req = sdk.calls[0]
+        self.assertEqual(req.get_method(), 'POST')
+        self.assertEqual(req.full_url, TOKEN_URL)
+        self.assertIsNone(req.get_header('Cookie'))
+        self.assertNotIn('msToken=', req.full_url)
+        payload=json.loads(req.data)
+        self.assertTrue(abs(payload['tspFromClient'] - time.time()*1000) < 5000)
+        self.assertEqual(payload['magic'],538969122)
+        self.assertIn('msToken=TEST_SERVER_TOKEN_', signer.queries[0])
+        self.assertEqual(c.diagnostic['token_source'],'server')
+        self.assertEqual(c.diagnostic['requests'],1)
+        self.assertTrue(c.diagnostic['login_cookie_sent'])
+        self.assertNotIn('TEST_SERVER_TOKEN',json.dumps(c.diagnostic))
+        self.assertNotIn('TEST_SESSION',json.dumps(c.diagnostic))
+        self.assertEqual(self.cookies.read_bytes(),original)
+
+    def test_sdk_header_token_supported(self):
+        self._without_token()
+        api,sdk=Transport([{'aweme_detail':record(126)}]),Transport([self._sdk_response(cookie=False)])
+        c=DouyinClient(self.cookies,opener=api,session_opener=sdk,signer=SigningStub(),gap=0)
+        c.detail('126')
+        self.assertEqual(c.diagnostic['session_stage'],'ready')
+        self.assertTrue(c.cookie('msToken').startswith('TEST_SERVER_TOKEN'))
+
+    def test_sdk_missing_token_never_sends_scan_or_fake_token(self):
+        self._without_token()
+        api,sdk,signer=Transport([]),Transport([self._sdk_response(token='')]),SigningStub()
+        c=DouyinClient(self.cookies,opener=api,session_opener=sdk,signer=signer,gap=0)
+        with self.assertRaises(DouyinError) as caught:c.detail('126')
+        self.assertEqual(caught.exception.kind,'session_token_missing')
+        self.assertEqual(c.diagnostic['requests'],0)
+        self.assertEqual(api.calls,[])
+        self.assertEqual(signer.queries,[])
+        self.assertEqual(c.cookie('msToken'),'')
+
+    def test_sdk_http_403_distinct_from_api_403_no_retry(self):
+        self._without_token()
+        api,sdk=Transport([]),Transport([urllib.error.HTTPError(TOKEN_URL,403,'denied',{},None)])
+        c=DouyinClient(self.cookies,opener=api,session_opener=sdk,signer=SigningStub(),gap=0)
+        with self.assertRaises(DouyinError) as caught:c.detail('126')
+        self.assertEqual(caught.exception.kind,'session_http')
+        self.assertEqual(c.diagnostic['token_http_status'],403)
+        self.assertEqual(c.diagnostic['requests'],0)
+        self.assertEqual(len(sdk.calls),1)
+        self.assertFalse(api.calls)
+
+    def test_sdk_does_not_run_if_imported_token_exists(self):
+        api,sdk=Transport([{'aweme_detail':record(126)}]),Transport([])
+        c=DouyinClient(self.cookies,opener=api,session_opener=sdk,signer=SigningStub(),gap=0)
+        c.detail('126')
+        self.assertFalse(sdk.calls)
+        self.assertEqual(c.diagnostic['token_source'],'imported_cookie')
+
+    def test_sdk_server_token_reused_only_in_memory_with_expiry(self):
+        self._without_token();shared={}
+        sdk=Transport([self._sdk_response()])
+        for index in range(2):
+            c=DouyinClient(self.cookies,opener=Transport([{'aweme_detail':record(126)}]),session_opener=sdk,session_state=shared,signer=SigningStub(),gap=0)
+            c.detail('126')
+        self.assertEqual(len(sdk.calls),1)
+        self.assertEqual(c.diagnostic['token_source'],'server_cached')
+        shared['expires']=0
+        with self.assertRaises(AssertionError):
+            DouyinClient(self.cookies,opener=Transport([]),session_opener=sdk,session_state=shared,signer=SigningStub(),gap=0).detail('126')
+
+    def test_sdk_redirect_never_forwards_payload(self):
+        with self.assertRaises(DouyinError) as caught:
+            NoTokenRedirect().redirect_request(None,None,302,'',{},'https://evil.test/')
+        self.assertEqual(caught.exception.kind,'session_redirect')
+
+    def test_sdk_invalid_token_never_sent(self):
+        self._without_token()
+        api=Transport([])
+        c=DouyinClient(self.cookies,opener=api,session_opener=Transport([self._sdk_response(cookie=False,token='TEST;TOKEN'+'A'*160)]),signer=SigningStub(),gap=0)
+        with self.assertRaises(DouyinError) as caught:c.detail('126')
+        self.assertEqual(caught.exception.kind,'session_token_missing')
+        self.assertFalse(api.calls)
 
     def test_uploaded_widget_layout_is_unchanged(self):
         import ast

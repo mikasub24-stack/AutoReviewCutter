@@ -7,7 +7,7 @@ NAME = "Auto Studio"
 SLUG = "AutoStudio"                           # ten tep / thu muc / exe (khong dau cach)
 TAGLINE = "Dịch · Lồng tiếng · Khớp hình"
 SUBTITLE = "Giọng CapCut theo tệp SRT, chèn thẳng vào project, tự căn chỉnh video theo lời đọc"
-VERSION = "2.5.47"
+VERSION = "2.5.48"
 OLD_NAMES = ("CapCutTTS",)                    # ten cu: thu muc du lieu cu duoc chuyen sang ten moi lan dau chay
 TRACK = "TTS_CapCut"                          # ten track audio trong CapCut (giu nguyen de project cu van nhan ra)
 BAK_TAG = ".bak_autostudio_"                     # duoi ban sao luu draft_content.json
@@ -40,6 +40,11 @@ def self_cmd(args=()):
 
 # Lich su phien ban (moi nhat truoc). Hien trong hop thoai 'Có gì mới' va ghi vao README.
 CHANGELOG = [
+    ("2.5.48", [
+        "Thêm khởi tạo phiên SDK khi cookie chưa có msToken; chỉ dùng token máy chủ cấp, không dùng token mẫu hay sinh ngẫu nhiên.",
+        "Tách lỗi lấy token khỏi lỗi danh sách API, giữ token trong bộ nhớ, không gửi cookie đăng nhập sang host SDK. Giữ nguyên giao diện.",
+        "Chưa xác nhận chạy Douyin thật: môi trường build bị chặn mạng trước khi tới Douyin/SDK. Mẫu SDK và bộ ký vẫn cần kiểm chứng trên máy người dùng.",
+    ]),
     ("2.5.47", [
         "Sửa cấu hình ký yêu cầu GET: dùng [0,1,8] thay cho mặc định POST [0,1,14] của thư viện ở 2.5.46.",
         "Dùng verifyFp/fp từ cookie s_v_web_id có sẵn, thêm chẩn đoán cookie thực gửi; giữ nguyên giao diện. Chưa xác nhận hết HTTP 403 trên Douyin thật.",

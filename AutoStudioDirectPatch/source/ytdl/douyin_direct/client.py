@@ -4,6 +4,7 @@ No browser/extension, CAPTCHA solver, session rotation or proxy rotation.
 Real acceptance of a_bogus must be tested on the user's connection.
 """
 import http.cookiejar
+from http.cookies import SimpleCookie
 import json
 from pathlib import Path
 import re
@@ -14,9 +15,17 @@ import urllib.parse
 import urllib.request
 
 from .vendor.abogus import ABogus
+from .vendor.token_template import TOKEN_PAYLOAD
 
-SIGNER_VERSION = 'f2-7dab3e2-get8-stdlib-sm3'
+SIGNER_VERSION = 'f2-7dab3e2-get8-sdk-session-v1'
 API_ORIGIN = 'https://www.douyin.com'
+TOKEN_URL = 'https://mssdk.bytedance.com/web/r/token?ms_appid=6383'
+
+
+class NoTokenRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        raise DouyinError('session_redirect', 'Dịch vụ token chuyển hướng ngoài dự kiến; đã dừng.')
+
 UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 FINGERPRINT = '1920|1080|1920|1080|0|0|0|0|1920|1080|1920|1040|1920|1080|24|24|Win32'
 
@@ -127,12 +136,15 @@ def cover_url(record):
 
 
 class DouyinClient:
-    def __init__(self, cookie_file, stop=None, progress=None, gap=2.0, opener=None, signer=None, user_agent=UA, pace_state=None):
+    def __init__(self, cookie_file, stop=None, progress=None, gap=2.0, opener=None, signer=None, user_agent=UA, pace_state=None, session_opener=None, session_state=None):
         self.stop = stop or threading.Event()
         self.progress = progress or (lambda *a: None)
         self.user_agent = user_agent
         self.jar = load_cookies(cookie_file)
         self.opener = opener or urllib.request.build_opener(ScopedRedirect(), urllib.request.HTTPCookieProcessor(self.jar))
+        self.session_opener = session_opener or urllib.request.build_opener(NoTokenRedirect())
+        self.session_state = session_state if session_state is not None else {}
+        self.session_ready = False
         self.signer = signer or ABogus(fp=FINGERPRINT, user_agent=user_agent, options=[0, 1, 8])
         self.gap = max(0, float(gap))
         self.pace_state = pace_state if pace_state is not None else {"next": 0.0, "lock": threading.Lock()}
@@ -206,7 +218,71 @@ class DouyinClient:
             data['fp'] = verification_fp
         return data
 
+    def ensure_session(self):
+        self.check()
+        if self.session_ready:
+            return
+        token = self.cookie('msToken')
+        if token:
+            self.diagnostic.update(session_stage='ready', token_source='imported_cookie', has_msToken=True)
+            self.session_ready = True
+            return
+        cached = self.session_state.get('token', '')
+        if cached and time.monotonic() < self.session_state.get('expires', 0):
+            self._set_session_token(cached)
+            self.diagnostic.update(session_stage='ready', token_source='server_cached', has_msToken=True)
+            self.session_ready = True
+            return
+        self.diagnostic.update(session_stage='token_request', token_source='none', token_requests=1)
+        self.progress('Đang xin token phiên từ máy chủ Douyin…', {'stage': 'session'})
+        self.pace()
+        payload = dict(TOKEN_PAYLOAD)
+        payload['tspFromClient'] = int(time.time() * 1000)
+        # Separate opener: never send imported login cookies to the SDK host.
+        request = urllib.request.Request(TOKEN_URL, data=json.dumps(payload).encode('utf-8'),
+                    headers={'User-Agent': self.user_agent, 'Content-Type': 'application/json; charset=utf-8',
+                             'Accept': 'application/json', 'Origin': API_ORIGIN, 'Referer': API_ORIGIN + '/'}, method='POST')
+        try:
+            with self.session_opener.open(request, timeout=20) as response:
+                status = getattr(response, 'status', 200)
+                self.diagnostic['token_http_status'] = status
+                response.read(65536)  # No response body or header values go to diagnostics.
+                headers = response.headers
+                token = headers.get('X-Ms-Token', '')
+                if not token:
+                    values = headers.get_all('Set-Cookie', []) if hasattr(headers, 'get_all') else [headers.get('Set-Cookie', '')]
+                    for value in values:
+                        parsed = SimpleCookie()
+                        try: parsed.load(value)
+                        except Exception: continue
+                        if 'msToken' in parsed:
+                            token = parsed['msToken'].value
+                            break
+        except urllib.error.HTTPError as error:
+            self.diagnostic.update(token_http_status=error.code, session_stage='token_http_error', result='session_error')
+            kind = 'rate_limit' if error.code in (429, 412) else 'session_http'
+            raise DouyinError(kind, 'Không khởi tạo được phiên: dịch vụ token trả HTTP %s. Chưa gửi yêu cầu quét danh sách.' % error.code,
+                              30 if kind == 'rate_limit' else 0) from None
+        except (urllib.error.URLError, TimeoutError, OSError):
+            self.diagnostic.update(session_stage='token_network_error', result='session_error')
+            raise DouyinError('session_network', 'Không kết nối được dịch vụ token Douyin. Chưa gửi yêu cầu quét danh sách.') from None
+        self.check()
+        if not 200 <= status < 300 or not isinstance(token, str) or not 32 <= len(token) <= 4096 or any(ord(c) <= 32 or ord(c) >= 127 or c in ';,' for c in token):
+            self.diagnostic.update(session_stage='token_missing', result='session_error')
+            raise DouyinError('session_token_missing', 'Dịch vụ phiên chưa cấp msToken hợp lệ. Đã dừng trước khi quét; mẫu SDK có thể không còn được máy chủ chấp nhận.')
+        self._set_session_token(token)
+        self.session_state.update(token=token, expires=time.monotonic() + 300)
+        self.diagnostic.update(session_stage='ready', token_source='server', has_msToken=True)
+        self.session_ready = True
+
+    def _set_session_token(self, token):
+        # A token returned by the SDK service is used only for the Douyin API session.
+        cookie = http.cookiejar.Cookie(0, 'msToken', token, None, False, '.douyin.com', True, True,
+                                      '/', True, True, None, True, None, None, {}, False)
+        self.jar.set_cookie(cookie)
+
     def request(self, path, extra):
+        self.ensure_session()
         self.pace()
         query = urllib.parse.urlencode(self.params(extra), quote_via=urllib.parse.quote)
         try:

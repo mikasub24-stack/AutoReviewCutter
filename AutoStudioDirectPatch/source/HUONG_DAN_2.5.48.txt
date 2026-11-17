@@ -1,10 +1,14 @@
-AUTO STUDIO 2.5.47 - CHI FILE SUA TAB QUET BO DOUYIN
+AUTO STUDIO 2.5.48 - CHI FILE SUA TAB QUET BO DOUYIN
 
-SUA TU 2.5.46
-- GET dung options [0,1,8], thay vi mac dinh POST [0,1,14] cua thu vien.
-- Gui verifyFp/fp neu cookie nhap san co s_v_web_id; khong tu tao ID.
-- Chan doan them co cookie dang nhap thuc su gui (khong ghi gia tri).
-- Day la sua loi request, CHUA xac nhan het HTTP 403 tren Douyin that.
+SUA TU 2.5.47
+- Khi cookie chua co msToken, xin token tu dich vu SDK may chu truoc khi ky API.
+- Khong dung lai token mau cua F2, khong tao token ngau nhien de thay the.
+- Khong gui cookie dang nhap den dich vu SDK. Token tra ve chi giu trong bo nho
+  toi da 5 phut, xoa cache khi doi file cookie, khong sua file cookie goc.
+- Neu lay token that bai thi dung truoc khi quet; bao rieng loi token va loi API.
+- Giu nguyen giao dien, khong mo trinh duyet, khong them nut.
+- Mau SDK duoc ghim tu F2; CHUA xac nhan may chu hien tai chap nhan mau nay.
+  Mang may build chan truy cap Douyin/SDK, nen chua the xac nhan het 403.
 
 YEU CAU DA GIU
 - Giu nguyen giao dien 2.5.45: khong doi bo cuc, nut bam, hang bo, anh bia,
@@ -16,7 +20,7 @@ YEU CAU DA GIU
 
 AP DUNG
 1. Dong Auto Studio; sao luu cac file cu.
-2. Giai nen ZIP nay vao THU MUC MA NGUON Auto Studio 2.5.45 (noi co app.py),
+2. Giai nen ZIP nay vao THU MUC MA NGUON Auto Studio 2.5.45 / 2.5.46 / 2.5.47 (noi co app.py),
    chap nhan chep de. Phai chep CA cac file moi trong ytdl/douyin_direct/.
 3. Chay bang ma nguon hoac build.bat cua du an nhu binh thuong.
    Day la ban va nguon, khong phai EXE. Chep .py canh EXE da bien dich khong
@@ -43,11 +47,11 @@ PHAN XU LY
 CHAN DOAN
 Trong thu muc cai dat rieng cua tab Quet (tabs.data_dir('ytscan')) co
 api_last_diagnostic.json sau moi viec. File chi chua loai loi, ma HTTP/API,
-so trang/video, phien ban bo ky; khong chua gia tri cookie/msToken/a_bogus.
+so trang/video, phien ban bo ky, session_stage, token_http_status, token_source; khong chua gia tri cookie/msToken/a_bogus.
 Neu chay khong duoc, gui file nay de doi chieu. Khong gui cookies.txt.
 
 KIEM CHUNG VA GIOI HAN
-- 37 kiem thu ngoai tuyen + thu hop dong giao dien Tk bang theme/the Tai gia lap.
+- 45 kiem thu ngoai tuyen + thu hop dong giao dien Tk bang theme/the Tai gia lap.
 - Ma tao giao dien cua 6 phan duoc doi chieu voi ban 2.5.45, giu nguyen.
 - CHUA quet Douyin that, CHUA xac nhan bo ky nay duoc Douyin hien tai chap nhan.
   Khong dam bao mo quet la thanh cong; can chay thu tren may va cookie cua ban.

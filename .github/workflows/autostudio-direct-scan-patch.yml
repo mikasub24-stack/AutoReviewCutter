@@ -31,26 +31,28 @@ jobs:
           if ($LASTEXITCODE) { throw 'ZIP packaging failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: AutoStudio-2.5.47-Direct-Scan-Source-Patch
+          name: AutoStudio-2.5.48-Direct-Scan-Source-Patch
           path: AutoStudioDirectPatch/dist/*
           if-no-files-found: error
       - name: Publish downloadable patch ZIP
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $tag = 'autostudio-v2.5.47-direct-api-patch'
+          $tag = 'autostudio-v2.5.48-direct-api-patch'
           @'
-          Sửa cấu hình ký GET bị dùng nhầm mặc định POST trong 2.5.46; tái sử dụng verifyFp có sẵn trong cookie, thêm chẩn đoán cookie thực gửi. Chưa xác nhận hết HTTP 403 thực tế. Chỉ file sửa cho nguồn Auto Studio 2.5.45/2.5.46: giữ nguyên mã dựng giao diện tab Quét bộ Douyin, thay Quét/Lấy link bằng API trực tiếp có ký a_bogus và dùng cookie tại thẻ Tải video. Không mở trình duyệt/tiện ích khi quét. Thẻ tải và lõi tải không được thay trong ZIP.
+          Bản vá khởi tạo phiên: khi chưa có msToken trong cookie, xin token từ dịch vụ SDK trước khi gọi API danh sách. Không gửi cookie đăng nhập sang host SDK, không tái sử dụng token mẫu, không sinh token ngẫu nhiên. Token trả về giữ trong bộ nhớ; nếu không được cấp token thì báo lỗi và dừng. Giữ nguyên giao diện và luồng quét trực tiếp, không tự mở trình duyệt.
 
-          Đã kiểm tra 37 trường hợp ngoại tuyến và hợp đồng giao diện bằng theme/downloader mô phỏng. Chưa thử Douyin thật, chưa xác nhận thuật toán ký hiện được máy chủ chấp nhận; không có tự giải CAPTCHA. Có báo cáo và checksum trong release.
+          Chưa xác nhận hết HTTP 403 trên Douyin thật. Lần thử mạng tới SDK tại môi trường build bị gateway chặn trước khi tới dịch vụ; mẫu SDK tĩnh và bộ ký chưa được kiểm chứng với máy chủ hiện tại. Đây là bản vá khởi tạo phiên để chạy thử, không phải xác nhận đã quét thành công. Thay cho nguồn 2.5.45/2.5.46/2.5.47.
 
-          Tải AutoStudio_v2.5.47_chi_file_sua.zip, giải nén đè vào bộ mã nguồn 2.5.45 rồi chạy/build lại theo dự án của bạn. Đây không phải EXE; chép .py cạnh EXE đã biên dịch không tự áp dụng bản vá.
+          Đã kiểm tra 45 trường hợp ngoại tuyến và hợp đồng giao diện bằng theme/downloader mô phỏng. Chưa thử Douyin thật, chưa xác nhận thuật toán ký hiện được máy chủ chấp nhận; không có tự giải CAPTCHA. Có báo cáo và checksum trong release.
+
+          Tải AutoStudio_v2.5.48_chi_file_sua.zip, giải nén đè vào bộ mã nguồn 2.5.45 rồi chạy/build lại theo dự án của bạn. Đây không phải EXE; chép .py cạnh EXE đã biên dịch không tự áp dụng bản vá.
           '@ | Set-Content "$env:RUNNER_TEMP/scan-patch.md" -Encoding utf8
           $existing = & gh release view $tag --repo $env:GITHUB_REPOSITORY --json isDraft 2>$null
           if ($LASTEXITCODE -eq 0) {
             if (!(($existing | ConvertFrom-Json).isDraft)) { throw 'Never overwrite published patch release' }
           } else {
-            & gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title 'Auto Studio 2.5.47 - Tab quét API trực tiếp, giữ giao diện' --notes-file "$env:RUNNER_TEMP/scan-patch.md"
+            & gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title 'Auto Studio 2.5.48 - Khởi tạo phiên SDK (chưa xác nhận quét thật)' --notes-file "$env:RUNNER_TEMP/scan-patch.md"
             if ($LASTEXITCODE) { throw 'Draft creation failed' }
           }
           & gh release upload $tag --repo $env:GITHUB_REPOSITORY AutoStudioDirectPatch/dist/* --clobber
