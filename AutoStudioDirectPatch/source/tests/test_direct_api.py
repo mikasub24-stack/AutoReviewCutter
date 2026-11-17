@@ -316,7 +316,7 @@ class ApiTests(unittest.TestCase):
         self.assertTrue(all('Chưa rõ tập' in i['name'] for i in items))
 
     def test_partial_collection_keeps_received_episode_positions(self):
-        c,_,_=self.client([{'aweme_list':[record(90,title='Không số',mix='12'),record(3,title='Không số',mix='12')],'has_more':1,'cursor':0}])
+        c,_,_=self.client([{'aweme_list':[record(90,title='Không số',mix='12'),record(3,title='Không số',mix='12')],'has_more':1,'cursor':0}]*2)
         with self.assertRaises(DouyinError):c.records('collection','12')
         items,_=directscan.ordered_items(c.last_items,'Bộ')
         self.assertEqual([i['episode'] for i in items],[1,2])
@@ -365,6 +365,77 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(reconcile(dl,['https://example.test/1\tTập 001','https://example.test/2\tTập 002']),0)
         self.assertEqual(engine.items['one']['title'],'Finished')
         self.assertEqual(engine.items['two']['title'],'Queued')
+
+    def test_pagination_terminal_string_false_is_not_stalled_more(self):
+        for value in ('false','FALSE',' 0 ',False,0):
+            c,transport,_=self.client([{'aweme_list':[record(1)],'has_more':value,'max_cursor':0}])
+            self.assertEqual(len(c.records('profile','OWNER_A')),1)
+            self.assertTrue(c.complete)
+            self.assertEqual(len(transport.calls),1)
+
+    def test_empty_page_with_forward_cursor_continues(self):
+        c,transport,_=self.client([
+            {'aweme_list':[record(1)],'has_more':1,'max_cursor':10},
+            {'aweme_list':[],'has_more':1,'max_cursor':20},
+            {'aweme_list':[record(2)],'has_more':0,'max_cursor':30}])
+        self.assertEqual([r['aweme_id'] for r in c.records('profile','OWNER_A')],['1','2'])
+        self.assertTrue(c.complete)
+        self.assertEqual(len(transport.calls),3)
+        self.assertEqual(urllib.parse.parse_qs(urllib.parse.urlparse(transport.calls[2].full_url).query)['max_cursor'],['20'])
+
+    def test_null_primary_cursor_does_not_hide_valid_fallback(self):
+        c,transport,_=self.client([
+            {'aweme_list':[record(1)],'has_more':1,'max_cursor':None,'cursor':20},
+            {'aweme_list':[record(2)],'has_more':0,'max_cursor':30}])
+        self.assertEqual(len(c.records('profile','OWNER_A')),2)
+        self.assertEqual(urllib.parse.parse_qs(urllib.parse.urlparse(transport.calls[1].full_url).query)['max_cursor'],['20'])
+
+    def test_134_videos_stalled_final_page_rechecks_and_deduplicates(self):
+        replies=[{'aweme_list':[record(i) for i in range(page*18+1,page*18+19)],'has_more':1,'max_cursor':page+1} for page in range(7)]
+        final=[record(i) for i in range(127,135)]
+        replies.extend([{'aweme_list':final,'has_more':1,'max_cursor':7},
+                        {'aweme_list':final,'has_more':0,'max_cursor':7}])
+        c,transport,_=self.client(replies)
+        self.assertEqual(len(c.records('profile','OWNER_A')),134)
+        self.assertTrue(c.complete)
+        self.assertEqual(len(transport.calls),9)
+        self.assertEqual(c.diagnostic['pagination']['stalled_rechecks'],1)
+        self.assertFalse(c.diagnostic['pagination']['has_more'])
+
+    def test_cursor_cycle_does_not_loop_or_report_complete(self):
+        c,transport,_=self.client([
+            {'aweme_list':[record(1)],'has_more':1,'max_cursor':2},
+            {'aweme_list':[record(2)],'has_more':1,'max_cursor':1},
+            {'aweme_list':[record(3)],'has_more':1,'max_cursor':2},
+            {'aweme_list':[record(3)],'has_more':1,'max_cursor':2}])
+        with self.assertRaises(DouyinError) as caught:c.records('profile','OWNER_A')
+        self.assertEqual(caught.exception.kind,'incomplete')
+        self.assertEqual(len(transport.calls),4)
+        self.assertFalse(c.complete)
+        self.assertEqual(len(c.last_items),3)
+        self.assertEqual(c.diagnostic['pagination']['stop_reason'],'cursor_stalled')
+
+    def test_forward_empty_pages_have_bounded_safety_limit(self):
+        c,transport,_=self.client([{'aweme_list':[],'has_more':1,'max_cursor':i} for i in range(1,5)])
+        with self.assertRaises(DouyinError):c.records('profile','OWNER_A')
+        self.assertEqual(len(transport.calls),4)
+        self.assertFalse(c.complete)
+        self.assertEqual(c.diagnostic['pagination']['stop_reason'],'too_many_empty_pages')
+
+    def test_stalled_recheck_never_retries_access_denied(self):
+        error=urllib.error.HTTPError(API_ORIGIN,403,'denied',{},None)
+        c,transport,_=self.client([{'aweme_list':[record(1)],'has_more':1,'max_cursor':0},error])
+        with self.assertRaises(DouyinError) as caught:c.records('profile','OWNER_A')
+        self.assertEqual(caught.exception.kind,'access_denied')
+        self.assertEqual(len(transport.calls),2)
+        self.assertFalse(c.complete)
+
+    def test_group_count_separates_4_collections_and_14_outside_videos(self):
+        groups=[{'key':'mix:'+str(i),'n':n} for i,n in enumerate([25,20,54,40])]+[{'key':'posts:OWNER_A','n':14}]
+        self.assertEqual(directscan.group_summary(groups),('4 bộ + 14 video ngoài bộ',153))
+
+    def test_outside_posts_are_not_called_one_collection(self):
+        self.assertEqual(directscan.group_summary([{'key':'posts:OWNER_A','n':134}]),('134 video ngoài bộ',134))
 
     def test_uploaded_widget_layout_is_unchanged(self):
         import ast
@@ -438,7 +509,7 @@ class ApiTests(unittest.TestCase):
         c, _, _ = self.client([{'aweme_list': [record(1,mix='12'),record(2,mix='88')], 'has_more':0,'cursor':0}])
         self.assertEqual([r['aweme_id'] for r in c.records('collection','12')], ['1'])
     def test_repeated_cursor_keeps_partial_and_does_not_claim_complete(self):
-        c, _, _ = self.client([{'aweme_list':[record(1)], 'has_more':1, 'max_cursor':0}])
+        c, _, _ = self.client([{'aweme_list':[record(1)], 'has_more':1, 'max_cursor':0}]*2)
         with self.assertRaises(DouyinError) as caught: c.records('profile','OWNER_A')
         self.assertEqual(caught.exception.kind, 'incomplete')
         self.assertEqual(len(c.last_items),1)
@@ -538,7 +609,7 @@ def test_scanner_reuses_owned_list_for_links_without_requery(self):
 
 def test_partial_group_scope_does_not_mix_other_series(self):
     data={'aweme_list':[record(1),record(2,mix='12')],'has_more':1,'max_cursor':0}
-    service,_=_scanner_fixture(self,[data])
+    service,_=_scanner_fixture(self,[data,data])
     job=service.submit('https://www.douyin.com/user/OWNER_A',{'group_key':'posts:OWNER_A','name':'Own','merged':True},'scan');service.thread.join(3)
     self.assertEqual(job.state,'error');self.assertEqual(job.error_kind,'incomplete')
     self.assertEqual([it['id'] for it in job.items],['1'])
@@ -592,5 +663,28 @@ def test_collection_fetch_ignores_post_cache_then_reuses_native_order(self):
     self.assertEqual(len(all_transports[2].calls),0)
 
 ScannerTests.test_collection_fetch_ignores_post_cache_then_reuses_native_order=test_collection_fetch_ignores_post_cache_then_reuses_native_order
+
+
+def test_partial_cache_is_kept_but_fresh_scan_rechecks_server(self):
+    transports=[]
+    data={'aweme_list':[record(1)],'has_more':1,'max_cursor':0}
+    def factory(cookie_file,**kwargs):
+        replies=[data,data] if not transports else [{'aweme_list':[record(1),record(2)],'has_more':0,'max_cursor':2}]
+        transport=Transport(replies);transports.append(transport)
+        return DouyinClient(cookie_file,opener=transport,signer=SigningStub(),gap=0,**kwargs)
+    service=directscan.Scanner(self.cookies,factory)
+    job=service.submit('https://www.douyin.com/user/OWNER_A',kind='list');service.thread.join(3)
+    self.assertEqual(job.state,'error');self.assertEqual(job.error_kind,'incomplete')
+    self.assertEqual(job.groups[0]['n'],1)
+    group=job.groups[0]
+    self.assertTrue(group['_partial'])
+    self.assertEqual(len(group['_records']),1)
+    self.assertIsNone(service._cached(group['key']))
+    job=service.submit(group['url'],{'group_key':group['key'],'name':group['name']},'scan');service.thread.join(3)
+    self.assertEqual(job.state,'done')
+    self.assertEqual(len(job.items),2)
+    self.assertEqual(len(transports[1].calls),1)
+
+ScannerTests.test_partial_cache_is_kept_but_fresh_scan_rechecks_server=test_partial_cache_is_kept_but_fresh_scan_rechecks_server
 
 if __name__=='__main__':unittest.main(verbosity=2)

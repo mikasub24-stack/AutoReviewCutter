@@ -31,28 +31,28 @@ jobs:
           if ($LASTEXITCODE) { throw 'ZIP packaging failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: AutoStudio-2.2.50-Direct-Scan-Source-Patch
+          name: AutoStudio-2.2.51-Direct-Scan-Source-Patch
           path: AutoStudioDirectPatch/dist/*
           if-no-files-found: error
       - name: Publish downloadable patch ZIP
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $tag = 'autostudio-v2.2.50-episode-prefix-patch'
+          $tag = 'autostudio-v2.2.51-pagination-patch'
           @'
-          Đổi tên file thành Tập 001 - <tên bộ>, Tập 002 - <tên bộ>…: số tập đứng trước tên tiếng Trung. Số phiên bản 2.2.50 do người dùng yêu cầu. Giữ nguyên thứ tự Douyin, giao diện và bộ ký của 2.5.50; giữ số khi chọn tập lẻ và chuyển tải.
+          Sửa phân trang Douyin: hiểu đúng has_more dạng bool/số/chuỗi, tiếp tục qua trang rỗng có con trỏ mới, dùng trường con trỏ hợp lệ khi trường chính null; kiểm tra lại một lần khi con trỏ đứng/lặp. HTTP 403/429/xác minh vẫn dừng ngay. Nếu vẫn không tiến được, giữ cảnh báo CHƯA QUÉT ĐỦ thay vì báo thành công giả.
 
-          Gói file nguồn sửa cho 2.5.50. Chép đè rồi build/chạy lại; Quét → Lấy lại bộ → Tải bộ này để dùng tên mới. Cập nhật tên mục chờ trong hàng đợi; không tự đổi tên file đã tải xong trên đĩa. Trong Explorer, chọn Sắp xếp → Tên → Tăng dần; Nhóm theo → Không để không bị phân nhóm theo ngày tải.
+          Phần bài đăng đã quét được giữ ở trạng thái dùng được để tải mà không cần quét lại tất cả. Đếm riêng bộ chính thức và video ngoài bộ: 4 bộ có 139 video + 14 video ngoài bộ = 153, không gọi thành 5 bộ. Giữ tên Tập 001 - tên bộ, bố cục và bộ ký đang hoạt động. Kiểm thử tình huống 134 video bằng dữ liệu mô phỏng; chưa chạy lại chính kênh bị dừng trên máy người dùng.
 
-          Đã kiểm tra 61 trường hợp ngoại tuyến và hợp đồng giao diện bằng theme/downloader mô phỏng. Chưa thử Douyin thật, chưa xác nhận thuật toán ký hiện được máy chủ chấp nhận; không có tự giải CAPTCHA. Có báo cáo và checksum trong release.
+          Đã kiểm tra 71 trường hợp ngoại tuyến và luồng giao diện Tk bằng theme/downloader mô phỏng, bao gồm tải phần quét dở mà không phát sinh yêu cầu quét mới. API/bộ ký giữ nguyên bản đã được người dùng xác nhận hoạt động; phần phục hồi phân trang mới chưa được kiểm chứng trực tiếp trên kênh gặp lỗi. Có báo cáo và checksum trong release.
 
-          Tải AutoStudio_v2.2.50_chi_file_sua.zip, giải nén đè vào bộ mã nguồn 2.5.50 rồi chạy/build lại theo dự án của bạn. Đây không phải EXE; chép .py cạnh EXE đã biên dịch không tự áp dụng bản vá.
+          Tải AutoStudio_v2.2.51_chi_file_sua.zip, giải nén đè vào bộ mã nguồn 2.2.50 rồi chạy/build lại theo dự án của bạn. Đây không phải EXE; chép .py cạnh EXE đã biên dịch không tự áp dụng bản vá.
           '@ | Set-Content "$env:RUNNER_TEMP/scan-patch.md" -Encoding utf8
           $existing = & gh release view $tag --repo $env:GITHUB_REPOSITORY --json isDraft 2>$null
           if ($LASTEXITCODE -eq 0) {
             if (!(($existing | ConvertFrom-Json).isDraft)) { throw 'Never overwrite published patch release' }
           } else {
-            & gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title 'Auto Studio 2.2.50 - Tập 001 đứng trước tên bộ' --notes-file "$env:RUNNER_TEMP/scan-patch.md"
+            & gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title 'Auto Studio 2.2.51 - Phân trang và dùng kết quả quét dở' --notes-file "$env:RUNNER_TEMP/scan-patch.md"
             if ($LASTEXITCODE) { throw 'Draft creation failed' }
           }
           & gh release upload $tag --repo $env:GITHUB_REPOSITORY AutoStudioDirectPatch/dist/* --clobber

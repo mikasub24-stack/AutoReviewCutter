@@ -139,6 +139,19 @@ def ordered_items(records, name, options=None):
     return output, skipped
 
 
+def group_summary(groups):
+    """Count native collections separately from unassigned posts/direct videos."""
+    collections = sum(str(g.get('key', '')).startswith('mix:') for g in groups)
+    outside = sum(g.get('n', 0) for g in groups if str(g.get('key', '')).startswith('posts:'))
+    standalone = sum(g.get('n', 0) for g in groups if str(g.get('key', '')).startswith('video:'))
+    total = sum(g.get('n', 0) for g in groups)
+    parts = []
+    if collections: parts.append('%d bộ' % collections)
+    if outside: parts.append('%d video ngoài bộ' % outside)
+    if standalone: parts.append('%d video đơn' % standalone)
+    return ' + '.join(parts) if parts else '0 video', total
+
+
 def grouped(records, kind, identity, requested_name=''):
     """Groups are based only on native mix membership, never cover/title similarity."""
     buckets = {}
@@ -263,7 +276,8 @@ class Scanner:
         if 'found' in values: job.found = values['found']
 
     def _cached(self, group_key):
-        return self.cache.get(group_key) if time.monotonic() - self.cache_at < 300 else None
+        group = self.cache.get(group_key) if time.monotonic() - self.cache_at < 300 else None
+        return group if group and not group.get('_partial') else None
 
     def _run(self, job):
         client = None
@@ -333,6 +347,15 @@ class Scanner:
         except ScanStopped:
             job.state = 'cancelled'
         except DouyinError as error:
+            if error.kind == 'incomplete' and client and client.last_items:
+                partial_groups = grouped(client.last_items, kind, identity, job.opts.get('name', ''))
+                for group in partial_groups:
+                    group['_partial'] = True
+                    group['_partial_reason'] = str(error)
+                    self.cache[group['key']] = group
+                self.cache_at = time.monotonic()
+                job.groups = partial_groups
+                job.found = len(client.last_items)
             job.error_kind = error.kind
             job.error = str(error)
             if error.kind == 'rate_limit' and error.retry_after:

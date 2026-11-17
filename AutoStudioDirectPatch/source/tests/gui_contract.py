@@ -75,6 +75,7 @@ with tempfile.TemporaryDirectory() as folder:
     assert page.browser_box.winfo_ismapped()
     assert hasattr(page, "direct")
     transports=[]
+    partial_replies=[]
     def factory(cookie_file,**kwargs):
         # User page is newest-first; only the mix endpoint provides the playlist order.
         episodes=[record(2,title='Không có số trong tiêu đề',mix='12'),record(1,title='Không có số trong tiêu đề',mix='12')]
@@ -82,7 +83,7 @@ with tempfile.TemporaryDirectory() as folder:
             reply={'aweme_list':episodes,'has_more':0,'max_cursor':0}
         else:
             reply={'aweme_list':list(reversed(episodes)),'has_more':0,'cursor':0}
-        transport=Transport([reply]);transports.append(transport)
+        transport=Transport(list(partial_replies) if partial_replies else [reply]);transports.append(transport)
         return DouyinClient(cookie_file,opener=transport,signer=SigningStub(),gap=0,**kwargs)
     page.direct=directscan.Scanner(str(cookie),factory)
     def settle():
@@ -92,7 +93,8 @@ with tempfile.TemporaryDirectory() as folder:
         root.update()
         assert not page.is_busy and page.job is None,'UI did not finish worker'
     errors=[]
-    with patch.object(module.messagebox,'showerror',side_effect=lambda *a,**k:errors.append(a)),patch.object(bridge,'get',side_effect=AssertionError('API must not touch extension bridge')):
+    warnings=[]
+    with patch.object(module.messagebox,'showerror',side_effect=lambda *a,**k:errors.append(a)),patch.object(module.messagebox,'showwarning',side_effect=lambda *a,**k:warnings.append(a)),patch.object(bridge,'get',side_effect=AssertionError('API must not touch extension bridge')):
         page.url_var.set('https://www.douyin.com/user/OWNER_A')
         page.start_list();settle()
         assert len(page.rows)==1 and page.rows[0]['g']['n']==2
@@ -117,6 +119,24 @@ with tempfile.TemporaryDirectory() as folder:
         assert dl.started==['https://www.douyin.com/video/2']
         assert dl.lines[0].split('\t')[1]=='Tập 002 - 同一部'
         assert browsers.launch.call_count==0
+        assert errors==[]
+        # A partial profile scan must expose usable videos immediately, without
+        # refetching all pages or claiming that the scan completed.
+        incomplete={'aweme_list':[record(9,title='Tập 09')],'has_more':1,'max_cursor':0}
+        partial_replies.extend([incomplete,incomplete])
+        page.start_list();settle()
+        assert len(page.rows)==1
+        partial_row=page.rows[0]
+        assert partial_row['state']=='partial' and partial_row['partial']
+        assert len(partial_row['items'])==1
+        assert len(warnings)==1
+        assert 'video ngoài bộ' in page.count_lbl.cget('text')
+        assert 'CHƯA QUÉT ĐỦ' in partial_row['info'].cget('text')
+        request_count=sum(len(t.calls) for t in transports)
+        page.download([partial_row])
+        assert dl.started==['https://www.douyin.com/video/9']
+        assert dl.lines[0].split('\t')[1].startswith('Tập 009 - ')
+        assert sum(len(t.calls) for t in transports)==request_count
         assert errors==[]
         page.shutdown()
     root.destroy()

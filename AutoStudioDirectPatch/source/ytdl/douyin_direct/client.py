@@ -396,6 +396,29 @@ class DouyinClient:
             raise DouyinError('identity_mismatch', 'API chưa trả đúng ID video đã yêu cầu; không lấy clip khác để thay thế.')
         return record
 
+    @staticmethod
+    def _more_flag(value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int) and value in (0, 1):
+            return bool(value)
+        if isinstance(value, str) and value.strip().lower() in ('0', '1', 'false', 'true'):
+            return value.strip().lower() in ('1', 'true')
+        raise DouyinError('incomplete', 'API trả cờ has_more không hợp lệ; giữ kết quả, chưa xác nhận đủ.')
+
+    @staticmethod
+    def _next_cursor(data, primary, current, visited):
+        candidates = []
+        for key in dict.fromkeys((primary, 'cursor', 'max_cursor')):
+            value = data.get(key)
+            if isinstance(value, bool) or value is None:
+                continue
+            text = str(value).strip()
+            if text.isdigit() and len(text) <= 64:
+                candidates.append((key, text))
+        forward = next(((key, value) for key, value in candidates if value != current and value not in visited), None)
+        return forward or (candidates[0] if candidates else ('', None))
+
     def records(self, kind, identity, on_page=None, max_pages=500):
         self.last_items = []
         self.complete = False
@@ -413,13 +436,14 @@ class DouyinClient:
         else:
             raise DouyinError('invalid_url', 'Loại link không hỗ trợ.')
         cursor, ids, cursors = '0', set(), set()
-        for page in range(max_pages):
+        page, stalled, empty_streak = 0, 0, 0
+        while page < max_pages:
             self.check()
             data = self.request(path, {**extra, cursor_key: cursor})
             batch = data.get('aweme_list')
             if not isinstance(batch, list) or 'has_more' not in data:
                 raise DouyinError('incomplete', 'API thiếu danh sách video hoặc cờ phân trang. Giữ kết quả đã nhận; chưa thể báo quét đủ.')
-            rejected = 0
+            rejected, before = 0, len(self.last_items)
             for record in batch:
                 if not isinstance(record, dict): continue
                 video_id = str(record.get('aweme_id') or '')
@@ -438,15 +462,37 @@ class DouyinClient:
             self.diagnostic.update(pages=page+1, accepted=len(self.last_items), rejected=rejected)
             self.progress('Đã đọc %d trang, %d video đúng nguồn.' % (page+1, len(self.last_items)), {'found': len(self.last_items), 'pages': page+1})
             if on_page: on_page(list(self.last_items))
-            more = data.get('has_more')
-            if more in (False, 0, '0'):
+            more = self._more_flag(data.get('has_more'))
+            field, next_cursor = self._next_cursor(data, cursor_key, cursor, cursors)
+            forward = next_cursor is not None and next_cursor != cursor and next_cursor not in cursors
+            self.diagnostic.update(pagination={'has_more': more, 'batch_count': len(batch),
+                'new_count': len(self.last_items)-before, 'cursor_field': field,
+                'cursor_present': next_cursor is not None, 'cursor_changed': next_cursor is not None and next_cursor != cursor,
+                'cursor_repeated': next_cursor in cursors, 'stalled_rechecks': stalled,
+                'empty_page_streak': empty_streak})
+            if not more:
                 if rejected and not self.last_items:
                     raise DouyinError('identity_mismatch', 'Danh sách trả về thuộc tài khoản/bộ khác; không dùng làm kết quả quét.')
                 self.complete = True
                 return self.last_items
-            next_cursor = data.get(cursor_key, data.get('cursor', data.get('max_cursor')))
-            if not batch or next_cursor is None or str(next_cursor) == cursor or str(next_cursor) in cursors:
-                raise DouyinError('incomplete', 'Douyin ngừng phân trang hoặc lặp con trỏ khi vẫn báo còn video. Đã giữ phần quét được, không báo đủ.')
+            if not forward:
+                # Recheck only a successful, structurally valid page once. HTTP/access/
+                # verification errors raised by request() never reach this retry path.
+                if stalled == 0:
+                    stalled = 1
+                    self.diagnostic['pagination']['stalled_rechecks'] = 1
+                    self.progress('Douyin chưa trả con trỏ mới; đang kiểm tra lại trang một lần…',
+                                  {'found': len(self.last_items), 'pages': page+1})
+                    continue
+                self.diagnostic['pagination']['stop_reason'] = 'cursor_stalled'
+                raise DouyinError('incomplete', 'Douyin vẫn không trả con trỏ mới sau khi kiểm tra lại một lần. Đã giữ %d video để dùng; chưa xác nhận quét đủ.' % len(self.last_items))
+            empty_streak = empty_streak + 1 if not batch else 0
+            self.diagnostic['pagination']['empty_page_streak'] = empty_streak
+            if empty_streak > 3:
+                self.diagnostic['pagination']['stop_reason'] = 'too_many_empty_pages'
+                raise DouyinError('incomplete', 'API trả nhiều trang rỗng dù còn con trỏ. Đã giữ %d video; chưa xác nhận đủ.' % len(self.last_items))
             cursors.add(cursor)
             cursor = str(next_cursor)
+            page += 1
+            stalled = 0
         raise DouyinError('incomplete', 'Đã tới giới hạn số trang an toàn; giữ kết quả nhưng chưa báo quét đủ.')

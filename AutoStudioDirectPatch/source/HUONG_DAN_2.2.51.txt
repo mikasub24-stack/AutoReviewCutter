@@ -1,39 +1,30 @@
-AUTO STUDIO 2.2.50 - CHI FILE SUA TAB QUET BO DOUYIN
+AUTO STUDIO 2.2.51 - CHI FILE SUA TAB QUET BO DOUYIN
 
-SUA TU 2.5.50 - SO PHIEN BAN 2.2.50 THEO YEU CAU NGUOI DUNG
-- Doi mau ten thanh: Tap 001 - <Ten bo>.mp4 (chu co dau trong app).
-  So tap dung truoc ten tieng Trung, giu 3 chu so: 001, 002, 003...
-- Khong doi thu tu tap, cac nut/giao dien, bo ky API va so luong tai song song.
-- Ten moi dung khi Lay lai bo va chuyen/tai danh sach moi; cac muc Cho/Tam
-  dung/Loi da co trong hang doi duoc cap nhat ten khi bam Tai bo nay.
-- Cac file da tai xong tu truoc giu ten cu; ban va khong tu sua file tren dia.
-- Trong File Explorer: Sap xep > Ten > Tang dan. De xem tat ca lien mach,
-  chon Nhom theo > Khong. Sap xep theo ngay tai van co the hien 003 truoc 001.
-- So phien ban 2.2.50 la gia tri nguoi dung yeu cau, nen nho hon 2.5.50 cu.
+SUA TU 2.2.50
+- Doc has_more dang bool/0/1 va chuoi true/false/0/1 dung nghia; khong xem
+  chuoi false la con video.
+- Trang rong co con tro moi: tiep tuc phan trang (toi da 3 trang rong lien tiep).
+- max_cursor/cursor bi null: thu truong con tro thay the hop le tu API.
+- Con tro dung/lap: kiem tra lai cung trang MOT LAN, co gian cach nhu cu.
+  Chi thu lai trang JSON hop le; HTTP 403/429/xac minh van dung ngay.
+- Neu van dung thi giu CHUA QUET DU. Khong lay so 134 hay tong uoc luong de
+  tu ket luan da quet het; khong sinh con tro tu timestamp hay ID video.
+- Nhom bai dang quet do duoc mo san o trang thai PARTIAL, co the chon va tai
+  video da nhan, khong can bam Lay link roi quet lai toan bo kenh.
+- Bam Lay lai van goi may chu de kiem tra lai; cache PARTIAL khong duoc doi
+  thanh ket qua du hay dung de ngan viec thu lai.
+- Dem rieng bo chinh thuc va video ngoai bo: vi du 25+20+54+40=139 video
+  trong 4 bo, them 14 video ngoai bo la 153 video; KHONG goi thanh 5 bo.
+- Chan doan them pagination: has_more, batch_count, new_count, cursor_field,
+  cursor_present/changed/repeated, stalled_rechecks, empty_page_streak,
+  stop_reason. Khong ghi gia tri con tro/cookie/token hay noi dung phan hoi.
+- Giu ten file Tap 001 - <Ten bo> (chu co dau), giao dien va bo ky dang chay.
 
-SUA TU 2.5.49
-- Khi Lay link mot bo /collection/, doc danh sach chinh bo do tu API mix/aweme.
-  Khong dung lai thu tu moi-cu cua cache bai dang tren trang kenh.
-- Uu tien so thu tu tap goc khi metadata current_episode cua TAT CA video co
-  gia tri hop le va rieng biet. Neu metadata chi lap lai tong tap, dung thu tu
-  danh sach tu API bo. Khong lay timestamp hay ID de danh so tap cua bo.
-- Dat ten Tap 001 - <Ten bo>, Tap 002 - <Ten bo>, ... (chu co dau trong app).
-  Chi tick tap 2/5/18 van giu so 002/005/018, khong danh so lai tu 1.
-- Lay link, luu .txt, Sang the Tai, Tai bo nay va Tai cac bo da lay cung dung
-  mot danh sach co ten va thu tu co dinh. Moi bo co danh sach rieng.
-- URL da co o the Tai: cap nhat ten/direct link cho muc Cho/Tam dung/Loi,
-  sap lai vi tri cua cac URL trong bo, giu cac muc khac o nguyen cho.
-  Khong doi ten file dang tai/da tai xong tren dia, khong sua worker dang chay.
-- Bo sung ytdl/download_order.py; phai chep du file moi nay khi build.
-- Giu nguyen giao dien, core tai va bo ky/API 2.5.49 da duoc nguoi dung xac
-  nhan quet/tai duoc. Chi them thu tu API bo va buoc chuyen danh sach tai.
-
-CACH DUNG SAU CAP NHAT
-1. Tam dung luot tai cu va dong app truoc khi thay nguon/build.
-2. Mo ban moi, Quet kenh va bam Lay lai/Lay link bo can tai.
-3. Kiem tra o tick hien 01,02,...,18 thay cho duoi ID video, roi bam Tai bo nay.
-4. Ten moi ap dung cho luot tai sau cap nhat; tai song song co the hoan tat
-   truoc/sau khac nhau nhung so tap/ten file van giu dung.
+CACH AP DUNG
+Chep de nguon 2.2.50, build lai, mo app va Quet lai kenh. Ket qua chua du se
+bao canh bao va danh dau ro; cac video da lay co the tai o nhom Bai dang.
+Ten moi ap dung cho luot tai sau cap nhat. File da tai xong khong tu doi ten.
+Trong Explorer: Sap xep > Ten > Tang dan; Nhom theo > Khong de xem lien mach.
 
 YEU CAU DA GIU
 - Giu nguyen giao dien 2.5.45: khong doi bo cuc, nut bam, hang bo, anh bia,
@@ -76,7 +67,7 @@ so trang/video, phien ban bo ky, session_stage, token_http_status, token_source;
 Neu chay khong duoc, gui file nay de doi chieu. Khong gui cookies.txt.
 
 KIEM CHUNG VA GIOI HAN
-- 61 kiem thu ngoai tuyen + thu hop dong giao dien Tk bang theme/the Tai gia lap.
+- 71 kiem thu ngoai tuyen + thu hop dong giao dien Tk bang theme/the Tai gia lap.
 - Ma tao giao dien cua 6 phan duoc doi chieu voi ban 2.5.45, giu nguyen.
 - CHUA quet Douyin that, CHUA xac nhan bo ky nay duoc Douyin hien tai chap nhan.
   Khong dam bao mo quet la thanh cong; can chay thu tren may va cookie cua ban.

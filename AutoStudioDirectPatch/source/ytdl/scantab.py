@@ -276,8 +276,8 @@ class Page(tk.Frame):
             self.empty_lbl.pack_forget()
         else:
             self.empty_lbl.pack(fill="x")
-        tot = sum(r["g"]["n"] for r in self.rows)
-        self.count_lbl.configure(text="%d bộ" % len(self.rows) + (" • khoảng %d video" % tot if tot else ""))
+        summary, tot = directscan.group_summary([r['g'] for r in self.rows])
+        self.count_lbl.configure(text=summary + (" • %d video" % tot if tot else ""))
         self.canvas.yview_moveto(0)
 
     def _add_row(self, g):
@@ -401,7 +401,7 @@ class Page(tk.Frame):
             n_eps = sum(1 for i in its if i["kind"] != "merged")
             n_m = len(its) - n_eps
             nd = sum(1 for i in its if i["direct"])
-            parts = ["✔ %d tập" % n_eps]
+            parts = [("✔ %d video" if str(g.get("key", "")).startswith("posts:") else "✔ %d tập") % n_eps]
             if n_m:
                 parts.append("%d tập gộp" % n_m)
             parts.append("%d/%d có link trực tiếp" % (nd, len(its)))
@@ -581,15 +581,31 @@ class Page(tk.Frame):
     def _list_done(self, job):
         if job.state == "done":
             self._set_groups(job.groups)
-            tot = sum(g["n"] for g in job.groups)
-            self.set_status("Tìm thấy %d bộ%s. Bấm «Lấy link bộ này» ở bộ cần, hoặc tick nhiều bộ rồi «Lấy link các bộ đã chọn»." % (len(self.rows), (" (khoảng %d video)" % tot) if tot else ""), GREEN)
+            summary, tot = directscan.group_summary(job.groups)
+            self.set_status("Tìm thấy %s%s. Bấm «Lấy link bộ này» ở bộ cần, hoặc tick nhiều bộ rồi «Lấy link các bộ đã chọn»." % (summary, (" (%d video)" % tot) if tot else ""), GREEN)
             if len(self.rows) == 1 and "/collection/" in self._list_url:       # dán thẳng link 1 bộ: lấy luôn
                 self.fetch_rows(self.rows)
         elif job.state == "error":
             if job.groups:
                 self._set_groups(job.groups)
-            self.set_status("✘ CHƯA QUÉT ĐỦ: " + (job.error or "Quét không thành công."), RED)
-            messagebox.showerror("Quét bộ / kênh", job.error or "Quét không thành công.", parent=self)
+            if getattr(job, 'error_kind', '') == 'incomplete' and job.groups:
+                # Keep user-post results usable without repeating the same scan. A native
+                # collection must still be fetched via its own endpoint before numbering.
+                for row in self.rows:
+                    group = row['g']
+                    if not str(group.get('key', '')).startswith('posts:'):
+                        continue
+                    partial = bridge.Job(group['url'], {'name': group['name']}, 'scan')
+                    partial.state, partial.error_kind, partial.error = 'error', 'incomplete', job.error
+                    directscan.Scanner._publish_items(partial, group.get('_records', []), group['name'])
+                    row['job'] = partial
+                    self._fetch_done(partial, row)
+            partial = getattr(job, 'error_kind', '') == 'incomplete' and bool(job.groups)
+            self.set_status(("⚠ CHƯA QUÉT ĐỦ: " if partial else "✘ CHƯA QUÉT ĐỦ: ") + (job.error or "Quét không thành công."), ORANGE if partial else RED)
+            if partial:
+                messagebox.showwarning("Quét chưa đủ", (job.error or "Quét chưa đủ.") + "\nCác video đã nhận được giữ lại; nhóm bài đăng có thể tải phần đã quét.", parent=self)
+            else:
+                messagebox.showerror("Quét bộ / kênh", job.error or "Quét không thành công.", parent=self)
         else:
             if job.groups:
                 self._set_groups(job.groups)
