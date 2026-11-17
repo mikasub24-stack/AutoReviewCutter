@@ -1,0 +1,8 @@
+F2 ABogus signer
+Author: JohnserfSeed / F2 contributors
+Source: https://raw.githubusercontent.com/Johnserf-Seed/f2/7dab3e2ffffaa2535834d28fca99dbc2e89fa9d3/f2/utils/abogus.py
+License: Apache-2.0 (APACHE-2.0.txt)
+Original SHA-256: 82cc97b63aab2ac80a5c312fe52850ccc74d6fdffe6edaee4e58add14083a3c3
+Local changes: replace gmssl with local SM3; remove executable examples.
+This pinned algorithm is not proof that current Douyin accepts it.
+No CAPTCHA solver, proxy rotation or session rotation is included.

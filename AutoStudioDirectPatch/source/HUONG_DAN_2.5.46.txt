@@ -1,0 +1,54 @@
+AUTO STUDIO 2.5.46 - CHI FILE SUA TAB QUET BO DOUYIN
+
+YEU CAU DA GIU
+- Giu nguyen giao dien 2.5.45: khong doi bo cuc, nut bam, hang bo, anh bia,
+  danh sach o tick, nut tai va chuyen sang the Tai video.
+- Chi thay backend Quet / Lay link thanh goi API Douyin truc tiep.
+- Khong tu mo trinh duyet, khong can tien ich de thuc hien luot quet nay.
+- Nut Mo trinh duyet va cac lua chon trinh duyet cu van giu nguyen theo yeu cau
+  giao dien; chi nut mo thu cong moi mo browser, khong tham gia luot API.
+
+AP DUNG
+1. Dong Auto Studio; sao luu cac file cu.
+2. Giai nen ZIP nay vao THU MUC MA NGUON Auto Studio 2.5.45 (noi co app.py),
+   chap nhan chep de. Phai chep CA cac file moi trong ytdl/douyin_direct/.
+3. Chay bang ma nguon hoac build.bat cua du an nhu binh thuong.
+   Day la ban va nguon, khong phai EXE. Chep .py canh EXE da bien dich khong
+   lam EXE tu su dung ma moi.
+4. O the Tai video, nap cookies.txt Douyin dang Netscape nhu truoc.
+5. Sang the Quet bo Douyin ben phai: dan link kenh /user/... hoac bo
+   /collection/... roi bam Quet; chon bo, Lay link, Tai bo nay / Sang the Tai.
+
+PHAN XU LY
+- Ky a_bogus tai may bang Python; khong them Node/Playwright/gmssl.
+- Cookie chi gui den dung mien API, khong gui cookie dang nhap den CDN anh bia.
+- Goi lan luot, cach nhau toi thieu 2 giay. Doc het phan trang neu API cho phep.
+- Chi lay aweme_list cua nguon da yeu cau, loc tac gia / mix_id sai, khop chinh
+  xac ID khi lay chi tiet, khong tron video de xuat / yeu thich.
+- Chi tach nhom khi co mix_id that cua Douyin; khong tu tach bang anh bia /
+  ten gan giong. Video khong co mix_id o nhom Bai dang cua kenh.
+- Doc so tap ro trong tieu de (ke ca 吃声亭126集). Khong ro so thi de ten
+  Chua ro tap - video <ID>; khong tu noi so len 159 hay tu suy tap tu mix.cur.
+- Khi API yeu cau xac minh, han che, sai du lieu hoac loi chu ky: dung hang doi;
+  giu ket qua tung trang voi nhan CHUA QUET DU. Khong tu doi cookie, IP hoac
+  chuyen sang trinh duyet de thu vuot. Khong co tu giai CAPTCHA.
+- Link truc tiep giu nguyen chu ky/query, co the het han theo may chu.
+
+CHAN DOAN
+Trong thu muc cai dat rieng cua tab Quet (tabs.data_dir('ytscan')) co
+api_last_diagnostic.json sau moi viec. File chi chua loai loi, ma HTTP/API,
+so trang/video, phien ban bo ky; khong chua gia tri cookie/msToken/a_bogus.
+Neu chay khong duoc, gui file nay de doi chieu. Khong gui cookies.txt.
+
+KIEM CHUNG VA GIOI HAN
+- 34 kiem thu ngoai tuyen + thu hop dong giao dien Tk bang theme/the Tai gia lap.
+- Ma tao giao dien cua 6 phan duoc doi chieu voi ban 2.5.45, giu nguyen.
+- CHUA quet Douyin that, CHUA xac nhan bo ky nay duoc Douyin hien tai chap nhan.
+  Khong dam bao mo quet la thanh cong; can chay thu tren may va cookie cua ban.
+- CHUA build/chay EXE Auto Studio day du vi goi nguon nay chi co cac file sua.
+- Bo ky duoc ghim tu F2 main, commit 7dab3e2ffffaa2535834d28fca99dbc2e89fa9d3;
+  khi Douyin thay doi co the phai cap nhat mo-dun. Khong khang dinh chu ky
+  doi theo quy nhu quang cao cua dich vu.
+- Giu giay phep Apache-2.0 va NOTICE cua F2 khi phan phoi. installer.iss da
+  them hai file giay phep vao licenses/Douyin-Direct. Neu dong goi ban portable,
+  can chep hai file nay vao thu muc licenses cua ban portable.
