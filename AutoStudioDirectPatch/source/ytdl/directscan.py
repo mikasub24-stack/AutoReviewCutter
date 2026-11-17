@@ -139,6 +139,32 @@ def ordered_items(records, name, options=None):
     return output, skipped
 
 
+def catalog_groups(entries):
+    """Keep creator catalog order, titles/counts/covers, including empty mixes."""
+    groups = []
+    for entry in entries:
+        mix_id = str(entry['mix_id'])
+        statis = entry.get('statis') if isinstance(entry.get('statis'), dict) else {}
+        value = statis.get('updated_to_episode')
+        count = int(str(value)) if not isinstance(value, bool) and str(value).isdigit() and len(str(value)) <= 7 else 0
+        count = count if 0 <= count <= 1000000 else 0
+        raw_cover = entry.get('cover_url') or {}
+        urls = raw_cover.get('url_list', []) if isinstance(raw_cover, dict) else (raw_cover if isinstance(raw_cover, list) else [raw_cover])
+        if isinstance(urls, str): urls = [urls]
+        image = next((url for url in urls if isinstance(url, str) and _cover_ok(url)), '')
+        name = ' '.join(str(entry.get('mix_name') or 'Bộ ' + mix_id).split())[:200]
+        groups.append({'key': 'mix:' + mix_id, 'name': name, 'n': count,
+                       'url': 'https://www.douyin.com/collection/' + mix_id,
+                       'cover': '', 'cover_url': image, '_records': [],
+                       '_catalog': True, '_collection_api_order': False})
+    # Preserve separate IDs even for identically titled mixes; avoid file collisions.
+    duplicates = Counter(group['name'] for group in groups)
+    for group in groups:
+        if duplicates[group['name']] > 1:
+            group['name'] += ' [' + group['key'].split(':', 1)[1][-6:] + ']'
+    return groups
+
+
 def group_summary(groups):
     """Count native collections separately from unassigned posts/direct videos."""
     collections = sum(str(g.get('key', '')).startswith('mix:') for g in groups)
@@ -186,8 +212,11 @@ _CDN_SUFFIXES = ('douyinpic.com', 'byteimg.com', 'pstatp.com', 'ibytedtos.com', 
 
 
 def _cover_ok(url):
-    p = urllib.parse.urlparse(url)
-    host = (p.hostname or '').lower()
+    try:
+        p = urllib.parse.urlparse(url)
+        host = (p.hostname or '').lower()
+    except ValueError:
+        return False
     return p.scheme == 'https' and not p.username and not p.password and any(host == d or host.endswith('.' + d) for d in _CDN_SUFFIXES)
 
 
@@ -250,7 +279,10 @@ class Scanner:
             job.error_kind = ''
             job.diagnostic = {'signer': SIGNER_VERSION, 'live_verified': False}
             job.stop_event = threading.Event()
-            job.opts.update(group_key=(opts or {}).get('group_key', ''))
+            expected = (opts or {}).get('expected_count', 0)
+            expected = expected if isinstance(expected, int) and not isinstance(expected, bool) and 0 <= expected <= 1000000 else 0
+            job.opts.update(group_key=(opts or {}).get('group_key', ''),
+                            catalog_count=bool((opts or {}).get('catalog_count')), expected_count=expected)
             job.msg = 'Chuẩn bị quét API trực tiếp; không mở trình duyệt.'
             self.job = job
             self.thread = threading.Thread(target=self._run, args=(job,), daemon=True)
@@ -293,6 +325,27 @@ class Scanner:
             client = self.client_factory(self.cookie_file, stop=job.stop_event, pace_state=self.pace_state, session_state=self.session_state,
                         progress=lambda text, values: self._progress(job, text, values))
             kind, identity = client.resolve_target(job.url)
+            if job.kind == 'list' and kind == 'profile':
+                job.catalog_only = True
+                def catalog_page(entries):
+                    job.groups = catalog_groups(entries)
+                entries = client.author_collections(identity, on_page=catalog_page)
+                if entries:
+                    groups = catalog_groups(entries)
+                    for group in groups:
+                        client.check()
+                        job.msg = 'Đang lấy ảnh bìa bộ «%s» từ mục 合集…' % group['name']
+                        group['cover'] = load_cover(group.get('cover_url', ''), job.stop_event)
+                        self.cache[group['key']] = group
+                    self.cache_at = time.monotonic()
+                    job.groups = groups
+                    job.found = len(groups)
+                    job.msg = 'Đã đọc %d bộ từ mục 合集 của kênh Douyin.' % len(groups)
+                    job.state = 'done'
+                    return
+                # Only a valid, fully empty catalog may fall back to user posts.
+                # Access/verification/schema errors never silently become fake catalogs.
+                job.catalog_only, job.catalog_empty = False, True
             group_key = job.opts.get('group_key', '')
             cached = self._cached(group_key) if job.kind == 'scan' and group_key else None
             if kind == 'collection' and cached and not cached.get('_collection_api_order'):
@@ -341,6 +394,14 @@ class Scanner:
                     job.done_n += 1
                     job.lines = items_lines(job.items)
                 job.blocked = sum(not it['direct'] for it in job.items)
+                if kind == 'collection' and job.opts.get('catalog_count'):
+                    expected = job.opts.get('expected_count', 0)
+                    expected = expected if isinstance(expected, int) and not isinstance(expected, bool) else 0
+                    client.diagnostic.update(expected_collection_count=expected, collection_count=len(records))
+                    if expected > len(records):
+                        for group in job.groups:
+                            group['_partial'] = True
+                        raise DouyinError('incomplete', 'Mục 合集 báo %d tập nhưng API bộ mới trả %d video. Đã giữ phần lấy được; chưa xác nhận đủ bộ.' % (expected, len(records)))
             client.check()
             job.msg = ('Đã quét %d nhóm nguồn từ %d bài đăng.' % (len(job.groups), job.found)) if job.kind == 'list' else 'Đã xử lý %d video; %d có link trực tiếp.' % (len(job.items), job.direct_count())
             job.state = 'done'
@@ -374,7 +435,9 @@ class Scanner:
                                   found=job.found, processed=job.done_n, direct=job.direct_count(),
                                   numbered=sum(it.get('episode') is not None for it in job.items),
                                   unknown_episode=sum(it.get('episode') is None for it in job.items),
-                                  episode_sources=sorted({it.get('episode_source', 'unknown') for it in job.items}))
+                                  episode_sources=sorted({it.get('episode_source', 'unknown') for it in job.items}),
+                                  catalog_only=bool(getattr(job, 'catalog_only', False)),
+                                  catalog_empty=bool(getattr(job, 'catalog_empty', False)))
             if job.cancel:
                 job.state = 'cancelled'
             job.updated = time.time()

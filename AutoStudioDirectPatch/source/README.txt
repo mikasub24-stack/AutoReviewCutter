@@ -1,4 +1,4 @@
-﻿AUTO STUDIO 2.2.51 - CHI FILE SUA TAB QUET BO DOUYIN
+﻿AUTO STUDIO 2.2.52 - CHI FILE SUA TAB QUET BO DOUYIN
 
 YEU CAU DA GIU
 - Giu nguyen giao dien 2.5.45: khong doi bo cuc, nut bam, hang bo, anh bia,
@@ -41,7 +41,7 @@ so trang/video, phien ban bo ky; khong chua gia tri cookie/msToken/a_bogus.
 Neu chay khong duoc, gui file nay de doi chieu. Khong gui cookies.txt.
 
 KIEM CHUNG VA GIOI HAN
-- 71 kiem thu ngoai tuyen + thu hop dong giao dien Tk bang theme/the Tai gia lap.
+- 83 kiem thu ngoai tuyen + thu hop dong giao dien Tk bang theme/the Tai gia lap.
 - Ma tao giao dien cua 6 phan duoc doi chieu voi ban 2.5.45, giu nguyen.
 - CHUA quet Douyin that, CHUA xac nhan bo ky nay duoc Douyin hien tai chap nhan.
   Khong dam bao mo quet la thanh cong; can chay thu tren may va cookie cua ban.

@@ -1,30 +1,34 @@
-AUTO STUDIO 2.2.51 - CHI FILE SUA TAB QUET BO DOUYIN
+AUTO STUDIO 2.2.52 - CHI FILE SUA TAB QUET BO DOUYIN
 
-SUA TU 2.2.50
-- Doc has_more dang bool/0/1 va chuoi true/false/0/1 dung nghia; khong xem
-  chuoi false la con video.
-- Trang rong co con tro moi: tiep tuc phan trang (toi da 3 trang rong lien tiep).
-- max_cursor/cursor bi null: thu truong con tro thay the hop le tu API.
-- Con tro dung/lap: kiem tra lai cung trang MOT LAN, co gian cach nhu cu.
-  Chi thu lai trang JSON hop le; HTTP 403/429/xac minh van dung ngay.
-- Neu van dung thi giu CHUA QUET DU. Khong lay so 134 hay tong uoc luong de
-  tu ket luan da quet het; khong sinh con tro tu timestamp hay ID video.
-- Nhom bai dang quet do duoc mo san o trang thai PARTIAL, co the chon va tai
-  video da nhan, khong can bam Lay link roi quet lai toan bo kenh.
-- Bam Lay lai van goi may chu de kiem tra lai; cache PARTIAL khong duoc doi
-  thanh ket qua du hay dung de ngan viec thu lai.
-- Dem rieng bo chinh thuc va video ngoai bo: vi du 25+20+54+40=139 video
-  trong 4 bo, them 14 video ngoai bo la 153 video; KHONG goi thanh 5 bo.
-- Chan doan them pagination: has_more, batch_count, new_count, cursor_field,
-  cursor_present/changed/repeated, stalled_rechecks, empty_page_streak,
-  stop_reason. Khong ghi gia tri con tro/cookie/token hay noi dung phan hoi.
-- Giu ten file Tap 001 - <Ten bo> (chu co dau), giao dien va bo ky dang chay.
+SUA TU 2.2.51: DANH SACH BO TU MUC 合集 CUA TAC GIA
+- Khi dan link kenh /user/... va bam Quet, goi /aweme/v1/web/mix/list/ voi
+  sec_user_id cua dung kenh, req_from=channel_pc_web, cursor/count.
+- Doc mix_infos truc tiep: mix_id, mix_name, cover_url.url_list va
+  statis.updated_to_episode. Giu thu tu API tra ve, khong suy bo tu bai dang.
+- Vi du kenh trong anh: hien 4 bo theo thu tu 25/20/54/40 tap, tong 139 tap
+  trong muc 合集. Khong chen 14 video ngoai bo vao danh sach nay. 153 la tong
+  bai dang cua kenh, khong phai so video trong 4 bo.
+- Chua tai danh sach tap khi chi Quet kenh. Bam Lay link bo nay moi goi
+  /mix/aweme/ cua dung mix_id, lay tap va link rieng bo duoc chon.
+- Anh bia lay tu catalog cua bo, khong lay anh video dau tien de thay the.
+- Neu so video lay duoc nho hon so tap catalog da bao, danh dau CHUA DU BO,
+  giu phan lay duoc de kiem tra/tai, khong bao da du tap.
+- Chi khi API catalog tra danh sach rong hop le moi chuyen sang bai dang.
+  Luc do status mau cam ghi ro nguon du phong, khong nhan la muc 合集 goc.
+  HTTP 403/429/xac minh/loi schema khong tu bien thanh catalog rong.
+- Loc tac gia sai khi API tra owner; khong doc bo da luu hay bo de xuat cua
+  tai khoan dang nhap. Khong tron/gop theo ten gan giong hay anh bia.
+- Giu bo cuc/nut/giao dien hien co va ten file Tap 001 - <Ten bo> (co dau).
 
-CACH AP DUNG
-Chep de nguon 2.2.50, build lai, mo app va Quet lai kenh. Ket qua chua du se
-bao canh bao va danh dau ro; cac video da lay co the tai o nhom Bai dang.
-Ten moi ap dung cho luot tai sau cap nhat. File da tai xong khong tu doi ten.
-Trong Explorer: Sap xep > Ten > Tang dan; Nhom theo > Khong de xem lien mach.
+AP DUNG VA DUNG
+Chep de nguon 2.2.51 (hoac 2.2.50), build lai. Dan link kenh va Quet, xem
+cac bo trong muc 合集, chon bo va Lay link bo nay, roi Tai bo nay. Chi nhom
+bai dang du phong moi can doc het cac trang bai dang.
+Dinh dang du lieu catalog doi chieu theo:
+https://github.com/Evil0ctal/Douyin_TikTok_Download_API/blob/3c045e11aecd58ab076562f1246931b9dd5d909b/src/dtk/platforms/douyin/params.py
+https://github.com/Evil0ctal/Douyin_TikTok_Download_API/blob/3c045e11aecd58ab076562f1246931b9dd5d909b/src/dtk/platforms/douyin/parser.py
+Da kiem thu du lieu/giao dien mo phong 4 bo; chua goi lai catalog tren kenh
+that cua nguoi dung tu may build do mang chan truy cap Douyin.
 
 YEU CAU DA GIU
 - Giu nguyen giao dien 2.5.45: khong doi bo cuc, nut bam, hang bo, anh bia,
@@ -67,7 +71,7 @@ so trang/video, phien ban bo ky, session_stage, token_http_status, token_source;
 Neu chay khong duoc, gui file nay de doi chieu. Khong gui cookies.txt.
 
 KIEM CHUNG VA GIOI HAN
-- 71 kiem thu ngoai tuyen + thu hop dong giao dien Tk bang theme/the Tai gia lap.
+- 83 kiem thu ngoai tuyen + thu hop dong giao dien Tk bang theme/the Tai gia lap.
 - Ma tao giao dien cua 6 phan duoc doi chieu voi ban 2.5.45, giu nguyen.
 - CHUA quet Douyin that, CHUA xac nhan bo ky nay duoc Douyin hien tai chap nhan.
   Khong dam bao mo quet la thanh cong; can chay thu tren may va cookie cua ban.

@@ -7,7 +7,7 @@ NAME = "Auto Studio"
 SLUG = "AutoStudio"                           # ten tep / thu muc / exe (khong dau cach)
 TAGLINE = "Dịch · Lồng tiếng · Khớp hình"
 SUBTITLE = "Giọng CapCut theo tệp SRT, chèn thẳng vào project, tự căn chỉnh video theo lời đọc"
-VERSION = "2.2.51"
+VERSION = "2.2.52"
 OLD_NAMES = ("CapCutTTS",)                    # ten cu: thu muc du lieu cu duoc chuyen sang ten moi lan dau chay
 TRACK = "TTS_CapCut"                          # ten track audio trong CapCut (giu nguyen de project cu van nhan ra)
 BAK_TAG = ".bak_autostudio_"                     # duoi ban sao luu draft_content.json
@@ -40,6 +40,11 @@ def self_cmd(args=()):
 
 # Lich su phien ban (moi nhat truoc). Hien trong hop thoai 'Có gì mới' va ghi vao README.
 CHANGELOG = [
+    ("2.2.52", [
+        "Quét link kênh bằng danh sách 合集 gốc qua mix/list: lấy tên, ảnh bìa, số tập, thứ tự từng bộ từ catalog tác giả; không cần đọc hết bài đăng để đoán bộ.",
+        "Chọn bộ mới lấy tập/link từ mix/aweme. Đối chiếu số video thực nhận với số tập catalog; thiếu thì báo chưa đủ. Giữ Tập 001 - tên bộ và bố cục hiện tại.",
+        "Catalog rỗng hợp lệ mới dùng nhóm bài đăng và ghi rõ nguồn dự phòng; lỗi API không giả thành danh sách rỗng. Bộ từ tác giả khác bị loại và báo chưa đủ.",
+    ]),
     ("2.2.51", [
         "Sửa phân trang: xử lý has_more dạng chuỗi, tiếp tục qua trang rỗng có con trỏ, kiểm tra lại trang một lần khi con trỏ đứng. Vẫn báo chưa đủ nếu API không tiến tiếp.",
         "Giữ phần bài đăng đã quét ở trạng thái dùng được để tải; không bắt quét lại toàn bộ mới lấy được link. Bổ sung chẩn đoán phân trang không chứa token hay con trỏ.",

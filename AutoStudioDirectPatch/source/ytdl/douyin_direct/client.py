@@ -396,6 +396,77 @@ class DouyinClient:
             raise DouyinError('identity_mismatch', 'API chưa trả đúng ID video đã yêu cầu; không lấy clip khác để thay thế.')
         return record
 
+    def author_collections(self, identity, on_page=None, max_pages=100):
+        """Read the creator's 合集 catalog, never saved/recommended collections.
+
+        Contract: mix/list -> mix_infos, cursor, has_more. Counts and covers
+        come from each mix's own statis.updated_to_episode and cover_url.
+        """
+        self.last_collections = []
+        self.last_items = []
+        self.catalog_complete = False
+        cursor, seen_ids, visited = '0', set(), set()
+        page, rechecked, empty_pages = 0, False, 0
+        while page < max_pages:
+            self.check()
+            data = self.request('/aweme/v1/web/mix/list/',
+                        {'sec_user_id': identity, 'req_from': 'channel_pc_web', 'cursor': cursor, 'count': 20})
+            owner = str(data.get('sec_user_id') or data.get('sec_uid') or '')
+            if owner and owner != identity:
+                raise DouyinError('identity_mismatch', 'Danh sách 合集 trả về thuộc kênh khác; đã dừng, không dùng bộ đề xuất/lưu của tài khoản khác.')
+            entries = data.get('mix_infos')
+            if not isinstance(entries, list) or 'has_more' not in data:
+                raise DouyinError('incomplete', 'API mục 合集 thiếu mix_infos hoặc has_more; chưa thể xác nhận danh sách bộ của kênh.')
+            rejected, invalid = 0, 0
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    invalid += 1
+                    continue
+                mix_id = str(entry.get('mix_id') or '')
+                author = entry.get('author') or {}
+                if not isinstance(author, dict):
+                    invalid += 1
+                    continue
+                entry_owner = str(author.get('sec_uid') or '')
+                if entry_owner and entry_owner != identity:
+                    rejected += 1
+                    continue
+                if not mix_id.isdigit() or not 1 <= len(mix_id) <= 25 or int(mix_id) == 0:
+                    invalid += 1
+                    continue
+                if mix_id not in seen_ids:
+                    seen_ids.add(mix_id)
+                    self.last_collections.append(entry)
+            self.diagnostic.update(catalog_pages=page+1, catalog_found=len(self.last_collections),
+                                   catalog_rejected=rejected, catalog_invalid=invalid,
+                                   discovery_source='author_mix_list')
+            self.progress('Đã đọc %d bộ từ mục 合集 của Douyin.' % len(self.last_collections),
+                          {'found': len(self.last_collections)})
+            if on_page: on_page(list(self.last_collections))
+            if rejected or invalid:
+                raise DouyinError('incomplete', 'API mục 合集 có bộ sai tác giả hoặc dữ liệu không hợp lệ. Chỉ giữ bộ đúng nguồn; chưa xác nhận danh sách đủ.')
+            more = self._more_flag(data['has_more'])
+            field, next_cursor = self._next_cursor(data, 'cursor', cursor, visited)
+            forward = next_cursor is not None and next_cursor != cursor and next_cursor not in visited
+            self.diagnostic.update(catalog_has_more=more, catalog_cursor_field=field,
+                                   catalog_cursor_changed=forward)
+            if not more:
+                self.catalog_complete = True
+                return self.last_collections
+            if not forward:
+                if not rechecked:
+                    rechecked = True
+                    continue
+                raise DouyinError('incomplete', 'Mục 合集 chưa trả con trỏ mới sau một lần kiểm tra lại; đã giữ các bộ nhận được, chưa xác nhận đủ.')
+            empty_pages = empty_pages + 1 if not entries else 0
+            if empty_pages > 3:
+                raise DouyinError('incomplete', 'Mục 合集 trả nhiều trang rỗng liên tiếp; chưa xác nhận đã lấy đủ bộ.')
+            visited.add(cursor)
+            cursor = next_cursor
+            page += 1
+            rechecked = False
+        raise DouyinError('incomplete', 'Đã tới giới hạn số trang của mục 合集; giữ phần đã đọc, chưa xác nhận đủ.')
+
     @staticmethod
     def _more_flag(value):
         if isinstance(value, bool):

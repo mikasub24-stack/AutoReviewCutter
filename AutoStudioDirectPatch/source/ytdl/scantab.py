@@ -496,7 +496,7 @@ class Page(tk.Frame):
                 continue
             br = self.direct
             try:
-                job = br.submit(row["g"]["url"], {"merged": True, "name": row["g"]["name"], "group_key": row["g"]["key"], "browser": self.job_browser(), "mini": self.mini_var.get()}, "scan")
+                job = br.submit(row["g"]["url"], {"merged": True, "name": row["g"]["name"], "group_key": row["g"]["key"], "catalog_count": bool(row["g"].get("_catalog")), "expected_count": row["g"]["n"], "browser": self.job_browser(), "mini": self.mini_var.get()}, "scan")
             except bridge.Busy:
                 self.queue.insert(0, row)
                 break
@@ -582,7 +582,12 @@ class Page(tk.Frame):
         if job.state == "done":
             self._set_groups(job.groups)
             summary, tot = directscan.group_summary(job.groups)
-            self.set_status("Tìm thấy %s%s. Bấm «Lấy link bộ này» ở bộ cần, hoặc tick nhiều bộ rồi «Lấy link các bộ đã chọn»." % (summary, (" (%d video)" % tot) if tot else ""), GREEN)
+            if getattr(job, 'catalog_only', False):
+                self.set_status("Mục 合集 của Douyin: %s%s. Chọn bộ rồi bấm «Lấy link bộ này»." % (summary, (" (%d tập theo Douyin)" % tot) if tot else ""), GREEN)
+            elif getattr(job, 'catalog_empty', False):
+                self.set_status("Douyin trả mục 合集 rỗng; đang hiển thị nhóm theo bài đăng: %s%s. Chưa xác nhận giống danh sách 合集 trên trang kênh." % (summary, (" (%d video)" % tot) if tot else ""), ORANGE)
+            else:
+                self.set_status("Tìm thấy %s%s. Bấm «Lấy link bộ này» ở bộ cần, hoặc tick nhiều bộ rồi «Lấy link các bộ đã chọn»." % (summary, (" (%d video)" % tot) if tot else ""), GREEN)
             if len(self.rows) == 1 and "/collection/" in self._list_url:       # dán thẳng link 1 bộ: lấy luôn
                 self.fetch_rows(self.rows)
         elif job.state == "error":

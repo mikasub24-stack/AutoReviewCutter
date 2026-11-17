@@ -31,28 +31,28 @@ jobs:
           if ($LASTEXITCODE) { throw 'ZIP packaging failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: AutoStudio-2.2.51-Direct-Scan-Source-Patch
+          name: AutoStudio-2.2.52-Direct-Scan-Source-Patch
           path: AutoStudioDirectPatch/dist/*
           if-no-files-found: error
       - name: Publish downloadable patch ZIP
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $tag = 'autostudio-v2.2.51-pagination-patch'
+          $tag = 'autostudio-v2.2.52-creator-catalog-patch'
           @'
-          Sửa phân trang Douyin: hiểu đúng has_more dạng bool/số/chuỗi, tiếp tục qua trang rỗng có con trỏ mới, dùng trường con trỏ hợp lệ khi trường chính null; kiểm tra lại một lần khi con trỏ đứng/lặp. HTTP 403/429/xác minh vẫn dừng ngay. Nếu vẫn không tiến được, giữ cảnh báo CHƯA QUÉT ĐỦ thay vì báo thành công giả.
+          Đọc trực tiếp danh sách 合集 của kênh qua /aweme/v1/web/mix/list/: tên, ảnh bìa, số tập và thứ tự từ mix_infos, thay cho suy ra bộ từ từng bài đăng. Với dữ liệu mẫu tương ứng ảnh người dùng, hiện 4 bộ 25/20/54/40 tập (139 tập trong bộ); 14 bài đăng ngoài bộ không chen vào danh sách 合集. Chỉ khi chọn bộ mới lấy tập/link qua mix/aweme. Giữ nguyên bố cục và mẫu tên Tập 001 - tên bộ.
 
-          Phần bài đăng đã quét được giữ ở trạng thái dùng được để tải mà không cần quét lại tất cả. Đếm riêng bộ chính thức và video ngoài bộ: 4 bộ có 139 video + 14 video ngoài bộ = 153, không gọi thành 5 bộ. Giữ tên Tập 001 - tên bộ, bố cục và bộ ký đang hoạt động. Kiểm thử tình huống 134 video bằng dữ liệu mô phỏng; chưa chạy lại chính kênh bị dừng trên máy người dùng.
+          Đối chiếu số video thực nhận với số tập catalog; thiếu thì báo chưa đủ. Catalog rỗng hợp lệ mới chuyển sang bài đăng với status nguồn dự phòng rõ ràng; lỗi HTTP/schema không giả thành danh sách rỗng. API có owner sai bị lọc và báo chưa đủ. Contract endpoint/schema đối chiếu nguồn Evil0ctal/Douyin_TikTok_Download_API commit 3c045e11. Chưa gọi trực tiếp catalog thật trên môi trường build vì mạng chặn Douyin.
 
-          Đã kiểm tra 71 trường hợp ngoại tuyến và luồng giao diện Tk bằng theme/downloader mô phỏng, bao gồm tải phần quét dở mà không phát sinh yêu cầu quét mới. API/bộ ký giữ nguyên bản đã được người dùng xác nhận hoạt động; phần phục hồi phân trang mới chưa được kiểm chứng trực tiếp trên kênh gặp lỗi. Có báo cáo và checksum trong release.
+          Đã kiểm tra 83 trường hợp ngoại tuyến và luồng Tk bằng theme/downloader mô phỏng: catalog 4 bộ, chọn bộ 25 tập, đặt tên và chuyển tải; giữ kiểm thử quét dở/phân trang trước. Bộ ký giữ nguyên bản đã hoạt động. Đây không phải xác nhận đã đối chiếu trực tiếp catalog của kênh người dùng. Có báo cáo và checksum.
 
-          Tải AutoStudio_v2.2.51_chi_file_sua.zip, giải nén đè vào bộ mã nguồn 2.2.50 rồi chạy/build lại theo dự án của bạn. Đây không phải EXE; chép .py cạnh EXE đã biên dịch không tự áp dụng bản vá.
+          Tải AutoStudio_v2.2.52_chi_file_sua.zip, giải nén đè vào bộ mã nguồn 2.2.51 (hoặc 2.2.50) rồi chạy/build lại theo dự án của bạn. Đây không phải EXE; chép .py cạnh EXE đã biên dịch không tự áp dụng bản vá.
           '@ | Set-Content "$env:RUNNER_TEMP/scan-patch.md" -Encoding utf8
           $existing = & gh release view $tag --repo $env:GITHUB_REPOSITORY --json isDraft 2>$null
           if ($LASTEXITCODE -eq 0) {
             if (!(($existing | ConvertFrom-Json).isDraft)) { throw 'Never overwrite published patch release' }
           } else {
-            & gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title 'Auto Studio 2.2.51 - Phân trang và dùng kết quả quét dở' --notes-file "$env:RUNNER_TEMP/scan-patch.md"
+            & gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title 'Auto Studio 2.2.52 - Danh sách bộ từ mục 合集 của kênh' --notes-file "$env:RUNNER_TEMP/scan-patch.md"
             if ($LASTEXITCODE) { throw 'Draft creation failed' }
           }
           & gh release upload $tag --repo $env:GITHUB_REPOSITORY AutoStudioDirectPatch/dist/* --clobber

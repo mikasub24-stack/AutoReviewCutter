@@ -14,7 +14,7 @@ import tkinter as tk
 import types
 from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from test_direct_api import Response, Transport, SigningStub, record
+from test_direct_api import Response, Transport, NoCatalogTransport, SigningStub, record, catalog_entry
 from ytdl import directscan, bridge
 from ytdl.douyin_direct.client import DouyinClient
 
@@ -76,6 +76,7 @@ with tempfile.TemporaryDirectory() as folder:
     assert hasattr(page, "direct")
     transports=[]
     partial_replies=[]
+    native_catalog=[]
     def factory(cookie_file,**kwargs):
         # User page is newest-first; only the mix endpoint provides the playlist order.
         episodes=[record(2,title='Không có số trong tiêu đề',mix='12'),record(1,title='Không có số trong tiêu đề',mix='12')]
@@ -83,7 +84,15 @@ with tempfile.TemporaryDirectory() as folder:
             reply={'aweme_list':episodes,'has_more':0,'max_cursor':0}
         else:
             reply={'aweme_list':list(reversed(episodes)),'has_more':0,'cursor':0}
-        transport=Transport(list(partial_replies) if partial_replies else [reply]);transports.append(transport)
+        if native_catalog:
+            if page.direct.job.kind=='list':
+                reply={'mix_infos':list(native_catalog),'has_more':0,'cursor':0}
+            else:
+                reply={'aweme_list':[record(1000+i,title='Không có số',mix='1001') for i in range(1,26)],'has_more':0,'cursor':0}
+            transport=Transport([reply])
+        else:
+            transport=NoCatalogTransport(list(partial_replies) if partial_replies else [reply])
+        transports.append(transport)
         return DouyinClient(cookie_file,opener=transport,signer=SigningStub(),gap=0,**kwargs)
     page.direct=directscan.Scanner(str(cookie),factory)
     def settle():
@@ -101,7 +110,7 @@ with tempfile.TemporaryDirectory() as folder:
         page.fetch_rows(page.rows);settle()
         row=page.rows[0]
         assert row['state']=='done' and len(row['items'])==2
-        assert len(transports[0].calls)==1 and len(transports[1].calls)==1
+        assert len(transports[0].calls)==2 and len(transports[1].calls)==1
         assert '/mix/aweme/' in transports[1].calls[0].full_url
         assert page.send(row,quiet=True)==2
         assert all(line.count('\t')==2 for line in dl.lines)
@@ -138,6 +147,28 @@ with tempfile.TemporaryDirectory() as folder:
         assert dl.lines[0].split('\t')[1].startswith('Tập 009 - ')
         assert sum(len(t.calls) for t in transports)==request_count
         assert errors==[]
+        # Read exactly the four creator catalog cards without fetching 153 user posts.
+        native_catalog.extend([catalog_entry(1001,'自在四合院1',25),catalog_entry(1002,'猛龙大鹏',20),catalog_entry(1003,'大海镇院',54),catalog_entry(1004,'我哥易中海（完结）',40)])
+        with patch.object(directscan,'load_cover',return_value=''):
+            page.start_list();settle()
+            assert len(page.rows)==4
+            assert [r['g']['name'] for r in page.rows]==[entry['mix_name'] for entry in native_catalog]
+            assert [r['g']['n'] for r in page.rows]==[25,20,54,40]
+            assert '4 bộ' in page.count_lbl.cget('text') and '139 video' in page.count_lbl.cget('text')
+            assert 'ngoài bộ' not in page.count_lbl.cget('text')
+            assert len(transports[-1].calls)==1 and '/mix/list/' in transports[-1].calls[0].full_url
+            first=page.rows[0]
+            page.fetch_rows([first]);settle()
+            assert first['state']=='done' and len(first['items'])==25
+            assert len(transports[-1].calls)==1 and '/mix/aweme/' in transports[-1].calls[0].full_url
+            assert first['items'][0]['name']=='Tập 001 - 自在四合院1'
+            assert first['items'][-1]['name']=='Tập 025 - 自在四合院1'
+            page.download([first])
+            assert len(dl.started)==25
+            assert dl.lines[0].split('\t')[1]=='Tập 001 - 自在四合院1'
+            assert dl.lines[-1].split('\t')[1]=='Tập 025 - 自在四合院1'
+            assert errors==[]
+            assert browsers.launch.call_count==0
         page.shutdown()
     root.destroy()
 print(json.dumps({'ui_contract':'passed','theme':'test shim','downloader':'test shim','browser_launches':0,'real_douyin_tested':False}))

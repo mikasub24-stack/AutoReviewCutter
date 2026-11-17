@@ -42,6 +42,15 @@ class Transport:
         return value if isinstance(value, Response) else Response(value)
 
 
+class NoCatalogTransport(Transport):
+    """Explicit fixture for a creator whose 合集 API is empty, then serve posts."""
+    def open(self, request, timeout=0):
+        if '/aweme/v1/web/mix/list/' in request.full_url:
+            self.calls.append(request)
+            return Response({'mix_infos': [], 'cursor': 0, 'has_more': 0})
+        return super().open(request, timeout)
+
+
 class SigningStub:
     def __init__(self, ua=UA): self.ua, self.queries = ua, []
     def generate_abogus(self, query, body):
@@ -55,6 +64,12 @@ def record(video_id, owner='OWNER_A', title='第1集', mix=None, direct=True):
             'video': {'play_addr': {'url_list': ['https://v3.douyinvod.com/video.mp4?signature=TEST%2B&x=2'] if direct else []}}}
     if mix: data['mix_info'] = {'mix_id': mix, 'mix_name': '同一部'}
     return data
+
+
+def catalog_entry(mix_id, title, count, owner='OWNER_A'):
+    return {'mix_id':str(mix_id),'mix_name':title,'author':{'sec_uid':owner},
+            'statis':{'updated_to_episode':count},
+            'cover_url':{'url_list':['https://p3.douyinpic.com/catalog-%s.png'%mix_id]}}
 
 
 class ApiTests(unittest.TestCase):
@@ -437,6 +452,81 @@ class ApiTests(unittest.TestCase):
     def test_outside_posts_are_not_called_one_collection(self):
         self.assertEqual(directscan.group_summary([{'key':'posts:OWNER_A','n':134}]),('134 video ngoài bộ',134))
 
+    def test_author_catalog_matches_4_native_tiles_order_counts_and_covers(self):
+        entries=[catalog_entry(1001,'自在四合院1',25),catalog_entry(1002,'猛龙大鹏',20),catalog_entry(1003,'大海镇院',54),catalog_entry(1004,'我哥易中海（完结）',40)]
+        c,transport,signer=self.client([{'mix_infos':entries,'has_more':0,'cursor':0}])
+        result=c.author_collections('OWNER_A')
+        groups=directscan.catalog_groups(result)
+        self.assertEqual([g['name'] for g in groups],[e['mix_name'] for e in entries])
+        self.assertEqual([g['n'] for g in groups],[25,20,54,40])
+        self.assertEqual([g['cover_url'] for g in groups],[e['cover_url']['url_list'][0] for e in entries])
+        self.assertEqual(len(groups),4)
+        self.assertEqual(sum(g['n'] for g in groups),139)
+        self.assertTrue(c.catalog_complete)
+        self.assertEqual(len(transport.calls),1)
+        self.assertIn('/mix/list/',transport.calls[0].full_url)
+        values=urllib.parse.parse_qs(signer.queries[0])
+        self.assertEqual(values['sec_user_id'],['OWNER_A'])
+        self.assertEqual(values['req_from'],['channel_pc_web'])
+        self.assertEqual(values['cursor'],['0'])
+        self.assertTrue(all(not g['_collection_api_order'] and not g['_records'] for g in groups))
+
+    def test_author_catalog_pagination_keeps_order_and_deduplicates_ids(self):
+        entries=[catalog_entry(i,'Bộ '+str(i),i) for i in range(1,5)]
+        c,transport,_=self.client([
+            {'mix_infos':entries[:2],'has_more':1,'cursor':20},
+            {'mix_infos':[],'has_more':1,'cursor':40},
+            {'mix_infos':[entries[1]]+entries[2:],'has_more':0,'cursor':0}])
+        self.assertEqual([m['mix_id'] for m in c.author_collections('OWNER_A')],['1','2','3','4'])
+        self.assertTrue(c.catalog_complete)
+        self.assertEqual(len(transport.calls),3)
+
+    def test_catalog_schema_failure_is_not_an_empty_catalog(self):
+        c,_,_=self.client([{'aweme_list':[],'has_more':0}])
+        with self.assertRaises(DouyinError) as caught:c.author_collections('OWNER_A')
+        self.assertEqual(caught.exception.kind,'incomplete')
+        self.assertFalse(c.catalog_complete)
+
+    def test_catalog_rejects_other_creator_entries_not_recommendations(self):
+        c,_,_=self.client([{'mix_infos':[catalog_entry(1,'Foreign',10,owner='OWNER_B')],'has_more':0,'cursor':0}])
+        with self.assertRaises(DouyinError):c.author_collections('OWNER_A')
+        self.assertFalse(c.catalog_complete)
+        self.assertEqual(c.last_collections,[])
+        self.assertEqual(c.diagnostic['catalog_rejected'],1)
+
+    def test_catalog_response_owner_must_match_requested_channel(self):
+        c,_,_=self.client([{'sec_uid':'OWNER_B','mix_infos':[catalog_entry(1,'Wrong',10)],'has_more':0,'cursor':0}])
+        with self.assertRaises(DouyinError) as caught:c.author_collections('OWNER_A')
+        self.assertEqual(caught.exception.kind,'identity_mismatch')
+        self.assertEqual(c.last_collections,[])
+
+    def test_catalog_stalled_page_rechecked_once_and_kept_partial(self):
+        response={'mix_infos':[catalog_entry(1,'Known',10)],'has_more':1,'cursor':0}
+        c,transport,_=self.client([response,response])
+        with self.assertRaises(DouyinError):c.author_collections('OWNER_A')
+        self.assertEqual(len(transport.calls),2)
+        self.assertEqual(len(c.last_collections),1)
+        self.assertFalse(c.catalog_complete)
+
+    def test_valid_empty_catalog_has_explicit_completion(self):
+        c,_,_=self.client([{'mix_infos':[],'has_more':False,'cursor':0}])
+        self.assertEqual(c.author_collections('OWNER_A'),[])
+        self.assertTrue(c.catalog_complete)
+
+    def test_catalog_missing_count_and_invalid_cover_do_not_invent_metadata(self):
+        entry=catalog_entry(1,'Original name',10)
+        entry['statis']={'updated_to_episode':2.5}
+        entry['cover_url']={'url_list':['https://evil.test/cover.png','https://[broken']}
+        group=directscan.catalog_groups([entry])[0]
+        self.assertEqual(group['name'],'Original name')
+        self.assertEqual(group['n'],0)
+        self.assertEqual(group['cover_url'],'')
+
+    def test_catalog_same_titles_keep_separate_mix_ids(self):
+        groups=directscan.catalog_groups([catalog_entry(1,'Same',10),catalog_entry(2,'Same',20)])
+        self.assertEqual([g['key'] for g in groups],['mix:1','mix:2'])
+        self.assertEqual(len({g['name'] for g in groups}),2)
+
     def test_uploaded_widget_layout_is_unchanged(self):
         import ast
         source=(Path(__file__).resolve().parents[1]/'ytdl/scantab.py').read_text(encoding='utf-8')
@@ -591,7 +681,7 @@ class ApiTests(unittest.TestCase):
 def _scanner_fixture(self, replies):
     transports=[]
     def factory(cookie_file, **kwargs):
-        transport=Transport(replies);transports.append(transport)
+        transport=NoCatalogTransport(replies);transports.append(transport)
         return DouyinClient(cookie_file,opener=transport,signer=SigningStub(),gap=0,**kwargs)
     return directscan.Scanner(self.cookies, factory),transports
 
@@ -603,7 +693,7 @@ def test_scanner_reuses_owned_list_for_links_without_requery(self):
     group=job.groups[0]
     job=service.submit(group['url'],{'group_key':group['key'],'name':group['name'],'merged':True},'scan');service.thread.join(3)
     self.assertEqual(job.state,'done');self.assertEqual(job.direct_count(),2)
-    self.assertEqual(sum(len(t.calls) for t in transports),1)
+    self.assertEqual(sum(len(t.calls) for t in transports),2)
     self.assertTrue(all(ln.count('\t')==2 for ln in job.lines))
 
 
@@ -648,7 +738,7 @@ def test_collection_fetch_ignores_post_cache_then_reuses_native_order(self):
     playlist=[profile[2],profile[1],profile[0]]
     def factory(cookie_file,**kwargs):
         replies=[{'aweme_list':profile,'has_more':0,'max_cursor':0}] if not all_transports else [{'aweme_list':playlist,'has_more':0,'cursor':0}]
-        transport=Transport(replies);all_transports.append(transport)
+        transport=NoCatalogTransport(replies);all_transports.append(transport)
         return DouyinClient(cookie_file,opener=transport,signer=SigningStub(),gap=0,**kwargs)
     service=directscan.Scanner(self.cookies,factory)
     job=service.submit('https://www.douyin.com/user/OWNER_A',kind='list');service.thread.join(3)
@@ -670,7 +760,7 @@ def test_partial_cache_is_kept_but_fresh_scan_rechecks_server(self):
     data={'aweme_list':[record(1)],'has_more':1,'max_cursor':0}
     def factory(cookie_file,**kwargs):
         replies=[data,data] if not transports else [{'aweme_list':[record(1),record(2)],'has_more':0,'max_cursor':2}]
-        transport=Transport(replies);transports.append(transport)
+        transport=NoCatalogTransport(replies);transports.append(transport)
         return DouyinClient(cookie_file,opener=transport,signer=SigningStub(),gap=0,**kwargs)
     service=directscan.Scanner(self.cookies,factory)
     job=service.submit('https://www.douyin.com/user/OWNER_A',kind='list');service.thread.join(3)
@@ -686,5 +776,57 @@ def test_partial_cache_is_kept_but_fresh_scan_rechecks_server(self):
     self.assertEqual(len(transports[1].calls),1)
 
 ScannerTests.test_partial_cache_is_kept_but_fresh_scan_rechecks_server=test_partial_cache_is_kept_but_fresh_scan_rechecks_server
+
+
+def test_catalog_listing_uses_no_user_post_scan_and_fetches_only_selected_mix(self):
+    entries=[catalog_entry(1001,'自在四合院1',25),catalog_entry(1002,'猛龙大鹏',20),catalog_entry(1003,'大海镇院',54),catalog_entry(1004,'我哥易中海（完结）',40)]
+    transports=[]
+    def factory(cookie_file,**kwargs):
+        reply={'mix_infos':entries,'has_more':0,'cursor':0} if not transports else {'aweme_list':[record(i,title='No number',mix='1001') for i in range(1,26)],'has_more':0,'cursor':0}
+        transport=Transport([reply]);transports.append(transport)
+        return DouyinClient(cookie_file,opener=transport,signer=SigningStub(),gap=0,**kwargs)
+    service=directscan.Scanner(self.cookies,factory)
+    with patch.object(directscan,'load_cover',return_value='') as covers:
+        job=service.submit('https://www.douyin.com/user/OWNER_A',kind='list');service.thread.join(3)
+        self.assertEqual(job.state,'done');self.assertTrue(job.catalog_only)
+        self.assertEqual([g['n'] for g in job.groups],[25,20,54,40])
+        self.assertEqual(len(transports[0].calls),1)
+        self.assertNotIn('/aweme/post/',transports[0].calls[0].full_url)
+        self.assertEqual([args[0][0] for args in covers.call_args_list],[e['cover_url']['url_list'][0] for e in entries])
+        selected=job.groups[0]
+        job=service.submit(selected['url'],{'name':selected['name'],'group_key':selected['key'],'catalog_count':True,'expected_count':25},'scan');service.thread.join(3)
+        self.assertEqual(job.state,'done')
+        self.assertEqual(len(job.items),25)
+        self.assertEqual(job.items[0]['name'],'Tập 001 - 自在四合院1')
+        self.assertEqual(job.items[-1]['name'],'Tập 025 - 自在四合院1')
+        self.assertIn('/mix/aweme/',transports[1].calls[0].full_url)
+        self.assertEqual(len(transports[1].calls),1)
+
+
+def test_catalog_http_error_never_silently_falls_back_to_posts(self):
+    transport=Transport([urllib.error.HTTPError(API_ORIGIN,403,'denied',{},None)])
+    def factory(cookie_file,**kwargs):return DouyinClient(cookie_file,opener=transport,signer=SigningStub(),gap=0,**kwargs)
+    service=directscan.Scanner(self.cookies,factory)
+    job=service.submit('https://www.douyin.com/user/OWNER_A',kind='list');service.thread.join(3)
+    self.assertEqual(job.state,'error');self.assertEqual(job.error_kind,'access_denied')
+    self.assertEqual(len(transport.calls),1)
+    self.assertIn('/mix/list/',transport.calls[0].full_url)
+    self.assertEqual(job.groups,[])
+
+
+def test_selected_mix_count_below_catalog_remains_partial_not_complete(self):
+    transport=Transport([{'aweme_list':[record(1,title='No number',mix='12'),record(2,title='No number',mix='12')],'has_more':0,'cursor':0}])
+    def factory(cookie_file,**kwargs):return DouyinClient(cookie_file,opener=transport,signer=SigningStub(),gap=0,**kwargs)
+    service=directscan.Scanner(self.cookies,factory)
+    job=service.submit('https://www.douyin.com/collection/12',{'name':'Bộ','group_key':'mix:12','catalog_count':True,'expected_count':3},'scan');service.thread.join(3)
+    self.assertEqual(job.state,'error');self.assertEqual(job.error_kind,'incomplete')
+    self.assertEqual(len(job.items),2)
+    self.assertEqual(job.diagnostic['expected_collection_count'],3)
+    self.assertEqual(job.diagnostic['collection_count'],2)
+    self.assertIsNone(service._cached('mix:12'))
+
+ScannerTests.test_catalog_listing_uses_no_user_post_scan_and_fetches_only_selected_mix=test_catalog_listing_uses_no_user_post_scan_and_fetches_only_selected_mix
+ScannerTests.test_catalog_http_error_never_silently_falls_back_to_posts=test_catalog_http_error_never_silently_falls_back_to_posts
+ScannerTests.test_selected_mix_count_below_catalog_remains_partial_not_complete=test_selected_mix_count_below_catalog_remains_partial_not_complete
 
 if __name__=='__main__':unittest.main(verbosity=2)
