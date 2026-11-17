@@ -14,7 +14,7 @@ import urllib.request
 from .bridge import Job, Busy, items_lines
 from .douyin_direct.client import (DouyinClient, DouyinError, ScanStopped, direct_urls, cover_url, author_of, SIGNER_VERSION)
 
-STOP_KINDS = {'session_http', 'session_network', 'session_token_missing', 'session_redirect', 'session_template', 'verification', 'rate_limit', 'access_denied', 'signer', 'non_json', 'api_error', 'identity_mismatch', 'incomplete', 'schema'}
+STOP_KINDS = {'identity_missing', 'session_http', 'session_network', 'session_token_missing', 'session_redirect', 'session_template', 'verification', 'rate_limit', 'access_denied', 'signer', 'non_json', 'api_error', 'identity_mismatch', 'incomplete', 'schema'}
 DIGITS = dict(zip('零〇一二两兩三四五六七八九', [0, 0, 1, 2, 2, 2, 3, 4, 5, 6, 7, 8, 9]))
 
 

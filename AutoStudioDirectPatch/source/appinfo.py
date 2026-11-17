@@ -7,7 +7,7 @@ NAME = "Auto Studio"
 SLUG = "AutoStudio"                           # ten tep / thu muc / exe (khong dau cach)
 TAGLINE = "Dịch · Lồng tiếng · Khớp hình"
 SUBTITLE = "Giọng CapCut theo tệp SRT, chèn thẳng vào project, tự căn chỉnh video theo lời đọc"
-VERSION = "2.5.48"
+VERSION = "2.5.49"
 OLD_NAMES = ("CapCutTTS",)                    # ten cu: thu muc du lieu cu duoc chuyen sang ten moi lan dau chay
 TRACK = "TTS_CapCut"                          # ten track audio trong CapCut (giu nguyen de project cu van nhan ra)
 BAK_TAG = ".bak_autostudio_"                     # duoi ban sao luu draft_content.json
@@ -40,6 +40,11 @@ def self_cmd(args=()):
 
 # Lich su phien ban (moi nhat truoc). Hien trong hop thoai 'Có gì mới' va ghi vao README.
 CHANGELOG = [
+    ("2.5.49", [
+        "Sửa thiếu lớp ký WebSign: thêm timestamp/x-secsdk-web-signature dựa trên uifid của cookie, thay A-Bogus cũ bằng native bdms 1.0.1.19.",
+        "Bổ sung tham số API bài đăng, Chrome 154 / vi, webid từ cookie; giữ nguyên giao diện và quét trực tiếp. Không lưu giá trị capture của người dùng.",
+        "Đối chiếu ngoại tuyến khớp chính xác WebSign của request trình duyệt trả 200; định dạng A-Bogus capture cũng khớp native. Chưa xác nhận quét trực tiếp trên môi trường build.",
+    ]),
     ("2.5.48", [
         "Thêm khởi tạo phiên SDK khi cookie chưa có msToken; chỉ dùng token máy chủ cấp, không dùng token mẫu hay sinh ngẫu nhiên.",
         "Tách lỗi lấy token khỏi lỗi danh sách API, giữ token trong bộ nhớ, không gửi cookie đăng nhập sang host SDK. Giữ nguyên giao diện.",

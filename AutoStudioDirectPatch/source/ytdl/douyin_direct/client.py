@@ -6,6 +6,7 @@ Real acceptance of a_bogus must be tested on the user's connection.
 import http.cookiejar
 from http.cookies import SimpleCookie
 import json
+import os
 from pathlib import Path
 import re
 import threading
@@ -14,10 +15,11 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from .vendor.abogus import ABogus
+from .signing import NativeSigner
+from .vendor.native import websign
 from .vendor.token_template import TOKEN_PAYLOAD
 
-SIGNER_VERSION = 'f2-7dab3e2-get8-sdk-session-v1'
+SIGNER_VERSION = 'native-3c045e1-bdms119-websign140'
 API_ORIGIN = 'https://www.douyin.com'
 TOKEN_URL = 'https://mssdk.bytedance.com/web/r/token?ms_appid=6383'
 
@@ -26,7 +28,7 @@ class NoTokenRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs):
         raise DouyinError('session_redirect', 'Dịch vụ token chuyển hướng ngoài dự kiến; đã dừng.')
 
-UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36'
 FINGERPRINT = '1920|1080|1920|1080|0|0|0|0|1920|1080|1920|1040|1920|1080|24|24|Win32'
 
 
@@ -140,12 +142,13 @@ class DouyinClient:
         self.stop = stop or threading.Event()
         self.progress = progress or (lambda *a: None)
         self.user_agent = user_agent
+        self.referer = API_ORIGIN + "/"
         self.jar = load_cookies(cookie_file)
         self.opener = opener or urllib.request.build_opener(ScopedRedirect(), urllib.request.HTTPCookieProcessor(self.jar))
         self.session_opener = session_opener or urllib.request.build_opener(NoTokenRedirect())
         self.session_state = session_state if session_state is not None else {}
         self.session_ready = False
-        self.signer = signer or ABogus(fp=FINGERPRINT, user_agent=user_agent, options=[0, 1, 8])
+        self.signer = signer or NativeSigner(user_agent)
         self.gap = max(0, float(gap))
         self.pace_state = pace_state if pace_state is not None else {"next": 0.0, "lock": threading.Lock()}
         self.last_items = []
@@ -182,6 +185,7 @@ class DouyinClient:
         url = checked_url(url)
         parsed = target_from_url(url)
         if parsed:
+            self.referer = API_ORIGIN + urllib.parse.urlparse(url).path
             return parsed
         host = urllib.parse.urlparse(url).hostname
         if host != 'v.douyin.com':
@@ -202,12 +206,23 @@ class DouyinClient:
         browser = re.search(r'Chrome/([\d.]+)', self.user_agent)
         version = browser.group(1) if browser else '131.0.0.0'
         data = {'device_platform': 'webapp', 'aid': '6383', 'channel': 'channel_pc_web',
-                **extra, 'pc_client_type': '1', 'version_code': '290100', 'version_name': '29.1.0',
+                **extra, 'update_version_code': '170400', 'pc_client_type': '1', 'pc_libra_divert': 'Windows',
+                'support_h265': '1', 'support_dash': '1', 'version_code': '290100', 'version_name': '29.1.0',
                 'cookie_enabled': 'true', 'screen_width': '1920', 'screen_height': '1080',
-                'browser_language': 'zh-CN', 'browser_platform': 'Win32', 'browser_name': 'Chrome',
+                'browser_language': 'vi', 'browser_platform': 'Win32', 'browser_name': 'Chrome',
                 'browser_version': version, 'browser_online': 'true', 'engine_name': 'Blink',
                 'engine_version': version, 'os_name': 'Windows', 'os_version': '10',
-                'cpu_core_num': '8', 'device_memory': '8', 'platform': 'PC'}
+                'cpu_core_num': str(os.cpu_count() or 8), 'device_memory': '32', 'platform': 'PC',
+                'downlink': '10', 'effective_type': '4g', 'round_trip_time': '100'}
+        # Reuse the identity held by this API's cookie jar, never a captured user's value.
+        for key in ('ttwidinfo_webid', '_tea_web_id', 'webid', 'tt_webid', 'tt_webid_v2'):
+            value = self.cookie(key)
+            if value.isdigit():
+                data['webid'] = value
+                break
+        uifid = next((self.cookie(name) for name in websign.UIFID_COOKIE_NAMES if self.cookie(name)), '')
+        if uifid:
+            data['uifid'] = uifid
         token = self.cookie('msToken')
         if token:
             data['msToken'] = token
@@ -284,7 +299,14 @@ class DouyinClient:
     def request(self, path, extra):
         self.ensure_session()
         self.pace()
-        query = urllib.parse.urlencode(self.params(extra), quote_via=urllib.parse.quote)
+        params = self.params(extra)
+        uifid = params.get('uifid', '')
+        self.diagnostic['has_uifid'] = bool(uifid)
+        if not uifid:
+            self.diagnostic['result'] = 'identity_missing'
+            raise DouyinError('identity_missing', 'Cookie chưa có uifid/UIFID_TEMP để ký API bài đăng. Cần nạp cookie đầy đủ của phiên Douyin; không dùng định danh mẫu.')
+        pairs = [(str(key), str(value)) for key, value in params.items()]
+        query = websign.encode_pairs(pairs)
         try:
             signed = self.signer.generate_abogus(query, '')
             signature, signed_ua = signed[1], signed[2]
@@ -292,12 +314,17 @@ class DouyinClient:
                 raise ValueError()
         except Exception:
             raise DouyinError('signer', 'Bộ ký a_bogus không tạo được chữ ký phù hợp. Cần cập nhật mô-đun ký, không mở trình duyệt tự động.') from None
-        url = API_ORIGIN + path + '?' + query + '&a_bogus=' + urllib.parse.quote(signature, safe='')
+        # WebSign covers the SAME ordered parameters plus a_bogus and timestamp.
+        # Let one serializer produce both the signed and transmitted query bytes.
+        signed_query, _, signature_headers = websign.sign(pairs + [('a_bogus', signature)], uifid)
+        self.diagnostic['websign_added'] = True
+        url = API_ORIGIN + path + '?' + signed_query
         self.diagnostic.update(request_path=path, requests=self.diagnostic['requests'] + 1,
                                has_msToken=bool(self.cookie('msToken')), result='requesting')
         self.progress('Đang gọi API Douyin…', {'requests': self.diagnostic['requests'], 'path': path})
         request = urllib.request.Request(url, headers={'User-Agent': self.user_agent, 'Accept': 'application/json',
-                    'Referer': API_ORIGIN + '/', 'Accept-Encoding': 'identity', 'Accept-Language': 'zh-CN,zh;q=0.9'})
+                    'Referer': self.referer, 'Accept-Encoding': 'identity', 'Accept-Language': 'vi,en;q=0.8',
+                    **signature_headers})
         # Check the actual API URL: a cookie for another path/subdomain must not
         # make a request look authenticated. Never put cookie values in diagnostics.
         self.jar.add_cookie_header(request)
@@ -306,7 +333,7 @@ class DouyinClient:
         self.diagnostic.update(cookie_sent_count=len(sent_names),
                                login_cookie_sent=bool(sent_names & {'sessionid', 'sessionid_ss', 'sid_tt'}),
                                verification_fp_sent=bool(self.cookie('s_v_web_id')),
-                               signature_method='GET', signature_options=[0, 1, 8])
+                               signature_method='GET', signature_scheme='native-a_bogus+secsdk-websign')
         try:
             with self.opener.open(request, timeout=20) as response:
                 code = getattr(response, 'status', 200)
@@ -321,6 +348,15 @@ class DouyinClient:
                     seconds = 30
                 raise DouyinError('rate_limit', 'Douyin đang hạn chế yêu cầu (HTTP %s). Đã dừng; nghỉ một lúc rồi quét lại, không thử dồn.' % e.code, seconds) from None
             if e.code in (401, 403):
+                # Keep only recognized reason labels; never retain arbitrary server bodies.
+                try: reason_body = e.read(8192).decode('utf-8', 'replace')
+                except Exception: reason_body = ''
+                for pattern, label in [(r'uifid\s+not\s+found', 'uifid_missing'),
+                                       (r'signature\s+not\s+found', 'signature_missing'),
+                                       (r'signature\s+(?:not\s+match|mismatch|invalid)', 'signature_invalid')]:
+                    if re.search(pattern, reason_body, re.I):
+                        self.diagnostic['denial_reason'] = label
+                        break
                 raise DouyinError('access_denied', 'Douyin từ chối truy cập (HTTP %s). Có thể do quyền/cookie/chữ ký/IP; chưa kết luận là CAPTCHA.' % e.code) from None
             raise DouyinError('http', 'API Douyin trả HTTP %s.' % e.code) from None
         except (urllib.error.URLError, TimeoutError, OSError):
@@ -369,7 +405,9 @@ class DouyinClient:
             if on_page: on_page(list(self.last_items))
             return self.last_items
         if kind == 'profile':
-            path, extra, cursor_key = '/aweme/v1/web/aweme/post/', {'sec_user_id': identity, 'count': 18}, 'max_cursor'
+            path, extra, cursor_key = '/aweme/v1/web/aweme/post/', {'sec_user_id': identity, 'locate_query': 'false', 'show_live_replay_strategy': '1',
+                'need_time_list': '1', 'time_list_query': '0', 'whale_cut_token': '', 'cut_version': '1',
+                'count': 18, 'publish_video_strategy_type': '2', 'from_user_page': '1'}, 'max_cursor'
         elif kind == 'collection':
             path, extra, cursor_key = '/aweme/v1/web/mix/aweme/', {'mix_id': identity, 'count': 18}, 'cursor'
         else:

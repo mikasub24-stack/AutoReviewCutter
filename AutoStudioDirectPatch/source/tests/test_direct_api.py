@@ -62,21 +62,21 @@ class ApiTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.folder = Path(self.tmp.name)
         self.cookies = self.folder / 'cookies.txt'
-        self.cookies.write_text('# Netscape HTTP Cookie File\n.douyin.com\tTRUE\t/\tTRUE\t0\tmsToken\tTEST_TOKEN+A==\n.douyin.com\tTRUE\t/\tTRUE\t0\tsessionid\tTEST_SESSION\n.evil-douyin.com\tTRUE\t/\tTRUE\t0\tSECRET\tFOREIGN_SECRET\n.google.com\tTRUE\t/\tTRUE\t0\tGOOGLE\tGOOGLE_SECRET\n', encoding='utf-8')
+        self.cookies.write_text('# Netscape HTTP Cookie File\n.douyin.com\tTRUE\t/\tTRUE\t0\tmsToken\tTEST_TOKEN+A==\n.douyin.com\tTRUE\t/\tTRUE\t0\tsessionid\tTEST_SESSION\n.douyin.com\tTRUE\t/\tTRUE\t0\tuifid\tTEST_UIFID\n.evil-douyin.com\tTRUE\t/\tTRUE\t0\tSECRET\tFOREIGN_SECRET\n.google.com\tTRUE\t/\tTRUE\t0\tGOOGLE\tGOOGLE_SECRET\n', encoding='utf-8')
     def tearDown(self): self.tmp.cleanup()
     def client(self, replies):
         transport, signer = Transport(replies), SigningStub()
         return DouyinClient(self.cookies, opener=transport, signer=signer, gap=0), transport, signer
-    def test_production_get_signer_uses_get_options(self):
+    def test_production_signer_uses_current_native_format(self):
+        from ytdl.douyin_direct.vendor.native.abogus import decode, structure_error
         c = DouyinClient(self.cookies, gap=0)
-        self.assertEqual(c.signer.options, [0, 1, 8])
-        from ytdl.douyin_direct.vendor import abogus
-        with patch.object(abogus.time, 'time', return_value=1700000000.0):
-            random.seed(77); actual = c.signer.generate_abogus('aid=6383', '')
-            random.seed(77); expected = ABogus(fp=FINGERPRINT, user_agent=UA, options=[0,1,8]).generate_abogus('aid=6383', '')
-            random.seed(77); wrong_post = ABogus(fp=FINGERPRINT, user_agent=UA, options=[0,1,14]).generate_abogus('aid=6383', '')
-        self.assertEqual(actual, expected)
-        self.assertNotEqual(actual[1], wrong_post[1])
+        query = 'aid=6383&aweme_id=126'
+        signed = c.signer.generate_abogus(query, '')
+        self.assertIsNone(structure_error(signed[1]))
+        decoded = decode(signed[1])
+        self.assertEqual(c.signer.native.page_id,6241)
+        self.assertEqual(c.signer.native.aid,6383)
+        self.assertEqual(signed[2],UA)
 
     def test_existing_session_fingerprint_reused_not_generated(self):
         with self.cookies.open('a') as f:
@@ -92,18 +92,18 @@ class ApiTests(unittest.TestCase):
         c, transport, signer = self.client([{'aweme_detail':record(126)}])
         c.detail('126')
         self.assertTrue(c.diagnostic['login_cookie_sent'])
-        self.assertEqual(c.diagnostic['cookie_sent_count'], 2)
+        self.assertEqual(c.diagnostic['cookie_sent_count'], 3)
         self.assertIn('sessionid=TEST_SESSION', transport.calls[0].get_header('Cookie'))
         self.assertNotIn('TEST_SESSION', json.dumps(c.diagnostic))
         self.assertNotIn('TEST_TOKEN', json.dumps(c.diagnostic))
-        self.cookies.write_text('# Netscape HTTP Cookie File\nother.douyin.com\tFALSE\t/\tTRUE\t0\tsessionid\tTEST_SUBDOMAIN\n.douyin.com\tTRUE\t/\tTRUE\t0\tmsToken\tTEST_SCOPE_TOKEN\n')
+        self.cookies.write_text('# Netscape HTTP Cookie File\nother.douyin.com\tFALSE\t/\tTRUE\t0\tsessionid\tTEST_SUBDOMAIN\n.douyin.com\tTRUE\t/\tTRUE\t0\tmsToken\tTEST_SCOPE_TOKEN\n.douyin.com\tTRUE\t/\tTRUE\t0\tuifid\tTEST_SCOPE_UIFID\n')
         c, transport, signer = self.client([{'aweme_detail':record(126)}])
         c.detail('126')
         self.assertFalse(c.diagnostic['login_cookie_sent'])
-        self.assertEqual(c.diagnostic['cookie_sent_count'], 1)
+        self.assertEqual(c.diagnostic['cookie_sent_count'], 2)
 
     def _without_token(self):
-        self.cookies.write_text('# Netscape HTTP Cookie File\n.douyin.com\tTRUE\t/\tTRUE\t0\tsessionid\tTEST_SESSION\n')
+        self.cookies.write_text('# Netscape HTTP Cookie File\n.douyin.com\tTRUE\t/\tTRUE\t0\tsessionid\tTEST_SESSION\n.douyin.com\tTRUE\t/\tTRUE\t0\tuifid\tTEST_UIFID\n')
 
     def _sdk_response(self, cookie=True, token='TEST_SERVER_TOKEN_' + 'A'*160):
         from email.message import Message
@@ -199,6 +199,81 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(caught.exception.kind,'session_token_missing')
         self.assertFalse(api.calls)
 
+    def test_websign_covers_exact_sent_order_encoding_and_abogus(self):
+        from ytdl.douyin_direct.vendor.native.websign import SALT
+        c, transport, signer = self.client([{'aweme_detail':record(126)}])
+        c.detail('126')
+        req=transport.calls[0]
+        query=urllib.parse.urlparse(req.full_url).query
+        covered, digest=query.rsplit('&x-secsdk-web-signature=',1)
+        params=urllib.parse.parse_qs(covered)
+        stamp=params['timestamp'][0]
+        expected=hashlib.md5(('TEST_UIFID_'+stamp+'_'+SALT+'_'+covered).encode()).hexdigest()
+        self.assertEqual(digest,expected)
+        self.assertEqual(params['a_bogus'],['TEST+SIGNATURE/='])
+        self.assertEqual(params['uifid'],['TEST_UIFID'])
+        self.assertEqual(req.get_header('X-secsdk-web-signature'),digest)
+        self.assertEqual(req.get_header('X-secsdk-web-expire'),stamp)
+        self.assertEqual(req.get_header('Uifid'),'TEST_UIFID')
+        self.assertEqual(covered.split('&a_bogus=',1)[0],signer.queries[0])
+        self.assertEqual(covered.count('uifid='),1)
+        self.assertTrue(c.diagnostic['websign_added'])
+        self.assertNotIn(digest,json.dumps(c.diagnostic))
+        self.assertNotIn('TEST_UIFID',json.dumps(c.diagnostic))
+
+    def test_native_real_signer_and_websign_together_without_browser(self):
+        from ytdl.douyin_direct.vendor.native.abogus import decode, structure_error
+        from ytdl.douyin_direct.vendor.native.websign import SALT
+        transport=Transport([{'aweme_detail':record(126)}])
+        c=DouyinClient(self.cookies,opener=transport,gap=0)
+        c.detail('126')
+        query=urllib.parse.urlparse(transport.calls[0].full_url).query
+        covered,digest=query.rsplit('&x-secsdk-web-signature=',1)
+        values=urllib.parse.parse_qs(covered)
+        ab=values['a_bogus'][0]
+        self.assertIsNone(structure_error(ab))
+        self.assertEqual(decode(ab)['page_id'],6241)
+        self.assertEqual(decode(ab)['aid'],6383)
+        self.assertEqual(digest,hashlib.md5(('TEST_UIFID_'+values['timestamp'][0]+'_'+SALT+'_'+covered).encode()).hexdigest())
+
+    def test_uifid_temp_alias_is_read_from_own_cookie(self):
+        self.cookies.write_text(self.cookies.read_text().replace('\tuifid\tTEST_UIFID','\tUIFID_TEMP\tTEST_TEMP_UIFID'))
+        c, transport, signer=self.client([{'aweme_detail':record(126)}])
+        c.detail('126')
+        self.assertEqual(urllib.parse.parse_qs(signer.queries[0])['uifid'],['TEST_TEMP_UIFID'])
+
+    def test_missing_uifid_stops_before_unsigned_protected_api(self):
+        self.cookies.write_text(self.cookies.read_text().replace('.douyin.com\tTRUE\t/\tTRUE\t0\tuifid\tTEST_UIFID\n',''))
+        c, transport, signer=self.client([])
+        with self.assertRaises(DouyinError) as caught:c.detail('126')
+        self.assertEqual(caught.exception.kind,'identity_missing')
+        self.assertFalse(transport.calls)
+        self.assertFalse(signer.queries)
+        self.assertFalse(c.diagnostic['has_uifid'])
+
+    def test_post_request_business_fields_and_cookie_webid(self):
+        with self.cookies.open('a') as f:f.write('.douyin.com\tTRUE\t/\tTRUE\t0\tttwidinfo_webid\t1234567890123456789\n')
+        c, transport, signer=self.client([{'aweme_list':[record(126)],'has_more':0,'max_cursor':0}])
+        c.resolve_target('https://www.douyin.com/user/OWNER_A?from_tab_name=main')
+        c.records('profile','OWNER_A')
+        values=urllib.parse.parse_qs(signer.queries[0],keep_blank_values=True)
+        for key,value in {'locate_query':'false','show_live_replay_strategy':'1','need_time_list':'1','time_list_query':'0','whale_cut_token':'','cut_version':'1','publish_video_strategy_type':'2','from_user_page':'1','update_version_code':'170400','pc_libra_divert':'Windows','support_h265':'1','support_dash':'1','webid':'1234567890123456789','browser_version':'154.0.0.0','browser_language':'vi'}.items():
+            self.assertEqual(values[key],[value],key)
+        self.assertEqual(transport.calls[0].get_header('Referer'),'https://www.douyin.com/user/OWNER_A')
+        self.assertNotIn('1234567890123456789',json.dumps(c.diagnostic))
+
+    def test_http_403_known_reason_only_not_arbitrary_body(self):
+        e=urllib.error.HTTPError(API_ORIGIN,403,'denied',{},io.BytesIO(b'Blocked by ArgusSecurityPlugin Uifid Not Found TEST_SECRET_RESPONSE'))
+        c,_,_=self.client([e])
+        with self.assertRaises(DouyinError):c.detail('126')
+        self.assertEqual(c.diagnostic['denial_reason'],'uifid_missing')
+        self.assertNotIn('TEST_SECRET_RESPONSE',json.dumps(c.diagnostic))
+
+    def test_native_sm3_matches_standard_vectors(self):
+        from ytdl.douyin_direct.vendor.native.sm3 import sm3_hexdigest
+        for raw, expected in [(b'abc','66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0'),(b'abcd'*16,'debe9ff92275b8a138604889c18e5a4d6fdb70e5387e5765293dcba39c0c5732')]:
+            self.assertEqual(sm3_hexdigest(raw),expected)
+
     def test_uploaded_widget_layout_is_unchanged(self):
         import ast
         source=(Path(__file__).resolve().parents[1]/'ytdl/scantab.py').read_text(encoding='utf-8')
@@ -230,7 +305,8 @@ class ApiTests(unittest.TestCase):
         c.detail('126')
         request = transport.calls[0]
         query = urllib.parse.urlparse(request.full_url).query
-        unsigned, signature = query.rsplit('&a_bogus=', 1)
+        unsigned, signature = query.split('&a_bogus=', 1)
+        signature = signature.split('&', 1)[0]
         self.assertEqual(unsigned, signer.queries[0])
         self.assertIn('msToken=TEST_TOKEN%2BA%3D%3D', unsigned)
         self.assertEqual(urllib.parse.unquote(signature), 'TEST+SIGNATURE/=')
@@ -240,7 +316,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(c.cookie('sessionid'), 'TEST_SESSION')
         self.assertEqual(c.cookie('SECRET'), '')
         self.assertEqual(c.cookie('GOOGLE'), '')
-        self.assertEqual(len(list(c.jar)), 2)
+        self.assertEqual(len(list(c.jar)), 3)
     def test_expired_cookies_not_silently_reused(self):
         self.cookies.write_text('# Netscape HTTP Cookie File\n.douyin.com\tTRUE\t/\tTRUE\t1\tsessionid\tEXPIRED\n')
         with self.assertRaises(DouyinError) as caught: DouyinClient(self.cookies)

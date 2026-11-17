@@ -13,3 +13,18 @@ Original conf.yaml SHA-256: 93b57efdad683ef75fcecb19e50ac3b1ca3d07c35648a1380c1c
 License: Apache-2.0. Extracted only magic/version/dataType/ulr/strData.
 No sample msToken, cookie or URL query token is reused. Client timestamp is fresh.
 This static SDK payload is versioned and may need updating; server acceptance is unverified.
+
+Native abogus.py: Evil0ctal / Douyin_TikTok_Download_API
+Source: https://raw.githubusercontent.com/Evil0ctal/Douyin_TikTok_Download_API/3c045e11aecd58ab076562f1246931b9dd5d909b/src/dtk/signing/native/abogus.py
+Original SHA-256: 59e0cd823175cd77dd83b8edc3d7deed985276c7056acd80fe9666cfa0f3a488
+Apache-2.0; only abogus SM3 import changed to package-relative. No other source changes.
+
+Native websign.py: Evil0ctal / Douyin_TikTok_Download_API
+Source: https://raw.githubusercontent.com/Evil0ctal/Douyin_TikTok_Download_API/3c045e11aecd58ab076562f1246931b9dd5d909b/src/dtk/signing/native/websign.py
+Original SHA-256: b31e1809de52e43f8098cbc903746d342b2128d56907542ca118af56d9c6010b
+Apache-2.0; only abogus SM3 import changed to package-relative. No other source changes.
+
+Native sm3.py: Evil0ctal / Douyin_TikTok_Download_API
+Source: https://raw.githubusercontent.com/Evil0ctal/Douyin_TikTok_Download_API/3c045e11aecd58ab076562f1246931b9dd5d909b/src/dtk/signing/native/sm3.py
+Original SHA-256: a5705e61612b90109f763bb859fe0b226a55ff2e76c48b00735624d86246d0b6
+Apache-2.0; only abogus SM3 import changed to package-relative. No other source changes.

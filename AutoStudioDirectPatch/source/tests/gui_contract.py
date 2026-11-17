@@ -40,7 +40,7 @@ with tempfile.TemporaryDirectory() as folder:
     browsers=types.ModuleType('ytdl.browsers');browsers.installed=lambda:[];browsers.launch=Mock(side_effect=AssertionError('API must not launch browser'));browsers.is_running=lambda c:False
     for name,module in [('theme',theme),('tabs',tabs),('ytdl.tab',download),('ytdl.browsers',browsers)]:sys.modules[name]=module
     module=importlib.import_module('ytdl.scantab')
-    cookie=Path(folder)/'cookies.txt';cookie.write_text('# Netscape HTTP Cookie File\n.douyin.com\tTRUE\t/\tTRUE\t0\tsessionid\tTEST_ONLY\n.douyin.com\tTRUE\t/\tTRUE\t0\tmsToken\tTEST_SESSION_TOKEN_GUI\n')
+    cookie=Path(folder)/'cookies.txt';cookie.write_text('# Netscape HTTP Cookie File\n.douyin.com\tTRUE\t/\tTRUE\t0\tsessionid\tTEST_ONLY\n.douyin.com\tTRUE\t/\tTRUE\t0\tmsToken\tTEST_SESSION_TOKEN_GUI\n.douyin.com\tTRUE\t/\tTRUE\t0\tuifid\tTEST_GUI_UIFID\n')
     class Download:
         cookie_file=str(cookie)
         folder_var=tk.StringVar(master=root,value=folder)
