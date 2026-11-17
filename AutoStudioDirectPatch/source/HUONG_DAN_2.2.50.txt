@@ -1,4 +1,15 @@
-AUTO STUDIO 2.5.50 - CHI FILE SUA TAB QUET BO DOUYIN
+AUTO STUDIO 2.2.50 - CHI FILE SUA TAB QUET BO DOUYIN
+
+SUA TU 2.5.50 - SO PHIEN BAN 2.2.50 THEO YEU CAU NGUOI DUNG
+- Doi mau ten thanh: Tap 001 - <Ten bo>.mp4 (chu co dau trong app).
+  So tap dung truoc ten tieng Trung, giu 3 chu so: 001, 002, 003...
+- Khong doi thu tu tap, cac nut/giao dien, bo ky API va so luong tai song song.
+- Ten moi dung khi Lay lai bo va chuyen/tai danh sach moi; cac muc Cho/Tam
+  dung/Loi da co trong hang doi duoc cap nhat ten khi bam Tai bo nay.
+- Cac file da tai xong tu truoc giu ten cu; ban va khong tu sua file tren dia.
+- Trong File Explorer: Sap xep > Ten > Tang dan. De xem tat ca lien mach,
+  chon Nhom theo > Khong. Sap xep theo ngay tai van co the hien 003 truoc 001.
+- So phien ban 2.2.50 la gia tri nguoi dung yeu cau, nen nho hon 2.5.50 cu.
 
 SUA TU 2.5.49
 - Khi Lay link mot bo /collection/, doc danh sach chinh bo do tu API mix/aweme.
@@ -6,7 +17,7 @@ SUA TU 2.5.49
 - Uu tien so thu tu tap goc khi metadata current_episode cua TAT CA video co
   gia tri hop le va rieng biet. Neu metadata chi lap lai tong tap, dung thu tu
   danh sach tu API bo. Khong lay timestamp hay ID de danh so tap cua bo.
-- Dat ten <Ten bo> - Tap 001, Tap 002, ... (chu co dau trong app).
+- Dat ten Tap 001 - <Ten bo>, Tap 002 - <Ten bo>, ... (chu co dau trong app).
   Chi tick tap 2/5/18 van giu so 002/005/018, khong danh so lai tu 1.
 - Lay link, luu .txt, Sang the Tai, Tai bo nay va Tai cac bo da lay cung dung
   mot danh sach co ten va thu tu co dinh. Moi bo co danh sach rieng.
@@ -34,7 +45,7 @@ YEU CAU DA GIU
 
 AP DUNG
 1. Dong Auto Studio; sao luu cac file cu.
-2. Giai nen ZIP nay vao THU MUC MA NGUON Auto Studio 2.5.45 / 2.5.46 / 2.5.47 / 2.5.48 / 2.5.49 (noi co app.py),
+2. Giai nen ZIP nay vao THU MUC MA NGUON Auto Studio 2.5.45 / 2.5.46 / 2.5.47 / 2.5.48 / 2.5.49 / 2.5.50 (noi co app.py),
    chap nhan chep de. Phai chep CA cac file moi trong ytdl/douyin_direct/.
 3. Chay bang ma nguon hoac build.bat cua du an nhu binh thuong.
    Day la ban va nguon, khong phai EXE. Chep .py canh EXE da bien dich khong

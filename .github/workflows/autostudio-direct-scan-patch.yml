@@ -31,28 +31,28 @@ jobs:
           if ($LASTEXITCODE) { throw 'ZIP packaging failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: AutoStudio-2.5.50-Direct-Scan-Source-Patch
+          name: AutoStudio-2.2.50-Direct-Scan-Source-Patch
           path: AutoStudioDirectPatch/dist/*
           if-no-files-found: error
       - name: Publish downloadable patch ZIP
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $tag = 'autostudio-v2.5.50-direct-api-patch'
+          $tag = 'autostudio-v2.2.50-episode-prefix-patch'
           @'
-          Sửa thứ tự và tên tập của bộ Douyin. Khi Lấy link bộ, đọc danh sách trực tiếp từ API /mix/aweme thay cho thứ tự bài đăng mới-cũ trên kênh. Ưu tiên metadata số tập riêng biệt; nếu metadata lặp tổng tập thì dùng thứ tự playlist do API bộ trả. Tên file <Tên bộ> - Tập 001, 002…; chọn tập lẻ giữ nguyên số. URL đã có trong tab tải được cập nhật tên/link ở trạng thái chờ, sắp lại thứ tự riêng các mục của bộ. Không đổi tên file đang tải hoặc đã hoàn tất trên đĩa.
+          Đổi tên file thành Tập 001 - <tên bộ>, Tập 002 - <tên bộ>…: số tập đứng trước tên tiếng Trung. Số phiên bản 2.2.50 do người dùng yêu cầu. Giữ nguyên thứ tự Douyin, giao diện và bộ ký của 2.5.50; giữ số khi chọn tập lẻ và chuyển tải.
 
-          Giữ nguyên giao diện, lõi tải và bộ ký 2.5.49 đã được người dùng xác nhận quét/tải được. Bản sửa thứ tự 2.5.50 chưa chạy trực tiếp trên môi trường build; kiểm thử dữ liệu mô phỏng và luồng Tk thực với theme/downloader giả lập. Sau cập nhật hãy Quét và Lấy lại bộ trước khi tải.
+          Gói file nguồn sửa cho 2.5.50. Chép đè rồi build/chạy lại; Quét → Lấy lại bộ → Tải bộ này để dùng tên mới. Cập nhật tên mục chờ trong hàng đợi; không tự đổi tên file đã tải xong trên đĩa. Trong Explorer, chọn Sắp xếp → Tên → Tăng dần; Nhóm theo → Không để không bị phân nhóm theo ngày tải.
 
           Đã kiểm tra 61 trường hợp ngoại tuyến và hợp đồng giao diện bằng theme/downloader mô phỏng. Chưa thử Douyin thật, chưa xác nhận thuật toán ký hiện được máy chủ chấp nhận; không có tự giải CAPTCHA. Có báo cáo và checksum trong release.
 
-          Tải AutoStudio_v2.5.50_chi_file_sua.zip, giải nén đè vào bộ mã nguồn 2.5.45 rồi chạy/build lại theo dự án của bạn. Đây không phải EXE; chép .py cạnh EXE đã biên dịch không tự áp dụng bản vá.
+          Tải AutoStudio_v2.2.50_chi_file_sua.zip, giải nén đè vào bộ mã nguồn 2.5.50 rồi chạy/build lại theo dự án của bạn. Đây không phải EXE; chép .py cạnh EXE đã biên dịch không tự áp dụng bản vá.
           '@ | Set-Content "$env:RUNNER_TEMP/scan-patch.md" -Encoding utf8
           $existing = & gh release view $tag --repo $env:GITHUB_REPOSITORY --json isDraft 2>$null
           if ($LASTEXITCODE -eq 0) {
             if (!(($existing | ConvertFrom-Json).isDraft)) { throw 'Never overwrite published patch release' }
           } else {
-            & gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title 'Auto Studio 2.5.50 - Đúng thứ tự tập Douyin và tên file tải' --notes-file "$env:RUNNER_TEMP/scan-patch.md"
+            & gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title 'Auto Studio 2.2.50 - Tập 001 đứng trước tên bộ' --notes-file "$env:RUNNER_TEMP/scan-patch.md"
             if ($LASTEXITCODE) { throw 'Draft creation failed' }
           }
           & gh release upload $tag --repo $env:GITHUB_REPOSITORY AutoStudioDirectPatch/dist/* --clobber

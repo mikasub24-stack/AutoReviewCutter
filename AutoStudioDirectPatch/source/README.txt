@@ -1,4 +1,4 @@
-﻿AUTO STUDIO 2.5.50 - CHI FILE SUA TAB QUET BO DOUYIN
+﻿AUTO STUDIO 2.2.50 - CHI FILE SUA TAB QUET BO DOUYIN
 
 YEU CAU DA GIU
 - Giu nguyen giao dien 2.5.45: khong doi bo cuc, nut bam, hang bo, anh bia,

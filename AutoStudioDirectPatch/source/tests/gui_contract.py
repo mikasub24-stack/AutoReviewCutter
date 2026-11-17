@@ -103,19 +103,19 @@ with tempfile.TemporaryDirectory() as folder:
         assert '/mix/aweme/' in transports[1].calls[0].full_url
         assert page.send(row,quiet=True)==2
         assert all(line.count('\t')==2 for line in dl.lines)
-        assert [line.split('\t')[1] for line in dl.lines]==['同一部 - Tập 001','同一部 - Tập 002']
+        assert [line.split('\t')[1] for line in dl.lines]==['Tập 001 - 同一部','Tập 002 - 同一部']
         # Existing rows must retain new scanned names instead of being discarded as duplicates.
         dl.eng.order.reverse()
         for item in dl.eng.items.values():item['title']='Old ID-based name'
         page.download([row])
         assert dl.started==['https://www.douyin.com/video/1','https://www.douyin.com/video/2']
-        assert [dl.eng.items[i]['title'] for i in dl.eng.order]==['同一部 - Tập 001','同一部 - Tập 002']
+        assert [dl.eng.items[i]['title'] for i in dl.eng.order]==['Tập 001 - 同一部','Tập 002 - 同一部']
         # Selecting only episode 2 must not rename it as episode 1.
         for item in dl.eng.items.values():item['status']='Chờ'
         row['items'][0]['var'].set(False)
         page.download([row])
         assert dl.started==['https://www.douyin.com/video/2']
-        assert dl.lines[0].split('\t')[1]=='同一部 - Tập 002'
+        assert dl.lines[0].split('\t')[1]=='Tập 002 - 同一部'
         assert browsers.launch.call_count==0
         assert errors==[]
         page.shutdown()

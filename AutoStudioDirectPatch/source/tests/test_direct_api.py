@@ -281,7 +281,7 @@ class ApiTests(unittest.TestCase):
         items,_=directscan.ordered_items(result,'Tên bộ')
         self.assertEqual([i['id'] for i in items],['90','3','70'])
         self.assertEqual([i['episode'] for i in items],[1,2,3])
-        self.assertEqual([i['name'] for i in items],['Tên bộ - Tập 001','Tên bộ - Tập 002','Tên bộ - Tập 003'])
+        self.assertEqual([i['name'] for i in items],['Tập 001 - Tên bộ','Tập 002 - Tên bộ','Tập 003 - Tên bộ'])
         self.assertTrue(all(i['episode_source']=='douyin_collection_order' for i in items))
         self.assertTrue(all('/mix/aweme/' in r.full_url for r in transport.calls))
 
@@ -331,7 +331,7 @@ class ApiTests(unittest.TestCase):
         items,_=directscan.ordered_items(rows,'Bộ')
         from ytdl.bridge import items_lines
         lines=items_lines([items[1],items[4],items[17]])
-        self.assertEqual([line.split('\t')[1] for line in lines],['Bộ - Tập 002','Bộ - Tập 005','Bộ - Tập 018'])
+        self.assertEqual([line.split('\t')[1] for line in lines],['Tập 002 - Bộ','Tập 005 - Bộ','Tập 018 - Bộ'])
         self.assertEqual([line.split('\t')[2] for line in lines],[rows[index]['video']['play_addr']['url_list'][0] for index in (1,4,17)])
 
     def test_download_reconcile_names_existing_idle_rows_only_and_orders_scope(self):
@@ -343,11 +343,11 @@ class ApiTests(unittest.TestCase):
             engine.items[iid]={'url':'https://example.test/'+iid,'title':'Old '+iid,'status':'Chờ','edited':False,'fetching':True}
         engine.items['ep3']['status']='Đang tải'
         dl=SimpleNamespace(eng=engine,refresh=refresh.append,rebuild_tree=lambda:None)
-        lines=['https://example.test/ep%d\tBộ - Tập %03d\thttps://cdn.test/%d.mp4'%(ep,ep,ep) for ep in (1,2,3)]
+        lines=['https://example.test/ep%d\tTập %03d - Bộ\thttps://cdn.test/%d.mp4'%(ep,ep,ep) for ep in (1,2,3)]
         self.assertEqual(reconcile(dl,lines),2)
         self.assertEqual(engine.order,['other1','ep1','ep2','other2','ep3'])
-        self.assertEqual(engine.items['ep1']['title'],'Bộ - Tập 001')
-        self.assertEqual(engine.items['ep2']['title'],'Bộ - Tập 002')
+        self.assertEqual(engine.items['ep1']['title'],'Tập 001 - Bộ')
+        self.assertEqual(engine.items['ep2']['title'],'Tập 002 - Bộ')
         self.assertEqual(engine.items['ep3']['title'],'Old ep3')
         self.assertEqual(engine.items['other1']['title'],'Old other1')
         self.assertTrue(engine.items['ep1']['edited'])

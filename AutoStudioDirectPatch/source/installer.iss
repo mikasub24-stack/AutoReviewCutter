@@ -11,7 +11,7 @@
 ; TEP NAY LUU DANG UTF-8 CO BOM (de chu tieng Viet co dau hien dung).
 
 #ifndef AppVer
-  #define AppVer "2.5.50"
+  #define AppVer "2.2.50"
 #endif
 #ifndef AppName
   #define AppName "Auto Studio"

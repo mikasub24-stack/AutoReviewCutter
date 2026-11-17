@@ -7,7 +7,7 @@ NAME = "Auto Studio"
 SLUG = "AutoStudio"                           # ten tep / thu muc / exe (khong dau cach)
 TAGLINE = "Dịch · Lồng tiếng · Khớp hình"
 SUBTITLE = "Giọng CapCut theo tệp SRT, chèn thẳng vào project, tự căn chỉnh video theo lời đọc"
-VERSION = "2.5.50"
+VERSION = "2.2.50"
 OLD_NAMES = ("CapCutTTS",)                    # ten cu: thu muc du lieu cu duoc chuyen sang ten moi lan dau chay
 TRACK = "TTS_CapCut"                          # ten track audio trong CapCut (giu nguyen de project cu van nhan ra)
 BAK_TAG = ".bak_autostudio_"                     # duoi ban sao luu draft_content.json
@@ -40,6 +40,10 @@ def self_cmd(args=()):
 
 # Lich su phien ban (moi nhat truoc). Hien trong hop thoai 'Có gì mới' va ghi vao README.
 CHANGELOG = [
+    ("2.2.50", [
+        "Đổi tên file Douyin thành Tập 001 - tên bộ, Tập 002 - tên bộ…; đưa số tập đứng trước tên tiếng Trung, giữ số khi chọn tập lẻ.",
+        "Số phiên bản 2.2.50 theo yêu cầu người dùng; giữ nguyên thứ tự tập và giao diện của bản 2.5.50.",
+    ]),
     ("2.5.50", [
         "Sửa thứ tự/tên tập khi tải bộ Douyin: đọc API của bộ thay cho cache bài đăng mới-cũ; lấy số tập gốc hoặc thứ tự playlist Douyin, đặt tên Tập 001, 002…",
         "Giữ số khi chọn lẻ tập và khi chuyển/sử dụng hàng đợi tải. Cập nhật tên/link cho URL đã có ở trạng thái chờ; giữ nguyên mục tải khác và file đã hoàn tất.",

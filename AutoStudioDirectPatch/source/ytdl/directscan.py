@@ -127,7 +127,7 @@ def ordered_items(records, name, options=None):
         tail = ('Tập %03d' % ep) if ep is not None else (suffix + ' - video ' + video_id if kind == 'merged' else 'Chưa rõ tập - video ' + video_id)
         urls = direct_urls(record)
         output.append({'id': video_id, 'url': 'https://www.douyin.com/video/' + video_id,
-                       'name': clean_name(name) + (' - video ' + video_id + ' - ' + suffix if kind == 'merged' else ' - ' + tail), 'direct': urls[0] if urls else '',
+                       'name': (tail + ' - ' + clean_name(name)) if ep is not None else (clean_name(name) + (' - video ' + video_id + ' - ' + suffix if kind == 'merged' else ' - ' + tail)), 'direct': urls[0] if urls else '',
                        'kind': kind, 'thumb': '', 'episode': ep, 'episode_source': ordering_source if video_id in numbers else ('title' if ep is not None else 'unknown'), 'timestamp': record.get('create_time') or 0,
                        '_record': record})
     duplicates = Counter(it['episode'] for it in output if it['episode'] is not None)
