@@ -21,7 +21,7 @@
   // Muse từ chối video có người thật / người nổi tiếng / nhân vật có bản quyền («blocked by policy»). Mọi prompt đều nói rõ người trong cảnh là người vô danh, hư cấu.
   // Đồng nhất là điều quan trọng nhất: mọi prompt lặp nguyên văn danh sách «không được đổi».
   const LOCKED = 'LOCKED - these never change unless the current step is working on them: the shape, size, height and style of the building or the room, the exact number of floors (storeys) of the building (a two-floor house always stays a two-floor house, never lower), the exact number and position of the windows and doors, the roof and the wall layout, the surroundings and the background, the direction of the light and the weather, the colors of everything this step does not touch, and the person\'s face, hair, skin, body size and clothes.';
-  const LOCKED_BUILD = 'LOCKED - these never change unless the current step is working on them: the shape, size, height, material and color of everything that is already built, the exact position of every finished part, the surroundings and the background, the direction of the light and the weather, the colors of everything this step does not touch, and the person\'s face, hair, skin, body size and clothes.';
+  const LOCKED_BUILD = 'LOCKED - these never change unless the current step is working on them: the shape, size, height, material and color of everything that is already built, the exact position of every finished part, the surroundings and the background, the ground (it stays bare packed earth, never a concrete slab or paving, unless this step works on it), the direction of the light and the weather, the colors of everything this step does not touch, the number and place of the tubs, buckets, tools and piles (nothing appears or disappears by itself; only the person moves things, with their own hands), and the person\'s face, hair, skin, body size, hat and clothes.';
   const SAFE_PEOPLE = 'People: every person in the video is an anonymous, generic, fictional individual - not any real person, not a celebrity, politician, athlete or public figure, not a lookalike of anyone, and not a known fictional, cartoon or movie character. No logos, brand names or trademarks are visible.';
   const SAFE_PEOPLE_IMAGE = SAFE_PEOPLE.replace('in the video', 'in the picture');
   const FACELESS = 'The person is always filmed from behind, from a distance or from the side, or only the hands and the body are shown; the face is never shown clearly and never in close-up.';
@@ -44,7 +44,7 @@
   };
 
   // Cảnh quay bếp: gần hơn cảnh sinh tồn thường (thấy rõ tay làm gạch, đất, vữa), vẫn thấy cả cái bếp và cả người.
-  const STOVE_SHOT = 'a medium-wide shot filmed from a few metres away: the whole stove and the person\'s whole body are in the frame, the stove fills a large part of the picture and the hands, the tools and the materials are clearly readable';
+  const STOVE_SHOT = 'a medium-wide shot filmed from a few metres away: the whole stove and the person\'s whole body (head included) are always in the frame, the stove fills a large part of the picture and the hands, the tools and the materials are clearly readable';
   // Mỗi chủ đề: base = hiện trạng ban đầu (dùng khi để Muse tạo ảnh gốc); steps = các việc nối tiếp nhau (vi = nhãn trên thẻ, en = việc làm trong clip, mã thứ 3 (nếu có) = nhịp: f / n / s).
   // survival: true = chủ đề sinh tồn: nhịp nhanh / thật / chậm xen kẽ, ít lau mồ hôi, diễn tự nhiên; locks = [[bước bắt đầu, vật đang xây]]: từ bước đó mọi clip nhắc lại chất liệu của vật đó.
   const THEMES = [
@@ -240,13 +240,13 @@
     // locks = [[bước bắt đầu, mô tả vật đang xây]]: từ bước đó trở đi MỌI clip (và ảnh mốc) nhắc lại chất liệu, để bếp đất sét không biến thành bếp sắt ở cảnh cuối.
     // Chữ cuối mỗi bước: f = việc nặng/lặp lại (tua nhanh), n = tốc độ thật, s = việc khéo tay (chậm, tỉ mỉ).
     {
-      id: 'stove_clay', label: 'Xây bếp · bếp đất sét có ống khói (2 họng)', hint: 'Ảnh gốc: khoảng đất phẳng ngoài trời có sẵn xẻng, xô, thau trộn và đống rơm khô. Nên chọn 8–10 phút.', person: true, personDefault: SURVIVOR, survival: true, defaultMinutes: 8,
+      id: 'stove_clay', label: 'Xây bếp · bếp đất sét có ống khói (2 họng)', hint: 'Ảnh gốc: khoảng đất phẳng ngoài trời có sẵn xẻng, xô, thau trộn và đống rơm khô. Nên chọn 8–10 phút.', person: true, personDefault: SURVIVOR, survival: true, defaultMinutes: 8, defaultCamera: 'fixed',
       place: 'a flat patch of bare ground in a quiet shaded yard at the edge of a forest', placeholder: 'Ví dụ: sân đất phẳng bên rìa rừng, có xẻng, xô nước, đống rơm khô',
       base: 'flat bare ground with a shovel, a bucket, a mixing tub and a pile of dry straw beside it', shotOut: STOVE_SHOT,
       locks: [
         [4, 'the stove being built is a hand-made CLAY stove: every part of it is made only of rough natural yellow-brown clay and stones, with no metal body, no cast iron, no steel, no bricks and no store-bought stove; it has only the parts that the finished steps have already built'],
         [10, 'the clay stove has a rectangular body of rough yellow-brown clay on a ring of stones, an arched fire door at the front and a flat clay top with two round pot openings; it is clay, never metal'],
-        [11, 'the clay stove has a rectangular body of rough yellow-brown clay on a ring of stones, an arched fire door at the front, a flat clay top with two round pot openings and a tall tapering round clay chimney at the back; it is clay, never metal'],
+        [11, 'the clay stove has a rectangular body of rough yellow-brown clay on a ring of stones, an arched fire door at the front, a flat clay top with two round pot openings and a tall tapering round chimney of solid clay at the back, not a metal pipe; it is clay, never metal'],
         [15, 'the outer walls of the clay stove are now matt white lime-washed clay, and the fire door edge, the chimney top and the inside stay natural clay; the stove is clay, never metal']
       ],
       steps: [
@@ -260,24 +260,24 @@
         ['Chừa cửa lửa', 'shapes an arched fire door opening at the front of the firebox and leaves a lower slot underneath for the ashes', 's'],
         ['Đặt đá làm vỉ lò', 'lays flat stone slabs across the bottom of the firebox with narrow gaps between them as a grate for air', 'n'],
         ['Làm mặt bếp', 'rolls out a thick flat slab of clay, lays it across the top walls and cuts two round pot openings into it using a bowl as a template', 's'],
-        ['Đắp ống khói', 'builds a round chimney at the back by stacking clay coils into a tall tapering tube and smoothing the inside with a wet hand', 's'],
+        ['Đắp ống khói', 'builds a round chimney at the back by stacking clay coils into a tall tapering tower of solid clay (not a metal pipe) and smoothing the outside with a wet hand', 's'],
         ['Vuốt nhẵn', 'smooths the whole stove with wet hands and a wooden paddle, filling every crack and rounding the corners', 's'],
         ['Tạo họa tiết', 'presses a simple border pattern into the front wall with a pointed stick and the back of a spoon', 's'],
         ['Phơi cho se', 'leaves the clay to dry in the shade, then pats the surface and fills hairline cracks with fresh clay', 'n'],
         ['Quét vôi trắng', 'brushes a thin coat of white lime wash over the outer walls of the dry stove with a wide brush', 'n'],
         ['Đốt lửa nhỏ sấy bếp', 'lights a small fire of thin twigs in the firebox with a match and feeds it slowly so the clay bakes gently, thin smoke rising up the chimney', 'n'],
-        ['Nấu thử', 'sets a clay pot of water on one pot opening and a pan on the other and feeds split logs into the fire door', 'n'],
+        ['Nấu thử', 'sets a clay pot of water on one pot opening and a clay pan on the other and feeds split logs into the fire door', 'n'],
         ['Hoàn thiện', 'stands beside the finished clay stove at dusk, a warm flame in the fire door and steam rising from the pot', 's']
       ]
     },
     {
-      id: 'stove_brick', label: 'Xây bếp · bếp gạch đỏ 2 họng, có ống khói', hint: 'Ảnh gốc: khoảng đất phẳng ngoài trời có sẵn đống gạch đỏ, bao cát, xẻng và thau trộn vữa. Nên chọn 8–10 phút.', person: true, personDefault: SURVIVOR, survival: true, defaultMinutes: 8,
+      id: 'stove_brick', label: 'Xây bếp · bếp gạch đỏ 2 họng, có ống khói', hint: 'Ảnh gốc: khoảng đất phẳng ngoài trời có sẵn đống gạch đỏ, bao cát, xẻng và thau trộn vữa. Nên chọn 8–10 phút.', person: true, personDefault: SURVIVOR, survival: true, defaultMinutes: 8, defaultCamera: 'fixed',
       place: 'a flat patch of bare ground in a tidy outdoor yard beside a stack of red bricks', placeholder: 'Ví dụ: sân đất phẳng cạnh mái hiên, có đống gạch đỏ, bao cát, xẻng',
       base: 'flat bare ground with a stack of red bricks, bags of cement and sand, a shovel and a mixing tub beside it', shotOut: STOVE_SHOT,
       locks: [
         [5, 'the stove being built is a hand-built RED BRICK stove laid in mortar with staggered joints: no metal body, no cast iron, no steel, no clay body and no store-bought stove; it has only the parts that the finished steps have already built'],
-        [11, 'the brick stove has red brick walls laid in mortar with staggered joints, an arched fire door opening and a lower ash opening at the front, and a flat brick top with two round pot openings; it is brick, never metal'],
-        [12, 'the brick stove has red brick walls laid in mortar with staggered joints, an arched fire door opening and a lower ash opening at the front, a flat brick top with two round pot openings and a tall rectangular brick chimney at the back; it is brick, never metal'],
+        [11, 'the brick stove has red brick walls laid in mortar with staggered joints, an arched fire door opening and a lower ash opening at the front, and a flat brick top with two square pot openings; it is brick, never metal'],
+        [12, 'the brick stove has red brick walls laid in mortar with staggered joints, an arched fire door opening and a lower ash opening at the front, a flat brick top with two square pot openings and a tall rectangular brick chimney at the back; it is brick, never metal'],
         [13, 'the outside walls of the brick stove are now covered with smooth pale plaster, the inside of the firebox stays pale fire brick, and the chimney, the fire door and the two pot openings stay as they were; it is brick and plaster, never metal'],
         [15, 'the brick stove has smooth pale plaster walls with a band of decorative ceramic tiles across the front wall, the fire door, the two pot openings and the chimney as before; it is brick, never metal']
       ],
@@ -285,56 +285,56 @@
         ['Chọn chỗ, đánh dấu', 'marks the outline of the stove on the flat ground with pegs and a string line and checks the corners with a tape measure', 's'],
         ['Đào móng, đầm đất', 'digs a shallow foundation trench with a shovel and tamps a layer of gravel into the bottom', 'f'],
         ['Trộn vữa', 'mixes cement, sand and water in a mixing tub with a hoe until the mortar is thick, even and creamy', 'f'],
-        ['Đổ móng, cán phẳng', 'pours concrete into the trench and levels the top with a trowel and a straight board', 'n'],
+        ['Lát cát, nền gạch', 'spreads a layer of sand in the trench and lays flat red bricks side by side on it as the base, tapping each brick level with a rubber mallet', 'n'],
         ['Xây hàng gạch đầu', 'spreads a bed of mortar with a trowel and lays the first course of red bricks around the outline, tapping each brick level with the trowel handle', 's'],
         ['Xây thành bếp', 'keeps laying red bricks course by course with staggered joints, scraping off the squeezed-out mortar and checking each course with a spirit level', 'n'],
         ['Chừa cửa lò', 'leaves the opening for the fire door and a lower ash opening at the front while the walls rise', 'n'],
         ['Đặt đá lanh tô', 'lifts a flat stone slab onto the walls above the fire door opening as a lintel and beds it in mortar', 's'],
         ['Lót gạch chịu lửa', 'lines the floor and the inside walls of the firebox with pale fire bricks laid in thin joints', 's'],
         ['Xây cao thêm', 'lays more courses of red bricks around the firebox up to waist height', 'f'],
-        ['Làm mặt bếp', 'builds the cooking top by laying bricks across the walls, framing two round pot openings with cut bricks', 's'],
-        ['Xây ống khói', 'builds a rectangular chimney at the back by laying bricks upward in a tapering shaft and checking it with a plumb line', 'n'],
+        ['Làm mặt bếp', 'lays a flat top of red bricks across the walls, leaving two square pot openings framed by whole bricks', 's'],
+        ['Xây ống khói', 'builds a rectangular chimney at the back by laying the same red bricks upward in a tapering shaft, checking it with a plumb line; the chimney is solid brick, not a metal pipe', 'n'],
         ['Trát vữa ngoài', 'spreads a smooth layer of plaster over the outside walls with a trowel and wipes it level with a wooden float', 'n'],
         ['Chà nhẵn', 'rubs the plaster smooth with a damp sponge and rounds the edges', 's'],
         ['Ốp gạch men trang trí', 'sets a band of decorative ceramic tiles on the front wall in tile adhesive with a notched trowel, pressing each tile flat', 's'],
         ['Chờ vữa khô, sấy lửa', 'lights a small fire of thin kindling in the firebox to cure the mortar slowly', 'n'],
-        ['Nấu thử', 'places a pot and a pan on the two openings and feeds split logs into the fire door, flames and steam rising', 'n'],
+        ['Nấu thử', 'places a white enamel pot and a clay pan on the two openings and feeds split logs into the fire door, flames and steam rising', 'n'],
         ['Hoàn thiện', 'stands beside the finished brick stove at dusk with a warm glow in the fire door', 's']
       ]
     },
     {
-      id: 'stove_rocket', label: 'Xây bếp · bếp rocket tiết kiệm củi (gạch + đất sét)', hint: 'Ảnh gốc: khoảng đất phẳng ngoài trời có sẵn gạch đỏ, thau trộn và đống cành khô. Nên chọn 8–10 phút.', person: true, personDefault: SURVIVOR, survival: true, defaultMinutes: 8,
-      place: 'a flat patch of bare ground in a sunny yard beside a stack of red bricks', placeholder: 'Ví dụ: sân đất phẳng đầy nắng, có đống gạch đỏ, thau trộn, cành khô',
-      base: 'flat bare ground with a stack of red bricks, a mixing tub, a bucket of clay and a pile of dry sticks beside it', shotOut: STOVE_SHOT,
+      id: 'stove_ring', label: 'Xây bếp · bếp lửa vòng gạch tròn (kiềng gỗ treo nồi)', hint: 'Ảnh gốc: khoảng đất phẳng ngoài trời có sẵn đống gạch đỏ, bao cát, thau trộn vữa, xẻng và vài cây gậy gỗ dài. Nên chọn 8–10 phút.', person: true, personDefault: SURVIVOR, survival: true, defaultMinutes: 8, defaultCamera: 'fixed',
+      place: 'a flat patch of bare ground in a sunny yard beside a stack of red bricks', placeholder: 'Ví dụ: sân đất phẳng đầy nắng, có đống gạch đỏ, bao cát, xẻng và vài cây gậy dài',
+      base: 'flat bare ground with a stack of red bricks, a bag of sand, a mixing tub, a shovel and a few long straight wooden poles beside it', shotOut: STOVE_SHOT,
       locks: [
-        [4, 'the stove being built is a small hand-built brick-and-clay ROCKET stove: no metal body, no cast iron, no steel and no store-bought stove; it has only the parts that the finished steps have already built'],
-        [10, 'the rocket stove has an L-shaped brick feed tube with a vertical riser inside a square outer wall of bricks, and a flat top with a round pot recess and three raised clay pot supports; it is brick and clay, never metal'],
-        [11, 'the outside of the rocket stove is now plastered with smooth natural clay; the feed opening, the pot recess and the three pot supports stay as they were; it is clay, never metal'],
-        [13, 'the outside of the rocket stove has a matt white clay finish; the feed opening, the pot recess and the three pot supports stay as they were; it is clay, never metal']
+        [6, 'the fire place being built is a hand-built ring of RED BRICKS laid in mortar with staggered joints: no metal ring, no steel fire bowl, no cast iron and no store-bought fire pit; it has only the parts that the finished steps have already built'],
+        [10, 'the fire ring is a round wall of five courses of red bricks laid in mortar with staggered joints, about knee high, standing on bare earth; it is brick, never metal'],
+        [13, 'the fire ring is a round wall of five courses of red bricks laid in mortar, with a neat border of flat stones lying on the ground around its outside; it is brick and stone, never metal'],
+        [15, 'the fire ring is a round wall of five courses of red bricks with a border of flat stones around it, and a tripod of three long straight wooden poles tied together at the top with rope stands over it; the ring is brick, never metal']
       ],
       steps: [
-        ['Chọn chỗ, san nền', 'levels a patch of ground with a shovel and packs it hard with a wooden tamper', 'f'],
-        ['Lát nền gạch', 'lays a flat base of red bricks on a thin bed of sand and taps them level with a rubber mallet', 'n'],
-        ['Trộn vữa đất sét', 'mixes clay, sand and water in a tub with a hoe into a thick sticky mortar', 'f'],
-        ['Xếp thử buồng đốt', 'dry-fits bricks on the base into an L-shaped feed tube with a vertical riser, checking that they fit together before using any mortar', 's'],
-        ['Xây ống nạp củi', 'lays the bricks of the horizontal feed tube in clay mortar, pressing each brick down and scraping off the excess', 's'],
-        ['Xây ống thẳng đứng', 'builds the vertical riser by stacking bricks upright in clay mortar and checking it with a plumb line', 's'],
-        ['Chừa miệng nạp củi', 'leaves the feed opening at the front of the horizontal tube with a small air gap beneath where the sticks will lie', 'n'],
-        ['Xây vỏ ngoài', 'builds a square outer wall of bricks around the riser, leaving a gap about a hand wide all around', 'n'],
-        ['Đổ lớp cách nhiệt', 'fills the gap between the riser and the outer wall with dry ash and fine sand, pressing it down with a stick', 'n'],
-        ['Làm mặt bếp', 'covers the top with a clay-and-brick plate, leaving a round recess above the riser and building three raised clay pot supports around it', 's'],
-        ['Trát đất sét ngoài', 'plasters the outside with wet clay using bare hands and a trowel until it is smooth', 'n'],
-        ['Tạo dáng, vuốt nhẵn', 'rounds the corners and smooths the clay with a wet sponge', 's'],
-        ['Phủ đất sét trắng', 'brushes a thin coat of white clay slip over the smooth clay and lets it set to a matt finish', 's'],
-        ['Phơi cho se', 'leaves the clay to dry in the sun, then fills the hairline cracks with fresh clay', 'n'],
-        ['Bẻ củi nhỏ', 'snaps dry sticks into short equal lengths over a log and stacks them neatly beside the stove', 'f'],
-        ['Nhóm lửa thử', 'lights a few thin sticks in the feed tube with a match and feeds more in slowly as the fire starts to draw', 'n'],
-        ['Đun nước', 'sets a pot of water on the pot supports while the fire burns hot with almost no smoke and steam starts to rise', 'n'],
-        ['Hoàn thiện', 'crouches beside the finished rocket stove feeding a stick into it as the pot boils', 's']
+        ['Dọn sạch chỗ làm', 'clears a round patch of ground of leaves and small stones with a rake and levels it with a shovel', 'f'],
+        ['Vẽ vòng tròn', 'marks a circle on the ground by turning a string around a peg and scratching the line with a stick', 's'],
+        ['Đào rãnh tròn', 'digs a shallow ring-shaped trench along the circle line with a shovel', 'f'],
+        ['Rải cát, đầm phẳng', 'pours sand from a bucket into the trench and packs it flat with a wooden tamper', 'n'],
+        ['Trộn vữa', 'mixes cement, sand and water in a mixing tub with a hoe until the mortar is thick and creamy', 'f'],
+        ['Đặt vòng gạch đầu', 'spreads mortar with a trowel and sets the first ring of red bricks standing along the circle, tapping each brick level with a rubber mallet', 's'],
+        ['Xây vòng thứ hai', 'spreads mortar on the first ring and lays a second ring of red bricks on it, shifting each brick half a brick sideways and scraping off the squeezed-out mortar', 'n'],
+        ['Xây vòng thứ ba', 'lays a third ring of red bricks in mortar on the second ring, one brick after another around the circle', 'n'],
+        ['Xây vòng thứ tư', 'lays a fourth ring of red bricks in mortar, working steadily around the circle', 'f'],
+        ['Xây vòng cuối', 'lays the fifth and last ring of red bricks in mortar and checks that the top is level with a spirit level', 'n'],
+        ['Miết mạch vữa', 'presses mortar into every joint of the brick ring with a pointing trowel and wipes the bricks clean with a damp sponge', 's'],
+        ['Rải sỏi đáy bếp', 'pours gravel from a bucket on the ground inside the ring and spreads it flat with a rake', 'n'],
+        ['Xếp đá viền ngoài', 'lays flat stones on the ground around the outside of the brick ring as a neat border, tapping each stone level with the mallet', 'n'],
+        ['Chẻ củi', 'splits logs into firewood and kindling with an axe on a chopping block and tosses the pieces onto a pile', 'f'],
+        ['Dựng kiềng ba chân', 'ties the tops of three long straight wooden poles together with rope, then stands them up and spreads the legs over the ring like a tripod', 's'],
+        ['Nhóm lửa', 'stacks kindling in the middle of the ring and lights it with a match, then adds small sticks as the flames grow', 'n'],
+        ['Treo nồi nấu', 'hangs a cooking pot of water from the top of the tripod over the flames', 'n'],
+        ['Hoàn thiện', 'sits beside the finished brick fire ring at dusk watching the pot steam over a warm fire', 's']
       ]
     },
     {
-      id: 'stove_oven', label: 'Xây bếp · lò nướng vòm đất sét (nướng bánh, pizza)', hint: 'Ảnh gốc: khoảng đất phẳng ngoài trời có sẵn đá, gạch, cát và tấm bạt. Nên chọn 8–10 phút.', person: true, personDefault: SURVIVOR, survival: true, defaultMinutes: 8,
+      id: 'stove_oven', label: 'Xây bếp · lò nướng vòm đất sét (nướng bánh, pizza)', hint: 'Ảnh gốc: khoảng đất phẳng ngoài trời có sẵn đá, gạch, cát và tấm bạt. Nên chọn 8–10 phút.', person: true, personDefault: SURVIVOR, survival: true, defaultMinutes: 8, defaultCamera: 'fixed',
       place: 'a flat patch of bare ground in a garden corner with stones, bricks and a heap of sand beside it', placeholder: 'Ví dụ: góc vườn đất phẳng, có đá, gạch, đống cát và tấm bạt',
       base: 'flat bare ground with a pile of stones and bricks, a heap of sand, a tarp, a bag of straw and a shovel beside it', shotOut: STOVE_SHOT,
       locks: [
@@ -365,14 +365,14 @@
       ]
     },
     {
-      id: 'stove_stone', label: 'Xây bếp · bếp đá xếp ngoài trời (vòm đá, mặt bếp đá)', hint: 'Ảnh gốc: khoảng đất phẳng ngoài trời có sẵn đống đá hộc, bao xi măng và cát. Nên chọn 8–10 phút.', person: true, personDefault: SURVIVOR, survival: true, defaultMinutes: 8,
+      id: 'stove_stone', label: 'Xây bếp · bếp đá xếp ngoài trời (vòm đá, mặt bếp đá)', hint: 'Ảnh gốc: khoảng đất phẳng ngoài trời có sẵn đống đá hộc, bao xi măng và cát. Nên chọn 8–10 phút.', person: true, personDefault: SURVIVOR, survival: true, defaultMinutes: 8, defaultCamera: 'fixed',
       place: 'a flat patch of bare ground in an outdoor yard beside a big pile of natural stones', placeholder: 'Ví dụ: sân đất phẳng cạnh suối, có đống đá hộc, bao xi măng, cát',
       base: 'flat bare ground with a big pile of natural stones, bags of cement and sand, a shovel and a mixing tub beside it', shotOut: STOVE_SHOT,
       locks: [
         [4, 'the stove being built is a hand-built natural STONE stove: rough natural stones laid in mortar, with no brick body, no metal body, no cast iron, no steel and no store-bought stove; it has only the parts that the finished steps have already built'],
         [8, 'the stone stove has rough natural stone walls laid in mortar, a wide fire opening at the front spanned by a stone arch and a separate tall opening on one side for firewood; it is stone, never metal'],
         [11, 'the stone stove has rough natural stone walls laid in mortar, a wide fire opening at the front spanned by a stone arch, a separate tall opening on one side for firewood and thick flat stone slabs across the top; it is stone, never metal'],
-        [12, 'the stone stove has rough natural stone walls laid in mortar, a wide fire opening at the front spanned by a stone arch, a separate tall opening on one side for firewood, thick flat stone slabs across the top and a tapering stone chimney at the back; it is stone, never metal'],
+        [12, 'the stone stove has rough natural stone walls laid in mortar, a wide fire opening at the front spanned by a stone arch, a separate tall opening on one side for firewood, thick flat stone slabs across the top and a tapering chimney of solid stone at the back, not a metal pipe; it is stone, never metal'],
         [13, 'the joints of the stone stove are now neatly filled with mortar and the stone faces are brushed clean; the arch, the openings, the top slabs and the chimney stay as they were; it is stone, never metal']
       ],
       steps: [
@@ -387,12 +387,12 @@
         ['Tháo khuôn', 'pulls the wooden form out from under the arch once the mortar has set', 's'],
         ['Lót lòng lò', 'lines the floor of the firebox with flat fire bricks', 'n'],
         ['Đặt mặt bếp đá', 'lays thick flat stone slabs side by side across the top walls, bedding each in mortar and checking it level', 's'],
-        ['Xây ống khói đá', 'builds a stone chimney at the back by stacking stones in mortar in a tapering column', 'n'],
+        ['Xây ống khói đá', 'builds a chimney at the back by stacking the same natural stones in mortar into a tapering column (solid stone, not a metal pipe)', 'n'],
         ['Chèn kẽ, trét vữa', 'pushes mortar into the joints with a pointing trowel and brushes the stone faces clean', 's'],
         ['Làm kệ gỗ bên hông', 'fits a thick rough wooden board into the side wall as a shelf and wedges it with stones', 's'],
         ['Xếp củi gọn', 'stacks split firewood neatly in the side opening', 'f'],
         ['Sấy lửa nhỏ', 'lights a small fire of thin kindling in the firebox to cure the mortar slowly', 'n'],
-        ['Nấu thử', 'sets a heavy pot of water on the stone top and feeds split logs into the fire opening, flames and steam rising', 'n'],
+        ['Nấu thử', 'sets a big aluminium pot of water on the stone top and feeds split logs into the fire opening, flames and steam rising', 'n'],
         ['Hoàn thiện', 'stands beside the finished stone stove at dusk with a warm glow in the arch', 's']
       ]
     },
@@ -423,9 +423,9 @@
     stove_clay: { label: 'Build a stove · clay stove with a chimney (2 burners)', hint: 'Start photo: flat open ground with a shovel, a bucket, a mixing tub and a pile of dry straw. Choose 8–10 minutes.', placeholder: 'e.g. flat yard at the edge of a forest with a shovel, a water bucket and dry straw',
       titles: ['Level the ground', 'Dig the clay', 'Mix clay, sand, straw', 'Knead and roll coils', 'Set the stone base', 'Pack the platform', 'Raise the firebox walls', 'Shape the fire door', 'Lay the grate stones', 'Make the cooking top', 'Build the chimney', 'Smooth the surface', 'Press the pattern', 'Let it dry', 'Lime-wash the walls', 'First small fire', 'Cook the first meal', 'Finished stove'] },
     stove_brick: { label: 'Build a stove · red brick stove, 2 burners, chimney', hint: 'Start photo: flat open ground with a stack of red bricks, bags of cement and sand, a shovel and a mixing tub. Choose 8–10 minutes.', placeholder: 'e.g. flat yard beside a veranda with a stack of red bricks, sand and a shovel',
-      titles: ['Mark the outline', 'Dig the foundation', 'Mix the mortar', 'Pour the foundation', 'Lay the first course', 'Raise the walls', 'Leave the fire door', 'Set the lintel', 'Line with fire bricks', 'Build up higher', 'Make the cooking top', 'Build the chimney', 'Plaster the outside', 'Smooth the plaster', 'Add decorative tiles', 'Cure with a small fire', 'Cook the first meal', 'Finished stove'] },
-    stove_rocket: { label: 'Build a stove · rocket stove (bricks + clay)', hint: 'Start photo: flat open ground with red bricks, a mixing tub, a bucket of clay and dry sticks. Choose 8–10 minutes.', placeholder: 'e.g. sunny flat yard with a stack of red bricks, a mixing tub and dry sticks',
-      titles: ['Level the ground', 'Lay the brick base', 'Mix clay mortar', 'Dry-fit the burn chamber', 'Build the feed tube', 'Build the riser', 'Leave the feed opening', 'Build the outer wall', 'Fill with ash insulation', 'Make the top and supports', 'Plaster with clay', 'Shape and smooth', 'Coat with white clay', 'Let it dry', 'Snap small sticks', 'First test fire', 'Boil water', 'Finished stove'] },
+      titles: ['Mark the outline', 'Dig the foundation', 'Mix the mortar', 'Lay the brick base', 'Lay the first course', 'Raise the walls', 'Leave the fire door', 'Set the lintel', 'Line with fire bricks', 'Build up higher', 'Make the cooking top', 'Build the chimney', 'Plaster the outside', 'Smooth the plaster', 'Add decorative tiles', 'Cure with a small fire', 'Cook the first meal', 'Finished stove'] },
+    stove_ring: { label: 'Build a stove · round brick fire ring (wooden tripod for the pot)', hint: 'Start photo: flat open ground with a stack of red bricks, a bag of sand, a mixing tub, a shovel and a few long wooden poles. Choose 8–10 minutes.', placeholder: 'e.g. sunny flat yard with a stack of red bricks, a bag of sand, a shovel and a few long poles',
+      titles: ['Clear the ground', 'Mark the circle', 'Dig the ring trench', 'Pack the sand', 'Mix the mortar', 'Set the first ring', 'Second ring', 'Third ring', 'Fourth ring', 'Last ring', 'Point the joints', 'Gravel floor', 'Stone border', 'Split firewood', 'Raise the tripod', 'Light the fire', 'Hang the pot', 'Finished fire ring'] },
     stove_oven: { label: 'Build a stove · clay dome oven (bread, pizza)', hint: 'Start photo: flat open ground with stones, bricks, a heap of sand and a tarp. Choose 8–10 minutes.', placeholder: 'e.g. flat garden corner with stones, bricks, a heap of sand and a tarp',
       titles: ['Level the ground', 'Build the stone base', 'Insulating layer', 'Lay the oven floor', 'Mark the dome circle', 'Shape the sand form', 'Wet newspaper layer', 'Mix the cob', 'Build the inner dome', 'Cut the door', 'Dig out the sand', 'Insulate the dome', 'Entrance arch and chimney', 'Plaster smooth', 'Make the wooden door', 'First small fire', 'Bake a test pizza', 'Finished oven'] },
     stove_stone: { label: 'Build a stove · outdoor stone stove (stone arch, stone top)', hint: 'Start photo: flat open ground with a big pile of natural stones, bags of cement and sand, a shovel and a mixing tub. Choose 8–10 minutes.', placeholder: 'e.g. flat ground by a stream with a big pile of stones, cement and sand',
@@ -457,7 +457,7 @@
       light: clean(input.light, 200) || DEFAULT_LIGHT,
       anchor: Boolean(input.anchor),
       parallel: input.parallel === 'auto' || input.parallel == null || input.parallel === '' ? 0 : Math.max(1, Math.min(MAX_PARALLEL, Math.round(Number(input.parallel)) || 1)),   // 0 = tự động theo số tài khoản
-      camera: !theme.forceVaried && input.camera === 'fixed' ? 'fixed' : 'varied',   // nhà đi từ ngoài vào trong thì không thể cố định một góc      // xen kẽ cảnh xa / vừa / gần (như video làm nhà thật) hoặc một góc cố định
+      camera: !theme.forceVaried && (input.camera || theme.defaultCamera) === 'fixed' ? 'fixed' : 'varied',   // nhà đi từ ngoài vào trong thì không thể cố định một góc      // xen kẽ cảnh xa / vừa / gần (như video làm nhà thật) hoặc một góc cố định
       faceless: Boolean(input.faceless),                 // mặc định CÓ mặt (như video mẫu); bật «không lộ mặt» thì Muse ít từ chối hơn và người ít bị lệch
       customSteps: custom
     };
@@ -509,7 +509,7 @@
     const lines = [
       `SCENE (identical in every clip): ${placeOf(config)}.`,
       config.camera === 'fixed'
-        ? 'Camera: one fixed camera on a tripod, same position, same height, same angle and same lens in every clip; no zoom, no pan, no tilt, no cuts, no camera shake.'
+        ? `Camera: one fixed camera on a tripod, same position, same height, same angle and same lens in every clip; no zoom, no pan, no tilt, no cuts, no camera shake.${themeOf(config.theme).survival && themeOf(config.theme).shotOut ? ` The framing never changes: ${themeOf(config.theme).shotOut}.` : ''}`
         : themeOf(config.theme).survival
           ? `Camera: a still, tripod-mounted real camera like a documentary about building by hand: ${themeOf(config.theme).shotOut || SHOT_OUT}; the camera never moves during a shot, and a change of angle is always a clean, clearly visible cut, never a pan or a zoom; never a push-in, never a face close-up, no handheld wobble, no shaking; the place, the lighting and the lens look stay identical.`
           : 'Camera: a still, tripod-mounted real camera like a time-lapse cleanup video: a WIDE, distant shot outside and ONE fixed angle inside that shows the action clearly; the camera never moves during a shot, and a change of angle is always a clean, clearly visible cut, never a pan or a zoom; never a push-in, never a face close-up, no handheld wobble, no shaking; the place, the lighting and the lens look stay identical.',
@@ -613,11 +613,11 @@
 
   // Nhịp của cảnh sinh tồn: việc nặng, lặp đi lặp lại thì tua nhanh (f); việc thường chạy tốc độ thật (n); việc khéo tay thì chậm, tỉ mỉ (s). Chủ đề khác không dùng (vẫn «fast-motion» như cũ).
   const PACE_TEXT = {
-    f: 'Pace: FAST-FORWARD. This is long, repetitive work, so the footage is sped up about 4x like a time-lapse: the hands and the tools move quickly but smoothly and naturally, with no jitter and no cartoon speed, and the progress of the work is clearly visible.',
+    f: 'Pace: BRISK. This is long, repetitive work, so the person works with a quick, efficient rhythm and repeats the same movement again and again (one repetition every second or two). The motion is smooth and natural at normal film speed: not a time-lapse, no jitter, no cartoon speed.',
     n: 'Pace: REAL TIME. The footage plays at normal speed as if it was filmed live: a natural, steady working rhythm, not sped up and not slow motion.',
     s: 'Pace: SLOW AND CAREFUL. This is careful detail work shown at normal or slightly slower speed, like a calm documentary shot of skilled hands: deliberate, precise movements, a short pause now and then to check the work, then adjust it. Never sped up.'
   };
-  const PACE_WORD = { f: 'sped up about 4x like a time-lapse', n: 'played at normal speed in real time', s: 'played at normal or slightly slower speed' };
+  const PACE_WORD = { f: 'normal film speed with a brisk working rhythm', n: 'played at normal speed in real time', s: 'played at normal or slightly slower speed' };
   function paceOf(step) {
     if (PACE_TEXT[step.pace]) return step.pace;
     const t = step.en || '';
@@ -631,7 +631,8 @@
     (themeOf(config.theme).locks || []).forEach(([from, text]) => { if (step.step >= from) desc = text; });
     return desc ? `OBJECT LOCK (identical in every clip from now on, never changes): ${desc}. It keeps this exact material, color and shape in every clip; it never turns into a different kind of object and never changes its material.` : '';
   }
-  const TECHNIQUE = 'Technique: the person uses the real, correct technique for this job, the way an experienced builder or bushcraft worker does: the right grip on the tool with both hands where needed, a stable stance, real weight and effort in each movement, and the materials react exactly as real materials do (clay squashes and smears, bricks sit on mortar, stones are lifted with effort, wood splits along the grain). No pretend or mimed actions, no tool working without touching the material, no hands passing through objects, and no repeating the same movement in a loop.';
+  const amountLine = seconds => `Amount of work: in these ${seconds} seconds only the small amount of work that one person can really do in that time appears (for example 3 or 4 bricks laid, a few trowels of mortar spread, one section of clay smoothed, or a few logs split). Everything already built in the first frame keeps exactly the same shape, size, position and material for the whole clip; only a little new work is added on top of it, and finished parts, tools, buckets and piles never appear, disappear or move by themselves.`;
+  const TECHNIQUE = 'Technique: the person uses the real, correct technique for this job, the way an experienced builder or bushcraft worker does: the right grip on the tool with both hands where needed, a stable stance, real weight and effort in each movement, and the materials react exactly as real materials do (clay squashes and smears, bricks sit on mortar, stones are lifted with effort, wood splits along the grain). No pretend or mimed actions, no tool working without touching the material, and no hands passing through objects.';
 
   // Đồ cầm trên tay: AI hay «đổi đồ» giữa chừng (đang cầm chổi thì thành xẻng, tay tự mọc thêm đồ). Mỗi cảnh chỉ cầm MỘT dụng cụ đúng việc, giữ nguyên cả clip;
   // sang bước mới thì đặt dụng cụ cũ xuống thấy rõ rồi nhặt dụng cụ mới lên, không đổi tức thì.
@@ -662,6 +663,7 @@
       sv ? PACE_TEXT[pace] : 'Pace: fast and energetic, as in a sped-up video; quick hands, quick steps, fast tool movements and rapid progress. Never slow motion, never slow or calm movement.',
       'Realism: it must look like a real person really doing this job. Natural human movement, real weight and real physics. Every change in the scene is made visibly by the person with their own hands and real tools; nothing ever changes by itself, by magic or by a cut.',
       sv ? TECHNIQUE : '',
+      sv ? amountLine(config.seconds) : '',
       'Continuity: the attached image shows the exact current state. Keep the same place, the same viewpoint, the same lighting and everything already done exactly as in the image. Do not add, remove, move or change anything except what this step does. Do not cut to another scene.',
       first ? '' : 'This clip continues directly from the previous clip without any jump: the person keeps the same pose, the same tool in the hands and the same movement as in the attached frame, and goes on working.',
       NO_SPEECH_FLOW,   // Muse và Flow đều xin tiếng động tự nhiên của công việc (chổi, nước, dụng cụ); không lời, không nhạc. Trước 1.9.1 Muse bị dặn «hoàn toàn im lặng» nên video ra không có âm thanh.

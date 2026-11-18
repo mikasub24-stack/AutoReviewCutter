@@ -63,7 +63,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     // Chủ đề: «cả ngôi nhà» đứng đầu và được chọn sẵn; có đủ 14 chủ đề (5 kiểu xây bếp nằm trước «Chủ đề khác»).
     const chips = await page.$$eval('#restoreTheme .chip', els => els.map(e => [e.dataset.theme, e.getAttribute('aria-pressed')]));
     assert.equal(chips.length, 14);
-    assert.deepEqual(chips.map(c => c[0]).slice(-6), ['stove_clay', 'stove_brick', 'stove_rocket', 'stove_oven', 'stove_stone', 'custom']);
+    assert.deepEqual(chips.map(c => c[0]).slice(-6), ['stove_clay', 'stove_brick', 'stove_ring', 'stove_oven', 'stove_stone', 'custom']);
     assert.deepEqual(chips[0], ['house_full', 'true']);
     assert.match(await page.locator('#restoreHint').textContent(), /TOÀN CẢNH/);
     // Nhà đi từ ngoài vào trong: không cho cố định một góc.
@@ -115,6 +115,8 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.click('#restoreTheme [data-theme="stove_clay"]');
     assert.equal(await page.locator('#restoreMinutes').inputValue(), '8', 'chọn bếp đất sét: 8 phút');
     assert.equal(await page.locator('#restorePerson').isDisabled(), true, 'bếp: luôn có người làm');
+    assert.equal(await page.locator('#restoreCamera').inputValue(), 'fixed', 'bếp: mặc định cố định một góc quay');
+    assert.equal(await page.locator('#restoreCamera').isDisabled(), false, 'vẫn đổi lại được');
     assert.match(await page.locator('#restoreHint').textContent(), /flat open ground|khoảng đất phẳng/);
     await page.selectOption('#restoreMinutes', '10');
     await page.click('#restoreTheme [data-theme="stove_clay"]');

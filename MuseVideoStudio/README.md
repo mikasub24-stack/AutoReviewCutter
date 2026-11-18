@@ -142,6 +142,15 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.8
+
+- **Sửa theo video bếp rocket 9 phút bạn gửi** (xem lại từng khung hình): hình dáng bếp đổi liên tục giữa các cảnh (tháp gạch bậc thang → ống kim loại + ống khói sắt → 3 cục hình nón → trụ đất nâu → tháp trắng nứt → hộp trắng), gạch tự mọc ra trong 8 giây, nền tự thành tấm bê tông, thêm đống gạch và nồi gang đen lơ lửng, cảnh cắt mất đầu người hoặc zoom sát mặt. Nguyên nhân chính: bếp rocket có lõi bên trong (ống nạp củi, ống thẳng đứng, đổ tro cách nhiệt) không quay thấy được nên Muse tự bịa, chữ «tube / chimney / riser» bị hiểu thành ống kim loại, và lệnh «tua nhanh 4x, tiến triển thật rõ» khiến Muse nhảy cóc công việc.
+- **Thay «bếp rocket» bằng «bếp lửa vòng gạch tròn có kiềng gỗ treo nồi»**: mọi bước đều thấy bên ngoài (vẽ vòng, đào rãnh, rải cát, xây 5 vòng gạch, miết mạch, rải sỏi, xếp đá viền, chẻ củi, dựng kiềng ba chân, nhóm lửa, treo nồi). Bản 1.9.7 đã chọn «bếp rocket» thì cần chọn lại chủ đề.
+- **Cảnh bếp mặc định cố định một góc quay** (đổi lại được ở Tùy chọn thêm), khung hình luôn có cả cái bếp lẫn toàn thân người, đầu không bị cắt.
+- **Mỗi cảnh chỉ làm một lượng việc nhỏ có thật** (ví dụ 3–4 viên gạch, vài bay vữa): phần đã xây giữ nguyên hình dạng, vị trí, chất liệu; đồ vật, xô, đống gạch không tự xuất hiện, biến mất hay nhúc nhích; nền luôn là đất nện (không tự thành tấm bê tông). Nhịp «nhanh» đổi từ «tua 4x» sang «nhịp làm nhanh, lặp lại, vẫn tốc độ phim thường» (nhịp thật và chậm giữ nguyên).
+- **Sửa các bước dễ bị hiểu thành vật kim loại hoặc khó quay**: ống khói luôn là gạch / đất / đá đặc «không phải ống kim loại»; bếp gạch bỏ bước «đổ bê tông» (lát cát + gạch nền), mặt bếp có 2 ô vuông thay ô tròn; nồi dùng nồi tráng men, nồi đất, nồi nhôm thay nồi gang.
+- Giới hạn: vẫn chưa chắc 100%. Muse vẫn có thể làm sai hình dạng giữa chừng; clip nào sai thì «Tạo lại» riêng clip đó. Sau khi tạo xong nên xem lại các chỗ nối clip.
+
 ## Update 1.9.7
 
 - **5 chủ đề xây bếp** trong tab «Dọn nhà · Sinh tồn»: bếp đất sét có ống khói (2 họng), bếp gạch đỏ 2 họng, bếp rocket tiết kiệm củi, lò nướng vòm đất sét (nướng bánh, pizza), bếp đá xếp ngoài trời. Mỗi chủ đề 18 bước đúng thứ tự thợ làm thật (đào đất, trộn vữa, xây từng lớp, chừa cửa lò, làm mặt bếp, ống khói, trát, phơi, đốt lửa sấy, nấu thử). Chọn chủ đề là tự đặt 8 phút (60 cảnh 8 giây; 10 phút = 75 cảnh); bấm lại đúng chủ đề đó thì giữ số phút bạn đã đổi.

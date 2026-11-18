@@ -534,7 +534,7 @@ test('ảnh mốc đầu đoạn: dặn trạng thái đã xong (sơn rồi thì
 });
 
 // ---- 1.9.7: xây bếp + sinh tồn tự nhiên (nhịp nhanh / thật / chậm, lau mồ hôi hiếm, khóa chất liệu)
-const STOVES = ['stove_clay', 'stove_brick', 'stove_rocket', 'stove_oven', 'stove_stone'];
+const STOVES = ['stove_clay', 'stove_brick', 'stove_ring', 'stove_oven', 'stove_stone'];
 const promptsOf = (theme, minutes = 8) => {
   const c = P.options({ theme, minutes, seconds: 8 }), steps = P.stepsOf(c);
   return { c, steps, prompts: steps.map((st, i) => P.clipPrompt(c, st, i + 1, steps.length, { first: i === 0 })) };
@@ -552,7 +552,7 @@ test('5 chủ đề xây bếp: 18 bước đúng thứ tự thợ làm, mặc �
     assert.ok(P.EN[id].label && P.EN[id].hint && P.EN[id].placeholder, id);
     assert.ok(t.steps.every(st => st.length === 3 && 'fns'.includes(st[2])), id + ': mỗi bước có nhịp f / n / s');
     assert.ok(new Set(t.steps.map(st => st[2])).size === 3, id + ': đủ cả ba nhịp');
-    assert.ok(t.steps.every(st => !/\b(iron|steel|metal|welds?|gas|electric)\b/i.test(st[1])), id + ': bước không nhắc bếp sắt / gas / điện');
+    assert.ok(t.steps.every(st => !/\b(iron|steel|metal|welds?|gas|electric)\b/i.test(st[1].replace(/(?:\(|; the chimney is solid brick, )?not a metal pipe\)?/gi, ''))), id + ': bước không nhắc bếp sắt / gas / điện (chỉ được nói «không phải ống kim loại»)');
     assert.ok(t.steps.every(st => !/\b(he|she|his|her|him)\b/i.test(st[1])), id + ': không dùng đại từ giới tính (người mặc định là nữ)');
     assert.ok(t.locks.length >= 2 && t.locks.every((l, i, a) => l[0] >= 1 && l[0] <= 18 && (i === 0 || l[0] > a[i - 1][0])), id + ': các mốc khóa tăng dần');
     assert.ok(t.locks.every(l => /never metal|no metal|never a different/.test(l[1]) || /no .*metal body/.test(l[1])), id + ': khóa nói rõ không phải kim loại');
@@ -573,10 +573,11 @@ test('sinh tồn: ba nhịp xen kẽ (tua nhanh, thời gian thật, chậm tỉ
   for (const id of [...STOVES, 'shelter', 'cabin', 'bunker']) {
     const { prompts } = promptsOf(id, id.startsWith('stove') ? 8 : 5);
     const all = prompts.join('\n');
-    assert.match(all, /Pace: FAST-FORWARD/, id);
+    assert.match(all, /Pace: BRISK/, id);
     assert.match(all, /Pace: REAL TIME/, id);
     assert.match(all, /Pace: SLOW AND CAREFUL/, id);
-    assert.doesNotMatch(all, /FAST-MOTION|about 6x speed|Never slow motion|never slow or calm movement|Pace: fast and energetic/, id);
+    assert.doesNotMatch(all, /FAST-MOTION|about 6x speed|Never slow motion|never slow or calm movement|Pace: fast and energetic|sped up about 4x|Pace: FAST-FORWARD/, id);   // không còn tua nhanh: Muse hiểu thành «gạch tự mọc ra»
+    assert.ok(prompts.every(p => /^Amount of work: in these 8 seconds only the small amount of work that one person can really do/m.test(p) && /never appear, disappear or move by themselves/.test(p) && /keeps exactly the same shape, size, position and material for the whole clip/.test(p)), id + ': mỗi cảnh chỉ làm một lượng việc nhỏ có thật, phần đã xây giữ nguyên');
     assert.ok(prompts.every(p => (p.match(/^Pace: /gm) || []).length === 1), id + ': mỗi cảnh đúng một dòng nhịp');
     // nhịp của cảnh đi theo bước: các cảnh cùng một bước giữ nguyên nhịp
     const byStep = new Map();
@@ -618,7 +619,7 @@ test('sinh tồn: kỹ thuật làm thật (cầm dụng cụ đúng, vật li�
 });
 
 test('khóa chất liệu bếp: từ lúc bếp xuất hiện tới cảnh cuối, mọi cảnh nhắc đúng chất liệu; không bao giờ thành bếp sắt', () => {
-  const must = { stove_clay: /CLAY stove[^\n]*no metal body, no cast iron, no steel/, stove_brick: /RED BRICK stove[^\n]*no metal body, no cast iron, no steel/, stove_rocket: /ROCKET stove[^\n]*no metal body/, stove_oven: /CLAY dome oven[^\n]*no metal body, no steel oven/, stove_stone: /STONE stove[^\n]*no brick body, no metal body/ };
+  const must = { stove_clay: /CLAY stove[^\n]*no metal body, no cast iron, no steel/, stove_brick: /RED BRICK stove[^\n]*no metal body, no cast iron, no steel/, stove_ring: /ring of RED BRICKS[^\n]*no metal ring, no steel fire bowl, no cast iron/, stove_oven: /CLAY dome oven[^\n]*no metal body, no steel oven/, stove_stone: /STONE stove[^\n]*no brick body, no metal body/ };
   for (const id of STOVES) {
     const t = P.themeOf(id), first = t.locks[0][0], { steps, prompts } = promptsOf(id);
     prompts.forEach((p, i) => {
@@ -634,7 +635,7 @@ test('khóa chất liệu bếp: từ lúc bếp xuất hiện tới cảnh cu�
   }
   // bếp đất sét: bếp được quét vôi trắng thì khóa chuyển sang vôi trắng nhưng vẫn là đất sét
   const clay = promptsOf('stove_clay');
-  assert.match(clay.prompts[clay.steps.findIndex(s => s.step === 14)], /clay chimney at the back; it is clay, never metal/);
+  assert.match(clay.prompts[clay.steps.findIndex(s => s.step === 14)], /chimney of solid clay at the back, not a metal pipe; it is clay, never metal/);
   assert.match(clay.prompts[clay.steps.findIndex(s => s.step === 16)], /matt white lime-washed clay[^\n]*the stove is clay, never metal/);
   // bước đầu: chưa có vật nào, chưa khóa gì
   assert.doesNotMatch(clay.prompts[0], /OBJECT LOCK/);
@@ -647,8 +648,13 @@ test('khóa chất liệu bếp: từ lúc bếp xuất hiện tới cảnh cu�
   assert.match(bunker.prompts.at(-1), /CLAY stove with a short clay chimney[^\n]*no metal body, no cast iron, no steel/);
   assert.ok(!/stone stove with a chimney pipe|clay stove with a chimney\b/.test(JSON.stringify(P.THEMES.filter(t => ['cabin', 'bunker'].includes(t.id)))), 'bước xây bếp đã đổi lời: không còn «chimney pipe» (ống sắt)');
   // khung hình bếp: gần hơn, thấy cả bếp lẫn người
-  assert.match(clay.prompts[5], /Camera: a still, tripod-mounted real camera like a documentary about building by hand: a medium-wide shot filmed from a few metres away: the whole stove and the person's whole body are in the frame/);
-  assert.doesNotMatch(clay.prompts[5], /WIDE, distant shot/);
+  assert.equal(clay.c.camera, 'fixed', 'bếp: mặc định cố định một góc quay');
+  assert.match(clay.prompts[5], /Camera: one fixed camera on a tripod[^\n]*The framing never changes: a medium-wide shot filmed from a few metres away: the whole stove and the person's whole body \(head included\) are always in the frame/);
+  assert.doesNotMatch(clay.prompts[5], /WIDE, distant shot|^SHOT:/m);
+  const varied = P.options({ theme: 'stove_clay', minutes: 8, camera: 'varied' });
+  assert.equal(varied.camera, 'varied', 'vẫn chọn lại được góc xen kẽ');
+  assert.match(P.clipPrompt(varied, P.stepsOf(varied)[5], 6, 60), /Camera: a still, tripod-mounted real camera like a documentary about building by hand: a medium-wide shot/);
+  assert.equal(cabin.c.camera, 'varied', 'nhà gỗ, hầm: giữ như cũ');
   assert.match(cabin.prompts[5], /documentary about building by hand: a WIDE, distant shot filmed from far away/);
   // dọn nhà không bị ảnh hưởng
   const house = P.options({ theme: 'house_full', minutes: 5 });

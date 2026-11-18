@@ -60,6 +60,8 @@
       b.onclick = () => {
         // Chủ đề xây bếp: chọn là tự đặt 8 phút (đủ 18 bước, mỗi bước ~25 giây); chọn lại đúng chủ đề đó thì giữ số phút người dùng đã đổi.
         if (t.defaultMinutes && t.id !== theme) $('restoreMinutes').value = String(t.defaultMinutes);
+        // Cảnh bếp: mặc định cố định một góc quay (đổi góc giữa các cảnh làm bếp bị đổi hình dạng); vẫn đổi lại được ở «Tùy chọn thêm».
+        if (t.defaultCamera && t.id !== theme) $('restoreCamera').value = t.defaultCamera;
         theme = t.id; remember(); renderThemes(); syncTheme(); renderCount();
       };
       return b;
