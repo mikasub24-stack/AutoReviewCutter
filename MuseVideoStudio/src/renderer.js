@@ -16,6 +16,23 @@ let state,drafts=[],referenceFiles=[],filter='all',restoredQueue=false,firstSnap
 const labels={pending:'Đang chờ',running:'Đang xử lý',completed:'Đã xong',failed:'Cần kiểm tra',interrupted:'Đã dừng'};
 function toast(text){$('toast').textContent=text;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,10000);}
 async function call(name,data){try{return await window.studio.invoke(name,data);}catch(e){toast(e.message.replace(/^Error invoking remote method '[^']+': Error: /,''));return null;}}
+// Hộp xác nhận xóa DÙNG CHUNG cho mọi tab (thẻ tác vụ, «Xóa toàn bộ danh sách», video Dọn nhà): có ô «xóa luôn file đã tự lưu» (chuyển vào Thùng rác, khôi phục được).
+// opts: title, text, label (chữ của ô tick), hint, checked (mặc định tick hay không). Trả về {files:boolean} hoặc null nếu bấm Hủy / Esc. Chữ tiếng Việt được tự dịch theo ngôn ngữ giao diện.
+function askDelete({title='Xóa?',text='',label='Xóa luôn file đã tự lưu về máy',hint='File được chuyển vào Thùng rác nên khôi phục được. Bản bạn đã lưu ra nơi khác không bị đụng tới.',checked=false}={}){
+  return new Promise(resolve=>{
+    const dlg=el('dialog','restoreDeleteDialog deleteDialog');
+    const row=el('div','dialogActions'),line=el('label','checkLine'),check=document.createElement('input');check.type='checkbox';check.id='deleteFiles';check.checked=Boolean(checked);
+    line.append(check,el('span','',label));
+    const cancel=el('button','secondary','Hủy'),ok=el('button','primary','Xóa');cancel.type=ok.type='button';ok.id='deleteOk';cancel.id='deleteCancel';
+    row.append(cancel,ok);
+    dlg.append(el('h3','',title));if(text)dlg.append(el('p','',text));dlg.append(line,el('p','hint',hint),row);
+    let result=null;
+    ok.onclick=()=>{result={files:check.checked};dlg.close();};cancel.onclick=()=>dlg.close();
+    dlg.addEventListener('close',()=>{dlg.remove();resolve(result);});
+    document.body.append(dlg);dlg.showModal();ok.focus();
+  });
+}
+const trashedToast=r=>{if(r?.removed?.trashed>0)toast('Đã chuyển file đã lưu vào Thùng rác (khôi phục được).');};
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;}
 const refMode=()=>$('referenceMode').value;
 function mapped(items){return window.referenceMap.mapReferences(items,referenceFiles,{mode:refMode()});}
@@ -128,10 +145,16 @@ function makeCard(id){
   row.upload.title='Tự thêm video cho cảnh này (đã tạo ở nơi khác): chọn file MP4 / WebM, tool đặt tên theo số cảnh và coi cảnh là đã xong.';
   row.remove=action('Xóa',async()=>{
     const j=row.job;
-    if(j.kind==='story'){   // Kể chuyện: xóa cảnh thì clip đã tải của cảnh vào Thùng rác; xóa cảnh cuối thì cả thư mục truyện (clip, ảnh, video ghép).
+    if(j.kind==='story'){   // thẻ cảnh của Kể chuyện: như trước (clip đã tải vào Thùng rác). Xóa CẢ truyện kèm tùy chọn giữ file: nút «Xóa» ở danh sách «Truyện đã tạo».
       const last=!(state?.jobs||[]).some(x=>x.kind==='story'&&x.storyId===j.storyId&&x.id!==j.id);
       if(last&&!confirm('Đây là cảnh cuối của truyện '+j.storyId+'. Xóa sẽ chuyển cả thư mục KeChuyen/'+j.storyId+' (clip, ảnh, video ghép) vào Thùng rác. Tiếp tục?'))return;
       if(!last&&j.output&&!confirm('Xóa cảnh này? Clip đã tải của cảnh cũng được chuyển vào Thùng rác.'))return;
+    }
+    // Tab Video / Ảnh: mỗi thẻ là một tác vụ, nên có ô «xóa luôn file đã tự lưu» (Thùng rác). Cảnh của Dọn nhà / Động vật chỉ là một phần của video: xóa video ở danh sách của tab đó.
+    if((j.kind==='video'||j.kind==='image')&&j.output){
+      const pick=await askDelete({title:'Xóa tác vụ này?',text:'Tác vụ sẽ bị bỏ khỏi danh sách.',label:'Xóa luôn file đã tự lưu về máy của tác vụ này'});
+      if(!pick)return;
+      const result=await call('remove',pick.files?{id:j.id,deleteFiles:true}:j.id);render(result);trashedToast(result);return;
     }
     render(await call('remove',j.id));
   });
@@ -409,7 +432,18 @@ $('logoutAccount').onclick=async()=>render(await call('logoutAccount',Number($('
 $('testBrowsers').onclick=async()=>render(await call('testBrowsers'));
 $('start').onclick=async()=>render(await call('start',{kind:mode}));$('pause').onclick=async()=>render(await call('stop'));
 $('clearPending').onclick=async()=>{if(confirm('Xóa tất cả tác vụ đang chờ? Các clip đã tải vẫn giữ nguyên.'))render(await call('clearPending',{kind:mode}));};
-$('clearList').onclick=async()=>{if(confirm(isStory()?'Dừng và xóa toàn bộ danh sách clip kể chuyện? Thư mục KeChuyen của các truyện này (clip, ảnh, video ghép) cũng được chuyển vào Thùng rác. Tác vụ đã gửi có thể còn chạy trên Muse.':'Dừng và xóa toàn bộ danh sách tác vụ? File video đã tải không bị xóa. Tác vụ đã gửi có thể còn chạy trên Muse.'))render(await call('clearList',{kind:mode}));};
+$('clearList').onclick=async()=>{
+  // Chữ từng tab viết trọn câu để có bản dịch tiếng Anh trong ui-i18n.js.
+  const T={
+    story:['Dừng và xóa toàn bộ danh sách clip kể chuyện?','Xóa luôn thư mục KeChuyen của các truyện này (clip, ảnh, video ghép) vào Thùng rác'],
+    image:['Dừng và xóa toàn bộ danh sách ảnh?','Xóa luôn ảnh đã tự lưu về máy của các tác vụ này (vào Thùng rác)'],
+    restore:['Dừng và xóa toàn bộ danh sách video Dọn nhà?','Xóa luôn thư mục DonNha của các video này (clip, ảnh, khung cuối, video đã dựng) vào Thùng rác'],
+    wild:['Dừng và xóa toàn bộ danh sách video Động vật?','Xóa luôn thư mục DongVat của các phim này (clip, ảnh, khung cuối, video đã dựng) vào Thùng rác']
+  }[mode]||['Dừng và xóa toàn bộ danh sách tác vụ?','Xóa luôn file đã tự lưu về máy của các tác vụ này (vào Thùng rác)'];
+  const pick=await askDelete({title:T[0],text:'Tác vụ đã gửi có thể còn chạy trên Muse.',label:T[1],checked:isStory()});
+  if(!pick)return;
+  const result=await call('clearList',{kind:mode,deleteFiles:pick.files});render(result);trashedToast(result);
+};
 $('folder').onclick=async()=>render(await call('folder'));$('export').onclick=()=>call('export');
 $('configure').onclick=()=>{for(const name of ['composer','fileInput','submit','stopSelector','video','image','attachmentReadySelector','messageSelector','timeoutMinutes','accountCount','ffmpeg','browserChoice','browserPath','dispatchMode','cooldownSeconds'])$('settingsForm').elements.namedItem(name).value=state.settings[name]??(name==='image'?'img':name==='dispatchMode'?'parallel':name==='cooldownSeconds'?3:'');$('settingsForm').elements.namedItem('finishAction').value=state.settings.autoMerge?'merge':state.settings.autoPackage?'package':'keep';$('settingsDialog').showModal();};
 $('closeSettings').onclick=()=>$('settingsDialog').close();$('settingsForm').onsubmit=async e=>{e.preventDefault();const result=await call('settings',Object.fromEntries(new FormData(e.target)));if(result){render(result);$('settingsDialog').close();toast('Đã lưu cấu hình.');}};

@@ -417,6 +417,88 @@ test('xóa cảnh / truyện kể chuyện khỏi danh sách thì file trong KeC
   }finally{await fs.rm(dir,{recursive:true,force:true});}
 });
 
+test('«xóa luôn file đã tự lưu» ở MỌI tab: chỉ khi deleteFiles:true, chỉ file trong thư mục lưu, vào Thùng rác; video thêm tay và file ngoài thư mục không bị đụng',{timeout:8000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-trash-all-'));
+  const outside=await fs.mkdtemp(path.join(os.tmpdir(),'muse-outside-'));
+  const R=path.join(dir,'DonNha','R1'),W=path.join(dir,'DongVat','W1'),S=path.join(dir,'KeChuyen','S1'),Img=path.join(dir,'Anh');
+  for(const folder of [R,W,S,Img])await fs.mkdir(folder,{recursive:true});
+  const files={v1:path.join(dir,'v1.mp4'),v2:path.join(dir,'v2.mp4'),v3:path.join(dir,'v3.mp4'),v4:path.join(dir,'v4.mp4'),v5:path.join(dir,'v5.mp4'),manual:path.join(dir,'tay.mp4'),
+    i1:path.join(Img,'i1.png'),i2:path.join(Img,'i2.png'),r1:path.join(R,'001.mp4'),r2:path.join(R,'002.mp4'),w1:path.join(W,'001.mp4'),s1:path.join(S,'001.mp4'),out:path.join(outside,'ngoai.mp4')};
+  for(const f of Object.values(files))await fs.writeFile(f,'x');
+  const job=(id,kind,storyId,output,order,extra={})=>({id,kind,storyId,status:'completed',stage:'completed',prompt:'p '+id,output,order,references:[],image:'',...extra});
+  const seed=[
+    job('v1','video','',files.v1,1),job('v2','video','',files.v2,2),job('v3','video','',files.v3,3),job('v4','video','',files.v4,4),job('v5','video','',files.v5,5,{previousOutputs:[files.v5.replace('v5','v5-cu')]}),
+    job('m1','video','',files.manual,6,{manual:true,outputs:[files.manual]}),job('o1','video','',files.out,7),
+    job('i1','image','',files.i1,8),job('i2','image','',files.i2,9),
+    job('r1','restore','R1',files.r1,10,{phase:'clip',number:1}),job('r2','restore','R1',files.r2,11,{phase:'clip',number:2}),
+    job('w1','wild','W1',files.w1,12,{phase:'clip',number:1}),
+    job('s1','story','S1',files.s1,13)
+  ];
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({settings:{output:dir},configVersion:2,jobs:seed}));
+  try{
+    const app=await boot(dir);
+    await app.invoke('remove','v1');
+    await app.invoke('remove',{id:'v2',deleteFiles:false});
+    assert.equal(app.trashed.length,0,'xóa kiểu cũ (chỉ id) hoặc deleteFiles:false: không đụng tới file');
+    const r=await app.invoke('remove',{id:'v3',deleteFiles:true});
+    assert.deepEqual(app.trashed,[files.v3],'tab Video: deleteFiles:true chuyển file của tác vụ vào Thùng rác');
+    assert.equal(r.removed.trashed,1);assert.equal(r.jobs.some(j=>j.id==='v3'),false);
+    await app.invoke('remove',{id:'m1',deleteFiles:true});
+    await app.invoke('remove',{id:'o1',deleteFiles:true});
+    assert.deepEqual(app.trashed,[files.v3],'video người dùng tự thêm và file nằm ngoài thư mục lưu không bao giờ bị đụng');
+    await app.invoke('remove',{id:'r1',deleteFiles:true});
+    assert.deepEqual(app.trashed.slice(1),[files.r1],'tab Dọn nhà: xóa một cảnh kèm file chỉ chuyển clip của cảnh đó');
+    await app.invoke('remove',{id:'v5',deleteFiles:true});
+    assert.deepEqual(app.trashed.slice(2),[files.v5],'file đã bị xóa từ trước (previousOutputs không còn trên đĩa) thì bỏ qua, không lỗi');
+    const base=app.trashed.length;
+    const imgs=await app.invoke('clearList',{kind:'image',deleteFiles:true});
+    assert.deepEqual(app.trashed.slice(base).sort(),[files.i1,files.i2].sort(),'xóa danh sách Ảnh + deleteFiles: ảnh đã lưu vào Thùng rác');
+    assert.equal(imgs.jobs.some(j=>j.kind==='image'),false);assert.equal(imgs.jobs.some(j=>j.id==='v4'),true,'tab khác giữ nguyên');
+    const b2=app.trashed.length;
+    await app.invoke('clearList',{kind:'restore',deleteFiles:true});
+    assert.deepEqual(app.trashed.slice(b2),[R],'xóa danh sách Dọn nhà + deleteFiles: cả thư mục DonNha/<video> vào Thùng rác');
+    const b3=app.trashed.length;
+    await app.invoke('clearList',{kind:'wild',deleteFiles:false});
+    assert.equal(app.trashed.length,b3,'deleteFiles:false thì giữ thư mục');
+    await app.invoke('clearList',{kind:'story',deleteFiles:false});
+    assert.equal(app.trashed.length,b3,'Kể chuyện cũng giữ file khi bỏ tick');
+    const b4=app.trashed.length;
+    await app.invoke('clearList',{kind:'video',deleteFiles:true});
+    assert.deepEqual(app.trashed.slice(b4),[files.v4],'xóa danh sách Video + deleteFiles: chỉ file còn lại của tab Video');
+    for(const keep of [files.v1,files.v2,files.manual,files.out,files.w1,files.s1])assert.equal(await fs.readFile(keep,'utf8'),'x');
+    await app.stop();
+  }finally{await fs.rm(dir,{recursive:true,force:true});await fs.rm(outside,{recursive:true,force:true});}
+});
+
+test('«Truyện đã tạo»: storyRemove bỏ cả truyện, chỉ chuyển KeChuyen/<truyện> vào Thùng rác khi deleteFiles:true; truyện không có thì báo lỗi; bản ghi mà file video đã mất được dọn',{timeout:8000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-story-runs-'));
+  const root=path.join(dir,'KeChuyen'),A=path.join(root,'Truyen-A'),B=path.join(root,'Truyen-B'),C=path.join(root,'Truyen-C');
+  for(const folder of [A,B,C])await fs.mkdir(folder,{recursive:true});
+  const finalB=path.join(B,'video-b.mp4');
+  for(const file of [path.join(A,'001.mp4'),path.join(A,'002.mp4'),path.join(B,'001.mp4'),finalB,path.join(C,'001.mp4')])await fs.writeFile(file,'x');
+  const job=(id,storyId,output,order,status='completed')=>({id,kind:'story',storyId,status,stage:status,prompt:'p '+id,output,order,references:[],image:''});
+  const seed=[job('a1','Truyen-A',path.join(A,'001.mp4'),1),job('a2','Truyen-A',path.join(A,'002.mp4'),2),job('c1','Truyen-C',path.join(C,'001.mp4'),3,'pending')];
+  // Truyện B đã xuất MP4 và hàng đợi đã dọn: chỉ còn bản ghi
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({settings:{output:dir,storyRuns:{'Truyen-B':{output:finalB,srt:'',name:'B',builtAt:1},'Truyen-X':{output:path.join(dir,'khong-con.mp4'),srt:'',name:'X',builtAt:2}}},configVersion:2,jobs:seed}));
+  try{
+    const app=await boot(dir);
+    await new Promise(r=>setTimeout(r,60));
+    const first=app.invoke('state');
+    assert.deepEqual(Object.keys(first.settings.storyRuns),['Truyen-B'],'bản ghi mà file video đã mất thì được dọn khi mở app');
+    await assert.rejects(()=>app.invoke('storyRemove',{storyId:'Khong-co',deleteFiles:true}),/Không thấy|not found/);
+    assert.equal(app.trashed.length,0);
+    const kept=await app.invoke('storyRemove',{storyId:'Truyen-A',deleteFiles:false});
+    assert.equal(app.trashed.length,0,'bỏ tick: chỉ bỏ khỏi danh sách, file còn nguyên');
+    assert.equal(kept.jobs.some(j=>j.storyId==='Truyen-A'),false);
+    assert.equal(await fs.readFile(path.join(A,'001.mp4'),'utf8'),'x');
+    const gone=await app.invoke('storyRemove',{storyId:'Truyen-B',deleteFiles:true});
+    assert.deepEqual(app.trashed,[B],'tick: cả thư mục KeChuyen/<truyện> vào Thùng rác');
+    assert.equal(gone.removed.trashed,1);assert.equal(gone.settings.storyRuns['Truyen-B'],undefined,'bản ghi video bị bỏ');
+    assert.equal(gone.jobs.some(j=>j.storyId==='Truyen-C'),true,'truyện khác không bị đụng');
+    await app.stop();
+  }finally{await fs.rm(dir,{recursive:true,force:true});}
+});
+
 function fixtureMp4(){
   const box=(type,data)=>{const head=Buffer.alloc(8);head.writeUInt32BE(data.length+8);head.write(type,4);return Buffer.concat([head,data]);};
   const hdlr=Buffer.alloc(12);hdlr.write('vide',8);

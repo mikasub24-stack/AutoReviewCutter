@@ -39,7 +39,7 @@ const{importPrompts}=require('../src/prompt-import.js');
   assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='start').length),2);
   assert.match(await page.locator('#queueState').textContent(),/Đang chạy/);
   await page.evaluate(()=>window.fixtureUpdate({testing:false}));await page.locator('#pause').click();
-  await page.locator('.queueMenu summary').click();await page.locator('#clearPending').click();assert.equal(await page.locator('.card').count(),1);await page.locator('#clearList').click();assert.equal(await page.locator('.card').count(),0);
+  await page.locator('.queueMenu summary').click();await page.locator('#clearPending').click();assert.equal(await page.locator('.card').count(),1);await page.locator('#clearList').click();await page.locator('#deleteOk').click();await page.waitForFunction(()=>document.querySelectorAll('.card').length===0);assert.equal(await page.locator('.card').count(),0);
   await page.locator('#toggleEditor').click();await page.locator('#prompts').fill('PROMPT 01: First complete motion prompt.\nPROMPT 02: Second motion prompt.\nPROMPT 03: Third motion prompt.');await page.locator('#referenceMode').selectOption('numbered');await page.locator('#imageFolder').click();await page.locator('#add').click();
   assert.equal(await page.locator('#draftRows textarea').count(),3);assert.match(await page.locator('.draftRow').nth(0).locator('.referenceList').textContent(),/01.png/);assert.match(await page.locator('.draftRow').nth(1).locator('.referenceList').textContent(),/02.png/);
   await page.locator('#commitDrafts').click();const second=await page.evaluate(()=>window.calls.filter(c=>c.name==='add').at(-1).data);assert.deepEqual(second.map(j=>j.references[0].split('\\').pop()),['01.png','02.png','03.png']);

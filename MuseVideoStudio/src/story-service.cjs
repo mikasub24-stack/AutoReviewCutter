@@ -33,11 +33,11 @@ async function freeStoryId(base, { output = '', jobs = [], folderOf = storyFolde
 
 // `kind` / `folderOf` / `runName`: tab khác (Động vật hoang dã) dùng lại cùng bộ làm giọng + ghép, nhưng việc, thư mục và thư mục tạm riêng.
 function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async () => {}, notify = () => {}, userDataDir, kind = 'story', folderOf = storyFolder, runName = 'story-run' }) {
-  const state = { busy: false, progress: '', error: '', output: '', srt: '', notes: [], storyId: '' };
+  const state = { busy: false, progress: '', error: '', output: '', srt: '', notes: [], storyId: '', workId: '' };   // workId: truyện đang / vừa xuất (để báo lỗi đúng truyện)
   let prepared = null, controller = null;
 
   const say = text => { state.progress = text; notify(); };
-  function status() { return { busy: state.busy, progress: state.progress, error: state.error, output: state.output, srt: state.srt, notes: state.notes, storyId: state.storyId }; }
+  function status() { return { busy: state.busy, progress: state.progress, error: state.error, output: state.output, srt: state.srt, notes: state.notes, storyId: state.storyId, workId: state.workId }; }
 
   function pick(storyId) {
     const jobs = storyJobs(getJobs(), storyId, kind);
@@ -58,6 +58,7 @@ function createStoryService({ getSettings, getJobs, voice, ensureAllowed = async
   // Bước 1: làm giọng đọc cho mọi cảnh, đo thời lượng để chia phụ đề.
   function prepare({ storyId, engine = 'none', voice: voiceId = '', tempo = 1, volume = 1 }) {
     return guard(async signal => {
+      state.workId = storyId;
       await ensureAllowed();
       const jobs = pick(storyId);
       const settings = getSettings();

@@ -70,6 +70,8 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
           if (name === 'storyListen') return 'C:\\Data\\preview\\nghe.mp3';
           if (name === 'storyPrepare') return { runId: 'r1', scenes: s.jobs.filter(j => j.kind === 'story' && j.storyId === data.storyId).map(j => ({ id: j.id, number: j.order, text: j.voiceover, seconds: 4.4, clipSeconds: 10, voiceSeconds: 4, pauses: [] })) };
           if (name === 'storyBuild') { s.story.output = 'C:\\Videos\\KeChuyen\\Truyen-1\\Truyen-1.mp4'; s.story.srt = data.srt ? 'C:\\Videos\\KeChuyen\\Truyen-1\\Truyen-1.srt' : ''; s.story.notes = [{ scene: 1, cut: 5.6, hold: 0 }, { scene: 2, cut: 0, hold: 2 }]; }
+          if (name === 'storyRemove') { s.jobs = s.jobs.filter(j => !(j.kind === 'story' && j.storyId === data.storyId)); if (s.settings.storyRuns) delete s.settings.storyRuns[data.storyId]; return { ...structuredClone(s), removed: { storyId: data.storyId, trashed: data.deleteFiles ? 1 : 0 } }; }
+          if (name === 'storyReveal') return true;
           return structuredClone(s);
         }
       };
@@ -92,6 +94,15 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
     assert.equal(await page.locator('.card').count(), 3);
     assert.equal(await page.locator('#storyPanel').isVisible(), true);
     assert.equal(await page.locator('#storyOutput').isVisible(), true);
+    // «Truyện đã tạo»: MỖI TRUYỆN một dòng (không phải từng thẻ cảnh trong hàng đợi).
+    assert.equal(await page.locator('#storyRuns').isVisible(), true);
+    assert.equal(await page.locator('#storyRunsList .storyRun').count(), 1);
+    assert.equal(await page.locator('.storyRun[data-story="Truyen-1"] strong').textContent(), 'Truyen-1');
+    assert.equal(await page.locator('.storyRun[data-story="Truyen-1"] .storyRunTop span').textContent(), '3/3 cảnh');
+    assert.equal(await page.locator('.storyRun[data-story="Truyen-1"] .storyRunFinish').isVisible(), true, 'clip xong hết mà chưa ghép: dòng truyện có nút Hoàn thành video');
+    assert.equal(await page.locator('.storyRun[data-story="Truyen-1"] .storyRunOpen').textContent(), 'Mở thư mục');
+    assert.equal(await page.locator('.storyRun[data-story="Truyen-1"] .storyRunDelete').isEnabled(), true);
+    assert.equal(await page.locator('.card').count(), 3, 'thẻ cảnh vẫn là thẻ cảnh; xóa cả truyện nằm ở danh sách «Truyện đã tạo»');
     assert.equal(await page.locator('#editorPanel').isVisible(), false);
     assert.equal(await page.locator('#outputTools').isVisible(), false);
     assert.equal(await page.locator('#folderPath').textContent(), 'C:\\Videos\\KeChuyen');
@@ -1079,11 +1090,14 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       assert.equal(await page.locator('#sdPct').textContent(), '85%');
       if (process.env.SHOT) await page.locator('#storyDone').screenshot({ path: process.env.SHOT.replace('.png', '-todo.png') });
       const bd = await builds();
-      await page.evaluate(() => { document.getElementById('storyOutput').open = true; }); await nap(100);
-      await page.locator('#storyExport').click();
+      // Nút «Hoàn thành video» nằm ngay trên thanh báo, cả khi mục xuất MP4 đang thu gọn: bấm là ghép lại.
+      assert.equal(await page.locator('#sdFinish').isVisible(), true, 'clip xong hết mà chưa ghép: có nút Hoàn thành video');
+      assert.equal(await page.locator('#sdFinish').textContent(), 'Finish the video');
+      await page.locator('#sdFinish').click();
       await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyBuild').length > n, bd);
       await page.waitForFunction(() => /final video is ready/.test(document.getElementById('sdTitle').textContent));
       assert.equal(await page.locator('#sdPct').textContent(), '100%');
+      assert.equal(await page.locator('#sdFinish').isVisible(), false, 'video xong thì không còn nút Hoàn thành video');
       assert.match(await page.locator('#sdFile').textContent(), /Truyen-1\.mp4/);
       await page.evaluate(() => { document.getElementById('storyOutput').open = false; }); await nap(100);
       assert.equal(await page.locator('#storyDone').isVisible(), true, 'mục thu gọn vẫn thấy thanh 100%');
@@ -1091,7 +1105,44 @@ const { chromium } = require('playwright-core'), http = require('http'), fs = re
       await page.evaluate(() => { window.s.story.error = 'Không đọc được giọng'; window.push(); }); await nap(200);
       assert.match(await page.locator('#sdTitle').textContent(), /not finished/);
       assert.equal(await page.locator('#sdBar').isVisible(), true);
+      // Lỗi giọng đọc giữa chừng: có nút Hoàn thành video + lời nhắn clip còn nguyên; bấm là xuất lại.
+      assert.equal(await page.locator('#sdFinish').isVisible(), true, 'lỗi ghép video: có nút Hoàn thành video');
+      assert.match(await page.locator('#sdFinishHint').textContent(), /clips are safe/);
+      const bErr = await builds();
+      await page.locator('#sdFinish').click();
+      await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyBuild').length > n, bErr);
       await page.evaluate(() => { window.s.story.error = ''; document.getElementById('storyOutput').open = true; window.push(); }); await nap(200);
+      // «Truyện đã tạo» (nhiều truyện): Hoàn thành video đúng truyện của dòng bấm; Xóa có ô «xóa luôn file đã lưu» (tick sẵn ở Kể chuyện), Hủy thì không xóa.
+      await page.evaluate(() => { window.s.story.output = ''; window.s.story.srt = ''; window.s.story.error = ''; window.s.settings.storyRuns = { 'Truyen-CU': { output: 'C:\\Videos\\KeChuyen\\Truyen-CU\\cu.mp4', srt: '', name: 'Cũ', builtAt: 5 } }; window.push(); }); await nap(300);
+      const calls = n => page.evaluate(x => window.calls.filter(c => c.name === x).map(c => c.data), n);
+      assert.equal(await page.locator('.storyRun[data-story="Truyen-CU"]').count(), 1, 'truyện đã xuất MP4 mà hàng đợi đã dọn vẫn có dòng riêng');
+      assert.equal(await page.locator('.storyRun[data-story="Truyen-CU"] .storyRunFinish').count(), 0, 'truyện đã có video thì không có nút Hoàn thành video');
+      assert.equal(await page.locator('.storyRun[data-story="Truyen-CU"] .storyRunTop span').textContent(), 'MP4 exported');
+      assert.equal(await page.locator('.storyRun[data-story="Truyen-CU"] .storyRunOpen').textContent(), 'Open video');
+      await page.locator('.storyRun[data-story="Truyen-CU"] .storyRunOpen').click();
+      assert.deepEqual((await calls('storyReveal')).at(-1), { storyId: 'Truyen-CU' });
+      const prepBefore = (await calls('storyPrepare')).length;
+      await page.locator('.storyRun[data-story="Truyen-OLD"] .storyRunFinish').click();
+      await page.waitForFunction(n => window.calls.filter(c => c.name === 'storyPrepare').length > n, prepBefore);
+      assert.equal((await calls('storyPrepare')).at(-1).storyId, 'Truyen-OLD', 'Hoàn thành video ghép đúng truyện của dòng, không phải truyện đang chọn ở ô «Truyện»');
+      await nap(300);
+      await page.evaluate(() => { window.s.story.output = ''; window.s.story.srt = ''; window.s.story.error = ''; window.push(); }); await nap(200);
+      const removes = () => calls('storyRemove');
+      await page.locator('.storyRun[data-story="Truyen-CU"] .storyRunDelete').click();
+      assert.equal(await page.locator('#deleteFiles').isChecked(), true, 'Kể chuyện: tick sẵn «xóa luôn file đã lưu»');
+      await page.locator('#deleteCancel').click(); await nap(100);
+      assert.equal((await removes()).length, 0, 'Hủy thì không xóa gì');
+      await page.locator('.storyRun[data-story="Truyen-CU"] .storyRunDelete').click();
+      await page.locator('#deleteOk').click();
+      await page.waitForFunction(() => !document.querySelector('.storyRun[data-story="Truyen-CU"]'));
+      assert.deepEqual((await removes()).at(-1), { storyId: 'Truyen-CU', deleteFiles: true });
+      assert.equal(await page.locator('#deleteFiles').count(), 0, 'hộp thoại đã đóng và gỡ khỏi trang');
+      await page.locator('.storyRun[data-story="Truyen-OLD"] .storyRunDelete').click();
+      await page.locator('#deleteFiles').uncheck();
+      await page.locator('#deleteOk').click();
+      await page.waitForFunction(() => !document.querySelector('.storyRun[data-story="Truyen-OLD"]'));
+      assert.deepEqual((await removes()).at(-1), { storyId: 'Truyen-OLD', deleteFiles: false }, 'bỏ tick: chỉ bỏ khỏi danh sách, giữ file');
+      assert.equal(await page.locator('.storyRun[data-story="Truyen-1"]').count(), 1, 'truyện khác không bị đụng');
       await page.locator('#modeAd').click(); await nap(100); await page.locator('#modeStory').click(); await nap(100);
       // Thanh tiến trình %: tạo clip 0–85%, rồi đọc giọng / edit / nối; ẩn nút «Xuất MP4» và dòng hướng dẫn thủ công lúc đang chạy, hiện lại khi xong.
       await page.locator('#modeStory').click(); await setAuto(true);

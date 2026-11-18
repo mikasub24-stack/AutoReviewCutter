@@ -264,6 +264,30 @@ async function trashStoryFiles({ids=[],files=[]}){
   }
   return moved;
 }
+// Mọi tab khác (Video, Ảnh, Dọn nhà, Động vật): xóa tác vụ khỏi danh sách; TÙY CHỌN (người dùng tick) chuyển luôn file đã tự lưu về máy vào THÙNG RÁC.
+// Chỉ đụng tới file nằm TRONG <thư mục lưu> (không bao giờ ra ngoài), thư mục chỉ là DonNha/<video> hoặc DongVat/<phim>; không xóa vĩnh viễn;
+// bản «Lưu video…» đã chép ra nơi khác, video người dùng tự thêm (manual) và thư mục KeChuyen (tab Kể chuyện có đường riêng) không bị đụng tới.
+const savedFilesOf=job=>job.manual?[]:[...new Set([job.output,...(job.outputs||[]),...(job.previousOutputs||[]),job.lastFrame])].filter(f=>typeof f==='string'&&f);
+async function trashSaved({files=[],folders=[]}){
+  if(!settings.output||typeof shell.trashItem!=='function')return 0;
+  const out=path.resolve(settings.output),roots=[path.join(out,'DonNha'),path.join(out,'DongVat')],story=path.join(out,'KeChuyen'),targets=[];
+  for(const f of folders){if(typeof f!=='string'||!f)continue;const r=path.resolve(f);if(roots.some(root=>inside(root,r))&&!targets.some(t=>t.path===r))targets.push({path:r,dir:true});}
+  for(const f of files){
+    if(typeof f!=='string'||!f)continue;
+    const r=path.resolve(f);
+    if(!inside(out,r)||inside(story,r)||targets.some(t=>t.path===r||(t.dir&&inside(t.path,r))))continue;
+    targets.push({path:r,dir:false});
+  }
+  let moved=0;
+  for(const t of targets){
+    const info=await fs.stat(t.path).catch(()=>null);
+    if(!info||(t.dir?!info.isDirectory():!info.isFile()))continue;
+    try{await shell.trashItem(t.path);moved++;}
+    catch(error){dialog.showErrorBox(ui('Không chuyển được vào Thùng rác','Could not move to the Recycle Bin'),t.path+'\n'+error.message);}
+  }
+  return moved;
+}
+const trashRestoreFolder=async storyId=>(await trashSaved({folders:[restoreFolder(settings.output,storyId)]}))>0;
 // Tab «Dọn nhà · Sinh tồn»: ảnh đầu của cảnh kế tiếp là khung cuối THẬT của clip này.
 async function saveLastFrame(job,clip){
   const out=path.join(chainFolder(job),'khung-cuoi',String(job.number).padStart(3,'0')+'-cuoi.png');
@@ -651,6 +675,24 @@ async function freeRestoreId(base){
   }
   return `${root}-${Date.now().toString(36)}`;
 }
+// Tab Kể chuyện: nhớ MỖI truyện đã xuất MP4 (file video, phụ đề) để danh sách «Truyện đã tạo» vẫn hiện truyện đã xong dù hàng đợi đã dọn; xóa truyện thì bỏ bản ghi.
+async function rememberStoryRun(name){
+  const st=storyService.status();
+  if(!st.output||!st.storyId)return;
+  (settings.storyRuns||(settings.storyRuns={}))[st.storyId]={output:st.output,srt:st.srt||'',name:name||'',builtAt:Date.now()};
+  await save();notify();
+}
+// Bản ghi mà truyện không còn trong hàng đợi và file video đã mất (người dùng tự xóa) thì bỏ để danh sách không treo bóng ma.
+async function pruneStoryRuns(){
+  const all=settings.storyRuns;if(!all)return;
+  const ids=new Set(queue.jobs.filter(j=>j.kind==='story').map(j=>j.storyId));let changed=false;
+  for(const [id,meta] of Object.entries(all)){
+    if(ids.has(id))continue;
+    const ok=meta?.output&&await fs.stat(meta.output).then(x=>x.isFile(),()=>false);
+    if(!ok){delete all[id];changed=true;}
+  }
+  if(changed){await save();notify();}
+}
 // Dựng video chỉ cần FFmpeg: đóng hết cửa sổ / tab trình duyệt (Muse, Chrome/Edge do tool mở, Flow) để nhường RAM. Chạy tiếp thì tool tự mở lại.
 async function closeAllBrowsers(){
   await Promise.allSettled([...opening.values(),...externalLaunches.values(),flowLaunch].filter(Boolean));
@@ -865,6 +907,7 @@ app.whenReady().then(async () => {
   queue = new Queue({ jobs: stored.jobs || [], save, run: runJob, notify, accounts: () => settings.accountCount });
   voiceService=createVoiceService({dataDir:app.getPath('userData'),getFfmpeg:()=>settings.ffmpeg,notify});await voiceService.load();voiceService.refreshCatalog().catch(()=>{});
   storyService=createStoryService({getSettings:()=>settings,getJobs:()=>queue.jobs,voice:voiceService,ensureAllowed:()=>licenseManager.ensureAllowed(),notify,userDataDir:app.getPath('userData')});
+  void pruneStoryRuns().catch(()=>{});
   storyAnalyzer=createStoryAnalyzer({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.ensureAllowed()});
   wildBuilder=createStoryService({getSettings:()=>settings,getJobs:()=>queue.jobs,voice:voiceService,ensureAllowed:()=>licenseManager.requireLongTerm(),notify,userDataDir:app.getPath('userData'),kind:'wild',folderOf:wildFolder,runName:'wild-run'});
   wildWriter=createWildWriter({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.requireLongTerm()});
@@ -896,7 +939,7 @@ app.whenReady().then(async () => {
     storyRemoveVoice:async key=>{await voiceService.removeClone(String(key||''));return snapshot();},
     storyListen:async data=>voiceService.preview({engine:String(data?.engine||''),voice:String(data?.voice||''),text:String(data?.text||''),tempo:Number(data?.tempo)||1,volume:data?.volume===undefined?1:Number(data.volume)}),
     storyPrepare:async data=>storyService.prepare({storyId:String(data?.storyId||''),engine:String(data?.engine||'none'),voice:String(data?.voice||''),tempo:Number(data?.tempo)||1,volume:data?.volume===undefined?1:Number(data.volume)}),
-    storyBuild:async data=>{await storyService.build({runId:String(data?.runId||''),name:String(data?.name||''),aspect:String(data?.aspect||'16:9'),subtitles:data?.subtitles!==false,srt:data?.srt===true,sfx:String(data?.sfx||'off'),scenes:Array.isArray(data?.scenes)?data.scenes:[]});return snapshot();},
+    storyBuild:async data=>{await storyService.build({runId:String(data?.runId||''),name:String(data?.name||''),aspect:String(data?.aspect||'16:9'),subtitles:data?.subtitles!==false,srt:data?.srt===true,sfx:String(data?.sfx||'off'),scenes:Array.isArray(data?.scenes)?data.scenes:[]});await rememberStoryRun(String(data?.name||''));return snapshot();},
     storyCancel:async()=>{storyService.cancel();return snapshot();},
     storyAnalyze:async data=>{
       try{return await storyAnalyzer.run({script:String(data?.script||''),options:{seconds:Number(data?.seconds),reference:Boolean(data?.reference),aspect:String(data?.aspect||'16:9'),style:String(data?.style||''),character:String(data?.character||''),form:String(data?.form||''),ad:data?.ad,tip:data?.tip===true,tipKind:['plant','history'].includes(data?.tipKind)?data.tipKind:'tip',tipMotion:data?.tipMotion==='full'?'full':'gentle',tipPrompt:data?.tipPrompt==='vi'?'vi':'en',histLook:data?.histLook==='film'?'film':'cartoon'},resume:data?.resume&&{from:Number(data.resume.from),cast:String(data.resume.cast||''),understanding:data.resume.understanding&&typeof data.resume.understanding==='object'?{summary:String(data.resume.understanding.summary||''),approach:String(data.resume.understanding.approach||''),setting:String(data.resume.understanding.setting||'')}:null}});}
@@ -923,7 +966,30 @@ app.whenReady().then(async () => {
     storyFreeId:async data=>freeStoryId(String(data?.base||''),{output:settings.output,jobs:queue.jobs}),
     // Kiểu hình của ảnh tham chiếu đầu tiên ('flat2d' hoặc ''): app viết thẳng kiểu đó vào đầu mọi prompt kể chuyện (xem ref-look.cjs).
     storyRefLook:async data=>{const file=String(data?.file||'');if(!file)return '';try{await fs.access(file);}catch{return '';}return require('./ref-look.cjs').lookOfFile(nativeImage,file);},
-    storyReveal:async()=>{const out=storyService.status().output;if(out)shell.showItemInFolder(out);return true;},
+    // Mở video của truyện (đúng truyện khi có storyId, không thì video vừa xuất); chưa có video thì mở thư mục KeChuyen/<truyện>.
+    storyReveal:async data=>{
+      const id=String(data?.storyId||''),st=storyService.status();
+      const out=id?(settings.storyRuns?.[id]?.output||(st.storyId===id?st.output:'')):st.output;
+      if(out&&await fs.stat(out).then(x=>x.isFile(),()=>false)){shell.showItemInFolder(out);return true;}
+      if(id&&settings.output){const folder=storyFolder(settings.output,id);if(inside(path.join(settings.output,'KeChuyen'),folder)&&await fs.stat(folder).then(x=>x.isDirectory(),()=>false)){await shell.openPath(folder);return true;}}
+      return false;
+    },
+    // «Xóa» một truyện đã tạo: bỏ mọi cảnh của truyện khỏi hàng đợi + bản ghi video; deleteFiles=true thì chuyển luôn thư mục KeChuyen/<truyện> (clip, ảnh, video ghép) vào Thùng rác.
+    storyRemove:async data=>{
+      const storyId=String(data?.storyId||'');
+      if(!storyId)throw Error(ui('Không thấy truyện này.','This story was not found.'));
+      if(stopping||merging||packaging||storyService.status().busy)throw Error(ui('Chờ xử lý hiện tại hoàn tất.','Wait for the current work to finish.'));
+      const own=queue.jobs.filter(j=>j.kind==='story'&&j.storyId===storyId);
+      if(!own.length&&!settings.storyRuns?.[storyId])throw Error(ui('Không thấy truyện này.','This story was not found.'));
+      if(own.some(j=>j.status==='running'))throw Error(ui('Dừng hàng đợi trước khi xóa truyện đang được tạo.','Stop the queue before removing a story that is being made.'));
+      for(const job of own){browsers.get(Number(job.account)-1)?.releasePage?.(job.id);if(job.trackerId)void dom(browsers.get(Number(job.account)-1),endTracking,{id:job.trackerId}).catch(()=>{});}
+      await queue.removeStory('story',storyId);
+      if(settings.storyRuns)delete settings.storyRuns[storyId];
+      if(storyService.state.storyId===storyId)Object.assign(storyService.state,{output:'',srt:'',notes:[],storyId:'',error:'',progress:''});
+      const trashed=data?.deleteFiles===true?await trashStoryFiles({ids:[storyId]}):0;
+      await save();notify();
+      return {...snapshot(),removed:{storyId,trashed}};
+    },
     // «Tải video»: hộp «Lưu như…» để chọn nơi lưu một bản sao MP4 (kèm .srt cùng tên nếu có và chưa có file trùng).
     storySave:async()=>{
       const st=storyService.status(),out=st.output;if(!out)return false;
@@ -1076,7 +1142,19 @@ app.whenReady().then(async () => {
       return {...snapshot(),relocked:{changed,skipped,total:scope.length}};
     },
     retry: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); const target=queue.jobs.find(j=>j.id===id),browser=browsers.get(Number(target?.account)-1);if(target?.kind==='video')invalidateOutputs(); await queue.retry(id);browser?.releasePage?.(id); return snapshot(); },
-    remove: async id => { if (merging || packaging) throw Error('Đang xử lý đầu ra video.'); const removed=queue.jobs.find(j=>j.id===id);if(removed?.kind==='video')invalidateOutputs(); await queue.remove(id);if(removed?.kind==='story')await trashStoryFiles(queue.jobs.some(j=>j.kind==='story'&&j.storyId===removed.storyId)?{files:[removed.output]}:{ids:[removed.storyId]});browsers.get(Number(removed?.account)-1)?.releasePage?.(id);if(removed?.trackerId)void dom(browsers.get(Number(removed.account)-1),endTracking,{id:removed.trackerId}).catch(()=>{}); return snapshot(); },
+    remove: async data => {   // data = id (cũ) hoặc {id, deleteFiles}. Kể chuyện: mặc định chuyển file vào Thùng rác (deleteFiles:false để giữ); tab khác: chỉ khi deleteFiles:true.
+      if (merging || packaging) throw Error('Đang xử lý đầu ra video.');
+      const id=typeof data==='string'?data:data?.id,deleteFiles=typeof data==='object'&&data?data.deleteFiles:undefined;
+      const removed=queue.jobs.find(j=>j.id===id);if(removed?.kind==='video')invalidateOutputs(); await queue.remove(id);
+      let trashed=0;
+      if(removed?.kind==='story'){
+        const more=queue.jobs.some(j=>j.kind==='story'&&j.storyId===removed.storyId);
+        if(deleteFiles!==false){trashed=await trashStoryFiles(more?{files:[removed.output]}:{ids:[removed.storyId]});if(!more&&settings.storyRuns)delete settings.storyRuns[removed.storyId];}
+      }
+      else if(removed&&deleteFiles===true)trashed=await trashSaved({files:savedFilesOf(removed)});
+      browsers.get(Number(removed?.account)-1)?.releasePage?.(id);if(removed?.trackerId)void dom(browsers.get(Number(removed.account)-1),endTracking,{id:removed.trackerId}).catch(()=>{});
+      return {...snapshot(),removed:{trashed}};
+    },
     browser: async index => { await openMuse(Number(index ?? 0)); return true; },
     diagnostics: async index=>{
       index=Number(index??0);validLoginAccount(index);const muse=browsers.get(index);assertMuse(muse);
@@ -1217,6 +1295,21 @@ app.whenReady().then(async () => {
       meta.excluded=[...set].sort((a,b)=>a-b);
       await save();notify();return snapshot();
     },
+    // «Xóa»: bỏ video (mọi cảnh, ảnh khung, thumbnail) khỏi danh sách. deleteFiles=true thì chuyển luôn file đã tự lưu về máy vào Thùng rác.
+    restoreRemove: async data => {
+      const storyId=String(data?.storyId||'');
+      if(!storyId)throw Error(ui('Không thấy video này.','This video was not found.'));
+      if(stopping||merging||packaging||restoreState.busy)throw Error(ui('Chờ xử lý hiện tại hoàn tất.','Wait for the current work to finish.'));
+      const own=queue.jobs.filter(j=>j.kind==='restore'&&j.storyId===storyId);
+      if(!own.length&&!settings.restoreStories?.[storyId])throw Error(ui('Không thấy video này.','This video was not found.'));
+      if(own.some(j=>j.status==='running'))throw Error(ui('Dừng hàng đợi trước khi xóa video đang được tạo.','Stop the queue before removing a video that is being made.'));
+      for(const job of own){browsers.get(Number(job.account)-1)?.releasePage?.(job.id);if(job.trackerId)void dom(browsers.get(Number(job.account)-1),endTracking,{id:job.trackerId}).catch(()=>{});}
+      await queue.removeStory('restore',storyId);
+      if(settings.restoreStories)delete settings.restoreStories[storyId];
+      const trashed=data?.deleteFiles===true?await trashRestoreFolder(storyId):false;
+      await save();notify();
+      return {...snapshot(),removed:{storyId,trashed}};
+    },
     // «Lưu video…»: hộp «Lưu như…» để chọn nơi lưu và đặt tên cho bản sao MP4 hoàn chỉnh.
     restoreSave: async data => {
       const out=settings.restoreStories?.[String(data?.storyId||'')]?.output;
@@ -1336,7 +1429,22 @@ app.whenReady().then(async () => {
     pause: stopAll,
     stop: stopAll,
     clearPending: async data=>{if(merging||packaging)throw Error('Chờ xử lý đầu ra hoàn tất.');const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':data?.kind==='restore'?'restore':data?.kind==='wild'?'wild':data?.kind==='video'?'video':'';if(kind==='video'||kind==='')invalidateOutputs();await queue.clearPending(kind);return snapshot();},
-    clearList: async data=>{if(stopping||merging||packaging)throw Error('Chờ xử lý đầu ra hoàn tất.');const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':data?.kind==='restore'?'restore':data?.kind==='wild'?'wild':data?.kind==='video'?'video':'';await stopAll();for(const job of queue.jobs.filter(j=>!kind||j.kind===kind)){browsers.get(Number(job.account)-1)?.releasePage?.(job.id);if(job.trackerId)void dom(browsers.get(Number(job.account)-1),endTracking,{id:job.trackerId}).catch(()=>{});}const storyIds=queue.jobs.filter(j=>j.kind==='story'&&(!kind||kind==='story')).map(j=>j.storyId);await queue.clearAll(kind);if(storyIds.length)await trashStoryFiles({ids:storyIds});if(kind==='video'||kind==='')invalidateOutputs();if(kind==='restore'||kind==='')pruneRestoreStories();if(kind==='wild'||kind==='')pruneWildStories();await save();notify();return snapshot();},
+    clearList: async data=>{   // deleteFiles: Kể chuyện mặc định chuyển thư mục KeChuyen vào Thùng rác (false để giữ); tab khác chỉ khi deleteFiles:true (file đã tự lưu vào Thùng rác).
+      if(stopping||merging||packaging)throw Error('Chờ xử lý đầu ra hoàn tất.');
+      const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':data?.kind==='restore'?'restore':data?.kind==='wild'?'wild':data?.kind==='video'?'video':'';
+      await stopAll();
+      const mine=queue.jobs.filter(j=>!kind||j.kind===kind);
+      for(const job of mine){browsers.get(Number(job.account)-1)?.releasePage?.(job.id);if(job.trackerId)void dom(browsers.get(Number(job.account)-1),endTracking,{id:job.trackerId}).catch(()=>{});}
+      const storyIds=mine.filter(j=>j.kind==='story').map(j=>j.storyId);
+      const saved=data?.deleteFiles===true?{files:mine.filter(j=>j.kind==='video'||j.kind==='image').flatMap(savedFilesOf),folders:[...new Set(mine.filter(j=>isChained(j)).map(chainFolder))]}:null;
+      await queue.clearAll(kind);
+      if((kind==='story'||kind==='')&&settings.storyRuns)settings.storyRuns={};   // danh sách «Truyện đã tạo» cũng được xóa sạch
+      let trashed=0;
+      if(storyIds.length&&data?.deleteFiles!==false)trashed+=await trashStoryFiles({ids:storyIds});
+      if(saved)trashed+=await trashSaved(saved);
+      if(kind==='video'||kind==='')invalidateOutputs();if(kind==='restore'||kind==='')pruneRestoreStories();if(kind==='wild'||kind==='')pruneWildStories();
+      await save();notify();return {...snapshot(),removed:{trashed}};
+    },
     applyReferences: async data=>{
       if(data?.assignments){for(const row of data.assignments){const j=queue.jobs.find(x=>x.id===row.id&&x.status==='pending'&&!x.lockedInput);if(j){if(!Array.isArray(row.references)||row.references.some(x=>typeof x!=='string'))throw Error('Ảnh không hợp lệ.');j.references=[...row.references];j.image=j.references[0]||'';}}await queue.publish();}
       else await queue.applyReferences(data?.files||[]);return snapshot();

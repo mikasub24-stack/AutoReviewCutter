@@ -5,7 +5,7 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
-const { randomUUID } = require('node:crypto');
+const { randomUUID, createHash } = require('node:crypto');
 const { command } = require('./merge.cjs');
 
 const ENGINES = ['none', 'windows', 'edge', 'clone', 'preset'];
@@ -132,6 +132,7 @@ function createVoiceService({ dataDir, getFfmpeg = () => 'ffmpeg', platform = pr
   const helperFile = path.join(dataDir, 'voice_helper.py');
   const readyFile = path.join(dataDir, 'voice-ready.json');
   const catalogFile = path.join(dataDir, 'ms-voices.json');
+  const cacheDir = path.join(dataDir, 'voice-cache');
   const win = platform === 'win32';
   const venvPython = win ? path.join(envDir, 'Scripts', 'python.exe') : path.join(envDir, 'bin', 'python');
   const state = { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: false, clone: false }, clones: [], windowsVoices: [], loadedModel: false, catalog: null, catalogBusy: false, catalogError: '' };
@@ -317,6 +318,17 @@ function createVoiceService({ dataDir, getFfmpeg = () => 'ffmpeg', platform = pr
     return out;
   }
 
+  // Giữ tối đa 14 ngày và 600 file giọng đã đọc.
+  async function pruneCache() {
+    try {
+      const rows = [];
+      for (const name of await fs.readdir(cacheDir)) { const st = await fs.stat(path.join(cacheDir, name)).catch(() => null); if (st?.isFile()) rows.push({ name, time: st.mtimeMs }); }
+      rows.sort((a, b) => b.time - a.time);
+      const cutoff = Date.now() - 14 * 86400000;
+      for (const [i, row] of rows.entries()) if (i >= 600 || row.time < cutoff) await fs.rm(path.join(cacheDir, row.name), { force: true });
+    } catch { /* thư mục chưa có */ }
+  }
+
   // items: [{id, text}] → [{id, file, seconds}]
   async function synth({ engine, voice, items, tempo = 1, volume = 1, dir, signal, onProgress = () => {} }) {
     if (!ENGINES.includes(engine) || engine === 'none') throw Error('Chưa chọn giọng đọc.');
@@ -326,6 +338,19 @@ function createVoiceService({ dataDir, getFfmpeg = () => 'ffmpeg', platform = pr
     const extension = engine === 'edge' ? '.mp3' : '.wav';
     const jobs = items.map(item => ({ id: String(item.id), label: item.label == null ? '' : String(item.label).slice(0, 20), text: String(item.text || '').trim(), out: path.join(dir, `${String(item.id).replace(/[^\w-]/g, '')}-${randomUUID().slice(0, 6)}${extension}`) })).filter(j => j.text);
     if (!jobs.length) return [];
+    // Giọng đã đọc xong được lưu lại (theo giọng + lời đọc): xuất lại sau khi lỗi chỉ đọc lại cảnh lỗi, không đọc lại cả truyện.
+    const cacheable = engine === 'edge' || engine === 'preset';
+    const cached = new Set();
+    if (cacheable) {
+      await fs.mkdir(cacheDir, { recursive: true }).catch(() => {});
+      await pruneCache();
+      for (const job of jobs) {
+        job.cache = path.join(cacheDir, createHash('sha1').update([engine, voice, job.text].join('\u0001')).digest('hex').slice(0, 32) + extension);
+        try { if ((await fs.stat(job.cache)).size > 0) { await fs.copyFile(job.cache, job.out); cached.add(job.id); } } catch { /* chưa có thì đọc mới */ }
+      }
+      if (cached.size) onProgress(`Dùng lại giọng đã đọc ${cached.size}/${jobs.length} cảnh`);
+    }
+    const todo = jobs.filter(j => !cached.has(j.id));
     const jobFile = path.join(dir, `job-${randomUUID().slice(0, 6)}.json`);
     let run, ref = '';
     if (engine === 'windows') {
@@ -344,12 +369,16 @@ function createVoiceService({ dataDir, getFfmpeg = () => 'ffmpeg', platform = pr
         if (!found) throw Error('Chưa chọn giọng clone. Thêm file giọng mẫu trước.');
         ref = found.file;
       } else if (!edgeList().some(v => v.id === voice)) throw Error('Chọn một giọng Microsoft trong danh sách.');
-      await fs.writeFile(jobFile, JSON.stringify({ engine, voice, ref, items: jobs }), 'utf8');
+      await fs.writeFile(jobFile, JSON.stringify({ engine, voice, ref, items: todo }), 'utf8');
       run = { file: venvPython, args: [helperFile, jobFile] };
     }
-    const done = new Set(), skipped = new Set();
+    const done = new Set(cached), skipped = new Set();
     let failure = '';
-    const result = await runner(run.file, run.args, {
+    const saveCache = async () => {
+      if (!cacheable) return;
+      for (const job of todo) if (done.has(job.id)) await fs.copyFile(job.out, job.cache).catch(() => {});
+    };
+    const result = todo.length ? await runner(run.file, run.args, {
       timeout: 3600000, signal,
       env: { PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1', HF_HUB_DISABLE_XET: '1', HF_HUB_DISABLE_PROGRESS_BARS: '1', HF_HUB_DISABLE_TELEMETRY: '1', TOKENIZERS_PARALLELISM: 'false' },
       onLine: line => {
@@ -360,7 +389,7 @@ function createVoiceService({ dataDir, getFfmpeg = () => 'ffmpeg', platform = pr
         else if (msg.done !== undefined) { done.add(String(msg.done)); onProgress(`Đã đọc ${done.size}/${jobs.length} cảnh`); }
         else if (msg.skip !== undefined) { skipped.add(String(msg.skip)); onProgress(`Bỏ qua cảnh ${jobs.find(j => j.id === String(msg.skip))?.label || msg.skip}: lời đọc không có chữ để đọc`); }
       }
-    }).catch(error => { if (error.name === 'AbortError') throw error; throw Error('Không chạy được giọng đọc: ' + error.message); });
+    }).catch(error => { if (error.name === 'AbortError') throw error; throw Error('Không chạy được giọng đọc: ' + error.message); }).finally(saveCache) : { code: 0, out: '', err: '' };
     await fs.rm(jobFile, { force: true });
     if (failure) throw Error(failure);
     if (result.code !== 0) throw Error('Giọng đọc thất bại (' + result.code + '): ' + tail(result.err || result.out));

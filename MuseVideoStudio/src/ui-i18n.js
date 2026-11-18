@@ -224,6 +224,8 @@ Clip đã xong hết, chưa ghép thành video hoàn chỉnh|All clips are done,
 Hàng đợi đang dừng|Queue stopped
 ✓ Video hoàn chỉnh đã sẵn sàng|✓ The final video is ready
 Ghép video chưa xong|The video was not finished
+Hoàn thành video|Finish the video
+Clip còn nguyên, không phải tạo lại. Giọng đã đọc xong được dùng lại.|The clips are safe, nothing needs to be regenerated. Voices that were already read are reused.
 Nếu app chưa tự ghép, mở mục «Giọng, phụ đề & xuất MP4» rồi bấm «Xuất MP4».|If the app has not assembled it yet, open “Voice, subtitles & MP4 export” and press “Export MP4”.
 Mở mục «Giọng, phụ đề & xuất MP4» để xem video.|Open “Voice, subtitles & MP4 export” to watch the video.
 Mở video|Open video
@@ -784,6 +786,35 @@ Veo 3.1 Fast (10 tín dụng)|Veo 3.1 Fast (10 credits)
 Veo 3.1 Quality (100 tín dụng)|Veo 3.1 Quality (100 credits)
 Clip chạy cùng lúc|Clips at once
 Mở Flow để đăng nhập Google|Open Flow to sign in to Google
+Xóa?|Remove?
+Tác vụ sẽ bị bỏ khỏi danh sách.|The task will be removed from the list.
+Xóa tác vụ này?|Remove this task?
+Xóa luôn file đã tự lưu về máy của tác vụ này|Also delete the files saved on this computer for this task
+Xóa luôn file đã tự lưu về máy|Also delete the files saved on this computer
+File được chuyển vào Thùng rác nên khôi phục được. Bản bạn đã lưu ra nơi khác không bị đụng tới.|Files go to the Recycle Bin, so they can be restored. Copies you saved elsewhere are not touched.
+Tác vụ đã gửi có thể còn chạy trên Muse.|Submitted tasks may still be running in Muse.
+Đã chuyển file đã lưu vào Thùng rác (khôi phục được).|Saved files were moved to the Recycle Bin (they can be restored).
+Dừng và xóa toàn bộ danh sách clip kể chuyện?|Stop and clear the whole list of story clips?
+Dừng và xóa toàn bộ danh sách ảnh?|Stop and clear the whole list of images?
+Dừng và xóa toàn bộ danh sách video Dọn nhà?|Stop and clear the whole list of house cleanup videos?
+Dừng và xóa toàn bộ danh sách video Động vật?|Stop and clear the whole list of wildlife videos?
+Dừng và xóa toàn bộ danh sách tác vụ?|Stop and clear the whole task list?
+Xóa luôn thư mục KeChuyen của các truyện này (clip, ảnh, video ghép) vào Thùng rác|Also move the KeChuyen folders of these stories (clips, images, final video) to the Recycle Bin
+Xóa luôn ảnh đã tự lưu về máy của các tác vụ này (vào Thùng rác)|Also move the images saved on this computer for these tasks to the Recycle Bin
+Xóa luôn thư mục DonNha của các video này (clip, ảnh, khung cuối, video đã dựng) vào Thùng rác|Also move the DonNha folders of these videos (clips, images, last frames, built video) to the Recycle Bin
+Xóa luôn thư mục DongVat của các phim này (clip, ảnh, khung cuối, video đã dựng) vào Thùng rác|Also move the DongVat folders of these films (clips, images, last frames, built video) to the Recycle Bin
+Xóa luôn file đã tự lưu về máy của các tác vụ này (vào Thùng rác)|Also move the files saved on this computer for these tasks to the Recycle Bin
+Truyện đã tạo|Created stories
+Xóa truyện này?|Remove this story?
+Đã xuất MP4|MP4 exported
+Clip đã xong hết, chưa ghép thành video|All clips are done, the video is not assembled yet
+Ghép video chưa xong|Video assembly is not finished
+Đã xóa truyện và chuyển file đã lưu vào Thùng rác.|Story removed and its saved files moved to the Recycle Bin.
+Đã xóa truyện khỏi danh sách (file vẫn còn trong thư mục).|Story removed from the list (its files are still in the folder).
+Chưa có file hoặc thư mục để mở.|There is no file or folder to open yet.
+Dừng hàng đợi hoặc chờ ghép xong rồi mới xóa được.|Stop the queue or wait for the assembly to finish before removing.
+Clip còn nguyên, không phải tạo lại. Giọng đã đọc xong được dùng lại, chỉ đọc lại cảnh lỗi.|The clips are safe, nothing needs to be regenerated. Voices already read are reused; only failed scenes are read again.
+
 `.trim().split('\n').map(line=>line.split('|')));
   const norm=s=>String(s).replace(/\s+/g,' ').trim();
   let language='en';try{language=localStorage.getItem('museStudio.language')==='vi'?'vi':'en';}catch{}
@@ -814,6 +845,13 @@ Mở Flow để đăng nhập Google|Open Flow to sign in to Google
       [/^Hàng đợi đã dừng, còn (\d+) cảnh chưa xong nên chưa tự xuất MP4\. .*$/,m=>'The queue stopped with '+m[1]+' scene(s) unfinished, so the MP4 was not exported automatically. Click “Continue” to carry on.'],
       [/^Tài khoản (\d+)$/,m=>'Account '+m[1]],
       [/^Đây là cảnh cuối của truyện (.+)\. Xóa sẽ chuyển cả thư mục KeChuyen\/(.+) \(clip, ảnh, video ghép\) vào Thùng rác\. Tiếp tục\?$/,m=>'This is the last scene of story '+m[1]+'. Deleting it moves the whole KeChuyen/'+m[2]+' folder (clips, images, final video) to the Recycle Bin. Continue?'],
+      [/^Truyện (.+) sẽ bị bỏ khỏi danh sách, kể cả mọi cảnh của nó trong hàng đợi\.$/,m=>'Story '+m[1]+' will be removed from the list, including all its scenes in the queue.'],
+      [/^Xóa luôn thư mục KeChuyen\/(.+) \(clip, ảnh, video ghép\) vào Thùng rác$/,m=>'Also move the KeChuyen/'+m[1]+' folder (clips, images, final video) to the Recycle Bin'],
+      [/^(\d+)\/(\d+) cảnh$/,m=>m[1]+'/'+m[2]+' scenes'],
+      [/^Đang dừng · (\d+)\/(\d+) clip$/,m=>'Stopped · '+m[1]+'/'+m[2]+' clips'],
+      [/^(\d+) cảnh lỗi hoặc bị dừng: bấm «Tiếp tục» ở Hàng đợi để làm lại\.$/,m=>m[1]+' scene(s) failed or were stopped: press “Continue” in the queue to redo them.'],
+      [/^✓ Video đã xuất: (.+)$/,m=>'✓ Video exported: '+m[1]],
+      [/^Xóa luôn file đã tự lưu về máy \(thư mục KeChuyen\/(.+): clip, ảnh, video ghép\) vào Thùng rác$/,m=>'Also delete the files saved on this computer (folder KeChuyen/'+m[1]+': clips, images, final video), moving them to the Recycle Bin'],
       [/^Gắn khóa ảnh nhân vật cho (\d+) cảnh chưa xong$/,m=>'Lock '+m[1]+' unfinished scene(s) to the character image'],
       [/^Đã gắn câu khóa hình dạng nhân vật vào (\d+) cảnh theo ảnh \/ hình dạng hiện tại\.$/,m=>'Added the character shape lock to '+m[1]+' scene(s) based on the current image / shape.'],
       [/^Đã gỡ câu khóa hình dạng nhân vật khỏi (\d+) cảnh \(không còn ảnh tham chiếu\)\.$/,m=>'Removed the character shape lock from '+m[1]+' scene(s) (no reference image any more).'],

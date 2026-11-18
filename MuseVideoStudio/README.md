@@ -142,6 +142,17 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.10
+
+- **Tab Kể chuyện có danh sách «Truyện đã tạo»: mỗi câu chuyện là MỘT dòng** (không phải từng thẻ cảnh trong hàng đợi), hiện tên truyện, số cảnh xong, trạng thái (đang tạo / đang dừng / đã xuất MP4 / ghép chưa xong) và các nút:
+  - **Hoàn thành video**: khi clip đã xong hết mà chưa ghép được video (lỗi giọng đọc, mất mạng, tắt app giữa chừng) thì bấm là ghép lại đúng truyện của dòng đó. Clip không phải tạo lại.
+  - **Mở video** (hoặc **Mở thư mục** nếu chưa có video).
+  - **Xóa**: hộp hỏi có xóa luôn file đã tự lưu về máy (thư mục `KeChuyen/<truyện>`: clip, ảnh, video ghép) hay không. File được chuyển vào **Thùng rác** (khôi phục được), không bao giờ xóa vĩnh viễn; bản bạn đã «Lưu video…» ra nơi khác không bị đụng. Tab Kể chuyện tick sẵn như trước đây.
+  - Truyện đã xuất MP4 vẫn nằm trong danh sách dù hàng đợi đã dọn; bản ghi tự mất nếu bạn tự xóa file video ngoài app.
+- **Ghép lại không phải đọc lại cả truyện**: giọng đã đọc xong (Microsoft / VieNeu) được nhớ theo nội dung, nên khi xuất lại sau lỗi chỉ cảnh lỗi bị đọc lại.
+- **Nút «Hoàn thành video» cũng nằm ngay trên thanh báo «Ghép video chưa xong»**, kèm dòng «Clip còn nguyên, không phải tạo lại».
+- **Mọi tab có tùy chọn «xóa luôn file đã tự lưu»** (chuyển vào Thùng rác): xóa một tác vụ ở tab Video / Ảnh, «Xóa toàn bộ danh sách» ở mọi tab, và «Xóa» video ở tab Dọn nhà. Mặc định KHÔNG tick (riêng Kể chuyện tick sẵn). Chỉ đụng tới file nằm trong thư mục lưu; video bạn tự thêm bằng «Tải video lên» và file ngoài thư mục lưu không bao giờ bị xóa.
+
 ## Update 1.9.9
 
 - **Sửa lỗi «Microsoft không trả giọng đọc (No audio was received…)» lúc ghép video.** Lỗi này KHÔNG phải micro: đây là máy chủ giọng đọc miễn phí của Microsoft (Edge TTS) trả về rỗng cho một cảnh. Hay gặp khi gọi dồn dập (bị giới hạn tốc độ), đoạn quá dài, hoặc lời đọc không có chữ nào để đọc (chỉ có «…», emoji, ghi chú trong ngoặc vuông).

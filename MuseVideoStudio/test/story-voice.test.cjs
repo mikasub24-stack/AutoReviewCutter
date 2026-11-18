@@ -83,6 +83,8 @@ class Communicate:
     async def save(self, path):
         global ACTIVE, PEAK
         ACTIVE += 1; PEAK = max(PEAK, ACTIVE)
+        if os.environ.get('FAKE_CALLS'):
+            open(os.environ['FAKE_CALLS'], 'a', encoding='utf-8').write(self.voice + '|' + self.text + '\\n')
         try:
             await asyncio.sleep(0.01)
             if 'LOI' in self.text:
@@ -142,6 +144,40 @@ test('giọng Microsoft (edge): đọc nhiều cảnh, báo tiến độ, thử 
   assert.ok(progress.includes('Đã đọc 2/2 cảnh'));
   await assert.rejects(() => svc.synth({ engine: 'edge', voice: 'vi-VN-HoaiMyNeural', items: [{ id: '1', text: 'LOI' }], dir: path.join(dir, 'run2') }), /Microsoft không trả giọng đọc.*403/);
   await assert.rejects(() => svc.synth({ engine: 'edge', voice: 'giong-la', items: [{ id: '1', text: 'a' }], dir: path.join(dir, 'run3') }), /Chọn một giọng Microsoft/);
+});
+
+test('giọng đã đọc xong được nhớ: xuất lại sau lỗi chỉ đọc lại cảnh lỗi; đổi giọng hoặc đổi lời thì đọc lại', { skip: !(hasFfmpeg && hasNumpy) && 'cần ffmpeg + python3 + numpy' }, async t => {
+  const dir = await temp(t);
+  const svc = await readyService(dir, await fakeLibs(dir));
+  const calls = path.join(dir, 'calls.txt');
+  process.env.FAKE_CALLS = calls;
+  t.after(() => { delete process.env.FAKE_CALLS; });
+  const log = async () => (await fs.readFile(calls, 'utf8').catch(() => '')).split('\n').filter(Boolean);
+  const items = text => [{ id: 'a', label: '1', text: 'Cảnh một đọc được.' }, { id: 'b', label: '2', text }, { id: 'c', label: '3', text: 'Cảnh ba đọc được.' }];
+  const voice = 'vi-VN-HoaiMyNeural';
+  // Lần 1: cảnh 2 bị Microsoft từ chối → báo lỗi, nhưng cảnh 1 và 3 đã đọc xong.
+  await assert.rejects(() => svc.synth({ engine: 'edge', voice, items: items('LOI cảnh hai'), dir: path.join(dir, 'run1') }), /Microsoft không trả giọng đọc.*403/);
+  const first = await log();
+  assert.equal(first.filter(l => /Cảnh một/.test(l)).length, 1, 'cảnh 1 đọc đúng một lần');
+  assert.equal(first.filter(l => /Cảnh ba/.test(l)).length, 1, 'cảnh 3 đọc đúng một lần');
+  // Lần 2 (xuất lại, cảnh lỗi đã ổn): chỉ cảnh 2 gọi Microsoft lại.
+  const progress = [];
+  const out = await svc.synth({ engine: 'edge', voice, items: items('Cảnh hai đọc được.'), dir: path.join(dir, 'run2'), onProgress: m => progress.push(m) });
+  assert.deepEqual(out.map(o => o.id), ['a', 'b', 'c']);
+  const second = (await log()).slice(first.length);
+  assert.equal(second.length, 1, 'chỉ đọc lại cảnh lỗi: ' + second.join(' | '));
+  assert.match(second[0], /Cảnh hai/);
+  assert.ok(progress.some(m => /Dùng lại giọng đã đọc 2\/3 cảnh/.test(m)), progress.join(' | '));
+  assert.ok(out.every(o => o.seconds > 0), 'file giọng dùng lại vẫn đúng và có độ dài');
+  // Lần 3: xuất lại hoàn toàn giống nhau → không gọi Microsoft nữa, kể cả đổi tốc độ / âm lượng (áp dụng sau khi đọc).
+  const before = (await log()).length;
+  const again = await svc.synth({ engine: 'edge', voice, items: items('Cảnh hai đọc được.'), dir: path.join(dir, 'run3'), tempo: 1.2, volume: 0.8 });
+  assert.equal(again.length, 3);
+  assert.equal((await log()).length, before, 'cùng giọng + cùng lời: không đọc lại');
+  // Đổi giọng thì phải đọc lại hết.
+  await svc.synth({ engine: 'edge', voice: 'vi-VN-NamMinhNeural', items: items('Cảnh hai đọc được.'), dir: path.join(dir, 'run4') });
+  assert.equal((await log()).length, before + 3, 'đổi giọng: đọc lại cả 3 cảnh');
+  // Giọng clone không được nhớ (file mẫu có thể đổi).
 });
 
 test('giọng Microsoft: bản dự phòng có hơn 70 ngôn ngữ, Việt rồi Anh đứng đầu; danh sách thật được lọc và xếp theo ngôn ngữ', () => {

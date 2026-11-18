@@ -1250,8 +1250,96 @@
     $('sdTitle').textContent = title;
     $('sdFile').textContent = kind === 'ready' ? baseName(s.output) + (s.srt ? ' + ' + baseName(s.srt) : '') : '';
     $('sdText').textContent = text; $('sdText').classList.toggle('warn', kind === 'error');
+    // Nút «Hoàn thành video»: clip đã xong hết mà chưa ghép được (lỗi giọng đọc, mất mạng, tắt app giữa chừng) thì bấm là ghép lại. Giọng đã đọc xong được dùng lại, chỉ đọc lại cảnh lỗi.
+    const finishable = (kind === 'error' || kind === 'todo') && !exporting && !(state?.story || {}).busy;
+    $('sdActions').hidden = !finishable;
+    $('sdFinish').disabled = !finishable;
+    $('sdFinishHint').textContent = kind === 'error' ? 'Clip còn nguyên, không phải tạo lại. Giọng đã đọc xong được dùng lại.' : '';
     $('sdPct').textContent = pct + '%';
     $('sdFill').style.width = pct + '%'; $('sdBar').setAttribute('aria-valuenow', String(pct));
+  }
+  /* ---------- «Truyện đã tạo»: MỖI TRUYỆN là một tác vụ (không phải từng thẻ cảnh) ---------- */
+  let runsKey = '';
+  function storyRows() {
+    const records = state?.settings?.storyRuns || {}, rows = new Map();
+    const blank = id => ({ id, total: 0, done: 0, running: 0, failed: 0, order: 0 });
+    for (const job of state?.jobs || []) {
+      if (job.kind !== 'story' || !job.storyId) continue;
+      const r = rows.get(job.storyId) || blank(job.storyId);
+      if (job.phase !== 'image') { r.total++; if (job.status === 'completed') r.done++; }
+      if (job.status === 'running') r.running++;
+      if (job.status === 'failed' || job.status === 'interrupted') r.failed++;
+      r.order = Math.max(r.order, job.order || 0);
+      rows.set(job.storyId, r);
+    }
+    for (const [id, meta] of Object.entries(records)) { const r = rows.get(id) || blank(id); r.meta = meta; rows.set(id, r); }
+    return [...rows.values()].sort((a, b) => (b.order || 0) - (a.order || 0) || (b.meta?.builtAt || 0) - (a.meta?.builtAt || 0));
+  }
+  function rowStatus(r) {
+    const s = state?.story || {}, live = Boolean(state?.active || state?.starting);
+    const output = r.meta?.output || (s.storyId === r.id ? s.output : '');
+    const allDone = r.total > 0 && r.done >= r.total;
+    const busyHere = (exporting && currentStory()?.id === r.id) || (Boolean(s.busy) && s.workId === r.id);
+    if (busyHere) return { kind: 'busy', label: 'Đang ghép video hoàn chỉnh…', pct: 90, output, allDone };
+    if (r.total > 0 && !allDone) {
+      const label = live && r.running ? `Đang tạo clip ${r.done}/${r.total}` : `Đang dừng · ${r.done}/${r.total} clip`;
+      return { kind: 'making', label, why: r.failed ? `${r.failed} cảnh lỗi hoặc bị dừng: bấm «Tiếp tục» ở Hàng đợi để làm lại.` : '', pct: Math.round(85 * r.done / r.total), output, allDone };
+    }
+    if (output) return { kind: 'ready', label: '✓ Video đã xuất: ' + baseName(output), pct: 100, output, allDone };
+    if (s.error && s.workId === r.id) return { kind: 'error', label: 'Ghép video chưa xong', why: s.error, pct: 85, output, allDone };
+    return { kind: 'todo', label: 'Clip đã xong hết, chưa ghép thành video', pct: 85, output, allDone };
+  }
+  async function removeStoryRun(r, name) {
+    const pick = await askDelete({   // hộp xóa dùng chung (renderer.js); Kể chuyện: tick sẵn như trước đây (file vào Thùng rác, khôi phục được)
+      title: 'Xóa truyện này?',
+      text: `Truyện ${name} sẽ bị bỏ khỏi danh sách, kể cả mọi cảnh của nó trong hàng đợi.`,
+      label: `Xóa luôn file đã tự lưu về máy (thư mục KeChuyen/${r.id}: clip, ảnh, video ghép) vào Thùng rác`,
+      checked: true
+    });
+    if (!pick) return;
+    const result = await call('storyRemove', { storyId: r.id, deleteFiles: pick.files });
+    if (!result) return;
+    runsKey = ''; exportDone.delete(r.id); exportedOk.delete(r.id); exportWatch.delete(r.id);
+    render(result);
+    toast(pick.files ? 'Đã xóa truyện và chuyển file đã lưu vào Thùng rác.' : 'Đã xóa truyện khỏi danh sách (file vẫn còn trong thư mục).');
+  }
+  function renderStoryRuns() {
+    const box = $('storyRuns'), list = $('storyRunsList');
+    const rows = state && !$('storyOutput').hidden ? storyRows() : [];
+    const titles = titleMap(), s = state?.story || {};
+    const busyAny = Boolean(exporting || s.busy);
+    const view = rows.map(r => ({ r, st: rowStatus(r), name: titles[r.id] || r.meta?.name || r.id }));
+    const key = JSON.stringify([window.studioI18n?.language, busyAny, Boolean(state?.stopping), view.map(v => [v.r.id, v.name, v.r.total, v.r.done, v.r.running, v.r.failed, v.st.kind, v.st.label, v.st.why || '', v.st.output])]);
+    box.hidden = !rows.length;
+    if (key === runsKey) return;
+    runsKey = key;
+    list.replaceChildren(...view.map(({ r, st, name }) => {
+      const row = el('div', 'storyRun' + (st.kind === 'ready' ? ' done' : st.kind === 'error' || st.kind === 'todo' ? ' error' : ''));
+      row.dataset.story = r.id;
+      const top = el('div', 'storyRunTop');
+      top.append(el('strong', '', name), el('span', '', r.total ? `${r.done}/${r.total} cảnh` : 'Đã xuất MP4'));
+      const bar = el('div', 'autoBar'), fill = el('i'); fill.style.width = st.pct + '%'; bar.append(fill);
+      const text = el('p', 'storyRunText' + (st.kind === 'error' ? ' warn' : ''), st.label);
+      const parts = [top, bar, text];
+      if (st.why) parts.push(el('p', 'storyRunText warn', st.why));
+      const actions = el('div', 'storyRunActions');
+      if (st.allDone && (st.kind === 'todo' || st.kind === 'error')) {
+        const finish = el('button', 'primary', 'Hoàn thành video'); finish.type = 'button'; finish.className = 'primary storyRunFinish';
+        finish.disabled = busyAny || Boolean(state?.stopping || state?.merging || state?.packaging);
+        finish.title = 'Clip còn nguyên, không phải tạo lại. Giọng đã đọc xong được dùng lại, chỉ đọc lại cảnh lỗi.';
+        finish.onclick = () => { $('storyPick').value = r.id; renderStatus(); exportVideo({ aspect: exportAspect[r.id] }); };
+        actions.append(finish);
+      }
+      const open = el('button', 'secondary storyRunOpen', st.output ? 'Mở video' : 'Mở thư mục'); open.type = 'button';
+      open.onclick = async () => { const ok = await call('storyReveal', { storyId: r.id }); if (ok === false) toast('Chưa có file hoặc thư mục để mở.'); };
+      const del = el('button', 'secondary danger storyRunDelete', 'Xóa'); del.type = 'button';
+      del.disabled = busyAny || r.running > 0 || Boolean(state?.stopping || state?.merging || state?.packaging);
+      del.title = del.disabled ? 'Dừng hàng đợi hoặc chờ ghép xong rồi mới xóa được.' : '';
+      del.onclick = () => removeStoryRun(r, name);
+      actions.append(open, del);
+      row.append(...parts, actions);
+      return row;
+    }));
   }
   function notesText(notes) {
     if (!Array.isArray(notes) || !notes.length) return '';
@@ -1292,6 +1380,7 @@
     checkAutoExport();
     renderRun();
     renderDone();
+    renderStoryRuns();
     if (isPlant()) renderAnalyze();   // nhãn «Chạy tiếp (còn N cảnh)» theo hàng đợi
   }
 
@@ -1307,6 +1396,7 @@
   $('storyRefPaste').onpaste = pasteRefs; $('storyRefPaste').ondragover = e => e.preventDefault(); $('storyRefPaste').ondrop = pasteRefs;
   $('storyCommit').onclick = () => commit(false); $('storyCreate').onclick = () => commit(true);
   $('storyExport').onclick = () => exportVideo();
+  $('sdFinish').onclick = () => exportVideo();
   $('storyRelock').onclick = relockQueued;
   $('storyStop').onclick = async () => { const r = await call('storyCancel'); if (r) render(r); };
   $('storyOpen').onclick = () => call('storyReveal');

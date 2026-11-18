@@ -246,6 +246,21 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.waitForFunction(() => window.calls.some(c => c.name === 'restoreBuild'));
     assert.equal((await calls('restoreBuild'))[0].data.storyId, 'Don-nha-1');
 
+    // «Xóa» video: dùng hộp xóa chung; ô «xóa luôn file đã lưu» mặc định KHÔNG tick, Hủy thì không xóa gì, tick thì gửi deleteFiles:true (file vào Thùng rác ở phía máy).
+    await page.evaluate(() => { window.s.active = false; if (window.s.restore) window.s.restore.busy = false; window.push(); });
+    const del = () => page.locator('#restoreRuns .restoreRun').first().locator('button:has-text("Xóa")');
+    await del().click();
+    assert.equal(await page.locator('#deleteFiles').isChecked(), false, 'Dọn nhà: không tick sẵn, tránh xóa file ngoài ý muốn');
+    assert.match(await page.locator('.deleteDialog').textContent(), /DonNha\/Don-nha-1/);
+    await page.locator('#deleteCancel').click();
+    assert.equal((await calls('restoreRemove')).length, 0, 'Hủy thì không gọi xóa');
+    await del().click(); await page.locator('#deleteOk').click();
+    await page.waitForFunction(() => window.calls.some(c => c.name === 'restoreRemove'));
+    assert.deepEqual((await calls('restoreRemove')).at(-1).data, { storyId: 'Don-nha-1', deleteFiles: false }, 'không tick: chỉ bỏ khỏi danh sách');
+    await del().click(); await page.locator('#deleteFiles').check(); await page.locator('#deleteOk').click();
+    await page.waitForFunction(() => window.calls.filter(c => c.name === 'restoreRemove').length === 2);
+    assert.deepEqual((await calls('restoreRemove')).at(-1).data, { storyId: 'Don-nha-1', deleteFiles: true });
+
     // Tạo khi có 3 tài khoản chạy song song: chia đoạn, có ảnh mốc, meta.seams đúng, mọi cảnh gắn cùng sổ cảnh.
     await page.evaluate(() => { window.s.jobs.length = 0; window.s.settings.dispatchMode = 'parallel'; window.s.settings.accountCount = 3; window.push(); });
     await page.selectOption('#restoreMinutes', '10');

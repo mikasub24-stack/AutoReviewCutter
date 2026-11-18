@@ -104,6 +104,13 @@ class Queue {
   }
   async retry(id){const j=this.jobs.find(x=>x.id===id);if(!j||!['failed','interrupted'].includes(j.status))throw Error('Chỉ chạy lại tác vụ lỗi hoặc bị gián đoạn.');delete j.resumeMode;resetRunFields(j);j.status='pending';await this.publish();}
   async remove(id){if(this.jobs.find(j=>j.id===id)?.status==='running')throw Error('Dừng tác vụ trước khi xóa.');this.jobs=this.jobs.filter(j=>j.id!==id);await this.publish();}
+  // Xóa MỌI việc của một video (kể cả việc ảnh khung và thumbnail). Có việc đang chạy thì từ chối. Trả về số việc đã bỏ.
+  async removeStory(kind,storyId){
+    const own=this.jobs.filter(j=>j.kind===kind&&j.storyId===storyId);
+    if(own.some(j=>j.status==='running'))throw Error('Dừng tác vụ trước khi xóa.');
+    if(own.length){this.jobs=this.jobs.filter(j=>!(j.kind===kind&&j.storyId===storyId));await this.publish();}
+    return own.length;
+  }
   async clearPending(kind){this.jobs=this.jobs.filter(j=>(kind&&j.kind!==kind)||j.status!=='pending'||j.mayHaveSubmitted);await this.publish();}
   // Dọn truyện cũ: chỉ bỏ truyện mà MỌI việc (kể cả việc ảnh) đã xong; truyện còn dở được giữ nguyên. Trả về số việc đã bỏ. File video đã tải không bị xóa.
   async removeFinishedStories(ids){

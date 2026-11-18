@@ -292,6 +292,28 @@
       const folder = document.createElement('button'); folder.type = 'button'; folder.className = 'secondary';
       folder.textContent = tr('Mở thư mục', 'Open folder'); folder.onclick = () => call('openOutput', { kind: 'restore' });
       actions.append(folder);
+      // «Xóa»: bỏ video khỏi danh sách, tùy chọn xóa luôn file đã tự lưu về máy (chuyển vào Thùng rác).
+      const del = document.createElement('button'); del.type = 'button'; del.className = 'secondary';
+      del.textContent = tr('Xóa', 'Delete');
+      del.disabled = Boolean(running || building || info.busy || s.stopping || s.merging || s.packaging);
+      del.title = del.disabled ? tr('Dừng hàng đợi / chờ dựng xong rồi mới xóa được', 'Stop the queue or wait for the build to finish before deleting') : '';
+      del.onclick = async () => {
+        const pick = await askDelete({   // hộp xóa dùng chung (renderer.js): mặc định KHÔNG tick, file vào Thùng rác
+          title: tr('Xóa video này?', 'Delete this video?'),
+          text: tr(`«${meta.name || id}» sẽ bị bỏ khỏi danh sách, kể cả các cảnh và thumbnail của nó.`, `“${meta.name || id}” will be removed from the list, including its scenes and thumbnail.`),
+          label: tr(`Xóa luôn file đã tự lưu về máy (thư mục DonNha/${id}: clip, ảnh, khung cuối, video đã dựng)`, `Also delete the files saved on this computer (folder DonNha/${id}: clips, images, last frames, built video)`),
+          hint: tr('File được chuyển vào Thùng rác nên khôi phục được. Bản bạn đã bấm «Lưu video…» ra nơi khác không bị đụng tới.', 'Files go to the Recycle Bin, so they can be restored. Copies you saved elsewhere with “Save video…” are not touched.')
+        });
+        if (!pick) return;
+        const r = await call('restoreRemove', { storyId: id, deleteFiles: pick.files });
+        if (r) {
+          runsKey = ''; render(r);
+          toast(pick.files
+            ? tr('Đã xóa video và chuyển file đã lưu vào Thùng rác.', 'Video deleted; its saved files were moved to the Recycle Bin.')
+            : tr('Đã xóa video khỏi danh sách (file vẫn còn trong thư mục).', 'Video removed from the list (its files are still in the folder).'));
+        }
+      };
+      actions.append(del);
       box.append(top, bar, text, ...extra, actions);
       return box;
     }));

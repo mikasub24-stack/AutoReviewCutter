@@ -55,7 +55,7 @@ const{chromium}=require('playwright-core'),http=require('http'),fs=require('fs/p
   // Clearing acts on the visible tab only.
   await page.locator('.queueMenu summary').click();await page.locator('#clearPending').click();
   assert.deepEqual(await page.evaluate(()=>window.calls.filter(c=>c.name==='clearPending').at(-1).data),{kind:'image'});
-  await page.locator('#clearList').click();assert.deepEqual(await page.evaluate(()=>window.calls.filter(c=>c.name==='clearList').at(-1).data),{kind:'image'});
+  await page.locator('#clearList').click();await page.locator('#deleteOk').click();await page.waitForFunction(()=>window.calls.some(c=>c.name==='clearList'));assert.deepEqual(await page.evaluate(()=>window.calls.filter(c=>c.name==='clearList').at(-1).data),{kind:'image',deleteFiles:false});
   // The chosen tab survives a reload; switching back restores the video view.
   await page.reload();await page.waitForFunction(()=>document.querySelectorAll('.card').length>0);
   assert.equal(await page.locator('#headingText').textContent(),'Danh sách tạo ảnh');assert.equal(await page.locator('#imagePrefix').inputValue(),'Tạo ảnh: ');
