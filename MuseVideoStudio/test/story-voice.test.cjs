@@ -66,7 +66,7 @@ async function fakeLibs(dir) {
   const libs = path.join(dir, 'fakelibs');
   await fs.mkdir(libs, { recursive: true });
   await fs.writeFile(path.join(libs, 'edge_tts.py'), `
-import wave, struct, os
+import wave, struct, os, asyncio
 async def list_voices():
     if os.environ.get('FAKE_VOICES_FAIL'):
         raise RuntimeError('mạng lỗi')
@@ -75,15 +75,29 @@ async def list_voices():
             dict(ShortName='en-US-AvaMultilingualNeural', Gender='Female', Locale='en-US', Status='GA'), dict(ShortName='xx-YY-CuNeural', Gender='Male', Locale='xx-YY', Status='Deprecated')]
     rows += [dict(ShortName='en-GB-Fake%dNeural' % i, Gender='Male' if i % 2 else 'Female', Locale='en-GB', Status='GA') for i in range(25)]
     return rows
+ACTIVE = PEAK = 0
+NOAUDIO = 'No audio was received. Please verify that your parameters are correct.'
 class Communicate:
     def __init__(self, text, voice):
         self.text, self.voice = text, voice
     async def save(self, path):
-        if 'LOI' in self.text:
-            raise RuntimeError('403 Invalid response status')
-        with wave.open(path, 'wb') as w:
-            w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
-            w.writeframes(struct.pack('<h', 1000) * int(16000 * 0.04 * len(self.text)))
+        global ACTIVE, PEAK
+        ACTIVE += 1; PEAK = max(PEAK, ACTIVE)
+        try:
+            await asyncio.sleep(0.01)
+            if 'LOI' in self.text:
+                raise RuntimeError('403 Invalid response status')
+            if 'KHONG' in self.text or not any(c.isalnum() for c in self.text) or '[' in self.text or '*' in self.text:   # như Microsoft thật: không có gì đọc được thì không trả tiếng
+                raise RuntimeError(NOAUDIO)
+            if 'DAI' in self.text and len(self.text) > 130:   # cả đoạn dài bị từ chối, từng câu ngắn thì được
+                raise RuntimeError(NOAUDIO)
+            with wave.open(path, 'wb') as w:
+                w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
+                w.writeframes(struct.pack('<h', 1000) * int(16000 * 0.04 * len(self.text)))
+        finally:
+            ACTIVE -= 1
+            if os.environ.get('FAKE_PEAK'):
+                open(os.environ['FAKE_PEAK'], 'w').write(str(PEAK))
 `);
   await fs.writeFile(path.join(libs, 'vieneu.py'), `
 import wave, numpy as np, os
@@ -321,4 +335,39 @@ test('giọng Windows: gọi PowerShell với file lệnh UTF-8, đọc danh sá
   await assert.rejects(() => svc.synth({ engine: 'windows', voice: 'Microsoft An', items: [{ id: '1', text: 'Xin chào Việt Nam' }], dir: path.join(dir, 'w') }));
   assert.ok(calls.some(c => c.file === 'powershell.exe' && c.args.includes('-ExecutionPolicy') && c.args.includes('Bypass') && c.args.some(a => /sapi-speak\.ps1$/.test(a))));
   assert.match(await fs.readFile(path.join(dir, 'sapi-speak.ps1'), 'utf8'), /System\.Speech/);
+});
+
+test('giọng Microsoft bị «No audio was received»: làm sạch chữ, cảnh không có chữ thì im lặng, cả đoạn bị từ chối thì đọc từng câu, chỉ 2 cảnh một lúc, lỗi nêu đúng số cảnh', { skip: !(hasFfmpeg && hasNumpy) && 'cần ffmpeg + python3 + numpy' }, async t => {
+  const dir = await temp(t);
+  const svc = await readyService(dir, await fakeLibs(dir));
+  const peak = path.join(dir, 'peak.txt');
+  process.env.FAKE_PEAK = peak;
+  t.after(() => { delete process.env.FAKE_PEAK; });
+  const long = 'Câu thứ nhất của cảnh dài này có độ dài vừa đủ để đọc được. Câu thứ hai cũng dài vừa phải như thế nhưng DAI hơn một chút. Câu thứ ba kết thúc cảnh dài này rất gọn.';
+  assert.ok(long.length > 130);
+  const progress = [];
+  const out = await svc.synth({
+    engine: 'edge', voice: 'vi-VN-HoaiMyNeural', dir: path.join(dir, 'ok'), onProgress: m => progress.push(m),
+    items: [
+      { id: 'a', label: '1', text: 'Xin chào các bạn' },
+      { id: 'b', label: '2', text: '… 😀 [Nhạc nền] ***' },
+      { id: 'c', label: '3', text: long },
+      { id: 'd', label: '4', text: 'Trời đẹp quá 😀 [cười] **hôm nay**' },
+      { id: 'e', label: '5', text: 'Ngày thứ năm' }, { id: 'f', label: '6', text: 'Ngày thứ sáu' }
+    ]
+  });
+  assert.deepEqual(out.map(o => o.id), ['a', 'c', 'd', 'e', 'f'], 'cảnh 2 chỉ có dấu / emoji / ghi chú nên không có giọng, các cảnh khác đủ');
+  assert.ok(progress.some(m => /Bỏ qua cảnh 2: lời đọc không có chữ để đọc/.test(m)), progress.join(' | '));
+  assert.ok(progress.includes('Đã đọc 5/6 cảnh'));
+  assert.ok(Number(await fs.readFile(peak, 'utf8')) <= 2, 'không gọi Microsoft quá 2 cảnh cùng lúc: ' + await fs.readFile(peak, 'utf8'));
+  assert.ok(out.find(o => o.id === 'c').seconds > 0.5, 'cảnh dài được nối từ nhiều câu');
+  // không còn file .part dư
+  assert.deepEqual((await fs.readdir(path.join(dir, 'ok'))).filter(f => /\.part\d+$/.test(f)), []);
+  // mọi cảnh đều không có chữ: không lỗi, không có giọng nào
+  assert.deepEqual(await svc.synth({ engine: 'edge', voice: 'vi-VN-HoaiMyNeural', items: [{ id: 'x', label: '1', text: '...' }, { id: 'y', label: '2', text: '[im lặng]' }], dir: path.join(dir, 'blank') }), []);
+  // cảnh Microsoft không bao giờ đọc: báo đúng số cảnh, nguyên nhân thật và cách tránh
+  await assert.rejects(
+    () => svc.synth({ engine: 'edge', voice: 'vi-VN-HoaiMyNeural', items: [{ id: 'g', label: '7', text: 'Bình thường' }, { id: 'h', label: '12', text: 'Chữ KHONG đọc được' }], dir: path.join(dir, 'bad') }),
+    err => /Microsoft không trả giọng đọc cho cảnh 12 \(No audio was received/.test(err.message) && !/cảnh 7/.test(err.message) && /Giọng Việt có sẵn VieNeu/.test(err.message) && /đợi 1–2 phút/.test(err.message)
+  );
 });

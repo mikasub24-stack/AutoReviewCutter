@@ -142,6 +142,15 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.9
+
+- **Sửa lỗi «Microsoft không trả giọng đọc (No audio was received…)» lúc ghép video.** Lỗi này KHÔNG phải micro: đây là máy chủ giọng đọc miễn phí của Microsoft (Edge TTS) trả về rỗng cho một cảnh. Hay gặp khi gọi dồn dập (bị giới hạn tốc độ), đoạn quá dài, hoặc lời đọc không có chữ nào để đọc (chỉ có «…», emoji, ghi chú trong ngoặc vuông).
+  - Làm sạch lời đọc trước khi gửi (bỏ `[ghi chú]`, `*markdown*`, emoji). Cảnh nào sau khi làm sạch không còn chữ thì để im lặng thay vì làm hỏng cả video; tiến độ ghi «Bỏ qua cảnh N».
+  - Gọi Microsoft 2 cảnh một lúc (trước là 4); thử lại 4 lần với thời gian chờ tăng dần.
+  - Cảnh nào vẫn lỗi thì nghỉ một lúc rồi đọc lại từng câu ngắn và nối lại (đoạn dài hay bị từ chối).
+  - Nếu vẫn lỗi, báo đúng số cảnh và cách xử lý (đợi 1–2 phút bấm Xuất lại, hoặc đổi sang «Giọng Việt có sẵn VieNeu» / giọng Windows chạy trên máy) thay vì «kiểm tra đồng hồ Windows».
+- Giới hạn: nếu Microsoft chặn cả IP / mạng của bạn thì cách duy nhất là đổi mạng hoặc dùng giọng chạy trên máy.
+
 ## Update 1.9.8
 
 - **Sửa theo video bếp rocket 9 phút bạn gửi** (xem lại từng khung hình): hình dáng bếp đổi liên tục giữa các cảnh (tháp gạch bậc thang → ống kim loại + ống khói sắt → 3 cục hình nón → trụ đất nâu → tháp trắng nứt → hộp trắng), gạch tự mọc ra trong 8 giây, nền tự thành tấm bê tông, thêm đống gạch và nồi gang đen lơ lửng, cảnh cắt mất đầu người hoặc zoom sát mặt. Nguyên nhân chính: bếp rocket có lõi bên trong (ống nạp củi, ống thẳng đứng, đổ tro cách nhiệt) không quay thấy được nên Muse tự bịa, chữ «tube / chimney / riser» bị hiểu thành ống kim loại, và lệnh «tua nhanh 4x, tiến triển thật rõ» khiến Muse nhảy cóc công việc.

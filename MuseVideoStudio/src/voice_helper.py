@@ -49,35 +49,117 @@ def pieces(text, limit=180):
     return out
 
 
+EMOJI = re.compile("[\U0001F000-\U0001FFFF\u2600-\u27BF\u2B00-\u2BFF\uFE0F\u200D]")
+
+
+def clean_for_speech(text):
+    """Bỏ phần Microsoft không đọc được: [ghi chú sân khấu], dấu markdown, emoji."""
+    text = re.sub(r"\[[^\]]*\]", " ", str(text))
+    text = re.sub(r"[*_#~`^|<>{}\\]+", " ", text)
+    text = EMOJI.sub(" ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def speakable(text):
+    """Có ít nhất một chữ hoặc số để đọc (chỉ có dấu chấm, gạch, emoji thì Microsoft trả về rỗng)."""
+    return bool(re.search(r"\w", text))
+
+
 def run_edge(job):
     import edge_tts
 
     voice = job["voice"]
     base = float(os.environ.get("VOICE_RETRY_SECONDS", "2"))
 
-    async def one(item):
+    async def attempt(text, out):
+        """Một lần gọi Microsoft. Trả về None nếu có tiếng, ngược lại là lý do."""
+        try:
+            await edge_tts.Communicate(text, voice).save(out)
+            if os.path.exists(out) and os.path.getsize(out) > 0:
+                return None
+            return "không nhận được âm thanh"
+        except Exception as error:  # noqa: BLE001 - báo nguyên nhân thật cho người dùng
+            return str(error) or error.__class__.__name__
+
+    async def whole(text, out):
         last = None
-        for attempt in range(4):
-            try:
-                await edge_tts.Communicate(item["text"], voice).save(item["out"])
-                if os.path.exists(item["out"]) and os.path.getsize(item["out"]) > 0:
-                    return
-                last = "không nhận được âm thanh"
-            except Exception as error:  # noqa: BLE001 - báo nguyên nhân thật cho người dùng
-                last = str(error) or error.__class__.__name__
-            await asyncio.sleep(base + attempt * base * 1.5)
-        raise RuntimeError("Microsoft không trả giọng đọc (%s). Kiểm tra mạng và đồng hồ Windows rồi thử lại." % last)
+        for n in range(4):
+            last = await attempt(text, out)
+            if last is None:
+                return None
+            await asyncio.sleep(base * (1 + n * 2))
+        return last
+
+    async def by_sentence(text, out):
+        """Cách dự phòng: đọc từng câu ngắn (Microsoft hay từ chối đoạn dài hoặc khi bị giới hạn tốc độ) rồi nối các file mp3."""
+        parts, last = [], None
+        for n, piece in enumerate(pieces(text, 120)):
+            if not speakable(piece):
+                continue
+            part = "%s.part%d" % (out, n)
+            err = None
+            for k in range(3):
+                err = await attempt(piece, part)
+                if err is None:
+                    break
+                await asyncio.sleep(base * (1 + k * 2))
+            if err is not None:
+                last = err
+                break
+            parts.append(part)
+        try:
+            if last is None and parts:
+                with open(out, "wb") as dst:
+                    for part in parts:
+                        with open(part, "rb") as src:
+                            dst.write(src.read())
+                return None
+            return last or "không nhận được âm thanh"
+        finally:
+            for part in parts:
+                try:
+                    os.remove(part)
+                except OSError:
+                    pass
 
     async def main():
-        # Đọc nhiều cảnh cùng lúc (tối đa 4) cho nhanh; mỗi cảnh vẫn ghi vào đúng file của nó.
-        gate = asyncio.Semaphore(4)
+        # Microsoft hay ngừng trả tiếng khi bị gọi dồn dập: đọc 2 cảnh cùng lúc, cảnh nào lỗi để lại làm sau, chậm hơn.
+        gate = asyncio.Semaphore(2)
+        failed = []
 
-        async def guarded(item):
+        async def first_pass(item):
             async with gate:
-                await one(item)
-                emit({"done": item["id"]})
+                text = clean_for_speech(item["text"])
+                if not speakable(text):
+                    emit({"skip": item["id"]})
+                    return
+                item["clean"] = text
+                err = await whole(text, item["out"])
+                if err is None:
+                    emit({"done": item["id"]})
+                else:
+                    item["error"] = err
+                    failed.append(item)
 
-        await asyncio.gather(*(guarded(item) for item in job["items"]))
+        await asyncio.gather(*(first_pass(item) for item in job["items"]))
+        if not failed:
+            return
+        await asyncio.sleep(base * 8)   # nghỉ cho Microsoft hết giới hạn, rồi thử lại từng cảnh một
+        broken = []
+        for item in failed:
+            err = await by_sentence(item["clean"], item["out"])
+            if err is None:
+                emit({"done": item["id"]})
+            else:
+                item["error"] = err
+                broken.append(item)
+        if broken:
+            names = ", ".join(str(item.get("label") or item["id"]) for item in broken)
+            raise RuntimeError(
+                "Microsoft không trả giọng đọc cho cảnh %s (%s). Dịch vụ giọng miễn phí của Microsoft đang quá tải hoặc tạm chặn: "
+                "đợi 1–2 phút rồi bấm Xuất lại, hoặc đổi sang «Giọng Việt có sẵn VieNeu» / giọng Windows (chạy trên máy, không cần mạng)."
+                % (names, broken[-1]["error"])
+            )
 
     asyncio.run(main())
 

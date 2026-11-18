@@ -324,7 +324,7 @@ function createVoiceService({ dataDir, getFfmpeg = () => 'ffmpeg', platform = pr
     tempo = normTempo(tempo); volume = normVolume(volume);
     await fs.mkdir(dir, { recursive: true });
     const extension = engine === 'edge' ? '.mp3' : '.wav';
-    const jobs = items.map(item => ({ id: String(item.id), text: String(item.text || '').trim(), out: path.join(dir, `${String(item.id).replace(/[^\w-]/g, '')}-${randomUUID().slice(0, 6)}${extension}`) })).filter(j => j.text);
+    const jobs = items.map(item => ({ id: String(item.id), label: item.label == null ? '' : String(item.label).slice(0, 20), text: String(item.text || '').trim(), out: path.join(dir, `${String(item.id).replace(/[^\w-]/g, '')}-${randomUUID().slice(0, 6)}${extension}`) })).filter(j => j.text);
     if (!jobs.length) return [];
     const jobFile = path.join(dir, `job-${randomUUID().slice(0, 6)}.json`);
     let run, ref = '';
@@ -347,7 +347,7 @@ function createVoiceService({ dataDir, getFfmpeg = () => 'ffmpeg', platform = pr
       await fs.writeFile(jobFile, JSON.stringify({ engine, voice, ref, items: jobs }), 'utf8');
       run = { file: venvPython, args: [helperFile, jobFile] };
     }
-    const done = new Set();
+    const done = new Set(), skipped = new Set();
     let failure = '';
     const result = await runner(run.file, run.args, {
       timeout: 3600000, signal,
@@ -358,6 +358,7 @@ function createVoiceService({ dataDir, getFfmpeg = () => 'ffmpeg', platform = pr
         else if (msg.event === 'loading') { state.loadedModel = false; onProgress('Đang nạp mô hình giọng (lần đầu phải tải nên lâu, vài phút)…'); }
         else if (msg.event === 'loaded') { state.loadedModel = true; onProgress('Đã nạp mô hình giọng.'); }
         else if (msg.done !== undefined) { done.add(String(msg.done)); onProgress(`Đã đọc ${done.size}/${jobs.length} cảnh`); }
+        else if (msg.skip !== undefined) { skipped.add(String(msg.skip)); onProgress(`Bỏ qua cảnh ${jobs.find(j => j.id === String(msg.skip))?.label || msg.skip}: lời đọc không có chữ để đọc`); }
       }
     }).catch(error => { if (error.name === 'AbortError') throw error; throw Error('Không chạy được giọng đọc: ' + error.message); });
     await fs.rm(jobFile, { force: true });
@@ -365,7 +366,8 @@ function createVoiceService({ dataDir, getFfmpeg = () => 'ffmpeg', platform = pr
     if (result.code !== 0) throw Error('Giọng đọc thất bại (' + result.code + '): ' + tail(result.err || result.out));
     const out = [];
     for (const job of jobs) {
-      if (!done.has(job.id)) throw Error(`Giọng đọc chưa tạo xong cảnh ${job.id}.`);
+      if (skipped.has(job.id)) continue;   // lời đọc chỉ có dấu / emoji / ghi chú trong ngoặc vuông: cảnh đó để im lặng
+      if (!done.has(job.id)) throw Error(`Giọng đọc chưa tạo xong cảnh ${job.label || job.id}.`);
       const file = await finish(job.out, tempo, volume);
       out.push({ id: job.id, file, seconds: await durationOf(file) });
     }
