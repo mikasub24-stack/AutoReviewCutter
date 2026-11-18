@@ -57,7 +57,11 @@
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'chip'; b.dataset.theme = t.id; b.textContent = P.text(t, lang()).label;
       b.setAttribute('aria-pressed', String(t.id === theme));
-      b.onclick = () => { theme = t.id; remember(); renderThemes(); syncTheme(); renderCount(); };
+      b.onclick = () => {
+        // Chủ đề xây bếp: chọn là tự đặt 8 phút (đủ 18 bước, mỗi bước ~25 giây); chọn lại đúng chủ đề đó thì giữ số phút người dùng đã đổi.
+        if (t.defaultMinutes && t.id !== theme) $('restoreMinutes').value = String(t.defaultMinutes);
+        theme = t.id; remember(); renderThemes(); syncTheme(); renderCount();
+      };
       return b;
     }));
   }

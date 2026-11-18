@@ -163,10 +163,10 @@ test('góc quay: máy luôn đứng yên, không cận mặt / zoom / lia; ngoà
   assert.match(prompt, /one fixed camera on a tripod/);
 });
 
-test('cảm xúc và sức lực: việc nặng thì thở mạnh, đổ mồ hôi, lau mặt; càng về cuối càng mệt; không lộ mặt thì chỉ dùng dáng người; không có người thì không có dòng này', () => {
-  const c = P.options({ theme: 'cabin', minutes: 5 }), steps = P.stepsOf(c), total = steps.length;
+test('cảm xúc và sức lực (dọn nhà): việc nặng thì thở mạnh, đổ mồ hôi, lau mặt; càng về cuối càng mệt; không lộ mặt thì chỉ dùng dáng người; không có người thì không có dòng này', () => {
+  const c = P.options({ theme: 'house_full', minutes: 5 }), steps = P.stepsOf(c), total = steps.length;
   const line = (cfg, st, n, t = total) => (P.clipPrompt(cfg, st, n, t).split('\n').find(l => l.startsWith('Emotion and effort')) || '');
-  const heavy = steps.findIndex(s => /levels the ground with a shovel|cuts long straight poles/.test(s.en));
+  const heavy = steps.findIndex(s => /cut down and cleared/.test(s.en));
   assert.ok(heavy >= 0);
   const h = line(c, steps[heavy], heavy + 1);
   assert.match(h, /HARD physical labour/);
@@ -181,15 +181,15 @@ test('cảm xúc và sức lực: việc nặng thì thở mạnh, đổ mồ h�
   assert.doesNotMatch(line(c, steps[heavy], 4, 60), /wipe the sweat/);
   assert.match(line(c, steps[heavy], 3, 60), /Once, in the middle of the clip, the person pauses for a moment to wipe the sweat/);
   assert.doesNotMatch(line(c, steps[heavy], 1, 60), /wipe the sweat/);
-  const plain = steps.find(s => !/levels the ground with a shovel|cuts long straight poles/.test(s.en) && !/stands proudly/.test(s.en));
+  const plain = steps.find(s => !/cut down and cleared/.test(s.en) && !/brand new/.test(s.en));
   assert.match(line(c, plain, 4, 60) + line(c, plain, 3, 60), /keeps working without stopping|The person works calmly|Once, in the middle/);
   assert.match(line(c, steps[heavy], 2), /just started/);
   assert.match(line(c, steps[heavy], Math.round(total * 0.45)), /Several hours/);
   assert.match(line(c, steps[heavy], Math.round(total * 0.8)), /Many hours/);
   assert.match(line(c, steps[heavy], total), /almost done: exhausted/);
-  const calm = P.stepsOf(P.options({ theme: 'cabin', minutes: 5 })).find(s => /stands proudly/.test(s.en));
+  const calm = steps.find(s => /brand new/.test(s.en));
   assert.match(line(c, calm, total), /relaxed, pleased expression/);
-  const faceless = P.options({ theme: 'cabin', minutes: 5, faceless: true });
+  const faceless = P.options({ theme: 'house_full', minutes: 5, faceless: true });
   assert.match(line(faceless, steps[heavy], 3), /with the body only/);
   const noPerson = P.options({ theme: 'car', minutes: 5, person: false }), ns = P.stepsOf(noPerson);
   assert.equal(line(noPerson, ns[0], 1), '', 'không có người thì không có dòng cảm xúc');
@@ -241,8 +241,8 @@ test('tiêu đề tiếng Anh và tên chủ đề', () => {
   const vi = P.stepsOf(P.options({ theme: 'cabin', minutes: 2, lang: 'vi' }));
   assert.notEqual(vi[0].title, en[0].title);
   assert.equal(P.videoTitle(P.options({ theme: 'bunker', lang: 'en' })), 'Survival · dig an underground shelter');
-  assert.equal(P.THEMES.length, 9);
-  assert.ok(P.THEMES.every(t => t.id === 'custom' || t.steps.length === (t.id === 'house_full' ? 21 : 15)));
+  assert.equal(P.THEMES.length, 14);
+  assert.ok(P.THEMES.every(t => t.id === 'custom' || t.steps.length === (t.id === 'house_full' ? 21 : t.id.startsWith('stove_') ? 18 : 15)));
   for (const t of P.THEMES) if (t.id !== 'custom') assert.equal(P.EN[t.id].titles.length, t.steps.length, t.id);
 });
 
@@ -531,4 +531,153 @@ test('ảnh mốc đầu đoạn: dặn trạng thái đã xong (sơn rồi thì
   // chủ đề tự viết không có danh sách bước thì không thêm trạng thái bịa
   const custom = P.options({ theme: 'custom', customText: 'dọn phòng', minutes: 5, seconds: 8, aspect: '16:9', person: false, parallel: 1, lang: 'vi' });
   assert.doesNotMatch(P.keyframePrompt(custom, P.stepsOf(custom)[3], 3, P.stepsOf(custom).length), /So the place now looks like this/);
+});
+
+// ---- 1.9.7: xây bếp + sinh tồn tự nhiên (nhịp nhanh / thật / chậm, lau mồ hôi hiếm, khóa chất liệu)
+const STOVES = ['stove_clay', 'stove_brick', 'stove_rocket', 'stove_oven', 'stove_stone'];
+const promptsOf = (theme, minutes = 8) => {
+  const c = P.options({ theme, minutes, seconds: 8 }), steps = P.stepsOf(c);
+  return { c, steps, prompts: steps.map((st, i) => P.clipPrompt(c, st, i + 1, steps.length, { first: i === 0 })) };
+};
+
+test('5 chủ đề xây bếp: 18 bước đúng thứ tự thợ làm, mặc định 8 phút, có tiêu đề tiếng Anh, không bước nào nói bếp sắt', () => {
+  assert.deepEqual(P.THEMES.filter(t => t.id.startsWith('stove_')).map(t => t.id), STOVES);
+  assert.ok(P.THEMES.findIndex(t => t.id === STOVES[4]) < P.THEMES.findIndex(t => t.id === 'custom'), 'chủ đề tự nhập vẫn nằm cuối');
+  for (const id of STOVES) {
+    const t = P.themeOf(id);
+    assert.equal(t.steps.length, 18, id);
+    assert.equal(t.defaultMinutes, 8, id);
+    assert.ok(t.survival && t.person, id);
+    assert.equal(P.EN[id].titles.length, 18, id);
+    assert.ok(P.EN[id].label && P.EN[id].hint && P.EN[id].placeholder, id);
+    assert.ok(t.steps.every(st => st.length === 3 && 'fns'.includes(st[2])), id + ': mỗi bước có nhịp f / n / s');
+    assert.ok(new Set(t.steps.map(st => st[2])).size === 3, id + ': đủ cả ba nhịp');
+    assert.ok(t.steps.every(st => !/\b(iron|steel|metal|welds?|gas|electric)\b/i.test(st[1])), id + ': bước không nhắc bếp sắt / gas / điện');
+    assert.ok(t.steps.every(st => !/\b(he|she|his|her|him)\b/i.test(st[1])), id + ': không dùng đại từ giới tính (người mặc định là nữ)');
+    assert.ok(t.locks.length >= 2 && t.locks.every((l, i, a) => l[0] >= 1 && l[0] <= 18 && (i === 0 || l[0] > a[i - 1][0])), id + ': các mốc khóa tăng dần');
+    assert.ok(t.locks.every(l => /never metal|no metal|never a different/.test(l[1]) || /no .*metal body/.test(l[1])), id + ': khóa nói rõ không phải kim loại');
+  }
+  const en = P.stepsOf(P.options({ theme: 'stove_brick', minutes: 8, lang: 'en' }));
+  assert.equal(en[0].title, 'Mark the outline (1/3)', '60 cảnh ÷ 18 bước: bước đầu 3 cảnh');
+  // 8 phút = 60 cảnh 8 giây, đủ cả 18 bước, mỗi bước 3–4 cảnh
+  for (const id of STOVES) {
+    const { steps } = promptsOf(id);
+    assert.equal(steps.length, 60);
+    assert.equal(new Set(steps.map(s => s.step)).size, 18, id);
+    assert.ok(steps.every(s => s.parts >= 3 && s.parts <= 4), id);
+  }
+  assert.equal(P.clipCount(P.options({ theme: 'stove_clay', minutes: 10, seconds: 8 })), 75, '10 phút = 75 cảnh');
+});
+
+test('sinh tồn: ba nhịp xen kẽ (tua nhanh, thời gian thật, chậm tỉ mỉ), không còn «6x», «luôn nhanh», «không bao giờ chậm»', () => {
+  for (const id of [...STOVES, 'shelter', 'cabin', 'bunker']) {
+    const { prompts } = promptsOf(id, id.startsWith('stove') ? 8 : 5);
+    const all = prompts.join('\n');
+    assert.match(all, /Pace: FAST-FORWARD/, id);
+    assert.match(all, /Pace: REAL TIME/, id);
+    assert.match(all, /Pace: SLOW AND CAREFUL/, id);
+    assert.doesNotMatch(all, /FAST-MOTION|about 6x speed|Never slow motion|never slow or calm movement|Pace: fast and energetic/, id);
+    assert.ok(prompts.every(p => (p.match(/^Pace: /gm) || []).length === 1), id + ': mỗi cảnh đúng một dòng nhịp');
+    // nhịp của cảnh đi theo bước: các cảnh cùng một bước giữ nguyên nhịp
+    const byStep = new Map();
+    prompts.forEach((p, i) => { const k = /STEP (\d+) of/.exec(p)[1], pace = /^Pace: ([A-Z -]+)\./m.exec(p)[1]; byStep.set(k, new Set([...(byStep.get(k) || []), pace])); });
+    assert.ok([...byStep.values()].every(set => set.size === 1), id);
+  }
+  // chủ đề dọn nhà vẫn tua nhanh như trước
+  const house = P.options({ theme: 'house_full', minutes: 5 }), hs = P.stepsOf(house);
+  assert.match(P.clipPrompt(house, hs[3], 4, hs.length), /FAST-MOTION real-life video[^\n]*about 6x speed/);
+  assert.match(P.clipPrompt(house, hs[3], 4, hs.length), /Pace: fast and energetic/);
+  assert.doesNotMatch(P.clipPrompt(house, hs[3], 4, hs.length), /Pace: REAL TIME|OBJECT LOCK|Technique:/);
+});
+
+test('sinh tồn: lau mồ hôi rất hiếm (không ở 7 clip đầu, cách nhau 15 clip), diễn bình tĩnh tự nhiên, không nhăn nhó / mồ hôi chảy ròng', () => {
+  const { prompts } = promptsOf('stove_clay');
+  const wipes = prompts.map((p, i) => (/briefly wipes the forehead/.test(p) ? i + 1 : 0)).filter(Boolean);
+  assert.deepEqual(wipes, [8, 23, 38, 53], 'tối đa 4 lần trong 8 phút');
+  assert.ok(prompts.slice(0, 7).every(p => /no wiping gesture of any kind/.test(p)), '7 clip đầu cấm lau mặt');
+  assert.equal(prompts.filter(p => /no wiping gesture of any kind/.test(p)).length, 56, 'các clip còn lại cấm động tác lau mặt');
+  const all = prompts.join('\n');
+  assert.doesNotMatch(all, /HARD physical labour|sweat running down|frowning with effort|jaw clenched|shirt dark with sweat|soaked in sweat|exhausted/);
+  assert.match(all, /works calmly and naturally like an experienced worker/);
+  assert.match(all, /No grimacing, no clenched jaw, no frowning, no dramatic panting/);
+  const faceless = P.options({ theme: 'stove_clay', minutes: 8, faceless: true }), fs = P.stepsOf(faceless);
+  assert.match(P.clipPrompt(faceless, fs[10], 11, 60), /body only: a steady posture and calm breathing/);
+  // ảnh mốc: người bình tĩnh, không ướt đẫm mồ hôi
+  const c = P.options({ theme: 'stove_clay', minutes: 8 }), st = P.stepsOf(c), kf = P.keyframePrompt(c, st[50], 50, 60);
+  assert.match(kf, /calm, with slightly damp hair and a little tired/);
+  assert.doesNotMatch(kf, /soaked in sweat|shirt dark with sweat|sweaty, hair damp/);
+  assert.match(P.keyframePrompt(c, st[3], 3, 60), /calm and fresh, at most a faint shine of sweat/);
+});
+
+test('sinh tồn: kỹ thuật làm thật (cầm dụng cụ đúng, vật liệu phản ứng thật, không động tác giả) có trong mọi cảnh', () => {
+  for (const id of [...STOVES, 'shelter', 'cabin', 'bunker']) {
+    const { prompts } = promptsOf(id, 5);
+    assert.ok(prompts.every(p => /Technique: the person uses the real, correct technique/.test(p) && /No pretend or mimed actions/.test(p) && /no hands passing through objects/.test(p)), id);
+    assert.ok(prompts.every(p => /LOCKED - these never change[^\n]*everything that is already built/.test(p) && !/number of floors/.test(p)), id + ': dùng luật khóa cho vật đang xây, không nói tầng nhà');
+  }
+});
+
+test('khóa chất liệu bếp: từ lúc bếp xuất hiện tới cảnh cuối, mọi cảnh nhắc đúng chất liệu; không bao giờ thành bếp sắt', () => {
+  const must = { stove_clay: /CLAY stove[^\n]*no metal body, no cast iron, no steel/, stove_brick: /RED BRICK stove[^\n]*no metal body, no cast iron, no steel/, stove_rocket: /ROCKET stove[^\n]*no metal body/, stove_oven: /CLAY dome oven[^\n]*no metal body, no steel oven/, stove_stone: /STONE stove[^\n]*no brick body, no metal body/ };
+  for (const id of STOVES) {
+    const t = P.themeOf(id), first = t.locks[0][0], { steps, prompts } = promptsOf(id);
+    prompts.forEach((p, i) => {
+      const has = /^OBJECT LOCK /m.test(p);
+      assert.equal(has, steps[i].step >= first, `${id} cảnh ${i + 1} (bước ${steps[i].step}): khóa từ bước ${first}`);
+      if (has) assert.match(p, /never changes[^\n]*never turns into a different kind of object and never changes its material/);
+    });
+    const last = prompts[prompts.length - 1];
+    assert.match(last, /^OBJECT LOCK .*never metal/m, id + ': cảnh cuối vẫn nhắc không phải kim loại');
+    assert.ok(prompts.some(p => must[id].test(p)), id + ': có cảnh mang khóa chất liệu đầy đủ');
+    // mốc khóa sau thay mô tả của mốc trước (không dồn hai mô tả)
+    assert.ok(prompts.every(p => (p.match(/^OBJECT LOCK /gm) || []).length <= 1), id);
+  }
+  // bếp đất sét: bếp được quét vôi trắng thì khóa chuyển sang vôi trắng nhưng vẫn là đất sét
+  const clay = promptsOf('stove_clay');
+  assert.match(clay.prompts[clay.steps.findIndex(s => s.step === 14)], /clay chimney at the back; it is clay, never metal/);
+  assert.match(clay.prompts[clay.steps.findIndex(s => s.step === 16)], /matt white lime-washed clay[^\n]*the stove is clay, never metal/);
+  // bước đầu: chưa có vật nào, chưa khóa gì
+  assert.doesNotMatch(clay.prompts[0], /OBJECT LOCK/);
+  // nhà gỗ và hầm: bếp xây bằng đá + đất sét / đất sét, không phải bếp sắt, và cảnh cuối nhắc lại
+  const cabin = promptsOf('cabin', 5), bunker = promptsOf('bunker', 5);
+  const lockedFrom = (r, from) => r.prompts.every((p, i) => /^OBJECT LOCK /m.test(p) === (r.steps[i].step >= from));
+  assert.ok(lockedFrom(cabin, 13), 'nhà gỗ: khóa từ bước 13');
+  assert.ok(lockedFrom(bunker, 14), 'hầm: khóa từ bước 14');
+  assert.match(cabin.prompts.at(-1), /STONE-and-clay stove with a short stone chimney[^\n]*no metal body, no cast iron, no steel/);
+  assert.match(bunker.prompts.at(-1), /CLAY stove with a short clay chimney[^\n]*no metal body, no cast iron, no steel/);
+  assert.ok(!/stone stove with a chimney pipe|clay stove with a chimney\b/.test(JSON.stringify(P.THEMES.filter(t => ['cabin', 'bunker'].includes(t.id)))), 'bước xây bếp đã đổi lời: không còn «chimney pipe» (ống sắt)');
+  // khung hình bếp: gần hơn, thấy cả bếp lẫn người
+  assert.match(clay.prompts[5], /Camera: a still, tripod-mounted real camera like a documentary about building by hand: a medium-wide shot filmed from a few metres away: the whole stove and the person's whole body are in the frame/);
+  assert.doesNotMatch(clay.prompts[5], /WIDE, distant shot/);
+  assert.match(cabin.prompts[5], /documentary about building by hand: a WIDE, distant shot filmed from far away/);
+  // dọn nhà không bị ảnh hưởng
+  const house = P.options({ theme: 'house_full', minutes: 5 });
+  assert.ok(P.stepsOf(house).every((st, i, a) => !/^OBJECT LOCK /m.test(P.clipPrompt(house, st, i + 1, a.length))));
+});
+
+test('ảnh mốc và chia lại truyện bếp: ảnh mốc cũng khóa chất liệu bếp, dùng chữ «vật đang xây» thay vì «ngôi nhà»', () => {
+  const c = P.options({ theme: 'stove_brick', minutes: 8 }), steps = P.stepsOf(c), at = steps.findIndex(s => s.step === 13);
+  const kf = P.keyframePrompt(c, steps[at], at, steps.length);
+  assert.match(kf, /OBJECT LOCK[^\n]*smooth pale plaster/);
+  assert.match(kf, /The thing being built keeps its exact shape, size, position, material and color/);
+  assert.doesNotMatch(kf, /number of floors|exact architecture/);
+  assert.match(kf, /View: a medium-wide shot filmed from a few metres away/);
+  assert.match(P.keyframePrompt(c, steps[0], 0, steps.length), /Edit the attached photo/);
+  assert.doesNotMatch(P.keyframePrompt(c, steps[0], 0, steps.length), /OBJECT LOCK/, 'bước đầu chưa khóa');
+  // truyện đang chạy (đã có prompt) chia thêm đoạn: ảnh mốc lấy nguyên dòng khóa từ prompt của cảnh đó
+  const jobs = P.buildJobs(c, { storyId: 'B', photo: '/p.jpg', accounts: 2 }).map((j, i) => ({ ...j, id: 'j' + i, status: 'pending' }));
+  jobs.filter(j => j.phase === 'image').forEach(j => { j.status = 'completed'; j.output = '/img' + j.number + '.png'; });
+  jobs.filter(j => j.phase === 'clip').slice(0, 5).forEach(j => { j.status = 'completed'; j.output = '/v' + j.number + '.mp4'; j.lastFrame = '/f' + j.number + '.png'; });
+  const plan = P.resegment(jobs, 5);
+  assert.ok(plan && plan.images.length >= 2, 'phải chia thêm đoạn');
+  for (const im of plan.images) {
+    const ch = plan.changes.find(x => x.needs[0].number === im.number), job = jobs.find(j => j.id === ch.id);
+    const lock = (/^OBJECT LOCK[^\n]*/m.exec(job.prompt) || [''])[0];
+    assert.ok(lock, 'cảnh ở giữa truyện đã có khóa');
+    assert.ok(im.prompt.includes(lock), 'ảnh mốc mang đúng dòng khóa của cảnh đó');
+    assert.match(im.prompt, /The thing being built keeps its exact shape/);
+  }
+  // truyện dọn nhà chia lại vẫn dùng chữ «ngôi nhà» như cũ
+  const { jobs: hj } = liveStory(3), hp = P.resegment(hj, 5);
+  assert.ok(hp.images.every(im => /The building keeps its exact architecture/.test(im.prompt) && !/OBJECT LOCK/.test(im.prompt)));
 });

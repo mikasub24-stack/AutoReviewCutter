@@ -60,9 +60,10 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.waitForSelector('#restoreBody', { state: 'visible' });
     assert.equal(await page.locator('#restoreLock').isVisible(), false);
 
-    // Chủ đề: «cả ngôi nhà» đứng đầu và được chọn sẵn; có đủ 9 chủ đề.
+    // Chủ đề: «cả ngôi nhà» đứng đầu và được chọn sẵn; có đủ 14 chủ đề (5 kiểu xây bếp nằm trước «Chủ đề khác»).
     const chips = await page.$$eval('#restoreTheme .chip', els => els.map(e => [e.dataset.theme, e.getAttribute('aria-pressed')]));
-    assert.equal(chips.length, 9);
+    assert.equal(chips.length, 14);
+    assert.deepEqual(chips.map(c => c[0]).slice(-6), ['stove_clay', 'stove_brick', 'stove_rocket', 'stove_oven', 'stove_stone', 'custom']);
     assert.deepEqual(chips[0], ['house_full', 'true']);
     assert.match(await page.locator('#restoreHint').textContent(), /TOÀN CẢNH/);
     // Nhà đi từ ngoài vào trong: không cho cố định một góc.
@@ -110,6 +111,18 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.equal(await page.locator('#restorePerson').isChecked(), true);
     assert.equal(await page.locator('#restorePerson').isDisabled(), true);
     assert.equal(await page.locator('#restoreCamera').isDisabled(), false);
+    // Chủ đề xây bếp: chọn là tự đặt 8 phút; đổi sang kiểu bếp khác cũng 8 phút; bấm lại đúng chủ đề đang chọn thì giữ số phút đã đổi.
+    await page.click('#restoreTheme [data-theme="stove_clay"]');
+    assert.equal(await page.locator('#restoreMinutes').inputValue(), '8', 'chọn bếp đất sét: 8 phút');
+    assert.equal(await page.locator('#restorePerson').isDisabled(), true, 'bếp: luôn có người làm');
+    assert.match(await page.locator('#restoreHint').textContent(), /flat open ground|khoảng đất phẳng/);
+    await page.selectOption('#restoreMinutes', '10');
+    await page.click('#restoreTheme [data-theme="stove_clay"]');
+    assert.equal(await page.locator('#restoreMinutes').inputValue(), '10', 'bấm lại đúng chủ đề: giữ 10 phút');
+    await page.click('#restoreTheme [data-theme="stove_stone"]');
+    assert.equal(await page.locator('#restoreMinutes').inputValue(), '8', 'đổi sang bếp đá: về 8 phút');
+    assert.match(await page.locator('#restoreCount').textContent(), /60/, '8 phút = 60 cảnh');
+    await page.selectOption('#restoreMinutes', '120');
     await page.click('#restoreTheme [data-theme="house_full"]');
     assert.equal(await page.locator('#restorePerson').isDisabled(), false);
 

@@ -142,6 +142,16 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.7
+
+- **5 chủ đề xây bếp** trong tab «Dọn nhà · Sinh tồn»: bếp đất sét có ống khói (2 họng), bếp gạch đỏ 2 họng, bếp rocket tiết kiệm củi, lò nướng vòm đất sét (nướng bánh, pizza), bếp đá xếp ngoài trời. Mỗi chủ đề 18 bước đúng thứ tự thợ làm thật (đào đất, trộn vữa, xây từng lớp, chừa cửa lò, làm mặt bếp, ống khói, trát, phơi, đốt lửa sấy, nấu thử). Chọn chủ đề là tự đặt 8 phút (60 cảnh 8 giây; 10 phút = 75 cảnh); bấm lại đúng chủ đề đó thì giữ số phút bạn đã đổi.
+- **Sửa các video sinh tồn nhìn giả** (dựng lều, nhà gỗ, hầm và 5 chủ đề bếp):
+  - Nhịp xen kẽ theo từng bước: việc nặng lặp đi lặp lại thì tua nhanh khoảng 4x, việc thường chạy tốc độ thật, việc khéo tay (buộc dây, chừa cửa, vuốt nhẵn, nhóm lửa) thì chậm, tỉ mỉ. Trước đây mọi cảnh đều «fast-motion 6x, không bao giờ chậm».
+  - Lau mồ hôi rất hiếm: tối đa 1 cảnh trong 15 (không bao giờ trong 7 cảnh đầu), các cảnh khác cấm động tác lau mặt; người làm việc bình tĩnh như thợ thật, bỏ «nhăn nhó, mồ hôi chảy ròng, thở dốc».
+  - Khóa chất liệu: từ lúc bếp xuất hiện tới cảnh cuối, mọi cảnh (và ảnh mốc) đều nhắc «bếp đất sét / gạch / đá, không phải kim loại, không phải bếp sắt mua sẵn». Bếp trong nhà gỗ (đá + đất sét) và hầm (đất sét) cũng được khóa; bỏ chữ «chimney pipe» (ống sắt) trong bước xây bếp.
+  - Thêm dòng kỹ thuật làm thật (cầm dụng cụ đúng hai tay, tư thế vững, vật liệu phản ứng thật, cấm động tác giả hoặc tay xuyên qua vật) và dùng luật khóa «vật đang xây» thay cho luật «ngôi nhà, số tầng»; chủ đề bếp quay gần hơn (thấy cả bếp lẫn người).
+- Giới hạn: chưa thử với Muse thật. Prompt chỉ làm Muse dễ làm đúng hơn, không đảm bảo; nếu một cảnh vẫn ra bếp sắt, dùng «Tạo lại». Đã thử bằng test đơn vị prompt (`test/restore-plan.test.cjs`) và smoke giao diện (`test/restore-tab-smoke.cjs`).
+
 ## Update 1.9.6
 
 - **Dải «Đang làm:» liệt kê từng cảnh đang chạy** (số cảnh · tài khoản · thời gian đã chạy) ngay dưới phần «Vừa xong». Hàng đợi có hàng trăm thẻ nên trước đây «2 đang làm» không biết là 2 thẻ nào. Bấm một nút trong dải (hoặc bấm chữ «N đang làm») để nhảy tới đúng thẻ, thẻ nháy sáng vài giây; từ đó dùng «Dừng cảnh này», «Tạo lại ngay» hoặc «Thử TK khác». Cảnh chạy quá «Ngưỡng báo Muse chậm» (Kết nối & cài đặt, mặc định 15 phút) có ⚠ và nút đổi màu đỏ.
