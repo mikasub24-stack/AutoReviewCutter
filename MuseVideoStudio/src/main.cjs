@@ -815,14 +815,15 @@ function saveMapDraft(id,draft){
   mapDraftChain=mapDraftChain.then(async()=>{await fs.mkdir(path.dirname(file),{recursive:true});await atomic(file,draft);}).catch(()=>{});
   return mapDraftChain;
 }
-// Giọng đọc tiếng Anh: giữ giọng người dùng chọn nếu hợp lệ, không thì lấy giọng nam Mỹ đầu danh sách.
-function pickMapVoice(wanted){
+// Giọng đọc theo ngôn ngữ video (en/de/fr/ru): giữ giọng người dùng chọn nếu đúng ngôn ngữ, không thì lấy giọng mặc định của ngôn ngữ đó.
+function pickMapVoice(wanted,language){
+  const L=mapPlan.langOf(language);
   const info=voiceService?.status()||{};
   if(!info.ready?.edge)throw Error('Chưa cài giọng Microsoft (miễn phí). Bấm «Cài giọng miễn phí» ở mục Giọng thuyết minh, đợi cài xong rồi làm video.');
-  const list=(info.edgeVoices||[]).filter(v=>v.lang==='en'||v.lang==='*');
-  if(!list.length)throw Error('Chưa có giọng tiếng Anh trong danh sách giọng. Bấm «Cài lại giọng miễn phí» rồi thử lại.');
+  const list=(info.edgeVoices||[]).filter(v=>v.lang===L.id||v.lang==='*');
+  if(!list.length)throw Error(`Chưa có giọng ${L.vi} trong danh sách giọng. Bấm «Cài lại giọng miễn phí» rồi thử lại.`);
   const id=String(wanted||'');
-  return (list.find(v=>v.id===id)||list.find(v=>v.id==='en-US-GuyNeural')||list.find(v=>/^en-US-/.test(v.id))||list[0]).id;
+  return (list.find(v=>v.id===id)||list.find(v=>v.id===L.voice)||list.find(v=>v.id.startsWith(L.voice.slice(0,5)))||list[0]).id;
 }
 const mapMusicOf=value=>{const f=String(value||'');if(!f)return '';if(!/\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(f))throw Error('Nhạc nền phải là mp3, wav, m4a, aac, ogg hoặc flac.');return f;};
 async function ensureMapGeo(){return mapGeoObject||(mapGeoObject=await mapService.geo());}
@@ -861,7 +862,7 @@ async function runMapWrite(runId,{auto}){
     mapGeoObject=await ensureMapGeo();
     const draft=await readJsonFile(mapDraftFile(runId));
     const avoid=Object.entries(mapRuns()).filter(([id,r])=>id!==runId&&r&&(r.topic||r.title)).map(([,r])=>r.topic||r.title);
-    const result=await mapWriter.write({options:{topic:meta.topic,category:meta.category,minutes:meta.minutes,country:meta.country,avoid},resume:draft&&draft.outline?draft:null,onDraft:d=>{void saveMapDraft(runId,d);},onOutline:o=>{
+    const result=await mapWriter.write({options:{topic:meta.topic,category:meta.category,minutes:meta.minutes,country:meta.country,language:meta.language,avoid},resume:draft&&draft.outline?draft:null,onDraft:d=>{void saveMapDraft(runId,d);},onOutline:o=>{
       // Chủ đề do Muse tự chọn: đặt tên video theo tiêu đề dàn ý ngay để danh sách hiện đúng tên.
       if(!meta.topic&&o&&o.title){meta.topic=o.title;meta.name=o.title;meta.auto=true;void save();notify();}
     }});
@@ -1446,16 +1447,16 @@ app.whenReady().then(async () => {
       if(queue.active||starting)throw Error('Hàng đợi đang chạy. Dừng hàng đợi trước khi làm video bản đồ.');
       const all=mapRuns(),resumeId=String(data?.resumeId||'');
       let runId;
-      if(resumeId&&all[resumeId]&&['draft','writing'].includes(all[resumeId].status)){runId=resumeId;Object.assign(all[runId],{voice:pickMapVoice(data?.voice||all[runId].voice),tempo:all[runId].tempo,music:mapMusicOf(data?.music??all[runId].music)});}
+      if(resumeId&&all[resumeId]&&['draft','writing'].includes(all[resumeId].status)){runId=resumeId;Object.assign(all[runId],{voice:pickMapVoice(data?.voice||all[runId].voice,all[runId].language),tempo:all[runId].tempo,music:mapMusicOf(data?.music??all[runId].music)});}
       else{
         const config=mapPlan.options(data);
         const bad=mapPlan.problems(config);
         if(bad.length)throw Error(bad[0]);
-        const voice=pickMapVoice(config.voice);
+        const voice=pickMapVoice(config.voice,config.language);
         const base=(config.topic||'Tu-chon').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/gi,'d').replace(/[^A-Za-z0-9]+/g,'-').slice(0,30);
         runId=await freeStoryId(base,{output:settings.output,jobs:[],folderOf:mapFolder,fallback:'BanDo'});
         const group=mapPlan.categoryOf(config.category);
-        all[runId]={name:config.topic||(group?'Muse tự chọn: '+group.label:'Muse tự chọn chủ đề'),topic:config.topic,category:config.topic?'':config.category,minutes:config.minutes,country:config.country,voice,tempo:config.tempo,music:mapMusicOf(config.music),musicVolume:config.musicVolume,status:'writing',createdAt:Date.now(),error:''};
+        all[runId]={name:config.topic||(group?'Muse tự chọn: '+group.label:'Muse tự chọn chủ đề'),topic:config.topic,category:config.topic?'':config.category,minutes:config.minutes,country:config.country,language:config.language,voice,tempo:config.tempo,music:mapMusicOf(config.music),musicVolume:config.musicVolume,status:'writing',createdAt:Date.now(),error:''};
         for(const id of Object.keys(all).slice(0,Math.max(0,Object.keys(all).length-40)))delete all[id];
       }
       await fs.mkdir(mapFolder(settings.output,runId),{recursive:true});
@@ -1494,7 +1495,8 @@ app.whenReady().then(async () => {
       const id=String(data?.runId||''),meta=mapRuns()[id];
       if(!meta)throw Error('Không thấy video này.');
       if(!await fs.stat(mapScriptFile(id)).then(x=>x.isFile(),()=>false))throw Error('Chưa có kịch bản. Bấm «Viết tiếp» hoặc soạn kịch bản trước.');
-      if(data?.voice!==undefined)meta.voice=pickMapVoice(data.voice);else meta.voice=pickMapVoice(meta.voice);
+      const lang=mapPlan.langOf((await readJsonFile(mapScriptFile(id)))?.lang||meta.language).id;meta.language=lang;
+      meta.voice=pickMapVoice(data?.voice!==undefined?data.voice:meta.voice,lang);
       if(data?.tempo!==undefined)meta.tempo=mapPlan.options({tempo:data.tempo}).tempo;
       if(data?.music!==undefined)meta.music=mapMusicOf(data.music);
       if(data?.musicVolume!==undefined)meta.musicVolume=mapPlan.options({musicVolume:data.musicVolume}).musicVolume;

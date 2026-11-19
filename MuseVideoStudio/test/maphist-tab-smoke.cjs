@@ -36,7 +36,10 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
       const voices = [
         { id: 'vi-VN-HoaiMyNeural', lang: 'vi', language: 'Tiếng Việt', name: 'Hoài My (nữ)' },
         { id: 'en-US-JennyNeural', lang: 'en', language: 'Tiếng Anh', name: 'Jenny (nữ) · en-US' }, { id: 'en-US-GuyNeural', lang: 'en', language: 'Tiếng Anh', name: 'Guy (nam) · en-US' },
-        { id: 'en-US-AndrewMultilingualNeural', lang: '*', language: 'Đa ngôn ngữ', name: 'Andrew (nam) · đa ngôn ngữ' }
+        { id: 'en-US-AndrewMultilingualNeural', lang: '*', language: 'Đa ngôn ngữ', name: 'Andrew (nam) · đa ngôn ngữ' },
+        { id: 'de-DE-KatjaNeural', lang: 'de', language: 'Tiếng Đức', name: 'Katja (nữ) · de-DE' }, { id: 'de-DE-ConradNeural', lang: 'de', language: 'Tiếng Đức', name: 'Conrad (nam) · de-DE' },
+        { id: 'fr-FR-DeniseNeural', lang: 'fr', language: 'Tiếng Pháp', name: 'Denise (nữ) · fr-FR' }, { id: 'fr-FR-HenriNeural', lang: 'fr', language: 'Tiếng Pháp', name: 'Henri (nam) · fr-FR' },
+        { id: 'ru-RU-SvetlanaNeural', lang: 'ru', language: 'Tiếng Nga', name: 'Svetlana (nữ) · ru-RU' }, { id: 'ru-RU-DmitryNeural', lang: 'ru', language: 'Tiếng Nga', name: 'Dmitry (nam) · ru-RU' }
       ];
       const s = {
         version: '1.9.12', active: false, paused: true, jobs: [],
@@ -148,6 +151,21 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     await page.click('#mapGroups button[data-group="war"]');
     assert.equal(await page.locator('#mapTopic').inputValue(), '', 'đổi sang nhóm khác thì bỏ đề tài của nhóm cũ');
     assert.match(await page.locator('#mapCreate').textContent(), /«Chiến tranh»/);
+    // Ngôn ngữ video: 4 lựa chọn (có nghĩa tiếng Việt), mặc định tiếng Anh; đổi ngôn ngữ thì danh sách giọng + giọng mặc định + lời giải thích đổi theo.
+    assert.deepEqual(await page.locator('#mapLang option').allTextContents(), ['English (tiếng Anh)', 'Deutsch (tiếng Đức)', 'Français (tiếng Pháp)', 'Русский (tiếng Nga)']);
+    assert.equal(await page.locator('#mapLang').inputValue(), 'en');
+    assert.match(await page.locator('#mapVoiceInfo').textContent(), /luôn bằng tiếng Anh/);
+    await page.selectOption('#mapLang', 'de');
+    assert.deepEqual(await page.locator('#mapVoice option').allTextContents(), ['Katja (nữ) · de-DE', 'Conrad (nam) · de-DE', 'Andrew (nam) · đa ngôn ngữ']);
+    assert.equal(await page.locator('#mapVoice').inputValue(), 'de-DE-ConradNeural', 'giọng mặc định tiếng Đức');
+    assert.match(await page.locator('#mapVoiceInfo').textContent(), /bằng tiếng Đức/);
+    await page.selectOption('#mapLang', 'fr'); assert.equal(await page.locator('#mapVoice').inputValue(), 'fr-FR-HenriNeural'); assert.match(await page.locator('#mapVoiceInfo').textContent(), /bằng tiếng Pháp/);
+    await page.selectOption('#mapLang', 'ru'); assert.equal(await page.locator('#mapVoice').inputValue(), 'ru-RU-DmitryNeural'); assert.match(await page.locator('#mapVoiceInfo').textContent(), /bằng tiếng Nga/);
+    await page.evaluate(() => { document.querySelector('#mapAdvanced').open = true; });
+    await page.selectOption('#mapVoice', 'ru-RU-SvetlanaNeural');
+    await page.selectOption('#mapLang', 'en'); assert.equal(await page.locator('#mapVoice').inputValue(), 'en-US-GuyNeural');
+    await page.selectOption('#mapLang', 'ru'); assert.equal(await page.locator('#mapVoice').inputValue(), 'ru-RU-SvetlanaNeural', 'nhớ giọng đã chọn riêng cho từng ngôn ngữ');
+    await page.selectOption('#mapLang', 'de');
     await page.fill('#mapTopic', 'ab');
     await page.click('#mapCreate'); await flush();
     assert.equal((await calls('mapMake')).length, 0, 'đề tài quá ngắn thì không gửi');
@@ -161,12 +179,14 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.equal(auto[0].data.topic, '', 'đề tài trống = Muse tự chọn trong nhóm');
     assert.equal(auto[0].data.category, 'war', 'gửi đúng nhóm đã chọn');
     assert.equal(auto[0].data.minutes, 6);
+    assert.equal(auto[0].data.language, 'de', 'gửi đúng ngôn ngữ video'); assert.equal(auto[0].data.voice, 'de-DE-ConradNeural', 'giọng đúng ngôn ngữ');
     assert.match(await page.locator('#mapRuns .restoreRun').first().textContent(), /Muse tự chọn: war/);
     // Bấm lại thẻ đang chọn thì bỏ chọn (về «Muse tự chọn hoàn toàn»).
     await page.evaluate(() => { document.querySelector('#mapForm').open = true; });
     await page.click('#mapGroups button[data-group="war"]');
     assert.equal(await page.locator('#mapGroups button.active').count(), 0);
     assert.match(await page.locator('#mapCreate').textContent(), /Muse tự chọn chủ đề và làm video/);
+    await page.selectOption('#mapLang', 'en');
     await page.evaluate(() => { window.calls.length = 0; window.s.maphist.runs = {}; Object.assign(window.s.maphist, { busy: false, phase: '', runId: '', progress: '', error: '' }); window.s.maphist.write = {}; window.push(); });
     await page.waitForFunction(() => !document.querySelector('#mapRuns .restoreRun') && !document.querySelector('#mapCreate').disabled);
     await page.evaluate(() => { document.querySelector('#mapForm').open = true; });
@@ -180,7 +200,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     await page.waitForSelector('#mapRuns .restoreRun');
     const made = await calls('mapMake');
     assert.equal(made.length, 1);
-    assert.deepEqual(made[0].data, { topic: 'History of Testland', category: '', country: 'Indonesia', minutes: 6, voice: 'en-US-GuyNeural', tempo: 1, music: 'C:\\Music\\epic.mp3', musicVolume: 0.2, auto: true });
+    assert.deepEqual(made[0].data, { topic: 'History of Testland', category: '', country: 'Indonesia', minutes: 6, language: 'en', voice: 'en-US-GuyNeural', tempo: 1, music: 'C:\\Music\\epic.mp3', musicVolume: 0.2, auto: true });
     assert.match(await page.locator('#mapRuns .restoreRunText').first().textContent(), /Soạn kịch bản 2\/3/);
     assert.match(await page.locator('#mapRunHint').textContent(), /Đang soạn kịch bản · 5\/12 giai đoạn/);
     assert.equal(await page.locator('#mapCreate').isDisabled(), true);

@@ -129,7 +129,7 @@ function createMapWriter({ plan = defaultPlan, geo, dom, openMuse, getMuse, getS
         onDraft(draft());
         say(`Đã soạn ${range[1]}/${outline.eras.length} giai đoạn`);
       }
-      const raw = plan.assemble(outline, items);
+      const raw = plan.assemble(outline, items, config.language);
       if (raw.eras.length !== outline.eras.length) throw Error(`Kịch bản mới có ${raw.eras.length}/${outline.eras.length} giai đoạn. Bấm «Viết tiếp».`);
       say(`Muse đã soạn xong kịch bản (${raw.eras.length} giai đoạn)`, { phase: 'done' });
       return { script: raw, outline, config };

@@ -548,7 +548,11 @@
       }
       const tx = 16 + cells * (cw + gap) + 4;
       c.fillStyle = '#1a1009'; c.beginPath(); c.roundRect(tx, 19 + ch / 2 - 30, tagW - 22, 60, 8); c.fill();
-      text(c, yearF < 0 ? 'BC' : 'AD', tx + (tagW - 22) / 2, 19 + ch / 2 + 11, { size: 32, weight: 700, fill: GOLD });
+      // «BC / AD» theo ngôn ngữ video; chữ dài hơn (v. Chr., apr. J.-C., до н.э.) thì thu nhỏ cho vừa ô
+      const era = Plan.strings(tl.lang)[yearF < 0 ? 'bcTag' : 'adTag'];
+      c.save(); c.font = `700 32px ${SERIF}`; const w32 = c.measureText(era).width; c.restore();
+      const es = w32 > 58 ? Math.max(14, Math.floor(32 * 58 / w32)) : 32;
+      text(c, era, tx + (tagW - 22) / 2, 19 + ch / 2 + 11 - (32 - es) * .34, { size: es, weight: 700, fill: GOLD });
       c.restore();
       return { x: x0, y: y0 + h, w, h };
     }
@@ -570,13 +574,12 @@
       c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#f7edd0'; c.fillText(shown, tw / 2 + 4, h / 2 + 2);
       c.restore();
     }
-    const people = n => n >= 1e9 ? (n / 1e9).toFixed(2).replace(/0+$/, '').replace(/\.$/, '') + ' billion' : n >= 1e6 ? (n / 1e6).toFixed(n >= 1e8 ? 0 : 1).replace(/\.0$/, '') + ' million' : n >= 1e3 ? Math.round(n / 1e3) + ' thousand' : String(Math.round(n));
     function population(c, n, x, y, slide) {
       if (!n || slide <= 0) return;
       c.save(); c.globalAlpha = slide; c.translate(x - (1 - slide) * 80, y);
       c.fillStyle = '#f6ecd0'; c.strokeStyle = 'rgba(10,20,34,.85)'; c.lineWidth = 5; c.lineJoin = 'round';
       c.beginPath(); c.arc(14, -22, 7, 0, TAU); c.stroke(); c.fill(); c.beginPath(); c.arc(14, -3, 12, Math.PI, 0); c.stroke(); c.fill();
-      text(c, `${people(n)} people`, 42, 0, { size: 30, weight: 700, style: 'italic', fill: '#f6ecd0', align: 'left', halo: 'rgba(10,20,34,.85)', haloW: 6 });
+      text(c, Plan.strings(tl.lang).people(n), 42, 0, { size: 30, weight: 700, style: 'italic', fill: '#f6ecd0', align: 'left', halo: 'rgba(10,20,34,.85)', haloW: 6 });
       c.restore();
     }
     // Đường thời gian mảnh trên đỉnh khung hình: mốc kim cương theo từng giai đoạn chính.
@@ -804,7 +807,7 @@
       const vg = c.createRadialGradient(width / 2, height * .5, 120, width / 2, height * .5, width * .62); vg.addColorStop(0, `rgba(6,16,30,${.8 * a})`); vg.addColorStop(1, `rgba(6,16,30,${.35 * a})`);
       c.fillStyle = vg; c.fillRect(0, 0, width, height); c.globalAlpha = a;
       compass(c, width / 2, height * .3, 70, curT * .25);
-      text(c, 'Thanks for watching', width / 2, height * .55, { size: 96, weight: 700, fill: '#f7edd0', halo: 'rgba(8,18,30,.9)', haloW: 16 });
+      text(c, Plan.strings(tl.lang).thanks, width / 2, height * .55, { size: 96, weight: 700, fill: '#f7edd0', halo: 'rgba(8,18,30,.9)', haloW: 16 });
       c.strokeStyle = GOLD; c.lineWidth = 3; c.beginPath(); c.moveTo(width / 2 - 300, height * .55 + 34); c.lineTo(width / 2 + 300, height * .55 + 34); c.stroke();
       if (tl.outro) text(c, tl.outro, width / 2, height * .55 + 100, { size: 44, weight: 600, style: 'italic', fill: GOLD, halo: 'rgba(8,18,30,.9)', haloW: 9 });
       c.restore();

@@ -2,6 +2,14 @@
 (()=>{
   const dictionary=Object.fromEntries(`
 Kể chuyện|Story
+Ngôn ngữ video (tiếng Anh, Đức, Pháp, Nga)|Video language (English, German, French, Russian)
+English (tiếng Anh)|English
+Deutsch (tiếng Đức)|Deutsch (German)
+Français (tiếng Pháp)|Français (French)
+Русский (tiếng Nga)|Русский (Russian)
+Lời đọc và chữ trên video bằng tiếng Đức (làm cho khán giả nói tiếng Đức). Cần có mạng lúc đọc.|Narration and on-screen text are in German (made for German-speaking viewers). An internet connection is needed while narrating.
+Lời đọc và chữ trên video bằng tiếng Pháp (làm cho khán giả nói tiếng Pháp). Cần có mạng lúc đọc.|Narration and on-screen text are in French (made for French-speaking viewers). An internet connection is needed while narrating.
+Lời đọc và chữ trên video bằng tiếng Nga (làm cho khán giả nói tiếng Nga). Cần có mạng lúc đọc.|Narration and on-screen text are in Russian (made for Russian-speaking viewers). An internet connection is needed while narrating.
 Tạo thumbnail 16:9|Create 16:9 thumbnail
 Tạo thumbnail khác|Create another thumbnail
 Đang tạo thumbnail…|Creating thumbnail…
@@ -63,19 +71,19 @@ Muse chọn đề tài «Độc lập và cách mạng» và làm video|Let Muse
 Muse tự chọn: Độc lập và cách mạng|Muse chooses: Independence and revolution
 🎲 Muse tự chọn|🎲 Let Muse choose
 Gợi ý đề tài|Subject suggestions
-Đề tài cụ thể (không bắt buộc; để trống thì Muse tự chọn trong nhóm, tiếng Anh càng rõ càng tốt)|Specific subject (optional; leave empty and Muse chooses inside the group; the clearer the English, the better)
+Đề tài cụ thể (không bắt buộc; để trống thì Muse tự chọn trong nhóm; gõ tiếng Anh càng rõ càng tốt)|Specific subject (optional; leave empty and Muse chooses inside the group; the clearer the English you type, the better)
 Để trống: Muse tự chọn. Hoặc gõ, hoặc bấm một đề tài gợi ý bên dưới|Leave empty: Muse chooses. Or type one, or click a suggested subject below
-Chỉ cần bấm một nút. Chọn một nhóm chủ đề (hoặc gõ đề tài của riêng bạn); Muse chọn đất nước, các giai đoạn và vùng lãnh thổ, soạn lời đọc tiếng Anh; tool vẽ bản đồ động (đất liền biến đổi theo từng thời kỳ, lá cờ có mặt cắm xuống, đồng hồ năm, địa cầu nhỏ chỉ vùng đang xem), đọc lời, thêm nhạc rồi xuất MP4. Bạn có thể xem và sửa kịch bản trước khi dựng.|Just click one button. Pick a topic group (or type your own subject). Muse chooses the country, the eras and the territories and writes the English narration; the tool draws the animated map (land that changes era by era, planted flags with faces, a year counter, a small globe showing the region), reads the narration, adds music and exports an MP4. You can review and edit the script before it is built.
+Chỉ cần bấm một nút. Chọn một nhóm chủ đề (hoặc gõ đề tài của riêng bạn); Muse chọn đất nước, các giai đoạn và vùng lãnh thổ, soạn lời đọc bằng ngôn ngữ bạn chọn; tool vẽ bản đồ động (đất liền biến đổi theo từng thời kỳ, lá cờ có mặt cắm xuống, đồng hồ năm, địa cầu nhỏ chỉ vùng đang xem), đọc lời, thêm nhạc rồi xuất MP4. Bạn có thể xem và sửa kịch bản trước khi dựng.|Just click one button. Pick a topic group (or type your own subject). Muse chooses the country, the eras and the territories and writes the narration in the language you choose; the tool draws the animated map (land that changes era by era, planted flags with faces, a year counter, a small globe showing the region), reads the narration, adds music and exports an MP4. You can review and edit the script before it is built.
 Giọng đọc, nhạc nền, nước làm trung tâm (đã chọn sẵn, không cần chỉnh)|Voice, background music, focus country (already chosen, no need to change)
 Chủ đề quá ngắn. Gõ rõ hơn (ví dụ: History of Vietnam, The Mongol Empire) hoặc để trống cho Muse tự chọn.|The topic is too short. Type it more clearly (for example: History of Vietnam, The Mongol Empire) or leave it empty and let Muse choose.
 Muse đang chọn chủ đề và soạn kịch bản. Tên video sẽ hiện ở danh sách ngay khi có dàn ý.|Muse is choosing a topic and writing the script. The video name appears in the list as soon as the outline is ready.
 Bản đồ lịch sử|History maps
-Gõ chủ đề → Muse soạn kịch bản tiếng Anh → vẽ bản đồ động, giọng đọc, nhạc → video|Type a topic → Muse writes an English script → animated map, narration, music → video
+Gõ chủ đề → Muse soạn kịch bản (Anh, Đức, Pháp, Nga) → vẽ bản đồ động, giọng đọc, nhạc → video|Type a topic → Muse writes the script (English, German, French, Russian) → animated map, narration, music → video
 Làm video bản đồ mới|Make a new map video
-Chỉ cần gõ chủ đề. Muse tự chọn đất nước, các giai đoạn và vùng lãnh thổ, soạn lời đọc tiếng Anh; tool vẽ bản đồ động (đất liền biến đổi theo từng thời kỳ, lá cờ có mặt cắm xuống, đồng hồ năm, địa cầu nhỏ chỉ vùng đang xem), đọc lời, thêm nhạc rồi xuất MP4. Bạn có thể xem và sửa kịch bản trước khi dựng.|Just type a topic. Muse picks the country, the eras and the territories and writes the English narration; the tool draws the animated map (land that changes era by era, planted flags with faces, a year counter, a small globe showing the region), reads the narration, adds music and exports an MP4. You can review and edit the script before it is built.
+Chỉ cần gõ chủ đề. Muse tự chọn đất nước, các giai đoạn và vùng lãnh thổ, soạn lời đọc bằng ngôn ngữ bạn chọn; tool vẽ bản đồ động (đất liền biến đổi theo từng thời kỳ, lá cờ có mặt cắm xuống, đồng hồ năm, địa cầu nhỏ chỉ vùng đang xem), đọc lời, thêm nhạc rồi xuất MP4. Bạn có thể xem và sửa kịch bản trước khi dựng.|Just type a topic. Muse picks the country, the eras and the territories and writes the narration in the language you choose; the tool draws the animated map (land that changes era by era, planted flags with faces, a year counter, a small globe showing the region), reads the narration, adds music and exports an MP4. You can review and edit the script before it is built.
 Chủ đề (tiếng Anh càng rõ càng tốt)|Topic (the clearer the English, the better)
 Nước làm trung tâm (không bắt buộc, để trống thì Muse tự chọn)|Focus country (optional; leave empty and Muse chooses)
-Giọng đọc (tiếng Anh)|Narration voice (English)
+Giọng đọc|Narration voice
 Không nhạc nền (chỉ có giọng đọc).|No background music (narration only).
 Âm lượng nhạc|Music volume
 Tự động làm hết: soạn kịch bản, vẽ, đọc, ghép nhạc, xuất video (bỏ tick để dừng ở kịch bản và xem, sửa trước khi dựng)|Do everything automatically: script, map, narration, music, export (untick to stop at the script and review or edit it before building)
@@ -89,7 +97,7 @@ Dựng lại|Build again
 Xem và sửa kịch bản|View and edit script
 Xem thử hình|Preview frame
 Kịch bản video bản đồ|Map video script
-Lời đọc và chữ trên video bằng tiếng Anh. Vùng lãnh thổ được tô theo tên nước/tỉnh ngày nay: bấm «Xem thử hình» ở từng giai đoạn để xem bản đồ trông thế nào.|Narration and on-screen text are in English. Territories are painted by today's country/province names: click “Preview frame” on each era to see how the map looks.
+Lời đọc và chữ trên video bằng ngôn ngữ đã chọn lúc tạo. Vùng lãnh thổ được tô theo tên nước/tỉnh ngày nay: bấm «Xem thử hình» ở từng giai đoạn để xem bản đồ trông thế nào.|Narration and on-screen text use the language chosen when the video was created. Territories are painted by today's country/province names: click “Preview picture” on each era to see how the map looks.
 Tiêu đề video|Video title
 Dòng phụ|Subtitle
 Lưu kịch bản|Save script
@@ -97,13 +105,13 @@ Lưu và dựng video|Save and build video
 + Thêm giai đoạn cuối|+ Add a final era
 + Thêm thế lực|+ Add a power
 Xóa giai đoạn này|Delete this era
-Tên giai đoạn (tiếng Anh)|Era name (English)
+Tên giai đoạn|Era name
 Năm (số âm = trước Công nguyên)|Year (negative = BC)
 Dân số (người, bỏ trống nếu không rõ)|Population (people, leave empty if unknown)
-Câu chữ trên thẻ (tiếng Anh, ngắn)|Caption on the card (English, short)
-Lời đọc (tiếng Anh, giọng kể chuyện)|Narration (English, storytelling tone)
+Câu chữ trên thẻ (ngắn)|Caption on the card (short)
+Lời đọc (giọng kể chuyện)|Narration (storytelling tone)
 Thế lực hiện trên bản đồ|Powers shown on the map
-Tên (tiếng Anh)|Name (English)
+Tên|Name
 Tên nước hoặc tỉnh, cách nhau bằng dấu phẩy|Country or province names, separated by commas
 Lá cờ có mặt|Flag with a face
 Tên địa danh|Place name

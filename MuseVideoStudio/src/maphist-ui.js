@@ -1,4 +1,4 @@
-// Giao diện tab «Bản đồ lịch sử»: gõ chủ đề → Muse soạn kịch bản tiếng Anh → (xem, sửa được) → dựng video bản đồ động có giọng đọc + nhạc.
+// Giao diện tab «Bản đồ lịch sử»: gõ chủ đề → Muse soạn kịch bản (tiếng Anh, Đức, Pháp hoặc Nga) → (xem, sửa được) → dựng video bản đồ động có giọng đọc + nhạc.
 // Phụ thuộc renderer.js (call, toast, localFileUrl, askDelete, el) và maphist-geo/plan/draw.js.
 (function () {
   'use strict';
@@ -13,7 +13,6 @@
   const CATS = Plan.CATEGORIES;
   const ALL_VALID = id => (CATS.some(c => c.id === id) ? id : '');
   const ALL_TOPICS = [...new Set(CATS.flatMap(c => c.topics))];
-  const SAMPLE = 'In the year thirteen fifty, a great kingdom rose from the sea and ruled the islands for generations.';
   const live = Object.assign(document.createElement('img'), { className: 'restoreLive', alt: 'Khung hình đang vẽ' });
   let liveAt = 0, category = ALL_VALID(saved.category), thumbBusy = '', advancedShown = false, shownVoiceKey = '', runsKey = '', listening = false, audio = null, lastState = null, music = saved.music || '';
   const node = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
@@ -24,10 +23,20 @@
   function fillSelects() {
     $('mapMinutes').replaceChildren(...MINUTES.map(m => { const o = document.createElement('option'); o.value = String(m); o.textContent = `${m} phút`; return o; }));
     $('mapMinutes').value = MINUTES.includes(Number(saved.minutes)) ? String(saved.minutes) : String(Plan.DEFAULT_MINUTES);
+    $('mapLang').replaceChildren(...Plan.LANGUAGES.map(l => { const o = document.createElement('option'); o.value = l.id; o.textContent = `${l.label} (${l.vi})`; return o; }));
+    $('mapLang').value = Plan.langOf(saved.language).id;
   }
+  // Ngôn ngữ video (en/de/fr/ru): quyết định ngôn ngữ kịch bản, giọng đọc, chữ trên video và gói đăng YouTube.
+  const lang = () => Plan.langOf($('mapLang').value).id;
+  const HINTS = {
+    en: 'Lời đọc và chữ trên video luôn bằng tiếng Anh (làm cho khán giả nước ngoài). Cần có mạng lúc đọc.',
+    de: 'Lời đọc và chữ trên video bằng tiếng Đức (làm cho khán giả nói tiếng Đức). Cần có mạng lúc đọc.',
+    fr: 'Lời đọc và chữ trên video bằng tiếng Pháp (làm cho khán giả nói tiếng Pháp). Cần có mạng lúc đọc.',
+    ru: 'Lời đọc và chữ trên video bằng tiếng Nga (làm cho khán giả nói tiếng Nga). Cần có mạng lúc đọc.',
+  };
   const tempo = () => Math.min(1.2, Math.max(0.8, Number($('mapTempo').value) || 1));
   const musicVolume = () => Math.min(0.6, Math.max(0, Number($('mapMusicVol').value) || 0.2));
-  const config = () => Plan.options({ topic: $('mapTopic').value, category, country: $('mapCountry').value, minutes: $('mapMinutes').value });
+  const config = () => Plan.options({ topic: $('mapTopic').value, category, country: $('mapCountry').value, minutes: $('mapMinutes').value, language: lang() });
   function renderCount() {
     const c = config(), n = Plan.eraCount(c.minutes);
     $('mapCount').textContent = `Video khoảng ${c.minutes} phút = khoảng ${n} giai đoạn (mỗi giai đoạn ~${Plan.ERA_SECONDS} giây). Dựng trên máy bạn: khoảng ${Math.max(2, Math.round(c.minutes * 1.8))}–${Math.max(4, Math.round(c.minutes * 3.5))} phút tùy cấu hình máy (có card đồ họa thì nhanh hơn).`;
@@ -69,20 +78,22 @@
     $('mapMusicClear').hidden = !music;
   }
 
-  // ---- giọng đọc tiếng Anh (giọng Microsoft miễn phí, dùng chung bộ làm giọng của Muse Studio)
-  function voiceChoices(v) {
-    const list = [...(v.edgeVoices || [])].filter(x => x.lang === 'en' || x.lang === '*');
-    list.sort((a, b) => (b.lang === 'en') - (a.lang === 'en'));
+  // ---- giọng đọc theo ngôn ngữ video (giọng Microsoft miễn phí, dùng chung bộ làm giọng của Muse Studio)
+  function voiceChoices(v, id = lang()) {
+    const list = [...(v.edgeVoices || [])].filter(x => x.lang === id || x.lang === '*');
+    list.sort((a, b) => (b.lang === id) - (a.lang === id));
     return list;
   }
+  // Giọng gửi kèm khi dựng lại một video đã có: chỉ khi ô giọng đang đúng ngôn ngữ của video đó, không thì để máy dùng giọng cũ của video.
+  const voiceFor = meta => (Plan.langOf(meta && meta.language).id === lang() ? { voice: $('mapVoice').value } : {});
   function renderVoice(s) {
     const v = (s && s.story && s.story.voice) || {}, ready = v.ready || {};
-    const choices = voiceChoices(v), key = choices.map(x => x.id).join(',');
+    const choices = voiceChoices(v), key = lang() + ':' + choices.map(x => x.id).join(',');
     const select = $('mapVoice');
     if (key !== shownVoiceKey) {
       shownVoiceKey = key;
       select.replaceChildren(...(choices.length ? choices.map(x => { const o = document.createElement('option'); o.value = x.id; o.textContent = x.name; return o; }) : [Object.assign(document.createElement('option'), { value: '', textContent: 'Chưa có giọng' })]));
-      const pick = choices.find(x => x.id === saved.voice) || choices.find(x => x.id === 'en-US-GuyNeural') || choices[0];
+      const pick = choices.find(x => x.id === ((saved.voices || {})[lang()] || (lang() === 'en' ? saved.voice : ''))) || choices.find(x => x.id === Plan.langOf(lang()).voice) || choices[0];
       select.value = pick ? pick.id : '';
     }
     select.disabled = !choices.length;
@@ -94,7 +105,7 @@
     if (v.setupBusy) info = v.setupMessage || 'Đang cài giọng…';
     else if (v.setupError) info = v.setupError;
     else if (!ready.edge) info = 'Chưa cài giọng Microsoft. Bấm «Cài giọng miễn phí» (cần Python 3.10–3.13 trên máy và có mạng), đợi cài xong rồi làm video.';
-    else info = 'Lời đọc và chữ trên video luôn bằng tiếng Anh (làm cho khán giả nước ngoài). Cần có mạng lúc đọc.';
+    else info = HINTS[lang()];
     $('mapVoiceInfo').textContent = info;
     if (v.ready && !ready.edge && !advancedShown) { advancedShown = true; $('mapAdvanced').open = true; }
   }
@@ -169,10 +180,10 @@
       const busy = Boolean(info.busy || s.active || s.starting || s.merging || s.packaging);
       if (writing || building) actions.append(button(writing ? 'Dừng soạn' : 'Dừng dựng', 'secondary', async () => { const r = await call('mapCancel'); if (r) { runsKey = ''; render(r); } }));
       else {
-        if (meta.status === 'draft') actions.append(button('Viết tiếp', 'primary', async () => { const r = await call('mapMake', { resumeId: id, auto: $('mapAuto').checked, voice: $('mapVoice').value }); if (r) await refresh(); }, busy));
+        if (meta.status === 'draft') actions.append(button('Viết tiếp', 'primary', async () => { const r = await call('mapMake', { resumeId: id, auto: $('mapAuto').checked, ...voiceFor(meta) }); if (r) await refresh(); }, busy));
         if (['script', 'done'].includes(meta.status)) {
           actions.append(button(meta.status === 'done' ? 'Dựng lại' : 'Dựng video', meta.status === 'done' ? 'secondary' : 'primary', async () => {
-            const r = await call('mapRender', { runId: id, voice: $('mapVoice').value, tempo: tempo(), music, musicVolume: musicVolume() });
+            const r = await call('mapRender', { runId: id, ...voiceFor(meta), tempo: tempo(), music, musicVolume: musicVolume() });
             if (r) await refresh();
           }, busy));
           actions.append(button('Xem và sửa kịch bản', 'secondary', () => openEditor(id), busy));
@@ -212,7 +223,7 @@
     if (bad.length) { toast(bad[0]); $('mapTopic').focus(); return; }
     $('mapCreate').disabled = true;
     try {
-      const fresh = await call('mapMake', { topic: c.topic, category: c.category, country: c.country, minutes: c.minutes, voice: $('mapVoice').value, tempo: tempo(), music, musicVolume: musicVolume(), auto: $('mapAuto').checked });
+      const fresh = await call('mapMake', { topic: c.topic, category: c.category, country: c.country, minutes: c.minutes, language: c.language, voice: $('mapVoice').value, tempo: tempo(), music, musicVolume: musicVolume(), auto: $('mapAuto').checked });
       if (fresh) {
         $('mapForm').open = false;
         toast(!c.topic ? 'Muse đang chọn chủ đề và soạn kịch bản. Tên video sẽ hiện ở danh sách ngay khi có dàn ý.' : $('mapAuto').checked ? 'Muse đang soạn kịch bản. Các bước sau (vẽ bản đồ, giọng đọc, nhạc) tự chạy, bạn không cần bấm gì thêm.' : 'Muse đang soạn kịch bản. Xong bạn bấm «Xem và sửa kịch bản» để kiểm tra rồi mới dựng.');
@@ -234,17 +245,17 @@
   const field = (label, control) => { const l = node('label', 'mapField'); l.append(node('span', '', label), control); return l; };
   function eraCard(era, i) {
     const card = node('details', 'mapEra');
-    const head = node('summary', '', ''), refreshHead = () => { head.textContent = `${i + 1}. ${Plan.yearLabel(era.year)} · ${era.title || '(chưa có tên)'}`; };
+    const head = node('summary', '', ''), refreshHead = () => { head.textContent = `${i + 1}. ${Plan.yearLabel(era.year, edit.script.lang)} · ${era.title || '(chưa có tên)'}`; };
     refreshHead(); card.append(head);
     const row = node('div', 'mapRow');
     const year = node('input'); year.type = 'number'; year.value = era.year; year.oninput = () => { const n = Number(year.value); if (Number.isFinite(n)) era.year = Math.round(n); refreshHead(); };
     const pop = node('input'); pop.type = 'number'; pop.min = '0'; pop.value = era.population || ''; pop.oninput = () => { era.population = Math.max(0, Number(pop.value) || 0); };
-    row.append(field('Năm (số âm = trước Công nguyên)', year), field('Tên giai đoạn (tiếng Anh)', textInput(era.title, '', v => { era.title = v; refreshHead(); })), field('Dân số (người, bỏ trống nếu không rõ)', pop));
-    card.append(row, field('Câu chữ trên thẻ (tiếng Anh, ngắn)', textInput(era.caption, '', v => { era.caption = v; })));
+    row.append(field('Năm (số âm = trước Công nguyên)', year), field('Tên giai đoạn', textInput(era.title, '', v => { era.title = v; refreshHead(); })), field('Dân số (người, bỏ trống nếu không rõ)', pop));
+    card.append(row, field('Câu chữ trên thẻ (ngắn)', textInput(era.caption, '', v => { era.caption = v; })));
     const nar = node('textarea'); nar.value = era.narration || ''; nar.maxLength = 1200; nar.rows = 4;
     const count = node('small', 'hint', ''), showCount = () => { count.textContent = `${Plan.words(nar.value)} từ · khoảng ${Math.round(Plan.speakSeconds(nar.value))} giây khi đọc`; };
     nar.oninput = () => { era.narration = nar.value; showCount(); }; showCount();
-    card.append(field('Lời đọc (tiếng Anh, giọng kể chuyện)', nar), count);
+    card.append(field('Lời đọc (giọng kể chuyện)', nar), count);
     // thế lực + vùng tô
     const realms = node('div', 'mapRealms'), drawRealms = () => {
       realms.replaceChildren(node('strong', '', 'Thế lực hiện trên bản đồ'), ...era.realms.map((r, k) => {
@@ -256,7 +267,7 @@
         const face = node('input'); face.type = 'checkbox'; face.checked = r.face !== false; face.onchange = () => { r.face = face.checked; };
         const faceLabel = node('label', 'checkLine'); faceLabel.append(face, node('span', '', 'Lá cờ có mặt'));
         const rm = button('✕', 'secondary', () => { era.realms.splice(k, 1); drawRealms(); });
-        line.append(textInput(r.name, 'Tên (tiếng Anh)', v => { r.name = v; }, 'mapRealmName'), regions, mood, color, faceLabel, rm);
+        line.append(textInput(r.name, 'Tên', v => { r.name = v; }, 'mapRealmName'), regions, mood, color, faceLabel, rm);
         if (r.unknown && r.unknown.length) line.append(node('p', 'restoreRunText warn', 'Không tìm thấy trên bản đồ: ' + r.unknown.join(', ') + '. Sửa tên cho khớp tên nước/tỉnh trong dữ liệu (tên tiếng Anh hoặc tên bản địa).'));
         return line;
       }), button('+ Thêm thế lực', 'secondary', () => { era.realms.push({ name: 'New realm', regions: [], circles: [], color: Plan.PALETTE[era.realms.length % Plan.PALETTE.length], colors: [Plan.PALETTE[era.realms.length % Plan.PALETTE.length]], flag: 'solid', mood: 'calm', face: false }); drawRealms(); }));
@@ -323,7 +334,7 @@
     if (!edit) return;
     const saved1 = await saveEdit();
     if (!saved1) return;
-    const r = await call('mapRender', { runId: edit.runId, voice: $('mapVoice').value, tempo: tempo(), music, musicVolume: musicVolume() });
+    const r = await call('mapRender', { runId: edit.runId, ...voiceFor({ language: edit.script.lang }), tempo: tempo(), music, musicVolume: musicVolume() });
     if (r) { $('mapEditor').close(); await refresh(); toast('Đang dựng video. Có thể theo dõi tiến độ ở danh sách.'); }
   };
 
@@ -347,14 +358,16 @@
   $('mapAuto').checked = saved.auto !== false;
   const showTempo = () => { $('mapTempoOut').textContent = tempo().toFixed(2) + '×'; };
   showTempo(); renderMusic(); renderCount(); renderGroups(); renderTopics();
-  const remember = () => { saved = { ...saved, topic: $('mapTopic').value, category, country: $('mapCountry').value, minutes: $('mapMinutes').value, tempo: tempo(), musicVolume: musicVolume(), music, voice: $('mapVoice').value, auto: $('mapAuto').checked }; persist(); };
+  const remember = () => { saved = { ...saved, topic: $('mapTopic').value, category, country: $('mapCountry').value, minutes: $('mapMinutes').value, tempo: tempo(), musicVolume: musicVolume(), music, language: lang(), auto: $('mapAuto').checked }; persist(); };
   $('mapMinutes').onchange = () => { remember(); renderCount(); };
   $('mapTopic').oninput = () => { remember(); renderCount(); renderTopics(); };
   $('mapCountry').oninput = remember;
   $('mapTempo').oninput = () => { showTempo(); remember(); };
   $('mapMusicVol').oninput = remember;
   $('mapAuto').onchange = remember;
-  $('mapVoice').onchange = remember;
+  // Nhớ giọng riêng cho từng ngôn ngữ; chỉ ghi khi người dùng tự đổi giọng (đổi ngôn ngữ thì ô giọng còn giữ giọng ngôn ngữ cũ, không được ghi nhầm).
+  $('mapVoice').onchange = () => { saved = { ...saved, voices: { ...(saved.voices || {}), [lang()]: $('mapVoice').value } }; remember(); };
+  $('mapLang').onchange = () => { remember(); renderVoice(lastState); renderCount(); };
   $('mapTopic').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); create(); } });
   $('mapCreate').onclick = create;
   $('mapKey').onclick = () => $('licenseDialog').showModal();
@@ -364,7 +377,7 @@
   $('mapListen').onclick = async () => {
     listening = true; renderVoice(lastState);
     try {
-      const file = await call('storyListen', { engine: 'edge', voice: $('mapVoice').value, tempo: tempo(), volume: 1, text: SAMPLE });
+      const file = await call('storyListen', { engine: 'edge', voice: $('mapVoice').value, tempo: tempo(), volume: 1, text: Plan.langOf(lang()).sample });
       if (file) { audio = audio || new Audio(); audio.src = localFileUrl(file); audio.play().catch(() => {}); }
     } finally { listening = false; renderVoice(lastState); }
   };

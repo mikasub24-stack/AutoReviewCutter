@@ -223,7 +223,8 @@ function createMapService({ getSettings = () => ({}), voice = null, ensureAllowe
     const timeline = Plan.compile(script, g, { durations: [], fps: FPS });
     const picks = pickEras(timeline), k = ((Math.round(Number(variant)) || 0) % picks.length + picks.length) % picks.length;
     const first = script.eras[0].year, last = script.eras[script.eras.length - 1].year;
-    const years = script.eras.length > 1 && first !== last ? `${Plan.yearLabel(first)} – ${Plan.yearLabel(last)}` : Plan.yearLabel(first);
+    const lang = timeline.lang || 'en';
+    const years = script.eras.length > 1 && first !== last ? `${Plan.yearLabel(first, lang)} – ${Plan.yearLabel(last, lang)}` : Plan.yearLabel(first, lang);
     let buffer = null;
     for (const quality of [.92, .86, .8, .72, .64]) {
       buffer = Buffer.from(await renderStill({ timeline, raw: await raw(), index: picks[k], title: script.title || name || '', subtitle: script.subtitle || '', years, quality }));

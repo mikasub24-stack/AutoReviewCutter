@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.18
+
+- **Làm video bản đồ bằng tiếng Đức, Pháp, Nga (ngoài tiếng Anh):** ở tab «Bản đồ lịch sử» có ô mới **«Ngôn ngữ video»**: English (tiếng Anh), Deutsch (tiếng Đức), Français (tiếng Pháp), Русский (tiếng Nga). Mỗi video một ngôn ngữ. Ngôn ngữ chọn xong quyết định: Muse viết tiêu đề, tên giai đoạn, chữ trên thẻ, lời đọc và tên các thế lực bằng ngôn ngữ đó; giọng đọc (danh sách giọng và giọng mặc định đổi theo ngôn ngữ; nhớ giọng riêng cho từng ngôn ngữ); các chữ cố định trên video («Cảm ơn đã xem», trước/sau Công nguyên, «triệu người»); và gói đăng YouTube (tiêu đề, mô tả có chương, thẻ, hashtag) cũng viết bằng ngôn ngữ đó.
+- Tên nước/tỉnh dùng để tô bản đồ vẫn là tiếng Anh (để khớp dữ liệu bản đồ), nhưng không hiện lên video.
+- Nên mỗi ngôn ngữ một kênh YouTube riêng để thuật toán đề xuất đúng khán giả. Video cũ không đổi: vẫn là tiếng Anh. Giọng Đức/Pháp/Nga dùng bộ giọng Microsoft miễn phí đã cài ở mục Giọng thuyết minh; nếu chưa thấy giọng, bấm «Cài lại giọng miễn phí».
+
 ## Update 1.9.17
 
 - **Sửa chữ tràn khung hình trong video:** tiêu đề ở phần mở đầu quá dài (ví dụ «The Aztec Empire: From a Lake Island to the Fall of Tenochtitlan — and the Mexico It Became») từng bị cắt ở hai mép màn hình. Giờ tiêu đề tự xuống dòng (tối đa 3 dòng, ưu tiên ngắt sau dấu hai chấm hoặc gạch ngang) và chọn cỡ chữ lớn nhất còn vừa khung; phụ đề thu nhỏ khi quá dài; la bàn nhích lên khi tiêu đề có 3 dòng.

@@ -466,6 +466,48 @@ test('thông tin đăng YouTube: tiêu đề đúng như trên video, chương c
   assert.equal(Plan.publishPack({ title: '', eras: [] }, null).title, 'History');
 });
 
+test('ngôn ngữ video: Anh, Đức, Pháp, Nga — kịch bản, nhãn năm, chữ cố định và gói YouTube đều theo ngôn ngữ', () => {
+  assert.deepEqual(Plan.LANGUAGES.map(l => l.id), ['en', 'de', 'fr', 'ru']);
+  assert.equal(Plan.options({}).language, 'en', 'mặc định tiếng Anh');
+  assert.equal(Plan.options({ language: 'fr' }).language, 'fr');
+  assert.equal(Plan.options({ language: 'xx' }).language, 'en', 'ngôn ngữ lạ thì về tiếng Anh');
+  assert.equal(Plan.yearLabel(-221, 'de'), '221 v. Chr.'); assert.equal(Plan.yearLabel(300, 'fr'), '300 apr. J.-C.'); assert.equal(Plan.yearLabel(300, 'ru'), '300 н. э.'); assert.equal(Plan.yearLabel(-221), '221 BC');
+  for (const l of Plan.LANGUAGES) {
+    assert.match(l.voice, new RegExp('^' + l.id + '-[A-Z]{2}-')); assert.ok(l.sample.length > 40 && l.label && l.vi);
+    assert.ok(l.s.thanks && l.s.bcTag && l.s.adTag && l.s.people(2500000) && l.s.people(800));
+  }
+  assert.equal(Plan.strings('ru').thanks, 'Спасибо за просмотр'); assert.equal(Plan.strings('de').people(2500000), '2,5 Mio. Menschen');
+  // Lời nhắc gửi Muse nói rõ ngôn ngữ, tên vùng (regions) luôn giữ tiếng Anh để khớp bản đồ.
+  for (const [id, name] of [['de', 'TIẾNG ĐỨC'], ['fr', 'TIẾNG PHÁP'], ['ru', 'TIẾNG NGA']]) {
+    const c = Plan.options({ topic: 'History of Testland', language: id });
+    assert.match(Plan.buildOutlineInstruction(c, ['Mongolia']), new RegExp(name));
+    assert.match(Plan.buildErasInstruction(c, { title: 'T', country: 'Mongolia', eras: [{ year: 1, title: 'x', focus: 'f' }] }, { range: [1, 1], countryNames: ['Mongolia'] }), new RegExp(name));
+  }
+  assert.doesNotMatch(Plan.buildOutlineInstruction(Plan.options({ topic: 'History of Testland' }), ['Mongolia']), /TIẾNG (ĐỨC|PHÁP|NGA)/);
+  // Kịch bản mang ngôn ngữ đi suốt: normalizeScript → compile → publishPack.
+  const era = (year, title) => ({ year, title, caption: 'c', narration: 'Eins zwei drei vier fünf sechs sieben acht neun zehn elf zwölf Wörter heute hier.', realms: [], markers: [], routes: [] });
+  for (const [id, chapters, tag] of [['de', 'Kapitel', /#Geschichte/], ['fr', 'Chapitres', /#Histoire/], ['ru', 'Главы', /#История/]]) {
+    const raw = { lang: id, title: 'T', subtitle: 'S', country: 'Mongolia', eras: [era(-221, 'a'), era(300, 'b'), era(1206, 'c'), era(1219, 'd'), era(1241, 'e')] };
+    const { script } = Plan.normalizeScript(raw, null);
+    assert.equal(script.lang, id);
+    const tl = Plan.compile(script, null, { durations: [14, 14, 14, 14, 14], fps: 30 });
+    assert.equal(tl.lang, id); assert.equal(tl.eras[0].label, Plan.yearLabel(-221, id));
+    const pack = Plan.publishPack(script, tl);
+    assert.equal(pack.lang, id); assert.ok(pack.description.includes('\n' + chapters + '\n0:00 ' + Plan.yearLabel(-221, id) + ': a'), pack.description); assert.match(pack.description, tag);
+    assert.ok(pack.tags.length >= 5 && pack.tags.join(', ').length <= 460);
+  }
+  assert.equal(Plan.normalizeScript({ lang: 'zz', title: 'T', eras: [] }, null).script.lang, 'en');
+  // assemble ghi ngôn ngữ và lời kêu gọi đăng ký của ngôn ngữ đó.
+  const out = Plan.assemble({ title: 'T', subtitle: 'S', country: 'Mongolia', eras: [{ n: 1, year: 1, title: 'x' }] }, new Map(), 'fr');
+  assert.equal(out.lang, 'fr'); assert.equal(out.outro, Plan.strings('fr').subscribe);
+  // Vẽ khung và dựng video dùng đúng bảng chữ, không còn chữ tiếng Anh cố định.
+  const draw = fs.readFileSync(path.join(__dirname, '..', 'src', 'maphist-draw.js'), 'utf8');
+  assert.match(draw, /Plan\.strings\(tl\.lang\)\.thanks/); assert.match(draw, /Plan\.strings\(tl\.lang\)\.people\(n\)/); assert.match(draw, /Plan\.strings\(tl\.lang\)\[yearF < 0 \? 'bcTag' : 'adTag'\]/);
+  assert.doesNotMatch(draw, /'Thanks for watching'|\$\{people\(n\)\} people/);
+  const main = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.cjs'), 'utf8');
+  assert.match(main, /function pickMapVoice\(wanted,language\)/); assert.match(main, /language:config\.language,voice/); assert.match(main, /language:meta\.language,avoid/);
+});
+
 test('tiêu đề mở đầu: tiêu đề dài tự xuống dòng (tối đa 3 dòng) và luôn vừa khung; dải tên giai đoạn không tràn', () => {
   const { titleLayout } = require('../src/maphist-draw.js');
   const ctx = { font: '', measureText(s) { return { width: s.length * Number(/(\d+)px/.exec(this.font)[1]) * .52 }; } };   // giả lập đo chữ: rộng ~0,52 × cỡ chữ mỗi ký tự
