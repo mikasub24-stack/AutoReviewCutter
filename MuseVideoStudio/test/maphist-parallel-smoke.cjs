@@ -44,7 +44,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
       const solo = await render(0, 1);
       assert.equal(solo.stopped, false);
       assert.equal(Object.keys(solo.hashes).length, solo.total, 'một cửa sổ vẽ đủ mọi khung');
-      for (const workers of [2, 3]) {
+      for (const workers of [3, 16]) {
         const parts = []; for (let w = 0; w < workers; w++) parts.push(await render(w, workers));
         const merged = {}; let count = 0;
         for (const p of parts) for (const [i, h] of Object.entries(p.hashes)) { assert.ok(!(i in merged), `khung ${i} chỉ do một cửa sổ vẽ`); merged[i] = h; count++; }
@@ -54,7 +54,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
         assert.deepEqual(bad, [], `[${theme}] khung khác nhau giữa ${workers} cửa sổ và một cửa sổ (lệch lớn nhất ${worst})`);
         assert.ok(far(solo.hashes[0], solo.hashes[Math.floor(solo.total / 2)]) > 20, 'các khung khác nhau thật (phép so không rỗng)');
       }
-      console.log(theme, 'OK:', solo.total, 'khung cùng một hình giữa 1, 2 và 3 cửa sổ');
+      console.log(theme, 'OK:', solo.total, 'khung cùng một hình giữa 1, 3 và 16 cửa sổ');
     }
   } finally { await browser.close(); server.close(); }
   console.log('maphist-parallel-smoke OK');

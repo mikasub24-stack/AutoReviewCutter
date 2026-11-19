@@ -3,9 +3,9 @@
    Nhận diện: nền giấy da có thớ, biển xanh mực với đường nước kẻ như bản khắc, lãnh thổ lan ra như MỰC LOANG rồi cắm cờ gợn sóng,
    viền vàng dập nổi, năm hiện bằng đồng hồ số cơ học, lời đọc hiện thành thẻ ghi chép sáng từng từ theo giọng, địa cầu nhỏ chỉ vùng đang xem. */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./maphist-plan.js'), require('./maphist-geo.js'), require('./maphist-cartoon.js'));
-  else root.maphistDraw = factory(root.maphistPlan, root.maphistGeo, root.maphistCartoon);
-})(typeof window !== 'undefined' ? window : globalThis, function (Plan, Geo, Cart) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./maphist-plan.js'), require('./maphist-geo.js'), require('./maphist-cartoon.js'), require('./maphist-scenes.js'));
+  else root.maphistDraw = factory(root.maphistPlan, root.maphistGeo, root.maphistCartoon, root.maphistScenes);
+})(typeof window !== 'undefined' ? window : globalThis, function (Plan, Geo, Cart, Scenes) {
   'use strict';
   const { W, H, CY } = Plan;
   const TAU = Math.PI * 2, DEG = Math.PI / 180;
@@ -818,6 +818,13 @@
       Cart.scroll(c, width, height, { cx: width / 2, bottom: height - 20, title, lines, flag, slide, arrow: outro ? 1 : 0, t });
       if (outro) Cart.subscribe(c, width, S.sub.toLocaleUpperCase(tl.lang), clamp((st.p - .12) / .3, 0, 1), t);
     }
+    // Cảnh minh hoạ có người chèn giữa giai đoạn: khung ảnh nảy ra giữa màn hình, bản đồ tối đi phía sau.
+    function toonCutaway(c, st, t) {
+      const cut = st.era && st.era.cut;
+      if (!cut || !Scenes) return;
+      const u = (st.local - cut.at) / cut.dur;
+      if (u > 0 && u < 1) Scenes.panel(c, { kind: cut.kind, u, t, shout: cut.shout, cx: width / 2, cy: 618, w: 1400, h: 540, screenW: width, screenH: height });
+    }
     // Chữ dán «BOOM!» / «LAND HO!» bật ra cạnh ký hiệu trận đánh / tàu đến (tín hiệu lấy từ Plan.cuesOf).
     function toonStickers(c, st, pr, t) {
       if (tl.stickerCues === undefined) tl.stickerCues = Plan.cuesOf(tl).filter(q => q.kind === 'sticker');
@@ -912,7 +919,7 @@
       lap('compose', ctx);
       if (!cartoon) finish(ctx);
       if (opts.bare) { stats.frames++; stats.ms += (typeof performance !== 'undefined' ? performance.now() : Date.now()) - started; return st; }
-      if (cartoon && st.era && st.phase === 'era') toonStickers(ctx, st, pr, t);
+      if (cartoon && st.era && st.phase === 'era') { toonStickers(ctx, st, pr, t); toonCutaway(ctx, st, t); }
       if (st.phase === 'intro') { if (cartoon) toonIntro(ctx, st, t); else drawIntro(ctx, st, t); }
       else if (st.era && cartoon) toonHud(ctx, st, t);
       else if (st.era) {

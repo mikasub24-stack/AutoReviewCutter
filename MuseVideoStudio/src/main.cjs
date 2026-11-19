@@ -842,7 +842,7 @@ async function runMapBuild(runId){
   try{
     const script=await readJsonFile(mapScriptFile(runId));
     if(!script)throw Error('Chưa có kịch bản để dựng.');
-    const result=await mapService.make({runId,dir:mapFolder(settings.output,runId),name:meta.name,config:{voice:meta.voice,tempo:meta.tempo,music:meta.music,musicVolume:meta.musicVolume},script});
+    const result=await mapService.make({runId,dir:mapFolder(settings.output,runId),name:meta.name,config:{voice:meta.voice,tempo:meta.tempo,music:meta.music,musicVolume:meta.musicVolume,workers:meta.workers},script});
     Object.assign(meta,{status:'done',output:result.output,seconds:Math.round(result.seconds),eras:result.eras,builtAt:Date.now(),error:'',publish:result.publish||null,publishFile:result.publishFile||''});
     mapState={busy:false,phase:'done',progress:'Video bản đồ đã dựng xong',error:'',runId};
   }catch(e){
@@ -1447,7 +1447,7 @@ app.whenReady().then(async () => {
       if(queue.active||starting)throw Error('Hàng đợi đang chạy. Dừng hàng đợi trước khi làm video bản đồ.');
       const all=mapRuns(),resumeId=String(data?.resumeId||'');
       let runId;
-      if(resumeId&&all[resumeId]&&['draft','writing'].includes(all[resumeId].status)){runId=resumeId;Object.assign(all[runId],{voice:pickMapVoice(data?.voice||all[runId].voice,all[runId].language),tempo:all[runId].tempo,music:mapMusicOf(data?.music??all[runId].music)});}
+      if(resumeId&&all[resumeId]&&['draft','writing'].includes(all[resumeId].status)){runId=resumeId;Object.assign(all[runId],{voice:pickMapVoice(data?.voice||all[runId].voice,all[runId].language),workers:mapPlan.options({workers:data?.workers}).workers,tempo:all[runId].tempo,music:mapMusicOf(data?.music??all[runId].music)});}
       else{
         const config=mapPlan.options(data);
         const bad=mapPlan.problems(config);
@@ -1456,7 +1456,7 @@ app.whenReady().then(async () => {
         const base=(config.topic||'Tu-chon').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/gi,'d').replace(/[^A-Za-z0-9]+/g,'-').slice(0,30);
         runId=await freeStoryId(base,{output:settings.output,jobs:[],folderOf:mapFolder,fallback:'BanDo'});
         const group=mapPlan.categoryOf(config.category);
-        all[runId]={name:config.topic||(group?'Muse tự chọn: '+group.label:'Muse tự chọn chủ đề'),topic:config.topic,category:config.topic?'':config.category,minutes:config.minutes,country:config.country,language:config.language,voice,tempo:config.tempo,music:mapMusicOf(config.music),musicVolume:config.musicVolume,status:'writing',createdAt:Date.now(),error:''};
+        all[runId]={name:config.topic||(group?'Muse tự chọn: '+group.label:'Muse tự chọn chủ đề'),topic:config.topic,category:config.topic?'':config.category,minutes:config.minutes,country:config.country,language:config.language,voice,tempo:config.tempo,music:mapMusicOf(config.music),musicVolume:config.musicVolume,workers:config.workers,status:'writing',createdAt:Date.now(),error:''};
         for(const id of Object.keys(all).slice(0,Math.max(0,Object.keys(all).length-40)))delete all[id];
       }
       await fs.mkdir(mapFolder(settings.output,runId),{recursive:true});
@@ -1513,6 +1513,7 @@ app.whenReady().then(async () => {
       if(data?.tempo!==undefined)meta.tempo=mapPlan.options({tempo:data.tempo}).tempo;
       if(data?.music!==undefined)meta.music=mapMusicOf(data.music);
       if(data?.musicVolume!==undefined)meta.musicVolume=mapPlan.options({musicVolume:data.musicVolume}).musicVolume;
+      if(data?.workers!==undefined)meta.workers=mapPlan.options({workers:data.workers}).workers;
       if(data?.name)meta.name=String(data.name).slice(0,120);
       await save();notify();
       void runMapBuild(id);

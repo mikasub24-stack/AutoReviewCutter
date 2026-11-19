@@ -93,6 +93,9 @@ Nước làm trung tâm (không bắt buộc, để trống thì Muse tự chọ
 Giọng đọc|Narration voice
 Không nhạc nền (chỉ có giọng đọc).|No background music (narration only).
 Âm lượng nhạc|Music volume
+Số cửa sổ vẽ|Render windows
+Tự động|Auto
+Mỗi cửa sổ vẽ một đoạn video cùng lúc. Nhiều cửa sổ hơn chỉ nhanh hơn khi CPU và RAM còn rảnh (mỗi cửa sổ tốn thêm vài trăm MB RAM).|Each window renders a different part of the video at the same time. More windows only help when CPU and RAM are free (each window needs a few hundred MB more RAM).
 Tự động làm hết: soạn kịch bản, vẽ, đọc, ghép nhạc, xuất video (bỏ tick để dừng ở kịch bản và xem, sửa trước khi dựng)|Do everything automatically: script, map, narration, music, export (untick to stop at the script and review or edit it before building)
 Dữ liệu bản đồ hiện đại (Natural Earth, phạm vi công cộng) nên ranh giới các đế chế xưa chỉ xấp xỉ theo biên giới ngày nay. Hãy đọc kịch bản để chắc các sự kiện, năm tháng đúng trước khi đăng, và bật mục «nội dung bị thay đổi hoặc tổng hợp» trên YouTube.|The map data is modern (Natural Earth, public domain), so the borders of old empires only approximate today's borders. Read the script to make sure events and dates are right before publishing, and switch on YouTube's “altered or synthetic content” disclosure.
 Làm video bản đồ|Make map video
@@ -116,6 +119,17 @@ Tên giai đoạn|Era name
 Năm (số âm = trước Công nguyên)|Year (negative = BC)
 Dân số (người, bỏ trống nếu không rõ)|Population (people, leave empty if unknown)
 Câu chữ trên thẻ (ngắn)|Caption on the card (short)
+Cảnh minh hoạ có người|Cartoon cutaway scene
+Tự chọn theo nội dung|Auto (from the era)
+Không chèn cảnh|No scene
+Tàu ra khơi|Ship sets sail
+Tàu cập bến|Ship arrives
+Trận đánh|Battle
+Vua và triều đình|King and court
+Chợ, thương mại|Market and trade
+Xây dựng|Building
+Núi lửa, thiên tai|Volcano and disasters
+Tiếng hô trên cảnh (ngắn, bỏ trống = mặc định)|Shout on the scene (short, empty = default)
 Lời đọc (giọng kể chuyện)|Narration (storytelling tone)
 Thế lực hiện trên bản đồ|Powers shown on the map
 Tên|Name

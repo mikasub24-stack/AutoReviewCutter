@@ -36,6 +36,7 @@
   };
   const tempo = () => Math.min(1.2, Math.max(0.8, Number($('mapTempo').value) || 1));
   const musicVolume = () => Math.min(0.6, Math.max(0, Number($('mapMusicVol').value) || 0.2));
+  const workers = () => Math.min(16, Math.max(0, Math.round(Number($('mapWorkers').value) || 0)));
   const config = () => Plan.options({ topic: $('mapTopic').value, category, country: $('mapCountry').value, minutes: $('mapMinutes').value, language: lang() });
   function renderCount() {
     const c = config(), n = Plan.eraCount(c.minutes);
@@ -188,7 +189,7 @@
         if (meta.status === 'draft') actions.append(button('Viết tiếp', 'primary', async () => { const r = await call('mapMake', { resumeId: id, auto: $('mapAuto').checked, ...voiceFor(meta) }); if (r) await refresh(); }, busy));
         if (['script', 'done'].includes(meta.status)) {
           actions.append(button(meta.status === 'done' ? 'Dựng lại' : 'Dựng video', meta.status === 'done' ? 'secondary' : 'primary', async () => {
-            const r = await call('mapRender', { runId: id, ...voiceFor(meta), tempo: tempo(), music, musicVolume: musicVolume() });
+            const r = await call('mapRender', { runId: id, ...voiceFor(meta), tempo: tempo(), music, musicVolume: musicVolume(), workers: workers() });
             if (r) await refresh();
           }, busy));
           actions.append(button('Xem và sửa kịch bản', 'secondary', () => openEditor(id), busy));
@@ -228,7 +229,7 @@
     if (bad.length) { toast(bad[0]); $('mapTopic').focus(); return; }
     $('mapCreate').disabled = true;
     try {
-      const fresh = await call('mapMake', { topic: c.topic, category: c.category, country: c.country, minutes: c.minutes, language: c.language, voice: $('mapVoice').value, tempo: tempo(), music, musicVolume: musicVolume(), auto: $('mapAuto').checked });
+      const fresh = await call('mapMake', { topic: c.topic, category: c.category, country: c.country, minutes: c.minutes, language: c.language, voice: $('mapVoice').value, tempo: tempo(), music, musicVolume: musicVolume(), workers: workers(), auto: $('mapAuto').checked });
       if (fresh) {
         $('mapForm').open = false;
         toast(!c.topic ? 'Muse đang chọn chủ đề và soạn kịch bản. Tên video sẽ hiện ở danh sách ngay khi có dàn ý.' : $('mapAuto').checked ? 'Muse đang soạn kịch bản. Các bước sau (vẽ bản đồ, giọng đọc, nhạc) tự chạy, bạn không cần bấm gì thêm.' : 'Muse đang soạn kịch bản. Xong bạn bấm «Xem và sửa kịch bản» để kiểm tra rồi mới dựng.');
@@ -257,6 +258,11 @@
     const pop = node('input'); pop.type = 'number'; pop.min = '0'; pop.value = era.population || ''; pop.oninput = () => { era.population = Math.max(0, Number(pop.value) || 0); };
     row.append(field('Năm (số âm = trước Công nguyên)', year), field('Tên giai đoạn', textInput(era.title, '', v => { era.title = v; refreshHead(); })), field('Dân số (người, bỏ trống nếu không rõ)', pop));
     card.append(row, field('Câu chữ trên thẻ (ngắn)', textInput(era.caption, '', v => { era.caption = v; })));
+    // cảnh minh hoạ có người chèn giữa giai đoạn (để trống = tự chọn theo biểu tượng và ký hiệu của giai đoạn)
+    const SCENE_NAMES = { voyage: 'Tàu ra khơi', arrival: 'Tàu cập bến', battle: 'Trận đánh', court: 'Vua và triều đình', market: 'Chợ, thương mại', build: 'Xây dựng', volcano: 'Núi lửa, thiên tai' };
+    const scene = node('select'); for (const [v, label] of [['', 'Tự chọn theo nội dung'], ['none', 'Không chèn cảnh'], ...Plan.SCENES.map(k => [k, SCENE_NAMES[k]])]) { const o = document.createElement('option'); o.value = v; o.textContent = label; scene.append(o); }
+    scene.value = era.scene || ''; scene.onchange = () => { era.scene = scene.value; };
+    const sceneRow = node('div', 'mapRow'); sceneRow.append(field('Cảnh minh hoạ có người', scene), field('Tiếng hô trên cảnh (ngắn, bỏ trống = mặc định)', textInput(era.shout || '', '', v => { era.shout = v.slice(0, 22); }))); card.append(sceneRow);
     const nar = node('textarea'); nar.value = era.narration || ''; nar.maxLength = 1200; nar.rows = 4;
     const count = node('small', 'hint', ''), showCount = () => { count.textContent = `${Plan.words(nar.value)} từ · khoảng ${Math.round(Plan.speakSeconds(nar.value))} giây khi đọc`; };
     nar.oninput = () => { era.narration = nar.value; showCount(); }; showCount();
@@ -340,7 +346,7 @@
     if (!edit) return;
     const saved1 = await saveEdit();
     if (!saved1) return;
-    const r = await call('mapRender', { runId: edit.runId, ...voiceFor({ language: edit.script.lang }), tempo: tempo(), music, musicVolume: musicVolume() });
+    const r = await call('mapRender', { runId: edit.runId, ...voiceFor({ language: edit.script.lang }), tempo: tempo(), music, musicVolume: musicVolume(), workers: workers() });
     if (r) { $('mapEditor').close(); await refresh(); toast('Đang dựng video. Có thể theo dõi tiến độ ở danh sách.'); }
   };
 
@@ -361,15 +367,17 @@
   $('mapCountry').value = saved.country || '';
   $('mapTempo').value = String(saved.tempo || 1);
   $('mapMusicVol').value = String(saved.musicVolume == null ? 0.2 : saved.musicVolume);
+  $('mapWorkers').value = String(saved.workers || 0);
   $('mapAuto').checked = saved.auto !== false;
   const showTempo = () => { $('mapTempoOut').textContent = tempo().toFixed(2) + '×'; };
   showTempo(); renderMusic(); renderCount(); renderGroups(); renderTopics();
-  const remember = () => { saved = { ...saved, topic: $('mapTopic').value, category, country: $('mapCountry').value, minutes: $('mapMinutes').value, tempo: tempo(), musicVolume: musicVolume(), music, language: lang(), auto: $('mapAuto').checked }; persist(); };
+  const remember = () => { saved = { ...saved, topic: $('mapTopic').value, category, country: $('mapCountry').value, minutes: $('mapMinutes').value, tempo: tempo(), musicVolume: musicVolume(), workers: workers(), music, language: lang(), auto: $('mapAuto').checked }; persist(); };
   $('mapMinutes').onchange = () => { remember(); renderCount(); };
   $('mapTopic').oninput = () => { remember(); renderCount(); renderTopics(); };
   $('mapCountry').oninput = remember;
   $('mapTempo').oninput = () => { showTempo(); remember(); };
   $('mapMusicVol').oninput = remember;
+  $('mapWorkers').onchange = remember;
   $('mapAuto').onchange = remember;
   // Nhớ giọng riêng cho từng ngôn ngữ; chỉ ghi khi người dùng tự đổi giọng (đổi ngôn ngữ thì ô giọng còn giữ giọng ngôn ngữ cũ, không được ghi nhầm).
   $('mapVoice').onchange = () => { saved = { ...saved, voices: { ...(saved.voices || {}), [lang()]: $('mapVoice').value } }; remember(); };

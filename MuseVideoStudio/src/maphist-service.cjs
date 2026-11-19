@@ -160,7 +160,7 @@ function createMapService({ getSettings = () => ({}), voice = null, ensureAllowe
         signal,
         feed: async stdin => {
           await renderFrames({
-            timeline, raw: await raw(), fps: FPS, signal, onInfo: info => { windows = Number(info && info.workers) || 0; },
+            timeline, raw: await raw(), fps: FPS, signal, workers: config.workers, onInfo: info => { windows = Number(info && info.workers) || 0; },
             onFrame: async buffer => {
               if (signal.aborted) return { stop: true };
               await writeChunk(stdin, Buffer.from(buffer));

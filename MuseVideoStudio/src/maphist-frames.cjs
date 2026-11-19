@@ -4,16 +4,18 @@
 const os = require('node:os');
 const path = require('node:path');
 
+const MAX_WORKERS = 16;
 const CHUNK = 24;   // số khung liên tiếp mỗi cửa sổ vẽ một lượt (khung liền nhau cùng cửa sổ để tận dụng bộ nhớ đệm bản đồ)
 
-// Số cửa sổ vẽ theo số nhân CPU và dung lượng RAM (mỗi cửa sổ vẽ tốn vài trăm MB): chừa chỗ cho bộ mã hóa video và giao diện.
-// Có thể ép bằng biến môi trường MUSE_RENDER_WORKERS (1–6).
+// Số cửa sổ vẽ theo số luồng CPU và dung lượng RAM (mỗi cửa sổ vẽ tốn vài trăm MB đến ~1 GB): chừa chỗ cho bộ mã hóa video và giao diện.
+// Có thể ép bằng biến môi trường MUSE_RENDER_WORKERS hoặc ô «Số cửa sổ vẽ» trong tab (1–MAX_WORKERS).
 function defaultWorkers(cores = os.cpus().length, env = process.env.MUSE_RENDER_WORKERS, memGB = os.totalmem() / 2 ** 30) {
   const forced = Math.round(Number(env));
-  if (forced >= 1 && forced <= 6) return forced;
-  const byCpu = cores >= 10 ? 4 : cores >= 6 ? 3 : cores >= 4 ? 2 : 1;
-  const byRam = memGB >= 12 ? 4 : memGB >= 7.5 ? 3 : memGB >= 5 ? 2 : 1;
-  return Math.min(byCpu, byRam);
+  if (forced >= 1 && forced <= MAX_WORKERS) return forced;
+  // Máy mạnh thì vẽ nhiều cửa sổ hơn: khoảng một cửa sổ cho mỗi 2,5 luồng CPU (12 luồng → 5, 16 → 6, 24 → 10), mỗi cửa sổ cần ~1,5 GB RAM chừa chỗ cho hệ thống.
+  const byCpu = cores >= 10 ? Math.max(4, Math.round(cores / 2.5)) : cores >= 6 ? 3 : cores >= 4 ? 2 : 1;
+  const byRam = memGB >= 12 ? Math.floor((memGB - 4) / 1.5) : memGB >= 7.5 ? 3 : memGB >= 5 ? 2 : 1;
+  return Math.min(byCpu, byRam, MAX_WORKERS);
 }
 
 // Nhận khung theo thứ tự bất kỳ, gọi onFrame đúng thứ tự 0,1,2,… Cửa sổ chỉ bị giữ lại khi nó vượt quá `limit` khung so với khung chờ ghi
@@ -74,10 +76,10 @@ function createWindowFrames({ BrowserWindow, ipcMain, quality = .92, workers = 0
   const destroy = win => { try { if (!win.isDestroyed()) win.destroy(); } catch { /* đã đóng */ } };
 
   // timeline đã dựng sẵn, raw = dữ liệu world.json; onFrame(buffer, index) được gọi đúng thứ tự khung và trả { stop } để dừng sớm.
-  async function renderFrames({ timeline, raw, fps, signal, onFrame, onInfo = () => {} }) {
+  async function renderFrames({ timeline, raw, fps, signal, onFrame, onInfo = () => {}, workers: wanted = 0 }) {
     register();
     const total = Math.ceil(timeline.total * fps);
-    const count = Math.max(1, Math.min(workers || defaultWorkers(), Math.ceil(total / CHUNK)));
+    const count = Math.max(1, Math.min(Math.min(MAX_WORKERS, Math.round(Number(wanted)) || workers || defaultWorkers()), Math.ceil(total / CHUNK)));
     const sink = orderedSink({ onFrame, limit: CHUNK * count });
     const wins = [];
     const stopAll = () => wins.forEach(destroy);
@@ -127,4 +129,4 @@ function createWindowFrames({ BrowserWindow, ipcMain, quality = .92, workers = 0
   return { renderFrames, renderStill };
 }
 
-module.exports = { createWindowFrames, orderedSink, defaultWorkers, CHUNK };
+module.exports = { createWindowFrames, orderedSink, defaultWorkers, CHUNK, MAX_WORKERS };

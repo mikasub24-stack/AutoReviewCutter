@@ -619,7 +619,7 @@ test('nối app: mọi lệnh giao diện gọi đều có trong main.cjs và da
   const ids = new Set([...ui.matchAll(/\$\('(map\w+)'\)/g)].map(m => m[1]));
   for (const id of ids) assert.ok(html.includes(`id="${id}"`), `index.html thiếu id ${id}`);
   for (const id of ['mapPanel', 'navMap', 'navMapCount', 'mapEditor']) assert.ok(html.includes(`id="${id}"`), id);
-  for (const file of ['maphist-geo.js', 'maphist-plan.js', 'maphist-cartoon.js', 'maphist-draw.js', 'maphist-ui.js']) assert.ok(html.includes(`src="${file}"`), file);
+  for (const file of ['maphist-geo.js', 'maphist-plan.js', 'maphist-cartoon.js', 'maphist-scenes.js', 'maphist-draw.js', 'maphist-ui.js']) assert.ok(html.includes(`src="${file}"`), file);
 });
 
 test('nối app: mọi việc tạo video bản đồ đều đòi gói Năm / Vĩnh viễn; xóa chỉ trong thư mục BanDo', () => {

@@ -25,5 +25,6 @@ require('./wild-plan.test.cjs');
 require('./wild-write.test.cjs');
 require('./maphist.test.cjs');
 require('./maphist-frames.test.cjs');
+require('./maphist-scenes.test.cjs');
 require('./flow-runner.test.cjs');
 require('./flow-driver.test.cjs');

@@ -8,7 +8,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     '/assets/muse-studio.svg': 'assets/muse-studio.svg', '/assets/zalo-qr.jpg': 'assets/zalo-qr.jpg', '/': 'index.html', '/style.css': 'style.css', '/renderer.js': 'renderer.js', '/ui-i18n.js': 'ui-i18n.js',
     '/script-planner.js': 'script-planner.js', '/prompt-import.js': 'prompt-import.js', '/reference-map.js': 'reference-map.js', '/story-plan.js': 'story-plan.js', '/story-ui.js': 'story-ui.js',
     '/restore-plan.js': 'restore-plan.js', '/restore-ui.js': 'restore-ui.js', '/wild-plan.js': 'wild-plan.js', '/wild-ui.js': 'wild-ui.js',
-    '/maphist-geo.js': 'maphist-geo.js', '/maphist-plan.js': 'maphist-plan.js', '/maphist-cartoon.js': 'maphist-cartoon.js', '/maphist-draw.js': 'maphist-draw.js', '/maphist-ui.js': 'maphist-ui.js',
+    '/maphist-geo.js': 'maphist-geo.js', '/maphist-plan.js': 'maphist-plan.js', '/maphist-cartoon.js': 'maphist-cartoon.js', '/maphist-scenes.js': 'maphist-scenes.js', '/maphist-draw.js': 'maphist-draw.js', '/maphist-ui.js': 'maphist-ui.js',
     '/assets/maphist/fonts/Lora-Variable.ttf': 'assets/maphist/fonts/Lora-Variable.ttf', '/assets/maphist/fonts/Inter-Black.otf': 'assets/maphist/fonts/Inter-Black.otf', '/assets/maphist/fonts/EricaOne-Regular.ttf': 'assets/maphist/fonts/EricaOne-Regular.ttf', '/assets/maphist/fonts/BricolageGrotesque-Bold.ttf': 'assets/maphist/fonts/BricolageGrotesque-Bold.ttf', '/assets/maphist/fonts/Lora-Italic-Variable.ttf': 'assets/maphist/fonts/Lora-Italic-Variable.ttf'
   };
   const world = zlib.gunzipSync(await fs.readFile(path.join(src, 'assets/maphist/world.json.gz')));
@@ -201,7 +201,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     await page.waitForSelector('#mapRuns .restoreRun');
     const made = await calls('mapMake');
     assert.equal(made.length, 1);
-    assert.deepEqual(made[0].data, { topic: 'History of Testland', category: '', country: 'Indonesia', minutes: 6, language: 'en', voice: 'en-US-GuyNeural', tempo: 1, music: 'C:\\Music\\epic.mp3', musicVolume: 0.2, auto: true });
+    assert.deepEqual(made[0].data, { topic: 'History of Testland', category: '', country: 'Indonesia', minutes: 6, language: 'en', voice: 'en-US-GuyNeural', tempo: 1, music: 'C:\\Music\\epic.mp3', musicVolume: 0.2, workers: 0, auto: true });
     assert.match(await page.locator('#mapRuns .restoreRunText').first().textContent(), /Soạn kịch bản 2\/3/);
     assert.match(await page.locator('#mapRunHint').textContent(), /Đang soạn kịch bản · 5\/12 giai đoạn/);
     assert.equal(await page.locator('#mapCreate').isDisabled(), true);
@@ -247,7 +247,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.deepEqual(saveCall.data.script.eras[1].realms[0].regions, ['Banten', 'Jakarta Raya', 'Jawa Barat']);
     assert.ok(!JSON.stringify(saveCall.data.script).includes('"units"'), 'không gửi các đơn vị tính sẵn');
     const render = (await calls('mapRender'))[0];
-    assert.deepEqual(render.data, { runId: 'History-of-Testland', voice: 'en-US-GuyNeural', tempo: 1, music: 'C:\\Music\\epic.mp3', musicVolume: 0.2 });
+    assert.deepEqual(render.data, { runId: 'History-of-Testland', voice: 'en-US-GuyNeural', tempo: 1, music: 'C:\\Music\\epic.mp3', musicVolume: 0.2, workers: 0 });
     await page.waitForFunction(() => !document.getElementById('mapEditor').open);
 
     // 7) Đang dựng: tiến độ phần trăm, nút Dừng dựng.
@@ -359,7 +359,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
       };
       const count = (cv, x0, y0, w, h, test) => { const d = cv.getContext('2d').getImageData(x0, y0, w, h).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (test(d[i], d[i + 1], d[i + 2])) n++; return n; };
       const probe = ({ tl, R, canvas }) => {
-        R.drawFrame(tl.eras[1].start + 9);
+        R.drawFrame(tl.eras[1].start + 12);   // sau khi cảnh minh hoạ kết thúc
         const mid = { pink: count(canvas, 700, 100, 520, 170, (r, g, b) => r > 225 && g < 130 && b > 110 && b < 205), paper: count(canvas, 420, 920, 1080, 120, (r, g, b) => r > 215 && g > 190 && g < 245 && b > 130 && b < 205), sea: count(canvas, 0, 0, 1920, 1080, (r, g, b) => r < 90 && g > 140 && b > 200), green: count(canvas, 0, 0, 1920, 1080, (r, g, b) => r > 70 && r < 130 && g > 180 && b > 100 && b < 150) };
         R.drawFrame(tl.total - 1);
         return { ...mid, red: count(canvas, 1500, 120, 400, 80, (r, g, b) => r > 200 && g < 90 && b < 90) };
@@ -371,6 +371,23 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.ok(toon.cartoon.paper > 40000, 'cuộn giấy da ở dưới: ' + toon.cartoon.paper);
     assert.ok(toon.cartoon.red > 3000, 'nút Subscribe đỏ ở màn kết: ' + toon.cartoon.red);
     assert.ok(toon.classic.sea < 20000 && toon.classic.red < 500 && toon.classic.pink < toon.cartoon.pink, 'kiểu cổ không có biển xanh phẳng / nút Subscribe: ' + JSON.stringify(toon.classic));
+
+    // 12b) Cảnh minh hoạ có người: giữa giai đoạn có cảnh thì khung hình khác hẳn khung không cảnh; ngoài khoảng đó thì giống hệt.
+    const cut = await page.evaluate(async () => {
+      const raw = await window.nodeJson('world'), sample = await window.nodeJson('sample'), geo = maphistGeo.build(raw);
+      const n = maphistPlan.normalizeScript({ ...sample, theme: 'cartoon', eras: sample.eras.map((e, i) => ({ ...e, scene: ['voyage', 'battle', 'court'][i % 3] })) }, geo), tl = maphistPlan.compile(n.script, geo, { durations: n.script.eras.map(() => 14), fps: 30 });
+      const canvas = Object.assign(document.createElement('canvas'), { width: 1920, height: 1080 }), R = maphistDraw.create({ canvas, geo }); R.setTimeline(tl);
+      const grab = t => { R.drawFrame(t); return canvas.getContext('2d').getImageData(260, 340, 1400, 540).data; };
+      const diff = (a, b) => { let c = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 60) c++; return c; };
+      const e = tl.eras[1], mid = e.start + e.cut.at + e.cut.dur / 2, before = e.start + 2.8, after = e.start + 12;
+      const withScene = grab(mid), kinds = tl.eras.map(x => x.cut && x.cut.kind), shouts = tl.eras.map(x => x.cut && x.cut.shout);
+      const a1 = grab(before), a2 = grab(after); e.cut = null;
+      const without = grab(mid);
+      return { diffMid: diff(withScene, without), kinds, shouts, cutDur: tl.eras[1].cut, hasCue: maphistPlan.cuesOf(tl).some(c => c.kind === 'boom'), a1: diff(a1, a1), a2: diff(a2, a2) };
+    });
+    assert.ok(cut.diffMid > 150000, 'cảnh minh hoạ phủ khung giữa màn hình: ' + JSON.stringify(cut));
+    assert.deepEqual(cut.kinds.slice(0, 3), ['voyage', 'battle', 'court']);
+    assert.ok(cut.shouts[1] && cut.shouts[1].length > 2, 'có tiếng hô mặc định');
     assert.deepEqual(errors, [], 'không lỗi script: ' + errors.join(' | '));
     console.log('maphist-tab-smoke OK');
   } finally { await browser.close(); server.close(); }
