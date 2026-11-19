@@ -842,7 +842,7 @@ async function runMapBuild(runId){
     const script=await readJsonFile(mapScriptFile(runId));
     if(!script)throw Error('Chưa có kịch bản để dựng.');
     const result=await mapService.make({runId,dir:mapFolder(settings.output,runId),name:meta.name,config:{voice:meta.voice,tempo:meta.tempo,music:meta.music,musicVolume:meta.musicVolume},script});
-    Object.assign(meta,{status:'done',output:result.output,seconds:Math.round(result.seconds),eras:result.eras,builtAt:Date.now(),error:''});
+    Object.assign(meta,{status:'done',output:result.output,seconds:Math.round(result.seconds),eras:result.eras,builtAt:Date.now(),error:'',publish:result.publish||null,publishFile:result.publishFile||''});
     mapState={busy:false,phase:'done',progress:'Video bản đồ đã dựng xong',error:'',runId};
   }catch(e){
     const stopped=e.name==='AbortError';
@@ -1539,7 +1539,7 @@ app.whenReady().then(async () => {
       const meta=mapRuns()[String(data?.runId||'')],thumb=Boolean(data?.thumb),out=thumb?meta?.thumb:meta?.output;
       if(!out||!await fs.stat(out).then(s=>s.isFile(),()=>false))throw Error(thumb?ui('Chưa có thumbnail để lưu. Bấm «Tạo thumbnail 16:9» trước.','There is no thumbnail to save yet. Press “Create 16:9 thumbnail” first.'):ui('Chưa có video hoàn chỉnh để lưu.','There is no finished video to save yet.'));
       const ext=thumb?'jpg':'mp4',base=thumb?path.basename(out).replace(/^thumbnail-\d+/i,String(meta.name||'video').replace(/[\\/:*?"<>|\x00-\x1f]+/g,' ').trim().slice(0,60)+' - thumbnail'):path.basename(out);
-      const picked=await dialog.showSaveDialog(main,{title:thumb?ui('Lưu thumbnail về','Save thumbnail'):ui('Lưu video về','Save video'),defaultPath:path.join(app.getPath('downloads'),base),filters:[{name:thumb?'JPEG':'MP4',extensions:thumb?['jpg','jpeg']:['mp4']}]});
+      const picked=await dialog.showSaveDialog(main,{title:thumb?ui('Lưu thumbnail về','Save thumbnail'):ui('Lưu video về','Save video'),defaultPath:path.join(app.getPath('downloads'),!thumb&&meta?.publish?.title?String(meta.publish.title).replace(/[\\/:*?"<>|\x00-\x1f]+/g,' ').replace(/\s+/g,' ').trim().slice(0,100)+'.mp4':base),filters:[{name:thumb?'JPEG':'MP4',extensions:thumb?['jpg','jpeg']:['mp4']}]});
       if(picked.canceled||!picked.filePath)return false;
       const dest=(thumb?/\.jpe?g$/i:/\.mp4$/i).test(picked.filePath)?picked.filePath:picked.filePath+'.'+ext;
       if(path.resolve(dest).toLowerCase()!==path.resolve(out).toLowerCase())await fs.copyFile(out,dest);

@@ -236,6 +236,24 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
 
     // 8) Dựng xong: video, lưu, mở, dựng lại, xóa (hộp hỏi có tick xóa file).
     await page.evaluate(() => { Object.assign(window.s.maphist, { busy: false, phase: 'done' }); window.s.maphist.build = {}; Object.assign(window.s.maphist.runs['History-of-Testland'], { status: 'done', output: 'C:\\Videos\\BanDo\\History-of-Testland\\History-of-Testland.mp4', seconds: 252, eras: 3 }); window.push(); });
+    // Video bản cũ (chưa có bộ thông tin đăng): vẫn hiện tiêu đề (tên video) và báo dựng lại để có mô tả + chương.
+    await page.waitForSelector('#mapRuns .publishBox');
+    assert.equal(await page.locator('#mapRuns input.publishTitle').inputValue(), 'History of Testland');
+    assert.match(await page.locator('#mapRuns .publishBox').textContent(), /dựng bằng bản cũ/);
+    assert.equal(await page.locator('#mapRuns .publishMore').count(), 0);
+    // Video mới: tiêu đề đúng như trên video + mô tả có chương + thẻ, sao chép được.
+    await page.evaluate(() => { Object.assign(window.s.maphist.runs['History-of-Testland'], { builtAt: 2, publish: { title: 'Testland: From Dust to Empire', description: 'A tale\n\nChapters\n0:00 1350: Start\n0:20 1400: Rise\n0:40 1500: Fall', tags: ['history', 'testland history'], chapters: [] }, publishFile: 'C:\\Videos\\BanDo\\History-of-Testland\\tieu-de-youtube.txt' }); window.push(); window.copied = []; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { window.copied.push(t); } } }); });
+    await page.waitForFunction(() => document.querySelector('#mapRuns input.publishTitle')?.value === 'Testland: From Dust to Empire');
+    await page.click('#mapRuns button:has-text("Sao chép tiêu đề")');
+    assert.deepEqual(await page.evaluate(() => window.copied), ['Testland: From Dust to Empire']);
+    assert.match(await page.locator('#toast').textContent(), /Đã sao chép tiêu đề/);
+    await page.click('#mapRuns .publishMore summary');
+    assert.match(await page.locator('#mapRuns textarea.publishDesc').inputValue(), /Chapters\n0:00 1350: Start/);
+    await page.click('#mapRuns button:has-text("Sao chép mô tả")');
+    assert.match((await page.evaluate(() => window.copied)).at(-1), /0:40 1500: Fall/);
+    await page.click('#mapRuns button:has-text("Sao chép thẻ")');
+    assert.equal((await page.evaluate(() => window.copied)).at(-1), 'history, testland history');
+    assert.match(await page.locator('#mapRuns .publishBox').textContent(), /tieu-de-youtube\.txt/);
     await page.waitForSelector('#mapRuns video');
     assert.match(await page.locator('#mapRuns .restoreRunText').first().textContent(), /Video hoàn chỉnh: History-of-Testland\.mp4/);
     assert.match(await page.locator('#mapRuns .restoreRunTop').first().textContent(), /4:12/);

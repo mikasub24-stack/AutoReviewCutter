@@ -416,7 +416,7 @@
         ? `4. «country» ĐÚNG là: ${config.country}.`
         : '4. «country»: nước hiện nay nằm ở trung tâm câu chuyện, ghi đúng tên tiếng Anh trong danh sách bên dưới. Nếu chủ đề trải ra nhiều nước (đế quốc, chiến tranh lớn) hãy chọn nước ở lõi câu chuyện; chỉ khi thật sự toàn cầu mới để chuỗi rỗng "".',
       '5. Năm trước Công nguyên ghi số âm (ví dụ -221). Chỉ trả lời DUY NHẤT một khối JSON, không viết thêm câu dẫn hay giải thích, đúng khuôn:',
-      '{"title":"<tiêu đề video, tiếng Anh>","subtitle":"<phụ đề ngắn>","country":"<tên nước>","eras":[{"year":-2879,"title":"<tên giai đoạn>","focus":"<một câu: chuyện gì xảy ra và bản đồ đổi ra sao>"}]}',
+      '{"title":"<tiêu đề video YouTube hấp dẫn, tiếng Anh, tối đa 60 ký tự, có tên chủ đề, ví dụ: The Mongol Empire: From Steppe to Superpower>","subtitle":"<phụ đề ngắn>","country":"<tên nước>","eras":[{"year":-2879,"title":"<tên giai đoạn>","focus":"<một câu: chuyện gì xảy ra và bản đồ đổi ra sao>"}]}',
       ...tail(marker),
       ...(config.country ? [] : ['', 'DANH SÁCH TÊN NƯỚC (chọn đúng một tên trong đây cho «country»):', countryNames.join(', ')]),
       ...(fix ? ['', 'SỬA LỖI – lần trước còn lỗi sau; viết lại ĐỦ toàn bộ khối JSON:', fix] : []),
@@ -531,9 +531,51 @@
     return { title: outline.title, subtitle: outline.subtitle, country: outline.country, outro: 'Subscribe for more history', eras };
   }
 
+
+  // ---- Bộ thông tin đăng YouTube: tiêu đề đúng như trên video, mô tả có chương (mốc giờ thật), thẻ.
+  const pad2 = n => String(n).padStart(2, '0');
+  function clock(sec) {
+    const t = Math.max(0, Math.round(Number(sec) || 0)), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60);
+    return h ? `${h}:${pad2(m)}:${pad2(t % 60)}` : `${m}:${pad2(t % 60)}`;
+  }
+  function publishPack(script, timeline) {
+    const title = flat(script && script.title).slice(0, 100) || 'History';
+    const subtitle = flat(script && script.subtitle).slice(0, 150);
+    const country = flat(script && script.country).slice(0, 60);
+    const eras = (timeline && timeline.eras) || (script && script.eras) || [];
+    const first = eras[0], last = eras[eras.length - 1];
+    const span = first && last && first.year !== last.year ? `${yearLabel(first.year)} to ${yearLabel(last.year)}` : first ? yearLabel(first.year) : '';
+    // Chương YouTube: bắt đầu đúng 0:00, mỗi chương cách chương trước từ 10 giây, cần ít nhất 3 chương.
+    const chapters = [];
+    if (timeline && timeline.eras) {
+      for (const e of timeline.eras) {
+        const t = chapters.length ? e.start : 0;
+        if (chapters.length && t - chapters[chapters.length - 1].t < 10) continue;
+        chapters.push({ t: Math.round(t), clock: clock(t), label: `${e.label}: ${e.title}`.slice(0, 80) });
+      }
+    }
+    const tagWords = [...new Set([title, 'history', 'history map', 'animated map', 'map history', 'historical maps', country, country && `${country} history`, ...title.split(/[:\-–—,]/).map(x => x.trim()).filter(x => x.length > 3)].filter(Boolean).map(x => x.toLowerCase()))];
+    const tags = []; let size = 0;
+    for (const x of tagWords) { if (size + x.length + 2 > 450) break; tags.push(x); size += x.length + 2; }
+    const hash = ['#History', '#HistoryMap', '#AnimatedMap', country && '#' + country.replace(/[^A-Za-z0-9]+/g, '')].filter(Boolean);
+    const body = [
+      subtitle || title,
+      '',
+      `${title}: an animated history map${span ? ' from ' + span : ''}, told era by era as the borders change.`,
+      ...(chapters.length >= 3 ? ['', 'Chapters', ...chapters.map(c => `${c.clock} ${c.label}`)] : []),
+      '',
+      'Borders and territories are drawn on a modern map, so they are approximate. Please check dates and details before you rely on them.',
+      '',
+      hash.join(' ')
+    ];
+    const description = body.join('\n').slice(0, 4900);
+    const text = ['TITLE', title, '', 'DESCRIPTION', description, '', 'TAGS', tags.join(', ')].join('\n') + '\n';
+    return { title, description, tags, chapters: chapters.length >= 3 ? chapters : [], text };
+  }
+
   return {
     W, H, CY, INTRO, OUTRO, LEAD, TAIL, MIN_ERA, ERA_SECONDS, MIN_MINUTES, MAX_MINUTES, DEFAULT_MINUTES, LENGTHS, MAX_ERAS, CATEGORIES, categoryOf, MOODS, FLAGS, MARKERS, ICONS, PALETTE,
     BATCH, NARRATION_MIN, NARRATION_MAX, buildOutlineInstruction, buildErasInstruction, extractJson, parseOutline, parseEras, checkEras, fixText, assemble,
-    eraCount, options, problems, yearLabel, normalizeScript, compile, stateAt, counterAt, chunksOf, subtitleAt, flyCam, fit, speakSeconds, bigRingsBox, easeInOut, clamp, lerp, mer, unmerLat, hex, num, words, flat, WORLD_VIEW
+    eraCount, options, problems, yearLabel, publishPack, clock, normalizeScript, compile, stateAt, counterAt, chunksOf, subtitleAt, flyCam, fit, speakSeconds, bigRingsBox, easeInOut, clamp, lerp, mer, unmerLat, hex, num, words, flat, WORLD_VIEW
   };
 });

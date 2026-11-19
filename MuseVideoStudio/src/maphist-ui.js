@@ -112,6 +112,26 @@
     const runs = (s.maphist && s.maphist.runs) || {};
     return Object.entries(runs).map(([id, meta]) => ({ id, meta })).sort((a, b) => (b.meta.createdAt || 0) - (a.meta.createdAt || 0));
   }
+  // Tiêu đề đăng YouTube: luôn hiện ngay dưới video đã dựng xong, có nút sao chép; mô tả (có chương) và thẻ ở mục bên dưới.
+  function copyButton(label, value, done) {
+    return button(label, 'secondary', async () => {
+      try { await navigator.clipboard.writeText(value); toast(done); } catch { toast('Không sao chép được. Hãy chọn chữ rồi nhấn Ctrl+C.'); }
+    });
+  }
+  function publishBox(meta) {
+    const p = meta.publish, title = (p && p.title) || meta.name || '', box = node('div', 'publishBox');
+    const input = node('input', 'publishTitle'); input.type = 'text'; input.readOnly = true; input.value = title; input.onfocus = () => input.select();
+    const row = node('div', 'publishRow'); row.append(input, copyButton('Sao chép tiêu đề', title, 'Đã sao chép tiêu đề.'));
+    box.append(node('strong', 'publishHead', 'Tiêu đề đăng YouTube (đúng như trên video)'), row);
+    if (p) {
+      const more = node('details', 'publishMore'), desc = node('textarea', 'publishDesc'), tags = node('textarea', 'publishTags');
+      desc.readOnly = true; desc.rows = 9; desc.value = p.description || ''; tags.readOnly = true; tags.rows = 2; tags.value = (p.tags || []).join(', ');
+      more.append(node('summary', '', 'Mô tả (có chương) và thẻ'), desc, copyButton('Sao chép mô tả', desc.value, 'Đã sao chép mô tả.'), tags, copyButton('Sao chép thẻ', tags.value, 'Đã sao chép thẻ.'));
+      box.append(more);
+      if (meta.publishFile) box.append(node('small', 'hint', 'Cả ba đã được lưu trong file tieu-de-youtube.txt cạnh video (bấm «Mở video» để tới thư mục).'));
+    } else box.append(node('small', 'hint', 'Video này dựng bằng bản cũ nên chưa có mô tả và chương. Bấm «Dựng lại» để có đủ.'));
+    return box;
+  }
   function renderRuns(s) {
     const info = s.maphist || {}, runs = runsOf(s), write = info.write || {}, build = info.build || {};
     const key = JSON.stringify([Boolean(s.active), Boolean(s.starting), Boolean(s.merging), info.busy, info.phase, info.progress, info.error, info.runId, write.progress, write.done, write.total, build.progress, build.done, build.total, build.previewAt || 0,
@@ -142,6 +162,7 @@
       const extra = [];
       // Vẽ tới đâu hiện tới đó: khung hình vừa vẽ xong (một thẻ img dùng lại, đổi nguồn khi có khung mới nên không nháy).
       if (building && build.preview) { if (liveAt !== build.previewAt) { live.src = localFileUrl(build.preview); liveAt = build.previewAt; } extra.push(live); } else liveAt = 0;
+      if (meta.output && meta.status === 'done' && !building) extra.push(publishBox(meta));
       if (meta.output && meta.status === 'done' && !building) { const video = node('video', 'restoreVideo'); video.controls = true; video.preload = 'metadata'; video.src = localFileUrl(meta.output); extra.push(video); }
       if (meta.thumb && meta.status === 'done' && !building) { const img = node('img', 'restoreThumb'); img.alt = 'Thumbnail 16:9'; img.src = localFileUrl(meta.thumb) + '?v=' + (meta.thumbAt || 0); extra.push(img); }
       const actions = node('div', 'restoreRunActions');

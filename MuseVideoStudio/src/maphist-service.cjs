@@ -189,7 +189,11 @@ function createMapService({ getSettings = () => ({}), voice = null, ensureAllowe
       Object.assign(state, { preview: '', previewAt: 0 });
       await fs.rm(temp, { recursive: true, force: true });
       say('Video bản đồ đã dựng xong', { phase: 'done' });
-      const result = { output, seconds: timeline.total, eras: script.eras.length, issues };
+      // Tiêu đề đăng YouTube (đúng tiêu đề trên video) + mô tả có chương + thẻ; ghi sẵn thành file cạnh video.
+      const publish = Plan.publishPack(script, timeline);
+      let publishFile = '';
+      try { publishFile = path.join(dir, 'tieu-de-youtube.txt'); await fs.writeFile(publishFile, publish.text, 'utf8'); } catch { publishFile = ''; }
+      const result = { output, seconds: timeline.total, eras: script.eras.length, issues, publish: { title: publish.title, description: publish.description, tags: publish.tags, chapters: publish.chapters }, publishFile };
       onDone(result);
       return result;
     } catch (error) {

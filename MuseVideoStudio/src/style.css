@@ -476,3 +476,12 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .mapAdvanced[open] > summary { margin-bottom: 10px; }
 .mapTopics > .hint { flex: 0 0 100%; margin: 0; }
 .restoreLive { display: block; width: 100%; max-width: 480px; aspect-ratio: 16 / 9; object-fit: cover; margin: 10px 0 2px; border: 1px solid var(--line); border-radius: 8px; background: #0c2133; }
+
+.publishBox { margin: 10px 0 4px; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 10px; background: #12303a; display: grid; gap: 8px; }
+.publishHead { font-size: 13px; }
+.publishRow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.publishRow input.publishTitle { flex: 1 1 320px; min-width: 0; font-size: 15px; font-weight: 600; }
+.publishMore { display: grid; gap: 8px; }
+.publishMore summary { cursor: pointer; font-size: 13px; }
+.publishMore textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; line-height: 1.45; resize: vertical; }
+.publishMore button { justify-self: start; }

@@ -318,6 +318,9 @@ test('dựng video: giọng → khung → MP4 có hình + tiếng, đúng độ 
   assert.ok(Math.abs(Number(info.format.duration) - expected) < .6, `duration ${info.format.duration} vs ${expected}`);
   assert.equal(Number(info.streams.find(s => s.codec_type === 'video').nb_frames), Math.ceil(expected * FPS));
   assert.ok(!fs.existsSync(path.join(dir, '.dang-dung')), 'xóa thư mục tạm');
+  assert.equal(result.publish.title, oneEra().title, 'trả về tiêu đề đăng YouTube đúng như trên video');
+  const pubFile = path.join(dir, 'tieu-de-youtube.txt');
+  assert.ok(fs.existsSync(pubFile) && result.publishFile === pubFile && fs.readFileSync(pubFile, 'utf8').startsWith('TITLE\n' + oneEra().title + '\n'), 'ghi sẵn file tiêu đề cạnh video');
   assert.ok(previews.length >= 3 && previews.every(p => p.ok), 'vẽ tới đâu có khung xem trước tới đó, file đọc được ngay khi báo');
   assert.deepEqual([...new Set(previews.map(p => path.basename(p.file)))].sort(), ['xem-truoc-0.jpg', 'xem-truoc-1.jpg'], 'ghi luân phiên hai file để khung đang hiện không bị ghi đè');
   assert.equal(service.status().preview, '', 'dựng xong thì bỏ xem trước');
@@ -438,6 +441,29 @@ test('nhóm chủ đề: bảy nhóm, mỗi nhóm có đề tài gợi ý và m�
   assert.match(ask, /Triều đại/); assert.match(ask, /TRIỀU ĐẠI/); assert.match(ask, /TỰ CHỌN/);
   const own = Plan.buildOutlineInstruction(Plan.options({ topic: 'The Han Dynasty', category: 'dynasty', minutes: 8 }));
   assert.doesNotMatch(own, /CHƯA chọn đề tài/, 'đã gõ đề tài thì không bảo Muse tự chọn');
+});
+
+test('thông tin đăng YouTube: tiêu đề đúng như trên video, chương có mốc giờ thật, thẻ và mô tả trong giới hạn', () => {
+  const era = (year, title) => ({ year, title, caption: 'c', narration: 'One two three four five six seven eight nine ten eleven twelve words here today.', realms: [], markers: [], routes: [] });
+  const script = { title: 'The Mongol Empire: From Steppe to Superpower', subtitle: 'How a few tribes ruled half the world', country: 'Mongolia', eras: [era(1206, 'Temujin united'), era(1219, 'Khwarazm falls'), era(1241, 'Europe trembles'), era(1260, 'Empire splits'), era(1368, 'Yuan ends')] };
+  const tl = Plan.compile(script, null, { durations: [14, 14, 14, 14, 14], fps: 30 });
+  const pack = Plan.publishPack(script, tl);
+  assert.equal(pack.title, script.title, 'đúng tiêu đề trên video');
+  assert.ok(pack.title.length <= 100);
+  assert.equal(pack.chapters.length, 5);
+  assert.equal(pack.chapters[0].clock, '0:00', 'chương đầu phải ở 0:00 (YouTube yêu cầu)');
+  for (let k = 1; k < pack.chapters.length; k++) assert.ok(pack.chapters[k].t - pack.chapters[k - 1].t >= 10, 'mỗi chương dài từ 10 giây');
+  assert.match(pack.description, /Chapters\n0:00 1206: Temujin united\n/);
+  assert.match(pack.description, /#History #HistoryMap #AnimatedMap #Mongolia/);
+  assert.ok(pack.description.length < 5000);
+  assert.ok(pack.tags.join(', ').length <= 460 && pack.tags.includes('mongolia history') && pack.tags.includes('the mongol empire'));
+  assert.match(pack.text, /^TITLE\nThe Mongol Empire: From Steppe to Superpower\n\nDESCRIPTION\n/);
+  assert.match(pack.text, /\nTAGS\nthe mongol empire: from steppe to superpower, /);
+  assert.equal(Plan.clock(3725), '1:02:05'); assert.equal(Plan.clock(75), '1:15');
+  // Quá ít chương (kịch bản ngắn) thì không in mục Chapters, tránh YouTube bỏ qua cả danh sách.
+  const short = Plan.publishPack({ title: 'Tiny', eras: [era(1, 'a')] }, Plan.compile({ title: 'Tiny', eras: [era(1, 'a')] }, null, { durations: [14], fps: 30 }));
+  assert.deepEqual(short.chapters, []); assert.doesNotMatch(short.description, /Chapters/);
+  assert.equal(Plan.publishPack({ title: '', eras: [] }, null).title, 'History');
 });
 
 test('nối app: mọi lệnh giao diện gọi đều có trong main.cjs và danh sách cho phép của preload; mọi id đều có trong index.html', () => {

@@ -5,6 +5,17 @@ Kể chuyện|Story
 Tạo thumbnail 16:9|Create 16:9 thumbnail
 Tạo thumbnail khác|Create another thumbnail
 Đang tạo thumbnail…|Creating thumbnail…
+Tiêu đề đăng YouTube (đúng như trên video)|YouTube title (exactly as on the video)
+Sao chép tiêu đề|Copy title
+Đã sao chép tiêu đề.|Title copied.
+Mô tả (có chương) và thẻ|Description (with chapters) and tags
+Sao chép mô tả|Copy description
+Đã sao chép mô tả.|Description copied.
+Sao chép thẻ|Copy tags
+Đã sao chép thẻ.|Tags copied.
+Không sao chép được. Hãy chọn chữ rồi nhấn Ctrl+C.|Could not copy. Select the text and press Ctrl+C.
+Cả ba đã được lưu trong file tieu-de-youtube.txt cạnh video (bấm «Mở video» để tới thư mục).|All three are also saved in tieu-de-youtube.txt next to the video (press “Open video” to go to the folder).
+Video này dựng bằng bản cũ nên chưa có mô tả và chương. Bấm «Dựng lại» để có đủ.|This video was built with an older version, so it has no description or chapters yet. Press “Build again” to get them.
 Khung hình đang vẽ|Frame being drawn
 Lưu thumbnail…|Save thumbnail…
 Mở thumbnail|Open thumbnail

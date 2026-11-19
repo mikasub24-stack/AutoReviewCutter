@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.16
+
+- **Tiêu đề đăng YouTube ngay dưới video đã dựng xong:** hộp «Tiêu đề đăng YouTube (đúng như trên video)» có nút «Sao chép tiêu đề». Mục «Mô tả (có chương) và thẻ» có sẵn mô tả tiếng Anh với CHƯƠNG theo mốc giờ thật của từng giai đoạn (bắt đầu 0:00, mỗi chương từ 10 giây, đúng chuẩn YouTube), dòng nhắc bản đồ chỉ xấp xỉ, hashtag, và thẻ; mỗi phần có nút sao chép riêng.
+- **File `tieu-de-youtube.txt`** cũng được ghi sẵn cạnh video (TITLE, DESCRIPTION, TAGS) để mở lúc nào cũng được. «Lưu video…» đặt tên file mặc định theo chính tiêu đề.
+- Muse được dặn đặt tiêu đề hấp dẫn, tiếng Anh, tối đa 60 ký tự, có tên chủ đề (ví dụ «The Mongol Empire: From Steppe to Superpower»). Tiêu đề này cũng là chữ trên video và trên thumbnail.
+- Video dựng bằng bản cũ chưa có mô tả và chương: bấm «Dựng lại» để có đủ.
+
 ## Update 1.9.15
 
 - **Chủ đề chọn theo NHÓM, mỗi nhóm có khung video mẫu thật:** 7 nhóm: Lịch sử một nước, Đế chế, Triều đại, Chiến tranh, Khám phá và thương mại, Văn minh cổ đại, Độc lập và cách mạng. Mỗi thẻ là một khung hình lấy từ chính bộ vẽ video (bản đồ, cờ, đồng hồ năm, lời chú), nên bạn thấy trước video của nhóm đó trông thế nào. Bấm một thẻ rồi bấm nút tạo: Muse tự chọn một đề tài hay trong nhóm (tránh những đề tài đã làm). Bấm lại thẻ để bỏ chọn.
