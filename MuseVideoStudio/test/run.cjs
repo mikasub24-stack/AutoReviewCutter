@@ -23,5 +23,6 @@ require('./restore-plan.test.cjs');
 require('./restore-render.test.cjs');
 require('./wild-plan.test.cjs');
 require('./wild-write.test.cjs');
+require('./maphist.test.cjs');
 require('./flow-runner.test.cjs');
 require('./flow-driver.test.cjs');

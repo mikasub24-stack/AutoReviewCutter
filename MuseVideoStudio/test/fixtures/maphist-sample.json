@@ -1,0 +1,191 @@
+{
+ "title": "History of Indonesia",
+ "subtitle": "From island kingdoms to a republic",
+ "country": "Indonesia",
+ "eras": [
+  {
+   "year": 1350,
+   "title": "Majapahit",
+   "caption": "A maritime kingdom rises on Java and rules the sea lanes",
+   "narration": "In the fourteenth century the Majapahit kingdom rose on the island of Java and ruled the sea lanes of the archipelago for generations.",
+   "population": 7300000,
+   "icon": "crown",
+   "realms": [
+    {
+     "name": "Majapahit",
+     "regions": [
+      "Banten",
+      "Jakarta Raya",
+      "Jawa Barat",
+      "Jawa Tengah",
+      "Yogyakarta",
+      "Jawa Timur",
+      "Bali"
+     ],
+     "colors": [
+      "#d62839",
+      "#ffffff"
+     ],
+     "flag": "h",
+     "mood": "happy",
+     "face": true
+    },
+    {
+     "name": "Srivijaya heirs",
+     "regions": [
+      "Sumatera Barat",
+      "Jambi"
+     ],
+     "color": "#1f9d8b"
+    }
+   ],
+   "markers": [
+    {
+     "type": "temple",
+     "name": "Trowulan",
+     "at": [
+      112.38,
+      -7.56
+     ]
+    }
+   ],
+   "routes": [
+    {
+     "points": [
+      [
+       112.6,
+       -6.2
+      ],
+      [
+       110.5,
+       -5.6
+      ],
+      [
+       108.0,
+       -5.0
+      ],
+      [
+       105.8,
+       -4.2
+      ],
+      [
+       104.2,
+       -2.4
+      ]
+     ],
+     "ship": true
+    }
+   ]
+  },
+  {
+   "year": 1602,
+   "title": "The Dutch arrive",
+   "caption": "The Dutch East India Company builds a trading empire",
+   "narration": "In sixteen hundred and two the Dutch East India Company arrived and slowly turned trading posts into a colony.",
+   "population": 22000000,
+   "icon": "ship",
+   "realms": [
+    {
+     "name": "Dutch East Indies",
+     "regions": [
+      "Banten",
+      "Jakarta Raya",
+      "Jawa Barat",
+      "Jawa Tengah",
+      "Yogyakarta",
+      "Jawa Timur",
+      "Maluku",
+      "Maluku Utara",
+      "Sulawesi Selatan"
+     ],
+     "colors": [
+      "#e1291c",
+      "#ffffff",
+      "#21468b"
+     ],
+     "flag": "h",
+     "mood": "proud",
+     "face": true
+    }
+   ],
+   "markers": [
+    {
+     "type": "capital",
+     "name": "Batavia",
+     "at": [
+      106.85,
+      -6.15
+     ]
+    },
+    {
+     "type": "battle",
+     "name": "Ambon",
+     "at": [
+      128.2,
+      -3.7
+     ]
+    }
+   ],
+   "routes": [
+    {
+     "points": [
+      [
+       106.85,
+       -6.15
+      ],
+      [
+       110,
+       -7.0
+      ],
+      [
+       116,
+       -7.4
+      ],
+      [
+       122,
+       -6.2
+      ],
+      [
+       128.2,
+       -3.7
+      ]
+     ],
+     "ship": false
+    }
+   ]
+  },
+  {
+   "year": 1945,
+   "title": "Independence",
+   "caption": "Indonesia declares independence and a new nation is born",
+   "narration": "In nineteen forty five Indonesia declared its independence and a new nation was born.",
+   "population": 70000000,
+   "icon": "flag",
+   "realms": [
+    {
+     "name": "Indonesia",
+     "regions": [
+      "Indonesia"
+     ],
+     "colors": [
+      "#e11d2e",
+      "#ffffff"
+     ],
+     "flag": "h",
+     "mood": "happy",
+     "face": true
+    }
+   ],
+   "markers": [
+    {
+     "type": "capital",
+     "name": "Jakarta",
+     "at": [
+      106.85,
+      -6.2
+     ]
+    }
+   ]
+  }
+ ]
+}

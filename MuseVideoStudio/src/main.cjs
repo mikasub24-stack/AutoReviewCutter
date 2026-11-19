@@ -27,7 +27,13 @@ const wildFolder=(output,id)=>path.join(output,'DongVat',String(id||'Phim').repl
 const isChained=job=>job.kind==='restore'||job.kind==='wild';
 const chainFolder=job=>job.kind==='wild'?wildFolder(settings.output,job.storyId):restoreFolder(settings.output,job.storyId);
 const {createStoryAnalyzer}=require('./story-analyze.cjs');
-let licenseManager,paymentDetails,voiceService,storyService,storyAnalyzer,wildBuilder,wildWriter;
+const mapPlan=require('./maphist-plan.js');
+const {createMapWriter}=require('./maphist-write.cjs');
+const {createMapService}=require('./maphist-service.cjs');
+const {createWindowFrames}=require('./maphist-frames.cjs');
+// Tab «Bản đồ lịch sử»: mỗi video một thư mục BanDo/<mã>.
+const mapFolder=(output,id)=>path.join(output,'BanDo',String(id||'BanDo').replace(/[^\w-]/g,'')||'BanDo');
+let licenseManager,paymentDetails,voiceService,storyService,storyAnalyzer,wildBuilder,wildWriter,mapWriter,mapService;
 let handlers;   // các lệnh IPC; khai báo ngoài hàm khởi tạo để các hàm chạy nền (tự chạy lại sau hết hạn mức, tab Động vật) gọi được handlers.start
 const { mergeVideos, checkTools } = require('./merge.cjs');
 const { exportEditPackage } = require('./edit-package.cjs');
@@ -59,7 +65,7 @@ const defaults = { language:'en', accountSessionIds:{}, dispatchMode:'parallel',
 function ui(vi,en){return settings?.language==='vi'?vi:en;}
 async function atomic(file, data) { await fs.writeFile(file + '.tmp', JSON.stringify(data, null, 2)); await fs.rename(file + '.tmp', file); }
 function snapshot() {
-  return {version:app.getVersion?.()||require('../package.json').version,jobs:queue.jobs,resting:queue.exhaustedAccounts().sort((a,b)=>a-b),restingUntil:queue.exhausted.size?queue.nextExhaustedAt():0,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,restore:{...restoreState,stories:settings.restoreStories||{}},wild:{...wildState,stories:settings.wildStories||{},write:wildWriter?.status()||{},build:wildBuilder?.status()||{}},story:{...(storyService?.status()||{}),analyze:storyAnalyzer?.status()||{},voice:voiceService?.status()||{}},
+  return {version:app.getVersion?.()||require('../package.json').version,jobs:queue.jobs,resting:queue.exhaustedAccounts().sort((a,b)=>a-b),restingUntil:queue.exhausted.size?queue.nextExhaustedAt():0,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,restore:{...restoreState,stories:settings.restoreStories||{}},wild:{...wildState,stories:settings.wildStories||{},write:wildWriter?.status()||{},build:wildBuilder?.status()||{}},maphist:{...mapState,runs:settings.mapRuns||{},write:mapWriter?.status()||{},build:mapService?.status()||{}},story:{...(storyService?.status()||{}),analyze:storyAnalyzer?.status()||{},voice:voiceService?.status()||{}},
     flow:{open:Boolean(flowBrowser&&!flowBrowser.isClosed()),opening:Boolean(flowLaunch)},
     accounts:Array.from({length:Math.max(settings.accountCount,MAX_ACCOUNTS)},(_,index)=>{
       const browser=browsers.get(index),external=settings.browserChoice !== 'builtin';
@@ -158,7 +164,7 @@ async function openMuse(index = 0) {
 }
 
 function accountOperationBusy() {
-  return testing || queue.active || starting || stopping || merging || packaging || opening.size || externalLaunches.size || Boolean(storyAnalyzer?.busy) || Boolean(wildWriter?.busy);
+  return testing || queue.active || starting || stopping || merging || packaging || opening.size || externalLaunches.size || Boolean(storyAnalyzer?.busy) || Boolean(wildWriter?.busy) || Boolean(mapWriter?.busy);
 }
 function logoutAccount(index) {
   validLoginAccount(index);
@@ -265,12 +271,12 @@ async function trashStoryFiles({ids=[],files=[]}){
   return moved;
 }
 // Mọi tab khác (Video, Ảnh, Dọn nhà, Động vật): xóa tác vụ khỏi danh sách; TÙY CHỌN (người dùng tick) chuyển luôn file đã tự lưu về máy vào THÙNG RÁC.
-// Chỉ đụng tới file nằm TRONG <thư mục lưu> (không bao giờ ra ngoài), thư mục chỉ là DonNha/<video> hoặc DongVat/<phim>; không xóa vĩnh viễn;
+// Chỉ đụng tới file nằm TRONG <thư mục lưu> (không bao giờ ra ngoài), thư mục chỉ là DonNha/<video>, DongVat/<phim> hoặc BanDo/<video>; không xóa vĩnh viễn;
 // bản «Lưu video…» đã chép ra nơi khác, video người dùng tự thêm (manual) và thư mục KeChuyen (tab Kể chuyện có đường riêng) không bị đụng tới.
 const savedFilesOf=job=>job.manual?[]:[...new Set([job.output,...(job.outputs||[]),...(job.previousOutputs||[]),job.lastFrame])].filter(f=>typeof f==='string'&&f);
 async function trashSaved({files=[],folders=[]}){
   if(!settings.output||typeof shell.trashItem!=='function')return 0;
-  const out=path.resolve(settings.output),roots=[path.join(out,'DonNha'),path.join(out,'DongVat')],story=path.join(out,'KeChuyen'),targets=[];
+  const out=path.resolve(settings.output),roots=[path.join(out,'DonNha'),path.join(out,'DongVat'),path.join(out,'BanDo')],story=path.join(out,'KeChuyen'),targets=[];
   for(const f of folders){if(typeof f!=='string'||!f)continue;const r=path.resolve(f);if(roots.some(root=>inside(root,r))&&!targets.some(t=>t.path===r))targets.push({path:r,dir:true});}
   for(const f of files){
     if(typeof f!=='string'||!f)continue;
@@ -796,6 +802,81 @@ async function restoreAutoRetry({retry,start,kind='restore'}){
   }catch(e){job.stageMessage='Tự thử lại không được: '+e.message;}
   finally{restoreRetrying=false;notify();}
 }
+// ---- Tab «Bản đồ lịch sử»: gõ chủ đề → Muse soạn kịch bản tiếng Anh (xem và sửa được) → cửa sổ ẩn vẽ bản đồ động → giọng đọc + nhạc → MP4.
+// Chạy ở tiến trình chính; kịch bản lưu nháp sau mỗi lượt để «Viết tiếp» khi Muse lỗi giữa chừng.
+let mapState={busy:false,phase:'',progress:'',error:'',runId:''};
+let mapGeoObject=null,mapDraftChain=Promise.resolve();
+const mapRuns=()=>settings.mapRuns||(settings.mapRuns={});
+const mapDraftFile=id=>path.join(mapFolder(settings.output,id),'ban-nhap.json');
+const mapScriptFile=id=>path.join(mapFolder(settings.output,id),'kich-ban.json');
+async function readJsonFile(file){try{return JSON.parse(await fs.readFile(file,'utf8'));}catch{return null;}}
+function saveMapDraft(id,draft){
+  const file=mapDraftFile(id);
+  mapDraftChain=mapDraftChain.then(async()=>{await fs.mkdir(path.dirname(file),{recursive:true});await atomic(file,draft);}).catch(()=>{});
+  return mapDraftChain;
+}
+// Giọng đọc tiếng Anh: giữ giọng người dùng chọn nếu hợp lệ, không thì lấy giọng nam Mỹ đầu danh sách.
+function pickMapVoice(wanted){
+  const info=voiceService?.status()||{};
+  if(!info.ready?.edge)throw Error('Chưa cài giọng Microsoft (miễn phí). Bấm «Cài giọng miễn phí» ở mục Giọng thuyết minh, đợi cài xong rồi làm video.');
+  const list=(info.edgeVoices||[]).filter(v=>v.lang==='en'||v.lang==='*');
+  if(!list.length)throw Error('Chưa có giọng tiếng Anh trong danh sách giọng. Bấm «Cài lại giọng miễn phí» rồi thử lại.');
+  const id=String(wanted||'');
+  return (list.find(v=>v.id===id)||list.find(v=>v.id==='en-US-GuyNeural')||list.find(v=>/^en-US-/.test(v.id))||list[0]).id;
+}
+const mapMusicOf=value=>{const f=String(value||'');if(!f)return '';if(!/\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(f))throw Error('Nhạc nền phải là mp3, wav, m4a, aac, ogg hoặc flac.');return f;};
+async function ensureMapGeo(){return mapGeoObject||(mapGeoObject=await mapService.geo());}
+async function mapChecks(){
+  if(merging||packaging)throw Error('Chờ xử lý đầu ra xong trước khi làm video bản đồ.');
+  if(mapState.busy||mapWriter?.busy||mapService?.busy)throw Error('Đang làm video bản đồ, chờ xong hoặc bấm Dừng.');
+  await licenseManager.requireLongTerm();
+  if(!settings.output)throw Error('Chọn thư mục lưu video trước.');
+  await checkTools(settings.ffmpeg).catch(()=>{throw Error('Tab «Bản đồ lịch sử» cần FFmpeg để dựng video. Chọn ffmpeg.exe (cùng thư mục ffprobe.exe) ở «Kết nối & cài đặt».');});
+}
+// Dựng video từ kịch bản đã lưu (kich-ban.json): giọng đọc → vẽ khung → ghép tiếng + nhạc.
+async function runMapBuild(runId){
+  const meta=mapRuns()[runId];
+  if(!meta)return;
+  mapState={busy:true,phase:'build',progress:'Đang chuẩn bị dựng video…',error:'',runId};meta.status='building';meta.error='';await save();notify();
+  try{
+    const script=await readJsonFile(mapScriptFile(runId));
+    if(!script)throw Error('Chưa có kịch bản để dựng.');
+    const result=await mapService.make({runId,dir:mapFolder(settings.output,runId),name:meta.name,config:{voice:meta.voice,tempo:meta.tempo,music:meta.music,musicVolume:meta.musicVolume},script});
+    Object.assign(meta,{status:'done',output:result.output,seconds:Math.round(result.seconds),eras:result.eras,builtAt:Date.now(),error:''});
+    mapState={busy:false,phase:'done',progress:'Video bản đồ đã dựng xong',error:'',runId};
+  }catch(e){
+    const stopped=e.name==='AbortError';
+    meta.status=meta.output&&await fs.stat(meta.output).then(x=>x.isFile(),()=>false)?'done':'script';
+    meta.error=stopped?'':e.message;
+    mapState={busy:false,phase:'',progress:'',error:stopped?'Đã dừng dựng video. Kịch bản vẫn còn, bấm «Dựng video» để làm lại.':e.message,runId};
+  }finally{await save();notify();}
+}
+// Muse soạn kịch bản; auto=true thì dựng luôn video khi soạn xong.
+async function runMapWrite(runId,{auto}){
+  const meta=mapRuns()[runId];
+  if(!meta)return;
+  mapState={busy:true,phase:'write',progress:'Muse đang soạn kịch bản…',error:'',runId};meta.status='writing';meta.error='';await save();notify();
+  let written=false;
+  try{
+    mapGeoObject=await ensureMapGeo();
+    const draft=await readJsonFile(mapDraftFile(runId));
+    const result=await mapWriter.write({options:{topic:meta.topic,minutes:meta.minutes,country:meta.country},resume:draft&&draft.outline?draft:null,onDraft:d=>{void saveMapDraft(runId,d);}});
+    await mapDraftChain;
+    await fs.mkdir(mapFolder(settings.output,runId),{recursive:true});
+    await atomic(mapScriptFile(runId),result.script);
+    meta.name=meta.name||result.script.title||meta.topic;
+    meta.title=result.script.title||meta.topic;
+    meta.eras=result.script.eras.length;
+    meta.status='script';
+    mapState={busy:false,phase:'script',progress:`Muse đã soạn xong kịch bản ${meta.eras} giai đoạn`,error:'',runId};
+    written=true;
+  }catch(e){
+    meta.status='draft';
+    meta.error=e.name==='AbortError'?'':e.message;
+    mapState={busy:false,phase:'',progress:'',error:e.name==='AbortError'?'Đã dừng soạn kịch bản. Bấm «Viết tiếp» để làm tiếp từ chỗ dở.':e.message,runId};
+  }finally{await mapDraftChain;await save();notify();}
+  if(written&&auto)await runMapBuild(runId);
+}
 // ---- Tab «Động vật hoang dã»: gõ tên con vật → Muse viết kịch bản (hồ sơ phim + từng chương) → ảnh mốc và clip liền mạch → lồng tiếng thuyết minh → MP4.
 // Toàn bộ chạy ở tiến trình chính nên người dùng đóng giao diện hoặc đi ngủ vẫn chạy tiếp; kịch bản lưu nháp sau mỗi lượt để «Viết tiếp» khi Muse lỗi giữa chừng.
 let wildState={busy:false,phase:'',progress:'',error:'',storyId:''};
@@ -911,6 +992,9 @@ app.whenReady().then(async () => {
   storyAnalyzer=createStoryAnalyzer({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.ensureAllowed()});
   wildBuilder=createStoryService({getSettings:()=>settings,getJobs:()=>queue.jobs,voice:voiceService,ensureAllowed:()=>licenseManager.requireLongTerm(),notify,userDataDir:app.getPath('userData'),kind:'wild',folderOf:wildFolder,runName:'wild-run'});
   wildWriter=createWildWriter({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.requireLongTerm()});
+  mapService=createMapService({getSettings:()=>settings,voice:voiceService,ensureAllowed:()=>licenseManager.requireLongTerm(),notify,renderFrames:createWindowFrames({BrowserWindow,ipcMain}).renderFrames,userDataDir:app.getPath('userData')});
+  mapWriter=createMapWriter({geo:()=>mapGeoObject,dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.requireLongTerm()});
+  for(const run of Object.values(settings.mapRuns||{}))if(run.status==='writing'||run.status==='building')run.status=run.status==='writing'?'draft':'script';   // app tắt giữa chừng: cho làm tiếp
   await save();
   main = new BrowserWindow({ icon:path.join(__dirname,'assets','muse-studio.png'), width: 1450, height: 950, minWidth: 1000, minHeight: 700, backgroundColor: '#101114', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true } });
   main.setMenu(null);main.setMenuBarVisibility(false);
@@ -1003,7 +1087,7 @@ app.whenReady().then(async () => {
     },
     language:async value=>{if(!['vi','en'].includes(value))throw Error('Unsupported language');settings.language=value;await save();notify();return snapshot();},
     testBrowsers,
-    openOutput:async data=>{if(!settings.output)throw Error('Chọn thư mục lưu video trước.');const folder=data?.kind==='image'?imageDirectory():data?.kind==='story'?path.join(settings.output,'KeChuyen'):data?.kind==='restore'?path.join(settings.output,'DonNha'):data?.kind==='wild'?path.join(settings.output,'DongVat'):settings.output;await fs.mkdir(folder,{recursive:true});const error=await shell.openPath(folder);if(error)throw Error(error);},
+    openOutput:async data=>{if(!settings.output)throw Error('Chọn thư mục lưu video trước.');const folder=data?.kind==='image'?imageDirectory():data?.kind==='story'?path.join(settings.output,'KeChuyen'):data?.kind==='restore'?path.join(settings.output,'DonNha'):data?.kind==='wild'?path.join(settings.output,'DongVat'):data?.kind==='maphist'?path.join(settings.output,'BanDo'):settings.output;await fs.mkdir(folder,{recursive:true});const error=await shell.openPath(folder);if(error)throw Error(error);},
     activateKey:async token=>{await licenseManager.activate(token);notify();return snapshot();},
     add: async data => { if (merging || packaging) throw Error('Chờ xử lý đầu ra xong trước khi thêm prompt.'); if(Array.isArray(data)&&data.some(j=>j?.kind==='restore'))await licenseManager.requireLongTerm(); if(!(Array.isArray(data)&&data.length&&data.every(j=>j?.kind==='image'||j?.kind==='story'||j?.kind==='restore')))invalidateOutputs(); await queue.add(data); return snapshot(); },
     retryDownload: async id=>{
@@ -1352,6 +1436,94 @@ app.whenReady().then(async () => {
       if(path.resolve(dest).toLowerCase()!==path.resolve(out).toLowerCase())await fs.copyFile(out,dest);
       shell.showItemInFolder(dest);return{file:dest};
     },
+    // Tab «Bản đồ lịch sử»: gõ chủ đề (auto=true: làm tất cả, false: chỉ soạn kịch bản để xem và sửa). Trả về ngay, theo dõi qua state.maphist.
+    mapMake: async data => {
+      await mapChecks();
+      if(queue.active||starting)throw Error('Hàng đợi đang chạy. Dừng hàng đợi trước khi làm video bản đồ.');
+      const all=mapRuns(),resumeId=String(data?.resumeId||'');
+      let runId;
+      if(resumeId&&all[resumeId]&&['draft','writing'].includes(all[resumeId].status)){runId=resumeId;Object.assign(all[runId],{voice:pickMapVoice(data?.voice||all[runId].voice),tempo:all[runId].tempo,music:mapMusicOf(data?.music??all[runId].music)});}
+      else{
+        const config=mapPlan.options(data);
+        const bad=mapPlan.problems(config);
+        if(bad.length)throw Error(bad[0]);
+        const voice=pickMapVoice(config.voice);
+        const base=config.topic.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/gi,'d').replace(/[^A-Za-z0-9]+/g,'-').slice(0,30);
+        runId=await freeStoryId(base,{output:settings.output,jobs:[],folderOf:mapFolder,fallback:'BanDo'});
+        all[runId]={name:config.topic,topic:config.topic,minutes:config.minutes,country:config.country,voice,tempo:config.tempo,music:mapMusicOf(config.music),musicVolume:config.musicVolume,status:'writing',createdAt:Date.now(),error:''};
+        for(const id of Object.keys(all).slice(0,Math.max(0,Object.keys(all).length-40)))delete all[id];
+      }
+      await fs.mkdir(mapFolder(settings.output,runId),{recursive:true});
+      await save();notify();
+      void runMapWrite(runId,{auto:data?.auto!==false});
+      return {runId};
+    },
+    mapCancel: async()=>{mapWriter?.cancel();mapService?.cancel();return snapshot();},
+    // Đọc kịch bản đã lưu để sửa: trả về bản chuẩn hóa + danh sách chỗ cần sửa (vùng không khớp bản đồ, thiếu lời đọc…).
+    mapScript: async data => {
+      const id=String(data?.runId||''),meta=mapRuns()[id];
+      if(!meta)throw Error('Không thấy video này.');
+      const raw=await readJsonFile(mapScriptFile(id));
+      if(!raw)return {script:null,issues:[],meta};
+      const {script,issues}=mapPlan.normalizeScript(raw,await ensureMapGeo());
+      return {script,issues:issues.map(x=>String(x.text||x)),meta};
+    },
+    // Lưu kịch bản người dùng đã sửa (kiểm lại bằng bộ chuẩn hóa, trả về chỗ còn lỗi).
+    mapSaveScript: async data => {
+      if(mapState.busy||mapService?.busy)throw Error('Đang làm video bản đồ, chờ xong hoặc bấm Dừng.');
+      await licenseManager.requireLongTerm();
+      const id=String(data?.runId||''),meta=mapRuns()[id];
+      if(!meta)throw Error('Không thấy video này.');
+      if(!data?.script||typeof data.script!=='object'||!Array.isArray(data.script.eras)||JSON.stringify(data.script).length>2e6)throw Error('Kịch bản không hợp lệ.');
+      const {script,issues}=mapPlan.normalizeScript(data.script,await ensureMapGeo());
+      if(!script.eras.length)throw Error('Kịch bản cần ít nhất một giai đoạn.');
+      await fs.mkdir(mapFolder(settings.output,id),{recursive:true});
+      await atomic(mapScriptFile(id),data.script);
+      meta.eras=script.eras.length;meta.title=script.title||meta.title;if(meta.status==='draft')meta.status='script';
+      await save();notify();
+      return {issues:issues.map(x=>String(x.text||x))};
+    },
+    // Dựng (lại) video từ kịch bản đã lưu; có thể đổi giọng, nhạc, tốc độ.
+    mapRender: async data => {
+      await mapChecks();
+      const id=String(data?.runId||''),meta=mapRuns()[id];
+      if(!meta)throw Error('Không thấy video này.');
+      if(!await fs.stat(mapScriptFile(id)).then(x=>x.isFile(),()=>false))throw Error('Chưa có kịch bản. Bấm «Viết tiếp» hoặc soạn kịch bản trước.');
+      if(data?.voice!==undefined)meta.voice=pickMapVoice(data.voice);else meta.voice=pickMapVoice(meta.voice);
+      if(data?.tempo!==undefined)meta.tempo=mapPlan.options({tempo:data.tempo}).tempo;
+      if(data?.music!==undefined)meta.music=mapMusicOf(data.music);
+      if(data?.musicVolume!==undefined)meta.musicVolume=mapPlan.options({musicVolume:data.musicVolume}).musicVolume;
+      if(data?.name)meta.name=String(data.name).slice(0,120);
+      await save();notify();
+      void runMapBuild(id);
+      return {runId:id};
+    },
+    // Dữ liệu bản đồ (Natural Earth) cho khung xem thử trong giao diện.
+    mapGeo: async()=>mapService.raw(),
+    mapRemove: async data => {
+      const id=String(data?.runId||''),meta=mapRuns()[id];
+      if(!meta)throw Error('Không thấy video này.');
+      if(mapState.busy&&mapState.runId===id)throw Error('Video này đang được làm. Bấm Dừng trước khi xóa.');
+      delete mapRuns()[id];
+      const trashed=data?.deleteFiles===true?await trashSaved({folders:[mapFolder(settings.output,id)]}):0;
+      await save();notify();
+      return {...snapshot(),removed:{runId:id,trashed}};
+    },
+    mapReveal: async data => {
+      const id=String(data?.runId||''),meta=mapRuns()[id];
+      if(meta?.output&&await fs.stat(meta.output).then(x=>x.isFile(),()=>false))shell.showItemInFolder(meta.output);
+      else if(settings.output&&meta){await fs.mkdir(mapFolder(settings.output,id),{recursive:true});await shell.openPath(mapFolder(settings.output,id));}
+      return true;
+    },
+    mapSave: async data => {
+      const out=mapRuns()[String(data?.runId||'')]?.output;
+      if(!out||!await fs.stat(out).then(s=>s.isFile(),()=>false))throw Error(ui('Chưa có video hoàn chỉnh để lưu.','There is no finished video to save yet.'));
+      const picked=await dialog.showSaveDialog(main,{title:ui('Lưu video về','Save video'),defaultPath:path.join(app.getPath('downloads'),path.basename(out)),filters:[{name:'MP4',extensions:['mp4']}]});
+      if(picked.canceled||!picked.filePath)return false;
+      const dest=/\.mp4$/i.test(picked.filePath)?picked.filePath:picked.filePath+'.mp4';
+      if(path.resolve(dest).toLowerCase()!==path.resolve(out).toLowerCase())await fs.copyFile(out,dest);
+      shell.showItemInFolder(dest);return{file:dest};
+    },
     // Tab «Động vật hoang dã»: chỉ cần tên con vật; mọi bước sau tự chạy ở nền (trả về ngay, theo dõi tiến độ qua state.wild).
     wildMake: async data => {
       if(merging||packaging)throw Error('Chờ xử lý đầu ra xong trước khi làm phim mới.');
@@ -1517,6 +1689,7 @@ app.on('before-quit', event => {
   event.preventDefault();
   if (flushingQuit) return;
   flushingQuit=true;runEpoch++;starting=false;main?.hide?.();
+  mapWriter?.cancel();mapService?.cancel();
   (async () => {
     if(queue)await stopAll();
     const closingExternal=Promise.allSettled([...browsers.values()].filter(browser=>browser.external&&!browser.isDestroyed()).map(browser=>browser.close()));

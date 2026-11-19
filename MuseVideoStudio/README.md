@@ -142,6 +142,16 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.12
+
+- **Tab mới «Bản đồ lịch sử» (gói Năm hoặc Vĩnh viễn):** chỉ gõ chủ đề (ví dụ `History of Vietnam`, `The Mongol Empire`), bấm một nút. Muse soạn kịch bản tiếng Anh theo từng giai đoạn (lời đọc, chữ trên thẻ, năm, dân số, thế lực, địa danh), tool vẽ bản đồ động, đọc lời, ghép nhạc và xuất MP4 1920×1080 dài tới khoảng 8 phút. Lời đọc và chữ luôn bằng tiếng Anh (làm cho khán giả nước ngoài).
+  - **Phong cách riêng «Atlas sống»:** giấy da mịn và biển xanh, mỗi thế lực nổi khối như mô hình, đồng hồ năm bằng đồng lăn số, lá cờ cắm xuống bản đồ **có mặt và đổi nét mặt theo tâm trạng**, địa cầu nhỏ chỉ vùng đang xem, thẻ lời đọc tô sáng từng từ, la bàn mở và đóng video. Không sao chép kênh nào.
+  - **Xem và sửa kịch bản trước khi dựng:** sửa lời đọc, năm, dân số, tên thế lực, vùng; chỗ nào không tìm thấy trên bản đồ được báo rõ; nút «Xem thử hình» vẽ ngay một khung thật của giai đoạn đó.
+  - Bỏ tick «Tự động làm hết» để dừng ở kịch bản. Soạn dở thì bấm «Viết tiếp», phần đã soạn được giữ lại.
+  - Giọng Microsoft tiếng Anh (mặc định Guy), tốc độ đọc, nhạc nền và âm lượng nhạc (nhạc tự hạ khi có giọng).
+  - Dữ liệu bản đồ hiện đại (Natural Earth, phạm vi công cộng) nên ranh giới đế chế xưa chỉ xấp xỉ. Hãy đọc kịch bản để chắc sự kiện, năm tháng đúng trước khi đăng, và bật mục «nội dung bị thay đổi hoặc tổng hợp» trên YouTube.
+  - File nằm trong `BanDo/<tên>` (kịch bản, lời đọc, video). Xóa một video bản đồ có hộp hỏi có xóa luôn file hay không; file đi vào **Thùng rác**.
+
 ## Update 1.9.11
 
 - **Ảnh tham chiếu giữ nguyên người và quần áo trong ảnh.** Trước đây khi bạn chọn ảnh có người nhưng để «Nữ» / «Nam» mặc định, prompt vẫn ghi sẵn trang phục mặc định (áo khoác xanh lá, mũ len xám, quần túi hộp…) cả ở bước nhờ Muse sửa ảnh lẫn trong từng clip, nên Muse thay quần áo trong ảnh của bạn. Giờ khi có ảnh, người trong ảnh được ưu tiên (mặt, tóc, dáng và đúng bộ quần áo, mũ, găng tay): mô tả mặc định chỉ dùng khi ảnh không có người nào. Bạn tự gõ mô tả người thì app nghe theo mô tả của bạn; chọn «Giống người trong ảnh» thì như cũ.

@@ -438,3 +438,25 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .restoreDeleteDialog { max-width: 480px; }
 .restoreDeleteDialog h3 { margin: 0 0 8px; }
 .restoreDeleteDialog .dialogActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+/* Tab «Bản đồ lịch sử» */
+@font-face { font-family: "MapLora"; font-weight: 400 700; font-style: normal; src: url("assets/maphist/fonts/Lora-Variable.ttf"); }
+@font-face { font-family: "MapLora"; font-weight: 400 700; font-style: italic; src: url("assets/maphist/fonts/Lora-Italic-Variable.ttf"); }
+.mapVol { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; color: #9fb2cc; }
+.mapVol input { width: 110px; }
+.mapEditor { width: min(1100px, 94vw); max-height: 92vh; overflow: auto; border: 1px solid var(--line); border-radius: 12px; background: #101b2a; color: #e6eefb; padding: 18px 20px; }
+.mapEditor::backdrop { background: rgba(5, 10, 18, .7); }
+.mapEditor .dialogHeader { display: flex; justify-content: space-between; align-items: center; }
+.mapEditor h2 { margin: 0; font-size: 17px; }
+.mapRow { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0; }
+.mapField { display: flex; flex-direction: column; gap: 4px; flex: 1 1 200px; font-size: 11px; color: #9fb2cc; }
+.mapField input, .mapField textarea, .mapRealm input[type=text], .mapRealm select { width: 100%; box-sizing: border-box; }
+.mapEras { display: grid; gap: 8px; margin: 12px 0; }
+.mapEra { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: #121d2c; }
+.mapEra > summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+.mapRealms { display: grid; gap: 6px; margin: 10px 0; }
+.mapRealm { display: grid; grid-template-columns: 160px 1fr 110px 44px auto auto; gap: 8px; align-items: center; }
+.mapRealm > .restoreRunText { grid-column: 1 / -1; margin: 0; }
+.mapPreviewBox { margin: 10px 0; }
+.mapPreviewBox canvas { display: block; width: 100%; max-width: 760px; aspect-ratio: 16 / 9; border-radius: 8px; border: 1px solid var(--line); background: #000; }
+#mapIssues div { font-size: 11px; margin-top: 3px; }

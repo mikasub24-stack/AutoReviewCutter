@@ -2,6 +2,75 @@
 (()=>{
   const dictionary=Object.fromEntries(`
 Kể chuyện|Story
+Bản đồ lịch sử|History maps
+Gõ chủ đề → Muse soạn kịch bản tiếng Anh → vẽ bản đồ động, giọng đọc, nhạc → video|Type a topic → Muse writes an English script → animated map, narration, music → video
+Làm video bản đồ mới|Make a new map video
+Chỉ cần gõ chủ đề. Muse tự chọn đất nước, các giai đoạn và vùng lãnh thổ, soạn lời đọc tiếng Anh; tool vẽ bản đồ động (đất liền biến đổi theo từng thời kỳ, lá cờ có mặt cắm xuống, đồng hồ năm, địa cầu nhỏ chỉ vùng đang xem), đọc lời, thêm nhạc rồi xuất MP4. Bạn có thể xem và sửa kịch bản trước khi dựng.|Just type a topic. Muse picks the country, the eras and the territories and writes the English narration; the tool draws the animated map (land that changes era by era, planted flags with faces, a year counter, a small globe showing the region), reads the narration, adds music and exports an MP4. You can review and edit the script before it is built.
+Chủ đề (tiếng Anh càng rõ càng tốt)|Topic (the clearer the English, the better)
+Nước làm trung tâm (không bắt buộc, để trống thì Muse tự chọn)|Focus country (optional; leave empty and Muse chooses)
+Giọng đọc (tiếng Anh)|Narration voice (English)
+▶ Nghe thử giọng|▶ Preview voice
+Không nhạc nền (chỉ có giọng đọc).|No background music (narration only).
+Âm lượng nhạc|Music volume
+Tự động làm hết: soạn kịch bản, vẽ, đọc, ghép nhạc, xuất video (bỏ tick để dừng ở kịch bản và xem, sửa trước khi dựng)|Do everything automatically: script, map, narration, music, export (untick to stop at the script and review or edit it before building)
+Dữ liệu bản đồ hiện đại (Natural Earth, phạm vi công cộng) nên ranh giới các đế chế xưa chỉ xấp xỉ theo biên giới ngày nay. Hãy đọc kịch bản để chắc các sự kiện, năm tháng đúng trước khi đăng, và bật mục «nội dung bị thay đổi hoặc tổng hợp» trên YouTube.|The map data is modern (Natural Earth, public domain), so the borders of old empires only approximate today's borders. Read the script to make sure events and dates are right before publishing, and switch on YouTube's “altered or synthetic content” disclosure.
+Làm video bản đồ|Make map video
+Dừng soạn|Stop writing
+Dừng dựng|Stop building
+Viết tiếp|Continue writing
+Dựng video|Build video
+Dựng lại|Build again
+Xem và sửa kịch bản|View and edit script
+Xem thử hình|Preview frame
+Kịch bản video bản đồ|Map video script
+Lời đọc và chữ trên video bằng tiếng Anh. Vùng lãnh thổ được tô theo tên nước/tỉnh ngày nay: bấm «Xem thử hình» ở từng giai đoạn để xem bản đồ trông thế nào.|Narration and on-screen text are in English. Territories are painted by today's country/province names: click “Preview frame” on each era to see how the map looks.
+Tiêu đề video|Video title
+Dòng phụ|Subtitle
+Lưu kịch bản|Save script
+Lưu và dựng video|Save and build video
++ Thêm giai đoạn cuối|+ Add a final era
++ Thêm thế lực|+ Add a power
+Xóa giai đoạn này|Delete this era
+Tên giai đoạn (tiếng Anh)|Era name (English)
+Năm (số âm = trước Công nguyên)|Year (negative = BC)
+Dân số (người, bỏ trống nếu không rõ)|Population (people, leave empty if unknown)
+Câu chữ trên thẻ (tiếng Anh, ngắn)|Caption on the card (English, short)
+Lời đọc (tiếng Anh, giọng kể chuyện)|Narration (English, storytelling tone)
+Thế lực hiện trên bản đồ|Powers shown on the map
+Tên (tiếng Anh)|Name (English)
+Tên nước hoặc tỉnh, cách nhau bằng dấu phẩy|Country or province names, separated by commas
+Lá cờ có mặt|Flag with a face
+Tên địa danh|Place name
+Địa danh|Places
+Vui|Happy
+Buồn|Sad
+Giận|Angry
+Mệt|Tired
+Tự hào|Proud
+Bình thản|Calm
+Chưa có kịch bản để sửa.|There is no script to edit yet.
+Kịch bản cần ít nhất một giai đoạn.|The script needs at least one era.
+Kịch bản đã sẵn sàng|Script ready
+Kịch bản chưa xong|Script unfinished
+Kịch bản đã sẵn sàng. Bấm «Xem và sửa kịch bản» để kiểm tra, hoặc «Dựng video» để làm luôn.|The script is ready. Click “View and edit script” to review it, or “Build video” to go straight on.
+Kịch bản chưa soạn xong. Bấm «Viết tiếp» để Muse làm tiếp từ chỗ dở (phần đã soạn được giữ lại).|The script is not finished. Click “Continue writing” and Muse picks up where it stopped (what is already written is kept).
+Muse đang soạn kịch bản. Các bước sau (vẽ bản đồ, giọng đọc, nhạc) tự chạy, bạn không cần bấm gì thêm.|Muse is writing the script. The next steps (map, narration, music) run by themselves; you do not need to click anything else.
+Muse đang soạn kịch bản. Xong bạn bấm «Xem và sửa kịch bản» để kiểm tra rồi mới dựng.|Muse is writing the script. When it is done, click “View and edit script” to review it before building.
+Muse đang soạn kịch bản…|Muse is writing the script…
+Đang soạn kịch bản|Writing the script
+Đang dựng video|Building the video
+Đang dựng video…|Building the video…
+Đang dựng video. Có thể theo dõi tiến độ ở danh sách.|Building the video. You can follow progress in the list.
+Đã dựng xong|Build finished
+Đã lưu kịch bản.|Script saved.
+Đã xóa video khỏi danh sách (file vẫn còn trong thư mục).|Video removed from the list (the files are still in the folder).
+Đã xóa video và chuyển file đã lưu vào Thùng rác.|Video removed and its saved files moved to the Recycle Bin.
+Xóa video bản đồ này?|Delete this map video?
+File được chuyển vào Thùng rác nên khôi phục được. Bản bạn đã bấm «Lưu video…» ra nơi khác không bị đụng tới.|Files go to the Recycle Bin so they can be restored. A copy you saved elsewhere with “Save video…” is not touched.
+Nhập chủ đề trước (ví dụ: History of Vietnam, The Mongol Empire).|Enter a topic first (for example: History of Vietnam, The Mongol Empire).
+Bản dùng thử và gói 30 ngày không dùng được tab này. Nâng cấp lên gói Năm hoặc Vĩnh viễn rồi nhập key mới.|The trial and the 30-day plan cannot use this tab. Upgrade to the Yearly or Lifetime plan and enter the new key.
+Chưa cài giọng Microsoft. Bấm «Cài giọng miễn phí» (cần Python 3.10–3.13 trên máy và có mạng), đợi cài xong rồi làm video.|The Microsoft voice is not installed. Click “Install free voice” (needs Python 3.10–3.13 and an internet connection), wait until it finishes, then make the video.
+Lời đọc và chữ trên video luôn bằng tiếng Anh (làm cho khán giả nước ngoài). Cần có mạng lúc đọc.|Narration and on-screen text are always in English (made for a foreign audience). An internet connection is needed while narrating.
 Câu chuyện & nhân vật|Story & character
 Kịch bản → cảnh → clip Muse|Script → scenes → Muse clips
 1. Câu chuyện|1. Story
