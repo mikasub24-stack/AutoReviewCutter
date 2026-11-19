@@ -155,12 +155,12 @@ function createMapService({ getSettings = () => ({}), voice = null, ensureAllowe
       Object.assign(state, { phase: 'render', done: 0, total: frames });
       say(`Đang vẽ khung hình 0/${frames}…`);
       const started = Date.now();
-      let written = 0;
+      let written = 0, windows = 0;
       await run(t.ffmpeg, videoArgs({ out: silent }), {
         signal,
         feed: async stdin => {
           await renderFrames({
-            timeline, raw: await raw(), fps: FPS, signal,
+            timeline, raw: await raw(), fps: FPS, signal, onInfo: info => { windows = Number(info && info.workers) || 0; },
             onFrame: async buffer => {
               if (signal.aborted) return { stop: true };
               await writeChunk(stdin, Buffer.from(buffer));
@@ -174,7 +174,7 @@ function createMapService({ getSettings = () => ({}), voice = null, ensureAllowe
                   await fs.writeFile(file, Buffer.from(buffer));
                   Object.assign(extra, { preview: file, previewAt: Date.now() });
                 } catch { /* không có xem trước thì thôi */ }
-                say(`Đang vẽ khung hình ${written}/${frames} · còn khoảng ${left >= 90 ? Math.round(left / 60) + ' phút' : left + ' giây'}`, extra);
+                say(`Đang vẽ khung hình ${written}/${frames} · ${speed.toFixed(1)} khung/giây${windows > 1 ? ` (${windows} cửa sổ vẽ song song)` : ''} · còn khoảng ${left >= 90 ? Math.round(left / 60) + ' phút' : left + ' giây'}`, extra);
               }
               return { stop: false };
             }

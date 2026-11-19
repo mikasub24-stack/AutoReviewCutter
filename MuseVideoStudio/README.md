@@ -142,6 +142,14 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.10.2
+
+- **Dựng video bản đồ nhanh hơn:** app vẽ bằng **nhiều cửa sổ ẩn song song** (2–4 cửa sổ tùy số nhân CPU và dung lượng RAM; máy ít RAM vẫn dùng một cửa sổ như trước). Mỗi cửa sổ vẽ từng khối 24 khung liên tiếp, khung được xếp lại đúng thứ tự trước khi đưa vào FFmpeg, nên video ra giống hệt khi vẽ bằng một cửa sổ (đã kiểm tra: so khung từng pixel giữa 1, 2, 3 cửa sổ ở cả hai kiểu hình, và so hai video hoàn chỉnh).
+- Dòng tiến độ giờ hiện **tốc độ vẽ (khung/giây)** và số cửa sổ đang vẽ.
+- Muốn ép số cửa sổ (1–6) thì đặt biến môi trường `MUSE_RENDER_WORKERS` trước khi mở app.
+- Kiểu «Atlas cổ» vẽ chậm hơn kiểu «Hoạt hình sáng» khoảng 2,3 lần; muốn nhanh nên dùng kiểu hoạt hình.
+- Khóa bộ nhớ đệm đất liền dùng tọa độ máy quay chính xác (không làm tròn), để một khung luôn ra cùng một hình dù khung nào được vẽ trước nó.
+
 ## Update 1.10.1
 
 - **Đổi màu số, màu chữ và phông chữ cho khác video mẫu:** số năm **hồng kẹo** (chuyển sắc) có vòng trắng và viền chàm; nhãn địa danh màu kem viền chàm; tên giai đoạn xanh chàm đậm trên cuộn giấy, dòng chú thích xanh xám; nút Subscribe vẫn đỏ.

@@ -24,17 +24,26 @@
       for (let i = 0; i < buf.length; i += 0x8000) str += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
       return btoa(str);
     },
-    async run({ fps = tl.fps, quality = .92 } = {}) {
+    // Khung mà cửa sổ số `worker` (trong `workers` cửa sổ) phải vẽ: cả video chia thành khối `chunk` khung liên tiếp, phát vòng tròn cho các cửa sổ.
+    // Khung liền nhau nằm cùng một cửa sổ nên bộ nhớ đệm bản đồ vẫn có tác dụng; mỗi khung chỉ phụ thuộc thời điểm t nên vẽ ở cửa sổ nào cũng ra đúng một hình.
+    framesOf(N, worker = 0, workers = 1, chunk = 24) {
+      const list = [];
+      for (let c = worker; c * chunk < N; c += workers) for (let i = c * chunk; i < Math.min(N, (c + 1) * chunk); i++) list.push(i);
+      return list;
+    },
+    async run({ fps = tl.fps, quality = .92, worker = 0, workers = 1, chunk = 24 } = {}) {
       const bridge = window.maphistBridge, N = Math.ceil(tl.total * fps), out = [];
+      const list = this.framesOf(N, worker, workers, chunk);
       let inflight = null;
-      for (let i = 0; i < N; i++) {
+      for (let k = 0; k < list.length; k++) {
+        const i = list[k];
         R.drawFrame(i / fps);
         const encoded = encode(quality);
-        if (inflight) { const r = await inflight; if (r && r.stop) return { frames: i, stopped: true }; }
+        if (inflight) { const r = await inflight; if (r && r.stop) return { frames: k, stopped: true }; }
         inflight = encoded.then(buf => bridge ? bridge.frame(i, buf) : (out.push(buf), null));
       }
-      if (inflight) { const r = await inflight; if (r && r.stop) return { frames: N, stopped: true }; }
-      return bridge ? { frames: N, stopped: false } : { frames: N, stopped: false, buffers: out };
+      if (inflight) { const r = await inflight; if (r && r.stop) return { frames: list.length, stopped: true }; }
+      return bridge ? { frames: list.length, stopped: false } : { frames: list.length, stopped: false, buffers: out };
     }
   };
   window.__mapRenderReady = true;

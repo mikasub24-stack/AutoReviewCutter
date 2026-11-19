@@ -860,7 +860,7 @@
       if (opts.cam) st.cam = opts.cam;
       if (opts.shift || opts.spanMul) { const span = st.cam.span * (opts.spanMul || 1); st.cam = { ...st.cam, span, lon: st.cam.lon - span * (opts.shift || 0) }; }
       const cam = st.cam, pr = projector(cam);
-      const key = [cam.lon, cam.lat, cam.span].map(v => v.toFixed(3)).join(',');
+      const key = [cam.lon, cam.lat, cam.span].join(',');   // khóa chính xác (không làm tròn): khung vẽ không phụ thuộc khung nào được vẽ trước nó, nên chia khung cho nhiều cửa sổ vẫn ra đúng một hình
       if (cache.key !== key) { cache.key = key; cache.paths.clear(); cache.landKey = ''; }
       const wasMoving = cache.moving; cache.moving = st.moving;
       if (wasMoving !== st.moving) { cache.paths.clear(); cache.landKey = ''; }
