@@ -860,7 +860,11 @@ async function runMapWrite(runId,{auto}){
   try{
     mapGeoObject=await ensureMapGeo();
     const draft=await readJsonFile(mapDraftFile(runId));
-    const result=await mapWriter.write({options:{topic:meta.topic,minutes:meta.minutes,country:meta.country},resume:draft&&draft.outline?draft:null,onDraft:d=>{void saveMapDraft(runId,d);}});
+    const avoid=Object.entries(mapRuns()).filter(([id,r])=>id!==runId&&r&&(r.topic||r.title)).map(([,r])=>r.topic||r.title);
+    const result=await mapWriter.write({options:{topic:meta.topic,minutes:meta.minutes,country:meta.country,avoid},resume:draft&&draft.outline?draft:null,onDraft:d=>{void saveMapDraft(runId,d);},onOutline:o=>{
+      // Chủ đề do Muse tự chọn: đặt tên video theo tiêu đề dàn ý ngay để danh sách hiện đúng tên.
+      if(!meta.topic&&o&&o.title){meta.topic=o.title;meta.name=o.title;meta.auto=true;void save();notify();}
+    }});
     await mapDraftChain;
     await fs.mkdir(mapFolder(settings.output,runId),{recursive:true});
     await atomic(mapScriptFile(runId),result.script);
@@ -1448,9 +1452,9 @@ app.whenReady().then(async () => {
         const bad=mapPlan.problems(config);
         if(bad.length)throw Error(bad[0]);
         const voice=pickMapVoice(config.voice);
-        const base=config.topic.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/gi,'d').replace(/[^A-Za-z0-9]+/g,'-').slice(0,30);
+        const base=(config.topic||'Tu-chon').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/gi,'d').replace(/[^A-Za-z0-9]+/g,'-').slice(0,30);
         runId=await freeStoryId(base,{output:settings.output,jobs:[],folderOf:mapFolder,fallback:'BanDo'});
-        all[runId]={name:config.topic,topic:config.topic,minutes:config.minutes,country:config.country,voice,tempo:config.tempo,music:mapMusicOf(config.music),musicVolume:config.musicVolume,status:'writing',createdAt:Date.now(),error:''};
+        all[runId]={name:config.topic||'Muse tự chọn chủ đề',topic:config.topic,minutes:config.minutes,country:config.country,voice,tempo:config.tempo,music:mapMusicOf(config.music),musicVolume:config.musicVolume,status:'writing',createdAt:Date.now(),error:''};
         for(const id of Object.keys(all).slice(0,Math.max(0,Object.keys(all).length-40)))delete all[id];
       }
       await fs.mkdir(mapFolder(settings.output,runId),{recursive:true});

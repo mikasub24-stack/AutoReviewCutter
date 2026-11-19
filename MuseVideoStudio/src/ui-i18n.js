@@ -2,6 +2,16 @@
 (()=>{
   const dictionary=Object.fromEntries(`
 Kể chuyện|Story
+Muse tự chọn chủ đề và làm video|Let Muse choose the topic and make the video
+Muse tự chọn chủ đề|Muse chooses the topic
+🎲 Muse tự chọn|🎲 Let Muse choose
+Gợi ý chủ đề|Topic suggestions
+Chủ đề (để trống thì Muse tự chọn; tiếng Anh càng rõ càng tốt)|Topic (leave empty and Muse chooses; the clearer the English, the better)
+Để trống: Muse tự chọn chủ đề. Hoặc gõ, hoặc bấm một chủ đề trong danh sách bên dưới|Leave empty: Muse chooses a topic. Or type one, or click a topic in the list below
+Chỉ cần bấm một nút. Chọn một chủ đề gợi ý hoặc tự gõ; để trống thì Muse tự chọn một chủ đề hay. Muse chọn đất nước, các giai đoạn và vùng lãnh thổ, soạn lời đọc tiếng Anh; tool vẽ bản đồ động (đất liền biến đổi theo từng thời kỳ, lá cờ có mặt cắm xuống, đồng hồ năm, địa cầu nhỏ chỉ vùng đang xem), đọc lời, thêm nhạc rồi xuất MP4. Bạn có thể xem và sửa kịch bản trước khi dựng.|Just click one button. Pick a suggested topic or type your own; leave it empty and Muse picks a good topic. Muse chooses the country, the eras and the territories and writes the English narration; the tool draws the animated map (land that changes era by era, planted flags with faces, a year counter, a small globe showing the region), reads the narration, adds music and exports an MP4. You can review and edit the script before it is built.
+Giọng đọc, nhạc nền, nước làm trung tâm (đã chọn sẵn, không cần chỉnh)|Voice, background music, focus country (already chosen, no need to change)
+Chủ đề quá ngắn. Gõ rõ hơn (ví dụ: History of Vietnam, The Mongol Empire) hoặc để trống cho Muse tự chọn.|The topic is too short. Type it more clearly (for example: History of Vietnam, The Mongol Empire) or leave it empty and let Muse choose.
+Muse đang chọn chủ đề và soạn kịch bản. Tên video sẽ hiện ở danh sách ngay khi có dàn ý.|Muse is choosing a topic and writing the script. The video name appears in the list as soon as the outline is ready.
 Bản đồ lịch sử|History maps
 Gõ chủ đề → Muse soạn kịch bản tiếng Anh → vẽ bản đồ động, giọng đọc, nhạc → video|Type a topic → Muse writes an English script → animated map, narration, music → video
 Làm video bản đồ mới|Make a new map video

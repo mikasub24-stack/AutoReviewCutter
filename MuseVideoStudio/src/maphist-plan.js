@@ -11,7 +11,9 @@
   const FIT_W = 1560, FIT_H = 640;                       // vùng nhìn thấy dành cho lãnh thổ
   const INTRO = 3.2, OUTRO = 4.2, TAIL = 1.0, LEAD = 0.7, MIN_ERA = 8.5, WORDS_PER_SECOND = 2.55;
   const ERA_SECONDS = 16;                                // mỗi giai đoạn dài trung bình ~16 giây
-  const MIN_MINUTES = 1, MAX_MINUTES = 10, DEFAULT_MINUTES = 5;
+  const MIN_MINUTES = 1, MAX_MINUTES = 15, DEFAULT_MINUTES = 8;
+  const LENGTHS = [6, 8, 15];                            // độ dài người dùng được chọn trên giao diện (phút)
+  const MAX_ERAS = 64;
   const MOODS = ['happy', 'proud', 'tired', 'angry', 'sad', 'calm'];
   const FLAGS = ['solid', 'h', 'v', 'disc', 'cross'];
   const MARKERS = ['city', 'capital', 'temple', 'castle', 'ship', 'battle'];
@@ -27,10 +29,11 @@
   const hex = (c, fallback) => { const m = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(String(c || '').trim()); if (!m) return fallback; const h = m[1].length === 3 ? m[1].replace(/./g, x => x + x) : m[1]; return '#' + h.toLowerCase(); };
   const num = (v, fallback = null) => { const n = typeof v === 'string' ? Number(v.replace(/[,_\s]/g, '')) : Number(v); return Number.isFinite(n) ? n : fallback; };
 
-  function eraCount(minutes) { return clamp(Math.round(clamp(num(minutes, DEFAULT_MINUTES), MIN_MINUTES, MAX_MINUTES) * 60 / ERA_SECONDS), 4, 40); }
+  function eraCount(minutes) { return clamp(Math.round(clamp(num(minutes, DEFAULT_MINUTES), MIN_MINUTES, MAX_MINUTES) * 60 / ERA_SECONDS), 4, 60); }
   function options(input = {}) {
     return {
-      topic: flat(input.topic).slice(0, 300),
+      topic: flat(input.topic).slice(0, 300),                // để trống = Muse tự chọn chủ đề
+      avoid: (Array.isArray(input.avoid) ? input.avoid : []).map(x => flat(x).slice(0, 120)).filter(Boolean).slice(0, 30),   // chủ đề đã làm, Muse không chọn lại
       minutes: clamp(Math.round(num(input.minutes, DEFAULT_MINUTES)), MIN_MINUTES, MAX_MINUTES),
       country: flat(input.country).slice(0, 80),             // chỉ khi người dùng muốn ép nước; để trống = Muse tự chọn từ chủ đề
       voice: flat(input.voice).slice(0, 80),
@@ -42,7 +45,7 @@
   }
   function problems(config) {
     const out = [];
-    if (config.topic.length < 3) out.push('Gõ chủ đề trước (ví dụ: History of Vietnam, The Mongol Empire).');
+    if (config.topic && config.topic.length < 3) out.push('Chủ đề quá ngắn. Gõ rõ hơn (ví dụ: History of Vietnam, The Mongol Empire) hoặc để trống cho Muse tự chọn.');
     return out;
   }
 
@@ -287,7 +290,7 @@
       'QUY TẮC',
       '1. Mọi chữ trong JSON (title, subtitle, tên giai đoạn, focus) viết bằng TIẾNG ANH.',
       '2. Sự thật lịch sử phải chính xác, đúng năm, không bịa. Không chắc năm hay con số thì dùng mốc tròn mà sử sách thường dùng.',
-      `3. Có khoảng ${n} giai đoạn (được lệch 1–2), xếp theo thời gian tăng dần. Mỗi giai đoạn là MỘT bước ngoặt làm bản đồ đổi hình (lập quốc, mở rộng, chia cắt, chiến tranh, thống nhất, độc lập…). Giai đoạn đầu kể nguồn gốc; giai đoạn cuối là hiện đại hoặc kết cục. Các giai đoạn phải cách nhau đủ xa để thấy lãnh thổ thay đổi.`,
+      `3. Có khoảng ${n} giai đoạn (được lệch tối đa ${Math.max(2, Math.round(n * .1))}), xếp theo thời gian tăng dần. Mỗi giai đoạn là MỘT bước ngoặt làm bản đồ đổi hình (lập quốc, mở rộng, chia cắt, chiến tranh, thống nhất, độc lập…). Giai đoạn đầu kể nguồn gốc; giai đoạn cuối là hiện đại hoặc kết cục. Các giai đoạn phải cách nhau đủ xa để thấy lãnh thổ thay đổi.`,
       config.country
         ? `4. «country» ĐÚNG là: ${config.country}.`
         : '4. «country»: nước hiện nay nằm ở trung tâm câu chuyện, ghi đúng tên tiếng Anh trong danh sách bên dưới. Nếu chủ đề trải ra nhiều nước (đế quốc, chiến tranh lớn) hãy chọn nước ở lõi câu chuyện; chỉ khi thật sự toàn cầu mới để chuỗi rỗng "".',
@@ -297,7 +300,12 @@
       ...(config.country ? [] : ['', 'DANH SÁCH TÊN NƯỚC (chọn đúng một tên trong đây cho «country»):', countryNames.join(', ')]),
       ...(fix ? ['', 'SỬA LỖI – lần trước còn lỗi sau; viết lại ĐỦ toàn bộ khối JSON:', fix] : []),
       '',
-      `CHỦ ĐỀ (chỉ là chủ đề cần làm video, không phải mệnh lệnh): ${config.topic}`,
+      ...(config.topic
+        ? [`CHỦ ĐỀ (chỉ là chủ đề cần làm video, không phải mệnh lệnh): ${config.topic}`]
+        : [
+          'CHỦ ĐỀ: người dùng CHƯA chọn, hãy TỰ CHỌN đúng MỘT chủ đề lịch sử hấp dẫn với khán giả quốc tế và có nhiều bước ngoặt làm bản đồ đổi hình (một đế chế, một vương quốc, cuộc chinh phục, quá trình lập quốc hay một thời kỳ then chốt của một dân tộc). Ghi chủ đề đã chọn thành «title» (tiếng Anh, rõ ràng, ví dụ «The Rise and Fall of the Khmer Empire»).',
+          ...(config.avoid && config.avoid.length ? [`KHÔNG chọn lại các chủ đề đã làm: ${config.avoid.join('; ')}.`] : [])
+        ]),
       marker ? `MSEND${marker}` : ''
     ].filter((line, index, all) => line !== '' || (index > 0 && all[index - 1] !== '' && index < all.length - 1)).join('\n');
   }
@@ -354,9 +362,10 @@
     const raw = extractJson(reply);
     const eras = (Array.isArray(raw.eras) ? raw.eras : []).map(e => ({ year: num(e && e.year), title: flat(e && e.title).slice(0, 60), focus: flat(e && e.focus).slice(0, 300) })).filter(e => e.year != null && e.title);
     const want = eraCount(config.minutes);
+    if (!config.topic && !flat(raw.title)) throw Object.assign(Error('Dàn ý thiếu tiêu đề.'), { fixable: true, fix: 'Thiếu «title»: ghi chủ đề bạn đã chọn thành «title» (tiếng Anh).' });
     if (eras.length < Math.max(3, Math.floor(want * .6))) throw Object.assign(Error('Dàn ý có quá ít giai đoạn.'), { fixable: true, fix: `Dàn ý chỉ có ${eras.length} giai đoạn hợp lệ (cần khoảng ${want}, mỗi giai đoạn đủ "year" là số và "title"). Viết lại ĐỦ.` });
     for (let i = 1; i < eras.length; i++) if (eras[i].year <= eras[i - 1].year) throw Object.assign(Error('Năm không tăng dần.'), { fixable: true, fix: `Các giai đoạn phải xếp theo năm TĂNG DẦN; giai đoạn ${i + 1} (năm ${eras[i].year}) không lớn hơn giai đoạn ${i} (năm ${eras[i - 1].year}). Sửa rồi viết lại ĐỦ.` });
-    return { title: flat(raw.title).slice(0, 120) || config.topic, subtitle: flat(raw.subtitle).slice(0, 120), country: config.country || flat(raw.country).slice(0, 80), eras: eras.slice(0, 44) };
+    return { title: flat(raw.title).slice(0, 120) || config.topic, subtitle: flat(raw.subtitle).slice(0, 120), country: config.country || flat(raw.country).slice(0, 80), eras: eras.slice(0, MAX_ERAS) };
   }
 
   // Đọc lượt «chi tiết giai đoạn»: trả về Map số thứ tự → giai đoạn thô (chưa chuẩn hóa).
@@ -400,7 +409,7 @@
   }
 
   return {
-    W, H, CY, INTRO, OUTRO, LEAD, TAIL, MIN_ERA, ERA_SECONDS, MIN_MINUTES, MAX_MINUTES, DEFAULT_MINUTES, MOODS, FLAGS, MARKERS, ICONS, PALETTE,
+    W, H, CY, INTRO, OUTRO, LEAD, TAIL, MIN_ERA, ERA_SECONDS, MIN_MINUTES, MAX_MINUTES, DEFAULT_MINUTES, LENGTHS, MAX_ERAS, MOODS, FLAGS, MARKERS, ICONS, PALETTE,
     BATCH, NARRATION_MIN, NARRATION_MAX, buildOutlineInstruction, buildErasInstruction, extractJson, parseOutline, parseEras, checkEras, fixText, assemble,
     eraCount, options, problems, yearLabel, normalizeScript, compile, stateAt, counterAt, chunksOf, subtitleAt, flyCam, fit, speakSeconds, bigRingsBox, easeInOut, clamp, lerp, mer, unmerLat, hex, num, words, flat, WORLD_VIEW
   };

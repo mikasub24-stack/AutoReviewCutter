@@ -78,7 +78,8 @@ function createMapWriter({ plan = defaultPlan, geo, dom, openMuse, getMuse, getS
   }
 
   // resume = { outline, items:{n: eraRaw} } từ bản nháp đã lưu. onDraft({outline, items}) được gọi sau mỗi lượt để lưu nháp.
-  async function write({ options: input = {}, resume = null, onDraft = () => {} }) {
+  // Chủ đề để trống: Muse tự chọn; onOutline(outline) báo ngay khi có dàn ý (có tên video thật).
+  async function write({ options: input = {}, resume = null, onDraft = () => {}, onOutline = () => {} }) {
     if (state.busy) throw Error('Muse đang soạn kịch bản. Chờ xong hoặc bấm Dừng.');
     const config = plan.options(input), bad = plan.problems(config);
     if (bad.length) throw Error(bad[0]);
@@ -99,6 +100,8 @@ function createMapWriter({ plan = defaultPlan, geo, dom, openMuse, getMuse, getS
       const countryNames = getGeo().countryNames;
       let outline = resume && resume.outline && Array.isArray(resume.outline.eras) && resume.outline.eras.length ? resume.outline : null;
       if (!outline) { outline = await writeOutline(muse, config, signal, countryNames); onDraft({ outline, items: {} }); }
+      if (!config.topic) config.topic = outline.title;     // chủ đề do Muse tự chọn: lấy tiêu đề dàn ý làm chủ đề
+      onOutline(outline);
       state.total = outline.eras.length;
       const items = new Map();
       for (const [k, v] of Object.entries((resume && resume.items) || {})) { const n = Number(k); if (v && Number.isInteger(n) && n >= 1 && n <= outline.eras.length) items.set(n, v); }

@@ -55,7 +55,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
           window.calls.push({ name, data: JSON.parse(JSON.stringify(data ?? null)) });
           if (name === 'mapMake') {
             const runId = data.resumeId || 'History-of-Testland';
-            s.maphist.runs[runId] = s.maphist.runs[runId] || { name: data.topic, topic: data.topic, minutes: data.minutes, status: 'writing', createdAt: 1 };
+            s.maphist.runs[runId] = s.maphist.runs[runId] || { name: data.topic || 'Muse tự chọn chủ đề', topic: data.topic, minutes: data.minutes, status: 'writing', createdAt: 1 };
             s.maphist.runs[runId].status = 'writing';
             Object.assign(s.maphist, { busy: true, phase: 'write', runId, progress: 'Muse đang soạn kịch bản…', error: '' });
             s.maphist.write = { busy: true, progress: 'Soạn kịch bản 2/3 (giai đoạn 6–10) · Muse đang viết…', done: 5, total: 12 };
@@ -97,14 +97,18 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     // 2) Gói Năm: mở khóa; giọng chỉ tiếng Anh, mặc định Guy; độ dài; số giai đoạn.
     await page.evaluate(() => { window.s.license = { status: 'active', plan: 'year', longTerm: true, device: 'T', expiresAt: Date.now() + 86400000 * 365, message: 'Đã kích hoạt key (gói Năm).' }; window.push(); });
     await page.waitForSelector('#mapBody', { state: 'visible' });
-    assert.deepEqual(await page.locator('#mapMinutes option').allTextContents(), ['2 phút', '3 phút', '4 phút', '5 phút', '6 phút', '8 phút']);
-    assert.equal(await page.locator('#mapMinutes').inputValue(), '4');
+    assert.deepEqual(await page.locator('#mapMinutes option').allTextContents(), ['6 phút', '8 phút', '15 phút']);
+    assert.equal(await page.locator('#mapMinutes').inputValue(), '8', 'mặc định 8 phút');
+    // Giọng, nhạc, nước làm trung tâm gom vào mục «đã chọn sẵn»: đóng sẵn khi giọng đã cài; mở ra mới chỉnh được.
+    assert.equal(await page.locator('#mapAdvanced').evaluate(el => el.open), false);
+    assert.match(await page.locator('#mapCount').textContent(), /khoảng 30 giai đoạn/);
+    await page.selectOption('#mapMinutes', '15');
+    assert.match(await page.locator('#mapCount').textContent(), /khoảng 56 giai đoạn/);
+    await page.selectOption('#mapMinutes', '6');
+    assert.match(await page.locator('#mapCount').textContent(), /khoảng 23 giai đoạn/);
+    await page.click('#mapAdvanced summary');
     assert.deepEqual(await page.locator('#mapVoice option').allTextContents(), ['Jenny (nữ) · en-US', 'Guy (nam) · en-US', 'Andrew (nam) · đa ngôn ngữ']);
     assert.equal(await page.locator('#mapVoice').inputValue(), 'en-US-GuyNeural');
-    assert.match(await page.locator('#mapCount').textContent(), /khoảng 15 giai đoạn/);
-    await page.selectOption('#mapMinutes', '8');
-    assert.match(await page.locator('#mapCount').textContent(), /khoảng 30 giai đoạn/);
-    await page.selectOption('#mapMinutes', '4');
     await page.click('#mapListen'); await flush();
     const listen = await calls('storyListen');
     assert.equal(listen.length, 1);
@@ -112,20 +116,50 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.match(listen[0].data.text, /thirteen fifty/);
     await page.click('#mapMusic'); await flush();
     assert.match(await page.locator('#mapMusicName').textContent(), /epic\.mp3/);
+    await page.click('#mapAdvanced summary');
 
-    // 3) Chưa gõ chủ đề thì không gửi gì.
+    // 3) Chủ đề: hàng gợi ý bấm chọn; để trống thì Muse tự chọn (một lệnh duy nhất, chủ đề rỗng).
+    const topicCount = await page.locator('#mapTopicList option').count();
+    assert.ok(topicCount >= 24, 'danh sách chủ đề ghi sẵn đủ dài: ' + topicCount);
+    assert.equal(await page.locator('#mapTopics button').count(), topicCount + 1, 'mỗi chủ đề một nút + nút Muse tự chọn');
+    assert.equal(await page.locator('#mapTopic').getAttribute('list'), 'mapTopicList', 'bấm vào ô chủ đề cũng xổ danh sách');
+    assert.match(await page.locator('#mapTopics button').first().textContent(), /Muse tự chọn/);
+    await page.fill('#mapTopic', '');
+    await page.locator('#mapTopic').dispatchEvent('input');
+    assert.equal(await page.locator('#mapTopics button.active').count(), 1);
+    assert.match(await page.locator('#mapTopics button.active').textContent(), /Muse tự chọn/);
+    assert.match(await page.locator('#mapCreate').textContent(), /Muse tự chọn chủ đề và làm video/);
+    await page.click('#mapTopics button:has-text("The Mongol Empire")');
+    assert.equal(await page.locator('#mapTopic').inputValue(), 'The Mongol Empire');
+    assert.match(await page.locator('#mapTopics button.active').textContent(), /Mongol/);
+    assert.equal((await page.locator('#mapCreate').textContent()).trim(), 'Làm video bản đồ');
+    await page.fill('#mapTopic', 'ab');
     await page.click('#mapCreate'); await flush();
-    assert.equal((await calls('mapMake')).length, 0);
-    assert.match(await page.locator('#toast').textContent(), /Nhập chủ đề/);
+    assert.equal((await calls('mapMake')).length, 0, 'chủ đề quá ngắn thì không gửi');
+    assert.match(await page.locator('#toast').textContent(), /quá ngắn/);
+    await page.click('#mapTopics button:has-text("Muse tự chọn")');
+    assert.equal(await page.locator('#mapTopic').inputValue(), '');
+    await page.click('#mapCreate');
+    await page.waitForSelector('#mapRuns .restoreRun');
+    const auto = await calls('mapMake');
+    assert.equal(auto.length, 1);
+    assert.equal(auto[0].data.topic, '', 'chủ đề trống = Muse tự chọn');
+    assert.equal(auto[0].data.minutes, 6);
+    assert.match(await page.locator('#mapRuns .restoreRun').first().textContent(), /Muse tự chọn chủ đề/);
+    await page.evaluate(() => { window.calls.length = 0; window.s.maphist.runs = {}; Object.assign(window.s.maphist, { busy: false, phase: '', runId: '', progress: '', error: '' }); window.s.maphist.write = {}; window.push(); });
+    await page.waitForFunction(() => !document.querySelector('#mapRuns .restoreRun') && !document.querySelector('#mapCreate').disabled);
+    await page.evaluate(() => { document.querySelector('#mapForm').open = true; });
 
     // 4) Gõ chủ đề rồi tạo: một lệnh duy nhất; tiến độ hiện ngay, có nút Dừng soạn.
     await page.fill('#mapTopic', 'History of Testland');
+    await page.evaluate(() => { document.querySelector('#mapAdvanced').open = true; });
     await page.fill('#mapCountry', 'Indonesia');
+    await page.evaluate(() => { document.querySelector('#mapAdvanced').open = false; });
     await page.click('#mapCreate');
     await page.waitForSelector('#mapRuns .restoreRun');
     const made = await calls('mapMake');
     assert.equal(made.length, 1);
-    assert.deepEqual(made[0].data, { topic: 'History of Testland', country: 'Indonesia', minutes: 4, voice: 'en-US-GuyNeural', tempo: 1, music: 'C:\\Music\\epic.mp3', musicVolume: 0.2, auto: true });
+    assert.deepEqual(made[0].data, { topic: 'History of Testland', country: 'Indonesia', minutes: 6, voice: 'en-US-GuyNeural', tempo: 1, music: 'C:\\Music\\epic.mp3', musicVolume: 0.2, auto: true });
     assert.match(await page.locator('#mapRuns .restoreRunText').first().textContent(), /Soạn kịch bản 2\/3/);
     assert.match(await page.locator('#mapRunHint').textContent(), /Đang soạn kịch bản · 5\/12 giai đoạn/);
     assert.equal(await page.locator('#mapCreate').isDisabled(), true);

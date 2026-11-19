@@ -142,6 +142,14 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.13
+
+- **Tab «Bản đồ lịch sử» gọn hơn, gần như tự động:**
+  - **Độ dài chỉ còn 3 mức: 6, 8 hoặc 15 phút** (mặc định 8). Video 15 phút có khoảng 56 giai đoạn; dựng trên máy lâu hơn tương ứng (hộp gợi ý ghi thời gian ước tính).
+  - **Chủ đề chọn sẵn:** danh sách hơn 30 chủ đề ghi sẵn ngay dưới ô chủ đề (bấm là chọn; bấm vào ô cũng xổ danh sách). Muốn gõ tay vẫn được.
+  - **Để trống chủ đề (hoặc bấm «🎲 Muse tự chọn») thì Muse tự chọn một chủ đề hay**, tránh các chủ đề bạn đã làm; tên video lấy từ dàn ý Muse lập.
+  - Giọng đọc, tốc độ, nhạc nền và «nước làm trung tâm» đã chọn sẵn và gom vào mục thu gọn; chỉ tự mở ra khi chưa cài giọng.
+
 ## Update 1.9.12
 
 - **Tab mới «Bản đồ lịch sử» (gói Năm hoặc Vĩnh viễn):** chỉ gõ chủ đề (ví dụ `History of Vietnam`, `The Mongol Empire`), bấm một nút. Muse soạn kịch bản tiếng Anh theo từng giai đoạn (lời đọc, chữ trên thẻ, năm, dân số, thế lực, địa danh), tool vẽ bản đồ động, đọc lời, ghép nhạc và xuất MP4 1920×1080 dài tới khoảng 8 phút. Lời đọc và chữ luôn bằng tiếng Anh (làm cho khán giả nước ngoài).

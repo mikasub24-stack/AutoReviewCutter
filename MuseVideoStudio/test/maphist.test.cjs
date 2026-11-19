@@ -205,6 +205,55 @@ test('thiếu chủ đề / đang bận / không đủ gói thì không hỏi Mu
   release(); await first;
 });
 
+test('độ dài chọn 6 / 8 / 15 phút: số giai đoạn tăng theo, không vượt trần', () => {
+  assert.deepEqual(Plan.LENGTHS, [6, 8, 15]);
+  assert.equal(Plan.DEFAULT_MINUTES, 8);
+  assert.deepEqual(Plan.LENGTHS.map(m => Plan.eraCount(m)), [23, 30, 56]);
+  assert.equal(Plan.options({ minutes: 99 }).minutes, 15, 'không vượt 15 phút');
+  assert.equal(Plan.options({}).minutes, 8, 'mặc định 8 phút');
+  assert.ok(Plan.eraCount(15) <= Plan.MAX_ERAS);
+});
+
+test('chủ đề để trống: được phép; chủ đề quá ngắn thì báo; lời nhắc dàn ý bảo Muse tự chọn và tránh chủ đề đã làm', () => {
+  assert.deepEqual(Plan.problems(Plan.options({ topic: '' })), []);
+  assert.match(Plan.problems(Plan.options({ topic: 'ab' }))[0], /quá ngắn/);
+  const auto = Plan.buildOutlineInstruction(Plan.options({ topic: '', minutes: 8, avoid: ['The Mongol Empire', 'Ancient Egypt'] }), { marker: 'abc', countryNames: ['Indonesia'] });
+  assert.match(auto, /CHƯA chọn/);
+  assert.match(auto, /TỰ CHỌN/);
+  assert.match(auto, /KHÔNG chọn lại[^\n]*The Mongol Empire; Ancient Egypt/);
+  assert.doesNotMatch(auto, /CHỦ ĐỀ \(chỉ là chủ đề/);
+  const given = Plan.buildOutlineInstruction(Plan.options({ topic: 'The Viking Age', minutes: 8 }), { marker: 'abc', countryNames: ['Norway'] });
+  assert.match(given, /CHỦ ĐỀ \(chỉ là chủ đề cần làm video[^\n]*: The Viking Age/);
+  assert.doesNotMatch(given, /CHƯA chọn/);
+  const raw = { country: 'Indonesia', eras: Array.from({ length: 12 }, (_, i) => ({ year: 1000 + i * 50, title: `Age ${i + 1}`, focus: 'x' })) };
+  assert.throws(() => Plan.parseOutline(JSON.stringify(raw), Plan.options({ topic: '', minutes: 3 })), e => e.fixable && /title/.test(e.fix), 'chủ đề tự chọn mà thiếu title thì bắt viết lại');
+});
+
+test('Muse tự chọn chủ đề: lấy title của dàn ý làm tên video và báo ngay khi có dàn ý', async () => {
+  const fake = fakeMapMuse({ eras: 12 }), seen = [];
+  const result = await writer(fake).write({ options: { topic: '', minutes: 3, avoid: ['Ancient Egypt'] }, onOutline: o => seen.push(o.title) });
+  assert.deepEqual(seen, ['History of Testland']);
+  assert.equal(result.config.topic, 'History of Testland');
+  assert.equal(result.script.eras.length, 12);
+  assert.match(fake.log.instructions[0], /CHƯA chọn/);
+  assert.match(fake.log.instructions[0], /Ancient Egypt/);
+  assert.doesNotMatch(fake.log.instructions[1], /CHƯA chọn/, 'các lượt chi tiết dùng dàn ý, không hỏi lại chủ đề');
+});
+
+test('video 15 phút: dàn ý ~56 giai đoạn được nhận đủ, chia lượt ≤5', async () => {
+  const fake = fakeMapMuse({ eras: 56 });
+  const result = await writer(fake).write({ options: { topic: 'History of Testland', minutes: 15 } });
+  assert.equal(result.script.eras.length, 56);
+  assert.equal(fake.log.eras.length, 12);
+  assert.deepEqual(fake.log.eras[11], [56, 56]);
+  assert.deepEqual(Plan.normalizeScript(result.script, geo).issues, []);
+  // Lệnh FFmpeg ghép âm thanh của 56 giai đoạn phải nằm dưới giới hạn dòng lệnh của Windows (32767 ký tự), kể cả đường dẫn dài.
+  const long = 'C:\\Users\\Nguoi Dung Ten Rat Dai\\AppData\\Local\\Temp\\muse-map-abc123def\\';
+  const voices = Array.from({ length: 56 }, (_, i) => ({ file: `${long}voice-${String(i).padStart(3, '0')}.mp3`, lead: .7, dur: 15.3 }));
+  const plan = audioPlan({ voices, music: long + 'nhac-nen.mp3', total: 900, introEnd: 3.2, outroSeconds: 4.2, firstInput: 1 });
+  assert.ok(plan.filters.join(';').length + plan.inputs.flat().join(' ').length < 22000, 'dòng lệnh âm thanh đủ ngắn');
+});
+
 // ---------- dựng video ----------
 const ffmpegOk = spawnSync('ffmpeg', ['-version']).status === 0 && spawnSync('ffprobe', ['-version']).status === 0;
 const jpeg = () => spawnSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=0x335577:s=320x180', '-frames:v', '1', '-f', 'image2', '-c:v', 'mjpeg', 'pipe:1'], { maxBuffer: 1e7 }).stdout;
