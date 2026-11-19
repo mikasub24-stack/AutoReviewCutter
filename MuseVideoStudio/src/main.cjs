@@ -996,7 +996,7 @@ app.whenReady().then(async () => {
   storyAnalyzer=createStoryAnalyzer({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.ensureAllowed()});
   wildBuilder=createStoryService({getSettings:()=>settings,getJobs:()=>queue.jobs,voice:voiceService,ensureAllowed:()=>licenseManager.requireLongTerm(),notify,userDataDir:app.getPath('userData'),kind:'wild',folderOf:wildFolder,runName:'wild-run'});
   wildWriter=createWildWriter({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.requireLongTerm()});
-  mapService=createMapService({getSettings:()=>settings,voice:voiceService,ensureAllowed:()=>licenseManager.requireLongTerm(),notify,renderFrames:createWindowFrames({BrowserWindow,ipcMain}).renderFrames,userDataDir:app.getPath('userData')});
+  mapService=createMapService({getSettings:()=>settings,voice:voiceService,ensureAllowed:()=>licenseManager.requireLongTerm(),notify,...(()=>{const f=createWindowFrames({BrowserWindow,ipcMain});return{renderFrames:f.renderFrames,renderStill:f.renderStill};})(),userDataDir:app.getPath('userData')});
   mapWriter=createMapWriter({geo:()=>mapGeoObject,dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.requireLongTerm()});
   for(const run of Object.values(settings.mapRuns||{}))if(run.status==='writing'||run.status==='building')run.status=run.status==='writing'?'draft':'script';   // app tắt giữa chừng: cho làm tiếp
   await save();
@@ -1515,9 +1515,24 @@ app.whenReady().then(async () => {
     },
     mapReveal: async data => {
       const id=String(data?.runId||''),meta=mapRuns()[id];
+      if(data?.thumb&&meta?.thumb&&await fs.stat(meta.thumb).then(x=>x.isFile(),()=>false)){shell.showItemInFolder(meta.thumb);return true;}
       if(meta?.output&&await fs.stat(meta.output).then(x=>x.isFile(),()=>false))shell.showItemInFolder(meta.output);
       else if(settings.output&&meta){await fs.mkdir(mapFolder(settings.output,id),{recursive:true});await shell.openPath(mapFolder(settings.output,id));}
       return true;
+    },
+    // Ảnh bìa (thumbnail) 16:9 của video đã dựng xong; mỗi lần bấm đổi sang một giai đoạn đẹp khác (tối đa 3 ảnh).
+    mapThumb: async data => {
+      const id=String(data?.runId||''),meta=mapRuns()[id];
+      if(!meta)throw Error('Không thấy video này.');
+      if(meta.status!=='done')throw Error('Dựng xong video rồi mới tạo thumbnail.');
+      if(mapState.busy||mapService?.busy)throw Error('Đang làm video bản đồ, chờ xong hoặc bấm Dừng.');
+      await licenseManager.requireLongTerm();
+      const raw=await readJsonFile(mapScriptFile(id));
+      if(!raw)throw Error('Không tìm thấy kịch bản của video này.');
+      const r=await mapService.thumbnail({dir:mapFolder(settings.output,id),name:meta.name,script:raw,variant:Number(meta.thumbVariant)||0});
+      meta.thumb=r.file;meta.thumbAt=Date.now();meta.thumbVariant=(r.variant+1)%r.count;
+      await save();notify();
+      return {file:r.file,variant:r.variant+1,count:r.count};
     },
     mapSave: async data => {
       const out=mapRuns()[String(data?.runId||'')]?.output;

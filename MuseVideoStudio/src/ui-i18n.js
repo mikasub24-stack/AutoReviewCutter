@@ -2,6 +2,11 @@
 (()=>{
   const dictionary=Object.fromEntries(`
 Kể chuyện|Story
+Tạo thumbnail 16:9|Create 16:9 thumbnail
+Tạo thumbnail khác|Create another thumbnail
+Đang tạo thumbnail…|Creating thumbnail…
+Mở thumbnail|Open thumbnail
+Muse tự chọn|Let Muse choose
 Muse tự chọn chủ đề và làm video|Let Muse choose the topic and make the video
 Muse tự chọn chủ đề|Muse chooses the topic
 🎲 Muse tự chọn|🎲 Let Muse choose

@@ -17,6 +17,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
   const server = http.createServer(async (req, res) => {
     if (req.url === '/world.json') { res.setHeader('Content-Type', 'application/json'); return res.end(world); }
     if (req.url === '/sample.json') { res.setHeader('Content-Type', 'application/json'); return res.end(sample); }
+    if (/^\/assets\/maphist\/topics\/[\w.-]+\.jpg$/.test(req.url)) { res.setHeader('Content-Type', 'image/jpeg'); return res.end(await fs.readFile(path.join(src, req.url.slice(1)))); }
     const name = files[req.url];
     if (!name) { res.writeHead(404); return res.end(); }
     res.setHeader('Content-Type', type(name));
@@ -74,6 +75,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
           }
           if (name === 'mapSaveScript') return { issues: [] };
           if (name === 'mapRender') { s.maphist.runs[data.runId].status = 'building'; Object.assign(s.maphist, { busy: true, phase: 'build', runId: data.runId }); s.maphist.build = { busy: true, progress: 'Đang vẽ khung hình 300/900 · còn khoảng 2 phút', done: 300, total: 900 }; setTimeout(window.push, 0); return { runId: data.runId }; }
+          if (name === 'mapThumb') { Object.assign(s.maphist.runs[data.runId], { thumb: 'C:\\Videos\\BanDo\\History-of-Testland\\thumbnail-1.jpg', thumbAt: 5 }); setTimeout(window.push, 0); return { file: 'C:\\Videos\\BanDo\\History-of-Testland\\thumbnail-1.jpg', variant: 1, count: 3 }; }
           if (name === 'mapRemove') { delete s.maphist.runs[data.runId]; return structuredClone(s); }
           return structuredClone(s);
         }
@@ -122,6 +124,8 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     const topicCount = await page.locator('#mapTopicList option').count();
     assert.ok(topicCount >= 24, 'danh sách chủ đề ghi sẵn đủ dài: ' + topicCount);
     assert.equal(await page.locator('#mapTopics button').count(), topicCount + 1, 'mỗi chủ đề một nút + nút Muse tự chọn');
+    assert.equal(await page.locator('#mapTopics button.topicCard img').count(), topicCount, 'mỗi chủ đề có hình mẫu cạnh bên');
+    assert.equal(await page.locator('#mapTopics button', { hasText: 'The Mongol Empire' }).locator('img').getAttribute('src'), 'assets/maphist/topics/the-mongol-empire.jpg');
     assert.equal(await page.locator('#mapTopic').getAttribute('list'), 'mapTopicList', 'bấm vào ô chủ đề cũng xổ danh sách');
     assert.match(await page.locator('#mapTopics button').first().textContent(), /Muse tự chọn/);
     await page.fill('#mapTopic', '');
@@ -220,6 +224,15 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.deepEqual((await calls('mapSave'))[0].data, { runId: 'History-of-Testland' });
     await page.click('#mapRuns button:has-text("Mở video")'); await flush();
     assert.deepEqual((await calls('mapReveal'))[0].data, { runId: 'History-of-Testland' });
+    // Ảnh bìa 16:9 chỉ có khi video đã xong: tạo, xem trước, đổi sang ảnh khác, mở thư mục.
+    assert.equal(await page.locator('#mapRuns img.restoreThumb').count(), 0);
+    await page.click('#mapRuns button:has-text("Tạo thumbnail 16:9")');
+    await page.waitForSelector('#mapRuns img.restoreThumb');
+    assert.deepEqual((await calls('mapThumb'))[0].data, { runId: 'History-of-Testland' });
+    assert.match(await page.locator('#toast').textContent(), /thumbnail 1920×1080/);
+    assert.equal(await page.locator('#mapRuns button', { hasText: 'Tạo thumbnail khác' }).count(), 1);
+    await page.click('#mapRuns button:has-text("Mở thumbnail")'); await flush();
+    assert.deepEqual((await calls('mapReveal')).at(-1).data, { runId: 'History-of-Testland', thumb: true });
     await page.click('#mapRuns button:has-text("Xóa")');
     await page.waitForSelector('#deleteFiles');
     await page.check('#deleteFiles'); await page.click('#deleteOk'); await flush();

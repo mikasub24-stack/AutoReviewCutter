@@ -378,6 +378,55 @@ test('nguồn khung hình trả thiếu khung: báo lỗi chứ không xuất vi
 });
 
 // ---------- nối vào app ----------
+test('ảnh bìa 16:9: chọn giai đoạn nhiều lãnh thổ nhất, đổi ảnh theo variant, nén xuống ≤ 2 MB, ghi tệp riêng từng ảnh', { skip: !ffmpegOk && 'cần ffmpeg để tạo JPEG mẫu' }, async () => {
+  const dir = tmp(), asked = [], small = jpeg();
+  const service = createMapService({ getSettings: () => ({}), renderFrames: fakeFrames(), renderStill: async a => { asked.push(a); return a.quality > .8 ? Buffer.alloc(2_100_000, 1) : small; } });
+  const a = await service.thumbnail({ dir, name: 'Thử', script: copy(sample), variant: 0 });
+  assert.equal(path.basename(a.file), 'thumbnail-1.jpg');
+  assert.ok(fs.existsSync(a.file) && fs.statSync(a.file).size <= 1.9e6, 'JPEG nhỏ hơn 2 MB (YouTube)');
+  assert.ok(asked.length >= 2 && asked[0].quality > asked.at(-1).quality, 'quá nặng thì nén thêm');
+  assert.equal(asked[0].title, sample.title);
+  assert.match(asked[0].years, /–/, 'khoảng năm đầu – cuối');
+  assert.equal(asked[0].timeline.W, 1920);
+  assert.equal(asked[0].timeline.H, 1080);
+  assert.ok(a.count >= 1 && a.count <= 3);
+  const b = await service.thumbnail({ dir, name: 'Thử', script: copy(sample), variant: 1 });
+  assert.equal(path.basename(b.file), 'thumbnail-2.jpg');
+  assert.notEqual(b.era, a.era, 'bấm lại ra giai đoạn khác');
+  const wrapped = await service.thumbnail({ dir, name: 'Thử', script: copy(sample), variant: a.count });
+  assert.equal(wrapped.variant, 0, 'hết vòng thì quay lại ảnh đầu');
+  assert.equal(fs.readdirSync(dir).filter(f => f.endsWith('.tmp')).length, 0);
+});
+
+test('ảnh bìa: đòi đúng gói, không chạy khi đang dựng, báo khi thiếu bộ vẽ hoặc kịch bản rỗng', async () => {
+  const dir = tmp();
+  const denied = createMapService({ getSettings: () => ({}), renderFrames: fakeFrames(), renderStill: async () => Buffer.from('x'), ensureAllowed: async () => { throw Error('Cần gói Năm'); } });
+  await assert.rejects(denied.thumbnail({ dir, script: copy(sample) }), /gói Năm/);
+  const none = createMapService({ getSettings: () => ({}), renderFrames: fakeFrames() });
+  await assert.rejects(none.thumbnail({ dir, script: copy(sample) }), /bộ vẽ ảnh bìa/);
+  const ok = createMapService({ getSettings: () => ({}), renderFrames: fakeFrames(), renderStill: async () => Buffer.from('x') });
+  await assert.rejects(ok.thumbnail({ dir, script: { title: 'x', eras: [] } }), /chưa có giai đoạn/i);
+});
+
+test('hình mẫu chủ đề: mỗi chủ đề trong giao diện có đúng một hình riêng, khác nhau, nhẹ, và có khai báo vùng/địa danh', () => {
+  const ui = fs.readFileSync(path.join(__dirname, '../src/maphist-ui.js'), 'utf8');
+  const listed = [...(/const TOPICS = \[([^\]]+)\];/.exec(ui)[1]).matchAll(/'((?:[^'\\]|\\.)*)'/g)].map(m => m[1].replace(/\\'/g, "'"));
+  const spec = JSON.parse(fs.readFileSync(path.join(__dirname, '../tools/maphist-topics.json'), 'utf8'));
+  assert.deepEqual([...listed].sort(), spec.map(t => t.topic).sort(), 'danh sách trong giao diện = danh sách vẽ hình mẫu');
+  const slug = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const hashes = new Set();
+  for (const topic of listed) {
+    const file = path.join(__dirname, '../src/assets/maphist/topics', slug(topic) + '.jpg'), buf = fs.readFileSync(file);
+    assert.ok(buf.length > 8000 && buf.length < 80000, `${topic}: cỡ hình ${buf.length}`);
+    assert.equal(buf[0], 0xff); assert.equal(buf[1], 0xd8);
+    hashes.add(require('node:crypto').createHash('sha1').update(buf).digest('hex'));
+  }
+  assert.equal(hashes.size, listed.length, 'không có hai chủ đề dùng hình giống hệt nhau');
+  const views = new Set(spec.map(t => JSON.stringify([t.view || null, t.regions.slice().sort()])));
+  assert.equal(views.size, spec.length, 'mỗi chủ đề có vùng nhìn/vùng tô khác nhau');
+  for (const t of spec) assert.ok((t.markers || []).length || (t.routes || []).length, `${t.topic} cần ít nhất một địa danh hoặc đường đi để hình mẫu khác biệt`);
+});
+
 test('nối app: mọi lệnh giao diện gọi đều có trong main.cjs và danh sách cho phép của preload; mọi id đều có trong index.html', () => {
   const read = f => fs.readFileSync(path.join(__dirname, '../src', f), 'utf8');
   const main = read('main.cjs'), preload = read('preload.cjs'), ui = read('maphist-ui.js'), html = read('index.html');

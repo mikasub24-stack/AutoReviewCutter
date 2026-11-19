@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.14
+
+- **Nút «Tạo thumbnail 16:9» khi video bản đồ đã dựng xong:** tạo ảnh bìa YouTube 1920×1080 (JPEG dưới 2 MB) từ đúng bản đồ của video: giai đoạn nhiều lãnh thổ nhất, tiêu đề lớn bên trái, khoảng năm, phụ đề vàng. Bấm lại để đổi sang ảnh khác (tối đa 3 ảnh, lưu `thumbnail-1.jpg`…`thumbnail-3.jpg` trong thư mục `BanDo/<tên>`). Có hình xem trước ngay trong thẻ video và nút «Mở thumbnail».
+- **Danh sách chủ đề có hình mẫu cạnh bên:** 32 chủ đề, mỗi chủ đề một hình bản đồ riêng (vùng nhìn, địa danh và đường đi khác nhau), vẽ sẵn bằng chính bộ vẽ của video. Bấm thẻ để chọn; thẻ «🎲 Muse tự chọn» (hoặc để trống) cho Muse tự chọn chủ đề.
+- Tạo lại hình mẫu: `node tools/make-topic-thumbs.cjs` (đọc `tools/maphist-topics.json`).
+
 ## Update 1.9.13
 
 - **Tab «Bản đồ lịch sử» gọn hơn, gần như tự động:**

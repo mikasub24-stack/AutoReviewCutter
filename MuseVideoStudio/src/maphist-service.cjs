@@ -89,7 +89,7 @@ function audioPlan({ voices, music, musicVolume = .2, total, introEnd, outroSeco
   return { inputs, filters, hasAudio: filters.length > 0 };
 }
 
-function createMapService({ getSettings = () => ({}), voice = null, ensureAllowed = async () => {}, notify = () => {}, renderFrames, loadRaw = null, userDataDir = '' } = {}) {
+function createMapService({ getSettings = () => ({}), voice = null, ensureAllowed = async () => {}, notify = () => {}, renderFrames, renderStill = null, loadRaw = null, userDataDir = '' } = {}) {
   const state = { busy: false, phase: '', progress: '', done: 0, total: 0, error: '', runId: '' };
   let controller = null, geoCache = null, rawCache = null;
   const say = (progress, extra = {}) => { Object.assign(state, { progress }, extra); notify(); };
@@ -194,8 +194,37 @@ function createMapService({ getSettings = () => ({}), voice = null, ensureAllowe
     }
   }
 
+  // Giai đoạn đáng làm ảnh bìa nhất: nhiều lãnh thổ + địa danh nhất (tối đa 3 lựa chọn, tốt nhất trước).
+  function pickEras(timeline) {
+    const scored = timeline.eras.map((e, i) => ({ i, score: (e.realms || []).reduce((n, r) => n + ((r.units || []).length), 0) * 10 + (e.markers || []).length * 3 + (e.routes || []).length * 2 + i * .01 }));
+    return scored.sort((a, b) => b.score - a.score).slice(0, 3).map(x => x.i);
+  }
+  // Ảnh bìa 16:9 (1920×1080 JPEG ≤ 2 MB, đúng giới hạn YouTube) của video đã có kịch bản. variant chọn trong tối đa 3 giai đoạn đẹp nhất.
+  async function thumbnail({ dir, name, script: rawScript, variant = 0 }) {
+    if (state.busy) throw Error('Đang dựng một video bản đồ. Chờ dựng xong rồi tạo thumbnail.');
+    await ensureAllowed();
+    if (!renderStill) throw Error('Chưa có bộ vẽ ảnh bìa.');
+    const g = await geo();
+    const { script } = Plan.normalizeScript(rawScript, g);
+    if (!script.eras.length) throw Error('Kịch bản chưa có giai đoạn nào.');
+    const timeline = Plan.compile(script, g, { durations: [], fps: FPS });
+    const picks = pickEras(timeline), k = ((Math.round(Number(variant)) || 0) % picks.length + picks.length) % picks.length;
+    const first = script.eras[0].year, last = script.eras[script.eras.length - 1].year;
+    const years = script.eras.length > 1 && first !== last ? `${Plan.yearLabel(first)} – ${Plan.yearLabel(last)}` : Plan.yearLabel(first);
+    let buffer = null;
+    for (const quality of [.92, .86, .8, .72, .64]) {
+      buffer = Buffer.from(await renderStill({ timeline, raw: await raw(), index: picks[k], title: script.title || name || '', subtitle: script.subtitle || '', years, quality }));
+      if (buffer.length <= 1.9e6) break;
+    }
+    await fs.mkdir(dir, { recursive: true });
+    const file = path.join(dir, `thumbnail-${k + 1}.jpg`), part = file + '.tmp';
+    await fs.writeFile(part, buffer);
+    await fs.rename(part, file);
+    return { file, era: picks[k], variant: k, count: picks.length, bytes: buffer.length };
+  }
+
   const cancel = () => controller?.abort();
-  return { make, cancel, status, geo, raw, speak, get busy() { return state.busy; } };
+  return { make, thumbnail, cancel, status, geo, raw, speak, get busy() { return state.busy; } };
 }
 
 module.exports = { createMapService, audioPlan, videoArgs, writeChunk, cleanName, FPS, MUSIC_EXT, WORLD_FILE };

@@ -13,7 +13,7 @@
   // Chủ đề gợi ý (tiếng Anh, nhiều bước ngoặt làm bản đồ đổi hình). «Muse tự chọn» = để trống chủ đề.
   const TOPICS = ['The Mongol Empire', 'Rise and Fall of Rome', 'History of Vietnam', 'The Ottoman Empire', 'Ancient Egypt', 'The British Empire', 'The Viking Age', 'History of China', 'The Persian Empire', 'Alexander the Great\'s Empire', 'The Spanish Empire', 'History of Japan', 'The Byzantine Empire', 'The Aztec Empire', 'The Inca Empire', 'The Khmer Empire', 'History of Korea', 'History of India', 'The Mughal Empire', 'The Russian Empire', 'Napoleon\'s French Empire', 'The Holy Roman Empire', 'Carthage and the Punic Wars', 'The Crusades', 'The Han Dynasty', 'The Qing Dynasty', 'History of Thailand', 'History of Indonesia', 'The Age of Exploration', 'World War I', 'World War II', 'The Cold War'];
   const SAMPLE = 'In the year thirteen fifty, a great kingdom rose from the sea and ruled the islands for generations.';
-  let advancedShown = false, shownVoiceKey = '', runsKey = '', listening = false, audio = null, lastState = null, music = saved.music || '';
+  let thumbBusy = '', advancedShown = false, shownVoiceKey = '', runsKey = '', listening = false, audio = null, lastState = null, music = saved.music || '';
   const node = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
   const button = (text, cls, onclick, disabled) => { const b = node('button', cls, text); b.type = 'button'; b.disabled = Boolean(disabled); b.onclick = onclick; return b; };
   const refresh = async () => { runsKey = ''; const st = await call('state'); if (st) render(st); };
@@ -33,15 +33,23 @@
   function renderTopics() {
     const box = $('mapTopics'), cur = $('mapTopic').value.trim();
     if (!box.childElementCount) {
-      const auto = button('🎲 Muse tự chọn', 'secondary', () => pickTopic(''));
+      const auto = button('', 'topicCard autoCard', () => pickTopic(''));
       auto.dataset.topic = '';
-      box.append(auto, ...TOPICS.map(t => { const b = button(t, 'secondary', () => pickTopic(t)); b.dataset.topic = t; return b; }));
+      auto.append(node('span', 'topicDice', '🎲'), node('span', 'topicName', 'Muse tự chọn'));
+      // Mỗi chủ đề một thẻ: hình bản đồ mẫu (vẽ sẵn bằng chính bộ vẽ của video) + tên.
+      box.append(auto, ...TOPICS.map(t => {
+        const b = button('', 'topicCard', () => pickTopic(t)), img = document.createElement('img');
+        b.dataset.topic = t; img.src = 'assets/maphist/topics/' + topicSlug(t) + '.jpg'; img.alt = ''; img.width = 160; img.height = 90; img.loading = 'lazy';
+        b.append(img, node('span', 'topicName', t)); b.title = t;
+        return b;
+      }));
     }
     const list = $('mapTopicList');
     if (!list.childElementCount) list.replaceChildren(...TOPICS.map(t => { const o = document.createElement('option'); o.value = t; return o; }));
     for (const b of box.children) b.classList.toggle('active', b.dataset.topic === cur);
     $('mapCreate').textContent = cur ? 'Làm video bản đồ' : 'Muse tự chọn chủ đề và làm video';
   }
+  const topicSlug = name => String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   function pickTopic(t) { $('mapTopic').value = t; remember(); renderCount(); renderTopics(); }
   function renderMusic() {
     $('mapMusicName').textContent = music ? 'Nhạc nền: ' + base(music) : 'Không nhạc nền (chỉ có giọng đọc).';
@@ -94,7 +102,7 @@
   function renderRuns(s) {
     const info = s.maphist || {}, runs = runsOf(s), write = info.write || {}, build = info.build || {};
     const key = JSON.stringify([Boolean(s.active), Boolean(s.starting), Boolean(s.merging), info.busy, info.phase, info.progress, info.error, info.runId, write.progress, write.done, write.total, build.progress, build.done, build.total,
-      runs.map(r => [r.id, r.meta.status || '', r.meta.output || '', r.meta.builtAt || 0, r.meta.error || '', r.meta.name || ''])]);
+      thumbBusy, runs.map(r => [r.id, r.meta.status || '', r.meta.output || '', r.meta.builtAt || 0, r.meta.error || '', r.meta.name || '', r.meta.thumb || '', r.meta.thumbAt || 0])]);
     if (key === runsKey) return;
     runsKey = key;
     const hint = $('mapRunHint');
@@ -120,6 +128,7 @@
       else if (meta.status === 'script') text.textContent = 'Kịch bản đã sẵn sàng. Bấm «Xem và sửa kịch bản» để kiểm tra, hoặc «Dựng video» để làm luôn.';
       const extra = [];
       if (meta.output && meta.status === 'done' && !building) { const video = node('video', 'restoreVideo'); video.controls = true; video.preload = 'metadata'; video.src = localFileUrl(meta.output); extra.push(video); }
+      if (meta.thumb && meta.status === 'done' && !building) { const img = node('img', 'restoreThumb'); img.alt = 'Thumbnail 16:9'; img.src = localFileUrl(meta.thumb) + '?v=' + (meta.thumbAt || 0); extra.push(img); }
       const actions = node('div', 'restoreRunActions');
       const busy = Boolean(info.busy || s.active || s.starting || s.merging || s.packaging);
       if (writing || building) actions.append(button(writing ? 'Dừng soạn' : 'Dừng dựng', 'secondary', async () => { const r = await call('mapCancel'); if (r) { runsKey = ''; render(r); } }));
@@ -135,6 +144,12 @@
         if (meta.status === 'done') {
           actions.append(button('Lưu video…', 'primary', async () => { const r = await call('mapSave', { runId: id }); if (r && r.file) toast('Đã lưu video: ' + r.file); }));
           actions.append(button('Mở video', 'secondary', () => call('mapReveal', { runId: id })));
+          actions.append(button(thumbBusy === id ? 'Đang tạo thumbnail…' : meta.thumb ? 'Tạo thumbnail khác' : 'Tạo thumbnail 16:9', 'secondary', async () => {
+            thumbBusy = id; runsKey = ''; render(lastState);
+            try { const r = await call('mapThumb', { runId: id }); if (r) toast(`Đã tạo thumbnail 1920×1080 (ảnh ${r.variant}/${r.count}). Bấm lại để đổi sang ảnh khác.`); }
+            finally { thumbBusy = ''; await refresh(); }
+          }, busy || Boolean(thumbBusy)));
+          if (meta.thumb) actions.append(button('Mở thumbnail', 'secondary', () => call('mapReveal', { runId: id, thumb: true })));
         } else actions.append(button('Mở thư mục', 'secondary', () => call('mapReveal', { runId: id })));
         const del = button('Xóa', 'secondary', async () => {
           const pick = await askDelete({

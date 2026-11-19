@@ -685,10 +685,13 @@
 
     // ---------- Một khung hình ----------
     function setTimeline(next) { tl = next; cache.key = ''; cache.paths.clear(); cache.landKey = ''; }
-    function drawFrame(t) {
+    // opts.bare: chỉ vẽ bản đồ (không đồng hồ năm, thẻ lời đọc, địa cầu) để làm hình mẫu chủ đề và ảnh bìa. opts.shift: dời bản đồ sang phải (tỉ lệ bề rộng); opts.spanMul: thu nhỏ bản đồ (>1).
+    function drawFrame(t, opts = {}) {
       const started = typeof performance !== 'undefined' ? performance.now() : Date.now();
       if (profile) lapAt = performance.now();
-      const st = Plan.stateAt(tl, t), cam = st.cam, pr = projector(cam);
+      const st = Plan.stateAt(tl, t);
+      if (opts.shift || opts.spanMul) { const span = st.cam.span * (opts.spanMul || 1); st.cam = { ...st.cam, span, lon: st.cam.lon - span * (opts.shift || 0) }; }
+      const cam = st.cam, pr = projector(cam);
       const key = [cam.lon, cam.lat, cam.span].map(v => v.toFixed(3)).join(',');
       if (cache.key !== key) { cache.key = key; cache.paths.clear(); cache.landKey = ''; }
       const wasMoving = cache.moving; cache.moving = st.moving;
@@ -728,13 +731,14 @@
       lap('realms+markers', sc);
       // ghép lên khung ra: thu phóng nhẹ (Ken Burns) rồi vẽ giao diện
       ctx.save();
-      const zoom = st.phase === 'era' ? 1 + .035 * easeInOut(st.p) : st.phase === 'outro' ? 1.035 : 1;
+      const zoom = opts.bare ? 1 : st.phase === 'era' ? 1 + .035 * easeInOut(st.p) : st.phase === 'outro' ? 1.035 : 1;
       ctx.fillStyle = '#000'; ctx.fillRect(0, 0, width, height);
       ctx.translate(width / 2, CY); ctx.scale(zoom, zoom); ctx.translate(-width / 2, -CY);
       ctx.drawImage(sceneCv, 0, 0);
       ctx.restore();
       lap('compose', ctx);
       finish(ctx);
+      if (opts.bare) { stats.frames++; stats.ms += (typeof performance !== 'undefined' ? performance.now() : Date.now()) - started; return st; }
       if (st.phase === 'intro') drawIntro(ctx, st, t);
       else if (st.era) {
         const local = st.local, out = st.phase === 'outro' ? 1 - easeOut(st.p / .4) : 1;
@@ -779,7 +783,51 @@
       if (tl.outro) text(c, tl.outro, width / 2, height * .55 + 100, { size: 44, weight: 600, style: 'italic', fill: GOLD, halo: 'rgba(8,18,30,.9)', haloW: 9 });
       c.restore();
     }
-    return { setTimeline, drawFrame, stats, projector, profile: p => { profile = p; }, get timeline() { return tl; } };
+    // Thời điểm trong giai đoạn i khi lãnh thổ đã mọc đủ và máy quay đã dừng.
+    function stillTime(i) {
+      const e = tl.eras[Math.max(0, Math.min(tl.eras.length - 1, i))];
+      return e.start + Math.min(Math.max(.5, e.dur - .8), 6.2);   // máy quay đã bay xong, lãnh thổ đã mọc đủ
+    }
+    // Hình mẫu chủ đề: chỉ bản đồ của giai đoạn i.
+    function drawStill(i, opts = {}) { return drawFrame(stillTime(i), { bare: true, shift: opts.shift || 0, spanMul: opts.spanMul || 1 }); }
+    // Ảnh bìa 16:9: bản đồ dời sang phải, tiêu đề lớn bên trái (chữ trắng viền xanh đậm), phụ đề vàng, khoảng năm.
+    function drawThumbnail(i, { title = '', subtitle = '', years = '' } = {}) {
+      drawStill(i, { shift: .2, spanMul: 1.28 });
+      const c = ctx;
+      c.save();
+      const g = c.createLinearGradient(0, 0, width * .66, 0); g.addColorStop(0, 'rgba(5,14,26,.9)'); g.addColorStop(.62, 'rgba(5,14,26,.55)'); g.addColorStop(1, 'rgba(5,14,26,0)');
+      c.fillStyle = g; c.fillRect(0, 0, width, height);
+      const b = c.createLinearGradient(0, height * .62, 0, height); b.addColorStop(0, 'rgba(5,14,26,0)'); b.addColorStop(1, 'rgba(5,14,26,.62)');
+      c.fillStyle = b; c.fillRect(0, height * .62, width, height * .38);
+      c.restore();
+      const words = String(title || '').trim().split(/\s+/).filter(Boolean), maxW = width * .5, left = 76;
+      let size = 168, lines = [];
+      for (; size >= 72; size -= 6) {
+        c.save(); c.font = `700 ${size}px ${SERIF}`;
+        lines = []; let cur = '';
+        for (const w of words) { const next = cur ? cur + ' ' + w : w; if (cur && c.measureText(next.toUpperCase()).width > maxW) { lines.push(cur); cur = w; } else cur = next; }
+        if (cur) lines.push(cur);
+        const widest = Math.max(0, ...lines.map(l => c.measureText(l.toUpperCase()).width));
+        c.restore();
+        if (lines.length <= 4 && widest <= maxW && lines.length * size * 1.04 <= height * .56) break;
+      }
+      const lineH = size * 1.04, blockH = lines.length * lineH, subSize = Math.round(Math.max(38, size * .3));
+      const top = Math.max(150, (height - blockH - (subtitle ? subSize * 1.9 : 0)) / 2 + 30);
+      if (years) {
+        c.save(); c.font = `700 40px ${SERIF}`; const w = c.measureText(years).width + 56;
+        c.shadowColor = 'rgba(0,0,0,.45)'; c.shadowBlur = 12; c.shadowOffsetY = 4;
+        const gold = c.createLinearGradient(0, top - 118, 0, top - 52); gold.addColorStop(0, '#f2d58a'); gold.addColorStop(1, '#b98a2c');
+        c.fillStyle = gold; c.beginPath(); c.roundRect(left, top - 118, w, 66, 14); c.fill(); c.shadowColor = 'transparent';
+        c.fillStyle = '#2a1c10'; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText(years, left + 28, top - 84); c.restore();
+      }
+      lines.forEach((l, k) => text(c, l.toUpperCase(), left, top + size * .86 + k * lineH, { size, weight: 700, fill: '#fffaf0', align: 'left', halo: 'rgba(8,20,36,.95)', haloW: Math.max(14, size / 7), spacing: 1 }));
+      if (subtitle) {
+        const y = top + blockH + subSize * .9;
+        c.save(); c.strokeStyle = GOLD; c.lineWidth = 5; c.beginPath(); c.moveTo(left, y - subSize * 1.05); c.lineTo(left + Math.min(maxW, 360), y - subSize * 1.05); c.stroke(); c.restore();
+        text(c, subtitle, left, y + subSize * .35, { size: subSize, weight: 600, style: 'italic', fill: GOLD, align: 'left', halo: 'rgba(8,20,36,.95)', haloW: 10 });
+      }
+    }
+    return { setTimeline, drawFrame, drawStill, drawThumbnail, stillTime, stats, projector, profile: p => { profile = p; }, get timeline() { return tl; } };
   }
   return { create, FONT: SERIF, GROW, FINE_SPAN, pigment };
 });
