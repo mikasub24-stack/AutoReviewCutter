@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.17
+
+- **Sửa chữ tràn khung hình trong video:** tiêu đề ở phần mở đầu quá dài (ví dụ «The Aztec Empire: From a Lake Island to the Fall of Tenochtitlan — and the Mexico It Became») từng bị cắt ở hai mép màn hình. Giờ tiêu đề tự xuống dòng (tối đa 3 dòng, ưu tiên ngắt sau dấu hai chấm hoặc gạch ngang) và chọn cỡ chữ lớn nhất còn vừa khung; phụ đề thu nhỏ khi quá dài; la bàn nhích lên khi tiêu đề có 3 dòng.
+- **Dải tên giai đoạn (góc trên bên trái)** không còn bị cắt đầu: tên dài thì dải dài ra (tối đa 860 px) rồi thu nhỏ chữ cho vừa.
+- Video đã dựng bằng bản cũ: mở lại và bấm «Dựng lại» để có chữ không bị cắt (kịch bản được giữ nguyên). Muốn tiêu đề trên video khớp tiêu đề YouTube, bấm «Xem và sửa kịch bản» và sửa tiêu đề trước khi dựng lại.
+
 ## Update 1.9.16
 
 - **Tiêu đề đăng YouTube ngay dưới video đã dựng xong:** hộp «Tiêu đề đăng YouTube (đúng như trên video)» có nút «Sao chép tiêu đề». Mục «Mô tả (có chương) và thẻ» có sẵn mô tả tiếng Anh với CHƯƠNG theo mốc giờ thật của từng giai đoạn (bắt đầu 0:00, mỗi chương từ 10 giây, đúng chuẩn YouTube), dòng nhắc bản đồ chỉ xấp xỉ, hashtag, và thẻ; mỗi phần có nút sao chép riêng.

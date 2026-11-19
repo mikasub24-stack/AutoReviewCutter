@@ -466,6 +466,25 @@ test('thông tin đăng YouTube: tiêu đề đúng như trên video, chương c
   assert.equal(Plan.publishPack({ title: '', eras: [] }, null).title, 'History');
 });
 
+test('tiêu đề mở đầu: tiêu đề dài tự xuống dòng (tối đa 3 dòng) và luôn vừa khung; dải tên giai đoạn không tràn', () => {
+  const { titleLayout } = require('../src/maphist-draw.js');
+  const ctx = { font: '', measureText(s) { return { width: s.length * Number(/(\d+)px/.exec(this.font)[1]) * .52 }; } };   // giả lập đo chữ: rộng ~0,52 × cỡ chữ mỗi ký tự
+  const widest = (r) => Math.max(...r.lines.map(l => { ctx.font = `700 ${r.size}px x`; return ctx.measureText(l).width; }));
+  const short = titleLayout(ctx, 'The Mongol Empire', 1560);
+  assert.deepEqual(short.lines, ['The Mongol Empire']); assert.equal(short.size, 128, 'tiêu đề ngắn giữ cỡ chữ lớn nhất, một dòng');
+  const mid = titleLayout(ctx, 'The Aztec Empire: Rise, Fall and the Making of Modern Mexico', 1560);
+  assert.equal(mid.lines.length, 2); assert.ok(mid.size >= 90 && widest(mid) <= 1560, JSON.stringify(mid));
+  const long = titleLayout(ctx, 'The Aztec Empire: From a Lake Island to the Fall of Tenochtitlan — and the Mexico It Became', 1560);
+  assert.ok(long.lines.length <= 3 && long.size >= 70 && widest(long) <= 1560, JSON.stringify(long));
+  assert.equal(long.lines.join(' '), 'The Aztec Empire: From a Lake Island to the Fall of Tenochtitlan — and the Mexico It Became', 'không làm rơi chữ nào');
+  const huge = titleLayout(ctx, 'word '.repeat(40).trim(), 1560);
+  assert.ok(huge.lines.length <= 3 && huge.size >= 40 && huge.lines.join(' ').split(' ').length === 40);
+  assert.deepEqual(titleLayout(ctx, '', 1560).lines, ['']);
+  // nguồn: dải tên giai đoạn thu nhỏ chữ khi quá dài (không để tràn ra ngoài khung hình)
+  const draw = fs.readFileSync(path.join(__dirname, '../src/maphist-draw.js'), 'utf8');
+  assert.match(draw, /MAXW - 90\) \/ textW/);
+});
+
 test('nối app: mọi lệnh giao diện gọi đều có trong main.cjs và danh sách cho phép của preload; mọi id đều có trong index.html', () => {
   const read = f => fs.readFileSync(path.join(__dirname, '../src', f), 'utf8');
   const main = read('main.cjs'), preload = read('preload.cjs'), ui = read('maphist-ui.js'), html = read('index.html');

@@ -38,6 +38,25 @@
   }
   const shade = (hex, k) => rgbHex(hexRgb(hex).map(v => k < 0 ? v * (1 + k) : v + (255 - v) * k));
 
+  // Chia tiêu đề thành 1–3 dòng cân đối (ưu tiên ngắt sau : – — ,) rồi chọn cỡ chữ lớn nhất cho vừa maxW; dòng ít hơn được ưu tiên nếu chữ còn đủ to.
+  function titleLayout(c, title, maxW) {
+    const words = String(title || '').trim().split(/\s+/).filter(Boolean), W100 = s => { c.font = `700 100px ${SERIF}`; return c.measureText(s).width; };
+    if (!words.length) return { lines: [''], size: 128 };
+    const cuts = n => { const out = []; const go = (from, left, acc) => { if (left === 1) { out.push([...acc, words.slice(from).join(' ')]); return; } for (let i = from + 1; i <= words.length - left + 1; i++) go(i, left - 1, [...acc, words.slice(from, i).join(' ')]); }; go(0, n, []); return out; };
+    let best = null;
+    for (let n = 1; n <= Math.min(3, words.length); n++) {
+      let pick = null;
+      for (const lines of cuts(n)) {
+        const widest = Math.max(...lines.map(W100)), nice = lines.slice(0, -1).every(l => /[:–—,]$/.test(l));
+        const cost = widest * (n > 1 && nice ? .9 : 1);
+        if (!pick || cost < pick.cost) pick = { lines, cost, widest };
+      }
+      const size = Math.min(128, Math.floor(maxW * 100 / pick.widest));
+      if (!best || (best.size < 92 && size > best.size)) best = { lines: pick.lines, size };
+      if (best.size >= 92) break;
+    }
+    return { lines: best.lines, size: Math.max(40, best.size) };
+  }
   function create({ canvas, geo, makeCanvas, W: width = W, H: height = H }) {
     const ctx = canvas.getContext('2d');
     const mkSize = (w, h) => makeCanvas ? makeCanvas(w, h) : (typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) : Object.assign(document.createElement('canvas'), { width: w, height: h }));
@@ -537,13 +556,18 @@
     function ribbon(c, label, x, y, slide, w0) {
       if (slide <= 0) return;
       c.save(); c.translate(x - (1 - slide) * 460, y);
-      c.font = `700 32px ${SERIF}`; if ('letterSpacing' in c) c.letterSpacing = '2px';
-      const tw = Math.min(w0 + 120, Math.max(w0, c.measureText(label.toUpperCase()).width + 90)), h = 56;
+      const shown = label.toUpperCase(), MAXW = 860;
+      let fs = 32; c.font = `700 ${fs}px ${SERIF}`; if ('letterSpacing' in c) c.letterSpacing = '2px';
+      let textW = c.measureText(shown).width;
+      if (textW + 90 > MAXW) {          // tên dài: thu nhỏ chữ cho vừa dải (dải dài tối đa 860 px), không để tràn ra ngoài khung hình
+        fs = Math.max(18, Math.floor(fs * (MAXW - 90) / textW)); c.font = `700 ${fs}px ${SERIF}`; textW = c.measureText(shown).width;
+      }
+      const tw = Math.min(MAXW, Math.max(w0, textW + 90)), h = 56;
       c.shadowColor = 'rgba(0,0,0,.4)'; c.shadowBlur = 14; c.shadowOffsetY = 6;
       c.fillStyle = NAVY; c.beginPath(); c.moveTo(0, 0); c.lineTo(tw, 0); c.lineTo(tw + 18, h / 2); c.lineTo(tw, h); c.lineTo(0, h); c.lineTo(18, h / 2); c.closePath(); c.fill();
       c.shadowColor = 'transparent'; c.strokeStyle = GOLD; c.lineWidth = 3; c.stroke();
       c.strokeStyle = 'rgba(230,195,106,.5)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(24, 6); c.lineTo(tw - 6, 6); c.moveTo(24, h - 6); c.lineTo(tw - 6, h - 6); c.stroke();
-      c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#f7edd0'; c.fillText(label.toUpperCase(), tw / 2 + 4, h / 2 + 2);
+      c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#f7edd0'; c.fillText(shown, tw / 2 + 4, h / 2 + 2);
       c.restore();
     }
     const people = n => n >= 1e9 ? (n / 1e9).toFixed(2).replace(/0+$/, '').replace(/\.$/, '') + ' billion' : n >= 1e6 ? (n / 1e6).toFixed(n >= 1e8 ? 0 : 1).replace(/\.0$/, '') + ' million' : n >= 1e3 ? Math.round(n / 1e3) + ' thousand' : String(Math.round(n));
@@ -762,14 +786,16 @@
       const vg = c.createRadialGradient(width / 2, height * .5, 120, width / 2, height * .5, width * .62); vg.addColorStop(0, `rgba(6,16,30,${.78 * a})`); vg.addColorStop(1, `rgba(6,16,30,${.3 * a})`);
       c.fillStyle = vg; c.fillRect(0, 0, width, height);
       c.globalAlpha = a;
-      compass(c, width / 2, height * .27 + (1 - rise) * 30, 74, t * .25, rise);
-      let size = 128; c.font = `700 ${size}px ${SERIF}`;
-      const title = tl.title;
-      while (c.measureText(title).width > 1560 && size > 54) { size -= 6; c.font = `700 ${size}px ${SERIF}`; }
-      const y = height * .54 + (1 - rise) * 40;
-      text(c, title, width / 2, y, { size, weight: 700, fill: '#f7edd0', halo: 'rgba(8,18,30,.9)', haloW: Math.max(12, size / 6) });
+      const fit = titleLayout(c, tl.title, 1560), size = fit.size, lineH = Math.round(size * 1.12);
+      compass(c, width / 2, height * (fit.lines.length >= 3 ? .2 : .27) + (1 - rise) * 30, 74, t * .25, rise);   // tiêu đề 3 dòng thì la bàn lên cao hơn để không chạm chữ
+      const y = height * (fit.lines.length === 1 ? .54 : fit.lines.length === 2 ? .58 : .6) + (1 - rise) * 40;   // dòng cuối; các dòng trước nằm phía trên
+      fit.lines.forEach((ln, k) => text(c, ln, width / 2, y - (fit.lines.length - 1 - k) * lineH, { size, weight: 700, fill: '#f7edd0', halo: 'rgba(8,18,30,.9)', haloW: Math.max(12, size / 6) }));
       c.strokeStyle = GOLD; c.lineWidth = 3; c.beginPath(); c.moveTo(width / 2 - 360 * rise, y + 36); c.lineTo(width / 2 + 360 * rise, y + 36); c.stroke();
-      if (tl.subtitle) text(c, tl.subtitle, width / 2, y + 96, { size: 42, weight: 600, style: 'italic', fill: GOLD, halo: 'rgba(8,18,30,.9)', haloW: 9 });
+      if (tl.subtitle) {
+        let sub = 42; c.font = `italic 600 ${sub}px ${SERIF}`;
+        while (c.measureText(tl.subtitle).width > 1700 && sub > 26) { sub -= 2; c.font = `italic 600 ${sub}px ${SERIF}`; }
+        text(c, tl.subtitle, width / 2, y + 96, { size: sub, weight: 600, style: 'italic', fill: GOLD, halo: 'rgba(8,18,30,.9)', haloW: 9 });
+      }
       c.restore();
     }
     function drawOutro(c, st) {
@@ -829,5 +855,5 @@
     }
     return { setTimeline, drawFrame, drawStill, drawThumbnail, stillTime, stats, projector, profile: p => { profile = p; }, get timeline() { return tl; } };
   }
-  return { create, FONT: SERIF, GROW, FINE_SPAN, pigment };
+  return { create, FONT: SERIF, GROW, FINE_SPAN, pigment, titleLayout };
 });
