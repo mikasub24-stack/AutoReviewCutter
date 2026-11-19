@@ -8,12 +8,12 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     '/assets/muse-studio.svg': 'assets/muse-studio.svg', '/assets/zalo-qr.jpg': 'assets/zalo-qr.jpg', '/': 'index.html', '/style.css': 'style.css', '/renderer.js': 'renderer.js', '/ui-i18n.js': 'ui-i18n.js',
     '/script-planner.js': 'script-planner.js', '/prompt-import.js': 'prompt-import.js', '/reference-map.js': 'reference-map.js', '/story-plan.js': 'story-plan.js', '/story-ui.js': 'story-ui.js',
     '/restore-plan.js': 'restore-plan.js', '/restore-ui.js': 'restore-ui.js', '/wild-plan.js': 'wild-plan.js', '/wild-ui.js': 'wild-ui.js',
-    '/maphist-geo.js': 'maphist-geo.js', '/maphist-plan.js': 'maphist-plan.js', '/maphist-draw.js': 'maphist-draw.js', '/maphist-ui.js': 'maphist-ui.js',
-    '/assets/maphist/fonts/Lora-Variable.ttf': 'assets/maphist/fonts/Lora-Variable.ttf', '/assets/maphist/fonts/Lora-Italic-Variable.ttf': 'assets/maphist/fonts/Lora-Italic-Variable.ttf'
+    '/maphist-geo.js': 'maphist-geo.js', '/maphist-plan.js': 'maphist-plan.js', '/maphist-cartoon.js': 'maphist-cartoon.js', '/maphist-draw.js': 'maphist-draw.js', '/maphist-ui.js': 'maphist-ui.js',
+    '/assets/maphist/fonts/Lora-Variable.ttf': 'assets/maphist/fonts/Lora-Variable.ttf', '/assets/maphist/fonts/Inter-Black.otf': 'assets/maphist/fonts/Inter-Black.otf', '/assets/maphist/fonts/Lora-Italic-Variable.ttf': 'assets/maphist/fonts/Lora-Italic-Variable.ttf'
   };
   const world = zlib.gunzipSync(await fs.readFile(path.join(src, 'assets/maphist/world.json.gz')));
   const sample = await fs.readFile(path.join(__dirname, 'fixtures/maphist-sample.json'));
-  const type = n => n.endsWith('.jpg') ? 'image/jpeg' : n.endsWith('.svg') ? 'image/svg+xml' : n.endsWith('.ttf') ? 'font/ttf' : n.endsWith('.js') ? 'application/javascript' : n.endsWith('.css') ? 'text/css' : 'text/html';
+  const type = n => n.endsWith('.jpg') ? 'image/jpeg' : n.endsWith('.svg') ? 'image/svg+xml' : n.endsWith('.ttf') ? 'font/ttf' : n.endsWith('.otf') ? 'font/otf' : n.endsWith('.js') ? 'application/javascript' : n.endsWith('.css') ? 'text/css' : 'text/html';
   const server = http.createServer(async (req, res) => {
     if (req.url === '/world.json') { res.setHeader('Content-Type', 'application/json'); return res.end(world); }
     if (req.url === '/sample.json') { res.setHeader('Content-Type', 'application/json'); return res.end(sample); }
@@ -241,6 +241,8 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     await page.click('#mapEditBuild'); await flush();
     const saveCall = (await calls('mapSaveScript'))[0];
     assert.equal(saveCall.data.runId, 'History-of-Testland');
+    assert.equal(await page.locator('#mapEditTheme').inputValue(), 'cartoon', 'kịch bản mới mặc định kiểu hoạt hình');
+    assert.equal(saveCall.data.script.theme, 'cartoon', 'kiểu hình được lưu cùng kịch bản');
     assert.equal(saveCall.data.script.eras[1].narration.startsWith('In sixteen hundred and two the Dutch East India Company arrived at Java'), true);
     assert.deepEqual(saveCall.data.script.eras[1].realms[0].regions, ['Banten', 'Jakarta Raya', 'Jawa Barat']);
     assert.ok(!JSON.stringify(saveCall.data.script).includes('"units"'), 'không gửi các đơn vị tính sẵn');
@@ -347,6 +349,28 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.deepEqual(thumbs.map(t => t.said), ['AZTEC EMPIRE', 'AZTEC EMPIRE', 'AZTEC EMPIRE'], 'chữ duy nhất trên ảnh bìa là hook (một hoặc hai dòng)');
     assert.ok(thumbs.every(t => t.sat > .3), 'màu rực (độ bão hòa cao): ' + thumbs.map(t => t.sat.toFixed(2)));
     assert.equal(new Set(thumbs.map(t => t.hash)).size, 3, 'ba kiểu bố cục khác nhau');
+    // 12) Kiểu hoạt hình thật sự được vẽ: biển xanh phẳng, số năm vàng, cuộn giấy da, nút Subscribe ở màn kết; kiểu cổ khác hẳn và không có các thứ đó.
+    const toon = await page.evaluate(async () => {
+      const raw = await window.nodeJson('world'), sample = await window.nodeJson('sample'), geo = maphistGeo.build(raw);
+      const make = theme => {
+        const n = maphistPlan.normalizeScript({ ...sample, theme }, geo), tl = maphistPlan.compile(n.script, geo, { durations: n.script.eras.map(() => 14), fps: 30 });
+        const canvas = Object.assign(document.createElement('canvas'), { width: 1920, height: 1080 }), R = maphistDraw.create({ canvas, geo }); R.setTimeline(tl);
+        return { tl, R, canvas };
+      };
+      const count = (cv, x0, y0, w, h, test) => { const d = cv.getContext('2d').getImageData(x0, y0, w, h).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (test(d[i], d[i + 1], d[i + 2])) n++; return n; };
+      const probe = ({ tl, R, canvas }) => {
+        R.drawFrame(tl.eras[1].start + 9);
+        const mid = { gold: count(canvas, 700, 100, 520, 170, (r, g, b) => r > 235 && g > 170 && g < 235 && b < 110), paper: count(canvas, 420, 920, 1080, 120, (r, g, b) => r > 215 && g > 190 && g < 245 && b > 130 && b < 205), sea: count(canvas, 0, 0, 1920, 1080, (r, g, b) => r < 90 && g > 140 && b > 200), green: count(canvas, 0, 0, 1920, 1080, (r, g, b) => r > 70 && r < 130 && g > 180 && b > 100 && b < 150) };
+        R.drawFrame(tl.total - 1);
+        return { ...mid, red: count(canvas, 1500, 120, 400, 80, (r, g, b) => r > 200 && g < 90 && b < 90) };
+      };
+      return { cartoon: probe(make('cartoon')), classic: probe(make('classic')) };
+    });
+    assert.ok(toon.cartoon.sea > 150000 && toon.cartoon.green > 5000, 'biển xanh phẳng và đất xanh lá: ' + JSON.stringify(toon.cartoon));
+    assert.ok(toon.cartoon.gold > 3000, 'số năm vàng to ở đầu khung: ' + toon.cartoon.gold);
+    assert.ok(toon.cartoon.paper > 40000, 'cuộn giấy da ở dưới: ' + toon.cartoon.paper);
+    assert.ok(toon.cartoon.red > 3000, 'nút Subscribe đỏ ở màn kết: ' + toon.cartoon.red);
+    assert.ok(toon.classic.sea < 20000 && toon.classic.red < 500 && toon.classic.gold < toon.cartoon.gold, 'kiểu cổ không có biển xanh phẳng / nút Subscribe: ' + JSON.stringify(toon.classic));
     assert.deepEqual(errors, [], 'không lỗi script: ' + errors.join(' | '));
     console.log('maphist-tab-smoke OK');
   } finally { await browser.close(); server.close(); }

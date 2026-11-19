@@ -294,7 +294,7 @@
   }
   function drawEditor() {
     const s = edit.script;
-    $('mapEditTitle').value = s.title || ''; $('mapEditSubtitle').value = s.subtitle || ''; $('mapEditHook').value = s.hook || Plan.hookOf(s).toLowerCase();
+    $('mapEditTitle').value = s.title || ''; $('mapEditSubtitle').value = s.subtitle || ''; $('mapEditHook').value = s.hook || Plan.hookOf(s).toLowerCase(); $('mapEditTheme').value = s.theme === 'classic' ? 'classic' : 'cartoon';
     const issues = $('mapIssues'); issues.hidden = !edit.issues.length;
     issues.replaceChildren(node('strong', '', `Cần kiểm tra (${edit.issues.length})`), ...edit.issues.slice(0, 40).map(x => node('div', '', x)));
     $('mapEras').replaceChildren(...s.eras.map(eraCard), button('+ Thêm giai đoạn cuối', 'secondary', () => { s.eras.push(eraTemplate(s.eras[s.eras.length - 1])); drawEditor(); }));
@@ -304,12 +304,13 @@
     if (!geo || !edit) return;
     const status = $('mapPreviewNote');
     try {
+      edit.script.theme = $('mapEditTheme').value === 'classic' ? 'classic' : 'cartoon';
       const { script } = Plan.normalizeScript(JSON.parse(JSON.stringify(edit.script)), geo);
       const tl = Plan.compile(script, geo, { durations: [], fps: 30 });
       const cv = $('mapPreview');
       if (!previewDraw || previewDraw.geo !== geo) previewDraw = { geo, lib: Draw.create({ canvas: cv, geo }) };
       previewDraw.lib.setTimeline(tl);
-      await document.fonts.load('700 40px MapLora');
+      await Promise.all(['700 40px MapLora', '900 40px MapImpact'].map(f => document.fonts.load(f)));
       const e = tl.eras[Math.min(i, tl.eras.length - 1)];
       const t = e.start + Math.min(e.dur - 1.2, 7);
       previewDraw.lib.drawFrame(t);
@@ -318,7 +319,7 @@
       $('mapPreviewBox').scrollIntoView({ block: 'nearest' });
     } catch (error) { status.textContent = 'Không dựng được hình xem thử: ' + error.message; $('mapPreviewBox').hidden = false; }
   }
-  function collect() { edit.script.title = $('mapEditTitle').value; edit.script.subtitle = $('mapEditSubtitle').value; edit.script.hook = $('mapEditHook').value.trim(); return JSON.parse(JSON.stringify(edit.script, (k, v) => (k === 'units' ? undefined : v))); }
+  function collect() { edit.script.title = $('mapEditTitle').value; edit.script.subtitle = $('mapEditSubtitle').value; edit.script.hook = $('mapEditHook').value.trim(); edit.script.theme = $('mapEditTheme').value === 'classic' ? 'classic' : 'cartoon'; return JSON.parse(JSON.stringify(edit.script, (k, v) => (k === 'units' ? undefined : v))); }
   async function saveEdit() {
     const r = await call('mapSaveScript', { runId: edit.runId, script: collect() });
     if (r) { edit.issues = r.issues || []; drawEditor(); toast(edit.issues.length ? `Đã lưu kịch bản. Còn ${edit.issues.length} chỗ cần kiểm tra.` : 'Đã lưu kịch bản.'); }

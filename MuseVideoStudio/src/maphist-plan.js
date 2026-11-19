@@ -177,7 +177,7 @@
   const LANGUAGES = [
     { id: 'en', label: 'English', vi: 'tiếng Anh', voice: 'en-US-GuyNeural', hookExample: 'RULERS OF THE STEPPE', titleExample: 'The Mongol Empire: From Steppe to Superpower',
       sample: 'In the year thirteen fifty, a great kingdom rose from the sea and ruled the islands for generations.',
-      s: { thanks: 'Thanks for watching', subscribe: 'Subscribe for more history', bc: 'BC', ad: 'AD', bcTag: 'BC', adTag: 'AD',
+      s: { thanks: 'Thanks for watching', subscribe: 'Subscribe for more history', sub: 'Subscribe', stickers: { battle: 'BOOM!', ship: 'LAND HO!' }, est: 'est.', fav: 'Which era is your favourite?', favSub: 'Tell us in the comments', bc: 'BC', ad: 'AD', bcTag: 'BC', adTag: 'AD',
         yearBC: y => `${y} BC`, yearAD: y => `${y} AD`, from: (a, b) => `from ${a} to ${b}`,
         people: n => (n >= 1e9 ? `${fmtNum(n / 1e9, 'en', 2)} billion` : n >= 1e6 ? `${fmtNum(n / 1e6, 'en', n >= 1e8 ? 0 : 1)} million` : n >= 1e3 ? `${Math.round(n / 1e3)} thousand` : String(Math.round(n))) + ' people' },
       pub: { chapters: 'Chapters', about: (t, span) => `${t}: an animated history map${span ? ' ' + span : ''}, told era by era as the borders change.`,
@@ -185,7 +185,7 @@
         hash: ['#History', '#HistoryMap', '#AnimatedMap'], tags: ['history', 'history map', 'animated map', 'map history', 'historical maps'], countryTag: c => `${c} history` } },
     { id: 'de', label: 'Deutsch', vi: 'tiếng Đức', voice: 'de-DE-ConradNeural', hookExample: 'HERREN DER STEPPE', titleExample: 'Das Mongolische Reich: Von der Steppe zur Supermacht',
       sample: 'Im Jahr dreizehnhundertfünfzig erhob sich ein großes Königreich aus dem Meer und herrschte über Generationen über die Inseln.',
-      s: { thanks: 'Danke fürs Zuschauen', subscribe: 'Abonniere für mehr Geschichte', bc: 'v. Chr.', ad: 'n. Chr.', bcTag: 'v. Chr.', adTag: 'n. Chr.',
+      s: { thanks: 'Danke fürs Zuschauen', subscribe: 'Abonniere für mehr Geschichte', sub: 'Abonnieren', stickers: { battle: 'BUMM!', ship: 'LAND IN SICHT!' }, est: 'ca.', fav: 'Welche Epoche gefällt dir am besten?', favSub: 'Schreib es in die Kommentare', bc: 'v. Chr.', ad: 'n. Chr.', bcTag: 'v. Chr.', adTag: 'n. Chr.',
         yearBC: y => `${y} v. Chr.`, yearAD: y => `${y} n. Chr.`, from: (a, b) => `von ${a} bis ${b}`,
         people: n => (n >= 1e9 ? `${fmtNum(n / 1e9, 'de', 2)} Mrd.` : n >= 1e6 ? `${fmtNum(n / 1e6, 'de', n >= 1e8 ? 0 : 1)} Mio.` : n >= 1e3 ? `${Math.round(n / 1e3)} Tsd.` : String(Math.round(n))) + ' Menschen' },
       pub: { chapters: 'Kapitel', about: (t, span) => `${t}: eine animierte Geschichtskarte${span ? ' ' + span : ''}, Epoche für Epoche erzählt, während sich die Grenzen verändern.`,
@@ -193,7 +193,7 @@
         hash: ['#Geschichte', '#Geschichtskarte', '#AnimierteKarte'], tags: ['geschichte', 'weltgeschichte', 'geschichtskarte', 'animierte karte', 'karte geschichte', 'historische karten'], countryTag: c => `${c} geschichte` } },
     { id: 'fr', label: 'Français', vi: 'tiếng Pháp', voice: 'fr-FR-HenriNeural', hookExample: 'MAÎTRES DE LA STEPPE', titleExample: 'L’Empire mongol : de la steppe à la superpuissance',
       sample: 'En treize cent cinquante, un grand royaume surgit de la mer et domina les îles pendant des générations.',
-      s: { thanks: 'Merci d’avoir regardé', subscribe: 'Abonnez-vous pour plus d’histoire', bc: 'av. J.-C.', ad: 'apr. J.-C.', bcTag: 'av. J.-C.', adTag: 'apr. J.-C.',
+      s: { thanks: 'Merci d’avoir regardé', subscribe: 'Abonnez-vous pour plus d’histoire', sub: 'S’abonner', stickers: { battle: 'BOUM !', ship: 'TERRE !' }, est: 'env.', fav: 'Quelle époque préférez-vous ?', favSub: 'Dites-le-nous en commentaire', bc: 'av. J.-C.', ad: 'apr. J.-C.', bcTag: 'av. J.-C.', adTag: 'apr. J.-C.',
         yearBC: y => `${y} av. J.-C.`, yearAD: y => `${y} apr. J.-C.`, from: (a, b) => `de ${a} à ${b}`,
         people: n => (n >= 1e9 ? `${fmtNum(n / 1e9, 'fr', 2)} Md d’habitants` : n >= 1e6 ? `${fmtNum(n / 1e6, 'fr', n >= 1e8 ? 0 : 1)} M d’habitants` : n >= 1e3 ? `${fmtNum(Math.round(n / 1e3) * 1e3, 'fr', 0)} habitants` : `${Math.round(n)} habitants`) },
       pub: { chapters: 'Chapitres', about: (t, span) => `${t} : une carte historique animée${span ? ' ' + span : ''}, racontée époque par époque au fil des frontières.`,
@@ -201,7 +201,7 @@
         hash: ['#Histoire', '#CarteHistorique', '#CarteAnimée'], tags: ['histoire', 'histoire du monde', 'carte historique', 'carte animée', 'histoire en cartes', 'cartes historiques'], countryTag: c => `histoire ${c}` } },
     { id: 'ru', label: 'Русский', vi: 'tiếng Nga', voice: 'ru-RU-DmitryNeural', hookExample: 'ВЛАСТЕЛИНЫ СТЕПИ', titleExample: 'Монгольская империя: от степи до сверхдержавы',
       sample: 'В тысяча триста пятидесятом году из моря поднялось великое королевство и столетиями правило островами.',
-      s: { thanks: 'Спасибо за просмотр', subscribe: 'Подпишитесь, чтобы узнать больше истории', bc: 'до н. э.', ad: 'н. э.', bcTag: 'до н.э.', adTag: 'н.э.',
+      s: { thanks: 'Спасибо за просмотр', subscribe: 'Подпишитесь, чтобы узнать больше истории', sub: 'Подписаться', stickers: { battle: 'БАХ!', ship: 'ЗЕМЛЯ!' }, est: 'ок.', fav: 'Какая эпоха вам нравится больше всего?', favSub: 'Напишите в комментариях', bc: 'до н. э.', ad: 'н. э.', bcTag: 'до н.э.', adTag: 'н.э.',
         yearBC: y => `${y} до н. э.`, yearAD: y => `${y} н. э.`, from: (a, b) => `с ${a} по ${b}`,
         people: n => (n >= 1e9 ? `${fmtNum(n / 1e9, 'ru', 2)} млрд` : n >= 1e6 ? `${fmtNum(n / 1e6, 'ru', n >= 1e8 ? 0 : 1)} млн` : n >= 1e3 ? `${Math.round(n / 1e3)} тыс.` : String(Math.round(n))) + ' человек' },
       pub: { chapters: 'Главы', about: (t, span) => `${t}: анимированная историческая карта${span ? ' ' + span : ''}, рассказ эпоха за эпохой по мере того, как менялись границы.`,
@@ -289,7 +289,7 @@
     });
     if (!eras.length) issues.push({ era: 0, text: 'Kịch bản chưa có giai đoạn nào.' });
     return {
-      script: { lang: langOf(src.lang).id, title: flat(src.title).slice(0, 120) || 'History', subtitle: flat(src.subtitle).slice(0, 120), hook: flat(src.hook).slice(0, 60), country, outro: flat(src.outro).slice(0, 120), eras },
+      script: { lang: langOf(src.lang).id, theme: src.theme === 'classic' ? 'classic' : 'cartoon', title: flat(src.title).slice(0, 120) || 'History', subtitle: flat(src.subtitle).slice(0, 120), hook: flat(src.hook).slice(0, 60), country, outro: flat(src.outro).slice(0, 120), eras },
       issues
     };
   }
@@ -350,11 +350,37 @@
     const milestones = order.map((idx, k) => ({ era: idx, year: eras[idx].year, label: eras[idx].label, icon: eras[idx].icon || icons[k % icons.length] }));
     const outroStart = t;
     return {
-      lang, title: script.title, subtitle: script.subtitle, hook: hookOf(script), outro: script.outro, country: script.country, fps, W, H,
+      lang, theme: script.theme === 'cartoon' ? 'cartoon' : 'classic', title: script.title, subtitle: script.subtitle, hook: hookOf(script), outro: script.outro, country: script.country, fps, W, H,
       introEnd: INTRO, outroStart, total: outroStart + OUTRO, worldView: { ...WORLD_VIEW },
       eras, milestones,
       focus: mainHit ? mainHit.a3 : ''
     };
+  }
+
+  // Nhịp xuất hiện trong mỗi giai đoạn (giây tính từ đầu giai đoạn); bộ vẽ và bộ âm thanh dùng chung để hình và tiếng khớp nhau.
+  const TIMING = { growDelay: .3, grow: 2.1, marker0: 1.1, markerStep: .4, count: 1.5, route: 1.4 };
+  // Danh sách «tín hiệu» theo giây trong cả video: tiếng (whoosh, tick, swell, pop, boom, ding, splash, coin, tada) và chữ dán (kind 'sticker').
+  function cuesOf(tl) {
+    const out = [], stick = strings(tl.lang).stickers || {};
+    out.push({ t: .12, kind: 'whoosh' }, { t: .5, kind: 'pop' });
+    tl.eras.forEach((e, i) => {
+      const s = e.start;
+      if (i > 0) out.push({ t: s, kind: 'whoosh', gain: .8 });
+      for (let k = 1; k <= 12; k++) out.push({ t: s + TIMING.count * (1 - Math.pow(1 - k / 12, 1 / 3)), kind: 'tick' });
+      const faces = e.realms.filter(r => r.units.length);
+      if (faces.length) out.push({ t: s + TIMING.growDelay, kind: 'swell' });
+      if (faces.some(r => r.face)) out.push({ t: s + TIMING.growDelay + TIMING.grow * .45 + .25, kind: 'pop' });
+      let stuck = false;
+      e.markers.forEach((m, k) => {
+        const t = s + TIMING.marker0 + k * TIMING.markerStep + .1;
+        out.push({ t, kind: m.type === 'battle' ? 'boom' : m.type === 'capital' ? 'ding' : m.type === 'ship' ? 'splash' : 'pop' });
+        if (!stuck && stick[m.type]) { stuck = true; out.push({ t: t + .05, kind: 'sticker', era: i, marker: k, text: stick[m.type], dur: 1.8 }); }
+      });
+      if (e.routes.length) out.push({ t: s + TIMING.route, kind: 'whoosh', gain: .6 });
+      if (tl.milestones.some(m => m.era === i)) out.push({ t: s + .35, kind: 'coin' });
+    });
+    out.push({ t: tl.outroStart + .1, kind: 'tada' }, { t: tl.outroStart + .12 * (tl.total - tl.outroStart) + .3, kind: 'pop' });
+    return out.filter(c => c.t >= 0 && c.t < tl.total).sort((a, b) => a.t - b.t);
   }
 
   // Máy bay camera từ góc nhìn a sang b với vòng zoom-out khi đi xa.
@@ -634,7 +660,7 @@
 
   return {
     W, H, CY, INTRO, OUTRO, LEAD, TAIL, MIN_ERA, ERA_SECONDS, MIN_MINUTES, MAX_MINUTES, DEFAULT_MINUTES, LENGTHS, MAX_ERAS, CATEGORIES, categoryOf, MOODS, FLAGS, MARKERS, ICONS, PALETTE,
-    BATCH, NARRATION_MIN, NARRATION_MAX, buildOutlineInstruction, buildErasInstruction, extractJson, parseOutline, parseEras, checkEras, fixText, assemble,
+    TIMING, cuesOf, BATCH, NARRATION_MIN, NARRATION_MAX, buildOutlineInstruction, buildErasInstruction, extractJson, parseOutline, parseEras, checkEras, fixText, assemble,
     eraCount, options, problems, yearLabel, publishPack, hookOf, clock, LANGUAGES, langOf, strings, normalizeScript, compile, stateAt, counterAt, chunksOf, subtitleAt, flyCam, fit, speakSeconds, bigRingsBox, easeInOut, clamp, lerp, mer, unmerLat, hex, num, words, flat, WORLD_VIEW
   };
 });

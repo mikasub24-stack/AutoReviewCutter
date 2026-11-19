@@ -442,6 +442,7 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 /* Tab «Bản đồ lịch sử» */
 @font-face { font-family: "MapLora"; font-weight: 400 700; font-style: normal; src: url("assets/maphist/fonts/Lora-Variable.ttf"); }
 @font-face { font-family: "MapLora"; font-weight: 400 700; font-style: italic; src: url("assets/maphist/fonts/Lora-Italic-Variable.ttf"); }
+@font-face { font-family: "MapImpact"; font-weight: 900; font-style: normal; src: url("assets/maphist/fonts/Inter-Black.otf"); }
 .mapVol { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; color: #9fb2cc; }
 .mapVol input { width: 110px; }
 .mapEditor { width: min(1100px, 94vw); max-height: 92vh; overflow: auto; border: 1px solid var(--line); border-radius: 12px; background: #101b2a; color: #e6eefb; padding: 18px 20px; }

@@ -3,9 +3,9 @@
    Nhận diện: nền giấy da có thớ, biển xanh mực với đường nước kẻ như bản khắc, lãnh thổ lan ra như MỰC LOANG rồi cắm cờ gợn sóng,
    viền vàng dập nổi, năm hiện bằng đồng hồ số cơ học, lời đọc hiện thành thẻ ghi chép sáng từng từ theo giọng, địa cầu nhỏ chỉ vùng đang xem. */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./maphist-plan.js'), require('./maphist-geo.js'));
-  else root.maphistDraw = factory(root.maphistPlan, root.maphistGeo);
-})(typeof window !== 'undefined' ? window : globalThis, function (Plan, Geo) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./maphist-plan.js'), require('./maphist-geo.js'), require('./maphist-cartoon.js'));
+  else root.maphistDraw = factory(root.maphistPlan, root.maphistGeo, root.maphistCartoon);
+})(typeof window !== 'undefined' ? window : globalThis, function (Plan, Geo, Cart) {
   'use strict';
   const { W, H, CY } = Plan;
   const TAU = Math.PI * 2, DEG = Math.PI / 180;
@@ -15,7 +15,7 @@
   const merY = lat => Math.log(Math.tan(Math.PI / 4 + clamp(lat, -82, 82) * Math.PI / 360));
   const SERIF = '"MapLora", "Lora", Georgia, "DejaVu Serif", serif';
   const INK = '#2a1c10', PAPER = '#f1e6c8', GOLD = '#e6c36a', GOLD_DEEP = '#a47a2c', NAVY = '#10324c';
-  const GROW = 2.1, GROW_DELAY = .3;          // thời gian mực loang ra và độ trễ sau khi sang giai đoạn mới
+  const GROW = Plan.TIMING.grow, GROW_DELAY = Plan.TIMING.growDelay;          // thời gian mực loang ra và độ trễ sau khi sang giai đoạn mới
   const FINE_SPAN = 48;                       // zoom gần hơn mức này thì dùng ranh giới tỉnh (độ phân giải cao) thay cho ranh giới nước
 
   // Màu cờ → màu pigment tô lãnh thổ: chọn màu có sắc (không trắng / đen), pha chút nâu đất cho hợp tông giấy cổ.
@@ -65,6 +65,7 @@
     let tl = null, curT = 0, minD = 1, oceanReady = false;
     const cache = { key: '', paths: new Map(), landAll: null, landKey: '', moving: null };
     const stats = { frames: 0, ms: 0 };
+    const toon = () => Boolean(tl && tl.theme === 'cartoon');   // kiểu «hoạt hình sáng» (maphist-cartoon.js); các kiểu khác dùng «Atlas sống»
     let profile = null, lapAt = 0;   // profile: đối tượng để ghi thời gian từng công đoạn (chỉ dùng khi đo tốc độ)
     const lap = (name, c) => { if (!profile) return; c.getImageData(0, 0, 1, 1); const n = performance.now(); profile[name] = (profile[name] || 0) + n - lapAt; lapAt = n; };
 
@@ -225,6 +226,7 @@
       }
       cache.landAll = all; cache.landKey = key;
       lc.setTransform(1, 0, 0, 1, 0, 0); lc.clearRect(0, 0, width, height);
+      if (toon()) { toonLand(lc, all, low); return target; }
       lc.save(); if (low) lc.scale(.5, .5); lc.lineJoin = 'round';
       // đường nước kẻ: vòng mảnh cách bờ 11 px và 24 px (tô dải rộng rồi khoét lõi bằng destination-out)
       for (const [d, a] of [[24, .3], [11, .5]]) {
@@ -249,6 +251,18 @@
       }
       lc.restore();
       return target;
+    }
+
+    // Đất hoạt hình: xanh lá phẳng, viền xanh đậm mảnh, quầng bọt sáng quanh bờ, bóng nhẹ dưới đất.
+    function toonLand(lc, all, low) {
+      lc.save(); if (low) lc.scale(.5, .5); lc.lineJoin = 'round';
+      for (const [w, a] of [[48, .13], [32, .2], [18, .34]]) { lc.strokeStyle = `rgba(220,246,255,${a})`; lc.lineWidth = w; lc.stroke(all); }
+      lc.save(); lc.translate(0, 7); lc.fillStyle = 'rgba(0,70,130,.22)'; lc.fill(all); lc.restore();
+      const g = lc.createLinearGradient(0, 0, 0, height); g.addColorStop(0, '#66cb7e'); g.addColorStop(1, '#44a866');
+      lc.fillStyle = g; lc.fill(all);
+      if (!low) { lc.save(); lc.clip(all); lc.strokeStyle = 'rgba(255,255,255,.16)'; lc.lineWidth = 18; lc.stroke(all); lc.strokeStyle = 'rgba(20,90,50,.14)'; lc.lineWidth = 7; lc.stroke(all); lc.restore(); }
+      lc.strokeStyle = '#2b8b55'; lc.lineWidth = 3.2; lc.stroke(all);
+      lc.restore();
     }
 
     // ---------- Lãnh thổ: pigment + gạch chéo + viền vàng dập nổi; mực loang khi mọc ----------
@@ -301,6 +315,35 @@
           // mép mực đang loang: vệt tối sẫm chạy theo mép
           if (reveal && reveal.p < 1) { c.save(); c.strokeStyle = `rgba(30,14,6,${.6 * (1 - reveal.p)})`; c.lineWidth = 22; inkEdge(c, reveal.cx, reveal.cy, Math.max(.1, reveal.r - 6), reveal.seed); c.stroke(); c.restore(); }
           c.restore();
+          c.restore();
+        };
+        draw(plain, false);
+        draw(blobs, true);
+      }
+      c.restore();
+    }
+    // Lãnh thổ hoạt hình: tô đúng lá cờ, viền đen dày, bóng đổ xuống biển, ánh bóng nhẹ; mọc ra như vòng tròn nảy.
+    function toonGroup(c, keys, realm, pr, { alpha = 1, reveal = null } = {}) {
+      if (!keys.length || alpha <= 0) return;
+      c.save(); c.globalAlpha = alpha; c.lineJoin = 'round';
+      if (reveal) { inkEdge(c, reveal.cx, reveal.cy, reveal.r, reveal.seed); c.clip(); }
+      for (const cluster of clustersOf(keys, pr)) {
+        const plain = cluster.keys.filter(k => !k.startsWith('B:')), blobs = cluster.keys.filter(k => k.startsWith('B:')), b = cluster.box;
+        const draw = (list, landClip) => {
+          if (!list.length) return;
+          const all = new Path2D();
+          for (const k of list) all.addPath(unitPath(k, pr));
+          c.save();
+          if (landClip && cache.landAll) c.clip(cache.landAll);
+          if (!landClip) { c.save(); c.translate(2, 9); c.fillStyle = 'rgba(0,45,100,.32)'; c.fill(all); c.restore(); }
+          c.strokeStyle = INK; c.lineWidth = 10; c.stroke(all);
+          c.save(); c.clip(all);
+          fillFlag(c, realm, { x: b.x - 6, y: b.y - 6, w: b.w + 12, h: b.h + 12, cx: b.cx, cy: b.cy });
+          const gl = c.createLinearGradient(b.x, b.y, b.x + b.w * .4, b.y + b.h); gl.addColorStop(0, 'rgba(255,255,255,.22)'); gl.addColorStop(.5, 'rgba(255,255,255,0)'); gl.addColorStop(1, 'rgba(0,0,40,.12)');
+          c.fillStyle = gl; c.fillRect(b.x - 8, b.y - 8, b.w + 16, b.h + 16);
+          if (!cache.moving) { c.strokeStyle = 'rgba(0,0,30,.13)'; c.lineWidth = 14; c.stroke(all); c.save(); c.translate(2, 3); c.strokeStyle = 'rgba(255,255,255,.2)'; c.lineWidth = 6; c.stroke(all); c.restore(); }
+          c.restore();
+          c.strokeStyle = INK; c.lineWidth = 5; c.stroke(all);
           c.restore();
         };
         draw(plain, false);
@@ -473,14 +516,25 @@
       c.restore();
     }
     function drawMarker(c, m, pr, local, i, t) {
-      const delay = 1.1 + i * .4, k = (local - delay) / .5;
+      const delay = Plan.TIMING.marker0 + i * Plan.TIMING.markerStep, k = (local - delay) / .5;
       if (k <= 0) return;
       const s = easeBack(k), [x, y] = pr.P(m.at[0], m.at[1]);
+      if (toon()) { toonMarker(c, m, x, y, s, t, k); return; }
       if (m.type === 'temple') temple(c, x, y + 6, 1.1 * s, m.name);
       else if (m.type === 'castle') castle(c, x, y + 6, 1.1 * s, m.name);
       else if (m.type === 'battle') battle(c, x, y, s, m.name, t);
       else if (m.type === 'ship') ship(c, x, y, 1.1 * s, 1, t);
       else dot(c, x, y, s, m.name, m.type);
+    }
+    // Ký hiệu hoạt hình: huy hiệu kiếm chéo (trận đánh), ghim đỏ (thủ đô), kim tự tháp (đền), pháo đài (thành), thuyền, chấm trắng (thành phố).
+    function toonMarker(c, m, x, y, s, t, k) {
+      const a = clamp((k - .3) / .5, 0, 1), lab = (dy, size = 22) => { c.save(); c.globalAlpha *= a; Cart.label(c, m.name, x, y + dy, size); c.restore(); };
+      if (m.type === 'battle') { Cart.battleMedal(c, x, y - 4, s, t); lab(64); }
+      else if (m.type === 'capital') { Cart.pin(c, x, y + 4, s); lab(38); }
+      else if (m.type === 'temple') { Cart.pyramid(c, x, y + 8, 1.05 * s); lab(36); }
+      else if (m.type === 'castle') { Cart.fort(c, x, y + 8, 1.05 * s); lab(36); }
+      else if (m.type === 'ship') Cart.boat(c, x, y, .95 * s, 1, t);
+      else { Cart.townDot(c, x, y, s); lab(38); }
     }
     function drawRoute(c, route, pr, local, t) {
       const start = 1.4, grow = clamp((local - start) / 3.2, 0, 1);
@@ -495,6 +549,18 @@
         const d = seg[i - 1], ang = Math.atan2(pts[i][1] - pts[i - 1][1], pts[i][0] - pts[i - 1][0]);
         if (need >= d) { path.lineTo(pts[i][0], pts[i][1]); need -= d; head = pts[i]; heading = Math.sign(pts[i][0] - pts[i - 1][0]) || heading; angle = ang; }
         else { const f = need / d; head = [lerp(pts[i - 1][0], pts[i][0], f), lerp(pts[i - 1][1], pts[i][1], f)]; heading = Math.sign(pts[i][0] - pts[i - 1][0]) || heading; angle = ang; path.lineTo(head[0], head[1]); break; }
+      }
+      if (toon()) {
+        c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
+        if (arrow) {
+          c.strokeStyle = INK; c.lineWidth = 21; c.stroke(path); c.strokeStyle = '#e8343a'; c.lineWidth = 12; c.stroke(path);
+          c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineWidth = 3; c.setLineDash([2, 18]); c.lineDashOffset = -t * 30; c.stroke(path); c.setLineDash([]);
+          c.translate(head[0], head[1]); c.rotate(angle); c.fillStyle = '#e8343a'; c.strokeStyle = INK; c.lineWidth = 6;
+          c.beginPath(); c.moveTo(30, 0); c.lineTo(-14, -26); c.lineTo(-4, 0); c.lineTo(-14, 26); c.closePath(); c.stroke(); c.fill();
+        } else { c.strokeStyle = 'rgba(0,50,100,.3)'; c.lineWidth = 10; c.stroke(path); c.strokeStyle = '#fff'; c.lineWidth = 5.5; c.setLineDash([16, 14]); c.lineDashOffset = -t * 26; c.stroke(path); c.setLineDash([]); }
+        c.restore();
+        if (route.ship) Cart.boat(c, head[0], head[1] - 6, .95, heading < 0 ? -1 : 1, t);
+        return;
       }
       c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
       if (arrow) {
@@ -710,6 +776,80 @@
       c.restore();
     }
 
+    // Đôi mắt thế lực: đặt ở trọng tâm phần lớn nhất; nhích sang bên nếu đè lên ký hiệu địa danh.
+    function eyeSpot(x, y, spots, R) {
+      const step = R * 2.4, tries = [[0, 0], [0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+      let best = [x, y], far = -1;
+      for (const [dx, dy] of tries) {
+        const bx = x + dx * step, by = y + dy * step; let d = 1e9;
+        for (const [sx, sy] of spots) d = Math.min(d, Math.hypot(sx - bx, (sy - by) * 1.1));
+        if (d >= R * 2.6 + 34) return [bx, by];
+        if (d > far) { far = d; best = [bx, by]; }
+      }
+      return best;
+    }
+    function toonRealm(c, r, pr, spots, local, t, opts) {
+      if (!r.units.length || opts.clean) return;
+      const key2 = bigUnit(r.units), cl = key2 && centroidOf(key2), b = boxOf(r.units, pr);
+      if (!cl || !b) return;
+      const [x, y] = pr.P(cl[0], cl[1]), ub = boxOf([key2], pr) || b, R = clamp(Math.sqrt(ub.w * ub.h) * .15, 12, 58), k = (local - GROW_DELAY - GROW * .45) / .6;
+      if (k <= 0) return;
+      const [ax, ay] = eyeSpot(x, y, spots, R), cols = r.colors && r.colors.length ? r.colors : [r.color];
+      if (r.face) Cart.eyes(c, ax, ay, R, { mood: r.mood, t, seed: seedOf(r.name), k: Cart.easeBack(k), lid: cols[0] });
+      if (r.name && Math.min(b.w, b.h) > 60 && R >= 18 && k > .7) { c.save(); c.globalAlpha *= clamp((k - .7) / .3, 0, 1); Cart.label(c, r.name, ax, ay + R * 2.7, clamp(R * .62, 15, 28)); c.restore(); }
+    }
+    // Biển ngả xám xanh ở giai đoạn có trận đánh (chuyển mượt khi sang giai đoạn mới).
+    const warOf = e => e && (e.markers || []).some(m => m.type === 'battle') ? .6 : 0;
+    function toonTone(st) { return lerp(st.prev ? warOf(st.prev) : warOf(st.era), warOf(st.era), easeOut(clamp(st.local / 1.2, 0, 1))); }
+    function toonHud(c, st, t) {
+      const S = Plan.strings(tl.lang), outro = st.phase === 'outro', local = st.local, era = st.era, ms = tl.milestones, n = ms.length;
+      const pos = outro ? tl.eras.length : st.index + clamp(local / era.dur, 0, 1), top = outro ? 1 : easeOut(local / .8);
+      let k = 0; while (k < n - 1 && pos >= ms[k + 1].era) k++;
+      const a = n ? ms[k].era : 0, b = n ? ms[Math.min(k + 1, n - 1)].era : 0, prog = n <= 1 ? 1 : (k + (b === a ? 0 : clamp((pos - a) / (b - a), 0, 1))) / (n - 1);
+      Cart.timeline(c, { ms, pos, prog, slide: top, t, durOf: i => (tl.eras[i] || {}).dur || 6, startLabel: tl.eras[0] ? tl.eras[0].label : '' });
+      const counters = Plan.counterAt(st), yr = Math.round(counters.year == null ? era.year : counters.year), pop = clamp((local - 1.3) / .6, 0, 1);
+      Cart.year(c, Math.abs(yr), yr < 0 ? S.bcTag : yr < 1000 ? S.adTag : '', width / 2, 246, { size: 150, pop: pop >= 1 ? 0 : pop, slide: top });
+      Cart.population(c, counters.pop, S.est, { en: ',', de: '.' }[tl.lang] || ' ', width / 2, 306, outro ? 1 : easeOut((local - .45) / .6));
+      const main = era.realms.find(r => r.face) || era.realms[0], flag = main ? (cc, box) => fillFlag(cc, main, box) : null;
+      const maxW = 1180 - (34 + 30 + (flag ? 126 : 6)) - (34 + 36 + (outro ? 70 : 0));
+      let title, lines, slide;
+      if (outro) { title = S.fav.toLocaleUpperCase(tl.lang); lines = Cart.wrap(c, S.favSub, maxW, 30, 700, Cart.TEXT, 1); slide = clamp((st.p - .02) / .25, 0, 1); }
+      else { title = String(era.title || '').toLocaleUpperCase(tl.lang); lines = Cart.wrap(c, era.caption, maxW, 30, 700, Cart.TEXT, 2); slide = clamp((local - .3) / .5, 0, 1) * clamp((era.dur - local) / .3, 0, 1); }
+      Cart.scroll(c, width, height, { cx: width / 2, bottom: height - 20, title, lines, flag, slide, arrow: outro ? 1 : 0, t });
+      if (outro) Cart.subscribe(c, width, S.sub.toLocaleUpperCase(tl.lang), clamp((st.p - .12) / .3, 0, 1), t);
+    }
+    // Chữ dán «BOOM!» / «LAND HO!» bật ra cạnh ký hiệu trận đánh / tàu đến (tín hiệu lấy từ Plan.cuesOf).
+    function toonStickers(c, st, pr, t) {
+      if (tl.stickerCues === undefined) tl.stickerCues = Plan.cuesOf(tl).filter(q => q.kind === 'sticker');
+      for (const q of tl.stickerCues) {
+        if (q.era !== st.index) continue;
+        const m = st.era.markers[q.marker], age = t - q.t, k = clamp(age / .32, 0, 1), fade = clamp((q.dur - age) / .3, 0, 1);
+        if (!m || age < 0 || fade <= 0) continue;
+        const [mx, my] = pr.P(m.at[0], m.at[1]);
+        const x = clamp(mx + 170, 330, width - 330), y = clamp(my - 130, 400, height - 330);
+        c.save(); c.globalAlpha = fade; Cart.sticker(c, q.text, x, y, { k, rot: -.08, size: 84, t }); c.restore();
+      }
+    }
+    function toonIntro(c, st, t) {
+      const S = Plan.strings(tl.lang), p = st.p, fade = clamp(1 - (p - .76) / .24, 0, 1);
+      c.save(); c.globalAlpha = fade;
+      const vg = c.createRadialGradient(width / 2, height * .45, 140, width / 2, height * .45, width * .7); vg.addColorStop(0, 'rgba(0,50,110,.34)'); vg.addColorStop(1, 'rgba(0,40,90,.08)');
+      c.fillStyle = vg; c.fillRect(0, 0, width, height);
+      const fit = Cart.layout(c, tl.title, 1640, { maxLines: 3, maxSize: 160 }), size = fit.size, lh = Math.round(size * 1.06), n = fit.lines.length, y0 = height * .4 - (n - 1) * lh / 2 + size * .3;
+      fit.lines.forEach((ln, i) => {
+        const kk = Cart.easeBack(clamp(p / .15 - i * .25, 0, 1)); if (kk <= 0) return;
+        const g = c.createLinearGradient(0, -size * .8, 0, size * .15); g.addColorStop(0, '#ffe566'); g.addColorStop(1, '#f2a900');
+        c.save(); c.translate(width / 2, y0 + i * lh); c.rotate(-.03 + i * .012); c.scale(kk, kk);
+        Cart.heavy(c, ln, 0, 0, { size, fill: i % 2 ? g : '#fff', stroke: Cart.INK, sw: Math.max(14, size * .18), shadow: { dx: 0, dy: size * .07, color: 'rgba(0,25,60,.45)' } });
+        c.restore();
+      });
+      if (tl.subtitle) {
+        const lines = Cart.wrap(c, tl.subtitle, 880, 30, 700, Cart.TEXT, 2);
+        Cart.scroll(c, width, height, { cx: width / 2, bottom: height - 70, title: '', lines, flag: null, slide: clamp((p - .3) / .22, 0, 1), t, center: true });
+      }
+      c.restore();
+    }
+
     // ---------- Một khung hình ----------
     function setTimeline(next) { tl = next; cache.key = ''; cache.paths.clear(); cache.landKey = ''; }
     // opts.bare: chỉ vẽ bản đồ (không đồng hồ năm, thẻ lời đọc, địa cầu) để làm hình mẫu chủ đề và ảnh bìa. opts.shift: dời bản đồ sang phải (tỉ lệ bề rộng); opts.spanMul: thu nhỏ bản đồ (>1).
@@ -726,26 +866,31 @@
       if (wasMoving !== st.moving) { cache.paths.clear(); cache.landKey = ''; }
       minD = st.moving ? 3 : 2;
       curT = t;
-      ocean(sc, t); sparkles(sc, t); lap('ocean', sc);
+      const cartoon = toon();
+      if (cartoon) Cart.sea(sc, width, height, t, toonTone(st)); else { ocean(sc, t); sparkles(sc, t); }
+      lap('ocean', sc);
       const land = landLayer(pr, st.moving); lap('landLayer', land.getContext('2d'));
       sc.drawImage(land, 0, 0, width, height); lap('landBlit', sc);
+      if (cartoon) Cart.clouds(sc, width, height, t, .38);
       if (st.era) {
         const local = st.local, parts = partsFor(st);
         const g = clamp((local - GROW_DELAY) / GROW, 0, 1), grow = easeOut(g);
-        for (const p of parts.removed) drawGroup(sc, p.keys, p.realm, pr, { alpha: 1 - clamp(local / 1.1, 0, 1), rise: 1 - clamp(local / .9, 0, 1) });
-        for (const p of parts.stable) drawGroup(sc, p.keys, p.realm, pr);
+        const group = cartoon ? toonGroup : drawGroup;
+        for (const p of parts.removed) group(sc, p.keys, p.realm, pr, { alpha: 1 - clamp(local / 1.1, 0, 1), rise: 1 - clamp(local / .9, 0, 1) });
+        for (const p of parts.stable) group(sc, p.keys, p.realm, pr);
         for (const p of parts.added) {
           const b = boxOf(p.keys, pr);
           if (!b) continue;
           const first = bigUnit(p.keys), cl = first && centroidOf(first), c0 = cl ? pr.P(cl[0], cl[1]) : [b.cx, b.cy];
           const R = Math.max(Math.hypot(b.w, b.h) * .75, 40);
-          drawGroup(sc, p.keys, p.realm, pr, { rise: easeOut(clamp(g * 1.25, 0, 1)), reveal: { cx: c0[0], cy: c0[1], r: R * grow, p: g, seed: (st.index + 1) * 1.7 } });
+          group(sc, p.keys, p.realm, pr, { rise: easeOut(clamp(g * 1.25, 0, 1)), reveal: { cx: c0[0], cy: c0[1], r: R * (cartoon ? Cart.easeBack(g) : grow), p: g, seed: (st.index + 1) * 1.7 } });
         }
-        clouds(sc, t);
+        if (!cartoon) clouds(sc, t);
         for (const r of st.era.routes) drawRoute(sc, r, pr, local, t);
         st.era.markers.forEach((m, i) => drawMarker(sc, opts.clean ? { ...m, name: '' } : m, pr, local, i, t));
         const spots = st.era.markers.map(m => pr.P(m.at[0], m.at[1]));
         st.era.realms.forEach(r => {
+          if (cartoon) { toonRealm(sc, r, pr, spots, local, t, opts); return; }
           if (!r.units.length) return;
           const key2 = bigUnit(r.units), cl = key2 && centroidOf(key2), b = boxOf(r.units, pr);
           if (!cl || !b) return;
@@ -765,9 +910,11 @@
       ctx.drawImage(sceneCv, 0, 0);
       ctx.restore();
       lap('compose', ctx);
-      finish(ctx);
+      if (!cartoon) finish(ctx);
       if (opts.bare) { stats.frames++; stats.ms += (typeof performance !== 'undefined' ? performance.now() : Date.now()) - started; return st; }
-      if (st.phase === 'intro') drawIntro(ctx, st, t);
+      if (cartoon && st.era && st.phase === 'era') toonStickers(ctx, st, pr, t);
+      if (st.phase === 'intro') { if (cartoon) toonIntro(ctx, st, t); else drawIntro(ctx, st, t); }
+      else if (st.era && cartoon) toonHud(ctx, st, t);
       else if (st.era) {
         const local = st.local, out = st.phase === 'outro' ? 1 - easeOut(st.p / .4) : 1;
         const counters = Plan.counterAt(st), top = easeOut(local / .8) * out;
@@ -954,7 +1101,7 @@
       // 1) màu rực: chụp khung rồi vẽ lại với độ bão hòa + tương phản cao
       thumbCv = thumbCv || mkSize(W2, H2);
       const tc = thumbCv.getContext('2d'); tc.clearRect(0, 0, W2, H2); tc.drawImage(canvas, 0, 0);
-      c.save(); c.filter = 'saturate(1.65) contrast(1.18) brightness(1.02)'; c.drawImage(thumbCv, 0, 0); c.filter = 'none'; c.restore();
+      c.save(); c.filter = toon() ? 'saturate(1.2) contrast(1.08)' : 'saturate(1.65) contrast(1.18) brightness(1.02)'; c.drawImage(thumbCv, 0, 0); c.filter = 'none'; c.restore();
       // 2) tia sáng + vầng sáng ấm sau vùng chính
       const fx = target[0], fy = target[1];
       c.save(); c.globalCompositeOperation = 'screen';

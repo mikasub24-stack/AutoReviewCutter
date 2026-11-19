@@ -142,6 +142,17 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.10.0
+
+- **Video bản đồ kiểu «hoạt hình sáng»** (giống video mẫu): biển xanh phẳng có sóng bọt, đất xanh lá có quầng bọt quanh bờ, lãnh thổ tô đúng lá cờ viền đen dày; mỗi thế lực có **đôi mắt to** (chớp mắt, nhìn quanh, nét mặt theo tâm trạng: vui, giận, buồn, mệt, tự hào).
+- **Giao diện mới:** số năm vàng rất to viền trắng (nảy khi đổi mốc), dân số ước tính có biểu tượng người, **thanh thời gian có huy hiệu** (thuyền, vương miện, kiếm chéo, sao, cờ, cuộn giấy, lâu đài, người, tên lửa; huy hiệu đã qua sáng vàng, chưa tới màu xám), **cuộn giấy** ở dưới ghi tên giai đoạn + một dòng chú thích kèm cờ. Biển ngả xám xanh ở giai đoạn có trận đánh.
+- **Ký hiệu hoạt hình:** huy hiệu kiếm chéo (trận đánh), ghim đỏ (thủ đô), kim tự tháp (đền), pháo đài (thành), thuyền buồm có thủy thủ (đường biển, vạch trắng đứt), mũi tên đỏ (hành quân).
+- **Hiệu ứng âm thanh tự tạo bằng mã** (không dính bản quyền): vút khi máy quay bay sang giai đoạn mới, lách tách khi số năm chạy, nổi khi lãnh thổ mọc, bốp khi mắt mở, **bùm** ở trận đánh, đing ở thủ đô, tiếng nước khi tàu đến, đồng xu ở huy hiệu mới, nhạc kết ở màn cuối. Trộn trên cùng, không bị nhạc nền hạ xuống.
+- **Chữ dán** «BOOM!» (trận đánh) và «LAND HO!» (tàu đến) bật ra cạnh ký hiệu, theo ngôn ngữ video (Anh, Đức, Pháp, Nga).
+- **Màn mở đầu:** tiêu đề chữ dày viền đen bật ra trên bản đồ + dòng phụ trên cuộn giấy. **Màn kết:** cuộn giấy «Which era is your favourite?» (đủ 4 ngôn ngữ) có mũi tên nhấp nhô và nút **Subscribe** đỏ.
+- Màn hình sửa kịch bản có ô **Kiểu hình video**: Hoạt hình sáng (mặc định, có hiệu ứng âm thanh) hoặc Atlas cổ (giấy da như trước, không hiệu ứng). Kịch bản cũ dựng lại sẽ dùng kiểu hoạt hình.
+- Chưa có trong bản này: các **cảnh hoạt hình có nhân vật người** (thuyền chèo, đánh trận, vua và triều thần…); sẽ làm ở bản sau.
+
 ## Update 1.9.19
 
 - **Thumbnail làm lại theo kiểu các kênh bản đồ ăn view:** bản đồ phóng to vào vùng chính, màu rực, vầng sáng và tia sáng; **vài từ rất to** (2–4 từ viết hoa, viền đen, ví dụ «MONGOL EMPIRE») thay vì cả tiêu đề; nhân vật là **quả cầu cờ mặt giận dữ** đội mũ sắt (giai đoạn có trận đánh) hoặc vương miện. Bấm «Tạo thumbnail khác» để đổi giữa 3 kiểu: **đối đầu** (hai thế lực hai bên, vụ nổ ở giữa; chỉ có một thế lực thì nhân vật đứng giữa), **nhân vật lớn bên trái**, **nhân vật lớn bên phải**; mỗi kiểu lấy một giai đoạn nhiều lãnh thổ và địa danh nhất.

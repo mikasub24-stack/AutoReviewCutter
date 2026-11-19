@@ -8,6 +8,7 @@ const { spawn } = require('node:child_process');
 const Geo = require('./maphist-geo.js');
 const Plan = require('./maphist-plan.js');
 const { checkTools } = require('./merge.cjs');
+const Sfx = require('./maphist-sfx.cjs');
 
 const FPS = 30;
 const MUSIC_EXT = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac'];
@@ -55,7 +56,7 @@ function videoArgs({ fps = FPS, out, threads = 0 }) {
 
 // Bộ lọc âm thanh: lời đọc đặt đúng giây, nhạc nền lặp + mờ vào/ra và tự nhỏ đi khi có lời.
 // voices: [{ file, start (giây trong video), dur (độ dài khoảng dành cho giai đoạn) }]; music: file hoặc ''.
-function audioPlan({ voices, music, musicVolume = .2, total, introEnd, outroSeconds, firstInput = 0 }) {
+function audioPlan({ voices, music, musicVolume = .2, total, introEnd, outroSeconds, firstInput = 0, sfx = '', sfxVolume = .7 }) {
   const inputs = [], filters = [];
   const norm = 'aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,asetpts=PTS-STARTPTS';
   let narration = '';
@@ -83,9 +84,17 @@ function audioPlan({ voices, music, musicVolume = .2, total, introEnd, outroSeco
     filters.push(`[${k}:a]${norm},volume=${num(musicVolume)},atrim=0:${num(total)},afade=t=in:d=2,afade=t=out:st=${num(Math.max(0, total - 3))}:d=3,asetpts=PTS-STARTPTS[mus]`);
     if (narration) {
       filters.push(`${narration}asplit=2[n1][n2]`, '[mus][n1]sidechaincompress=threshold=0.04:ratio=9:attack=20:release=500[duck]',
-        '[duck][n2]amix=inputs=2:duration=longest:dropout_transition=0,volume=2,alimiter=limit=0.95[aout]');
-    } else filters.push('[mus]alimiter=limit=0.95[aout]');
-  } else if (narration) filters.push(`${narration}alimiter=limit=0.95[aout]`);
+        '[duck][n2]amix=inputs=2:duration=longest:dropout_transition=0,volume=2[amain]');
+    } else filters.push('[mus]anull[amain]');
+  } else if (narration) filters.push(`${narration}anull[amain]`);
+  // Hiệu ứng âm thanh (file WAV đã tổng hợp, dài bằng cả video) trộn lên trên cùng, không bị nhạc nền nhấn xuống.
+  if (sfx) {
+    inputs.push(['-i', sfx]);
+    const k = firstInput + inputs.length - 1;
+    filters.push(`[${k}:a]${norm},volume=${num(sfxVolume)},atrim=0:${num(total)},asetpts=PTS-STARTPTS[sfx]`);
+    if (filters.some(f => f.endsWith('[amain]'))) filters.push('[amain][sfx]amix=inputs=2:duration=longest:dropout_transition=0,volume=2,alimiter=limit=0.95[aout]');
+    else filters.push('[sfx]alimiter=limit=0.95[aout]');
+  } else if (filters.length) filters.push('[amain]alimiter=limit=0.95[aout]');
   return { inputs, filters, hasAudio: filters.length > 0 };
 }
 
@@ -179,7 +188,10 @@ function createMapService({ getSettings = () => ({}), voice = null, ensureAllowe
       say('Đang ghép lời đọc và nhạc nền…', { phase: 'mux' });
       const output = path.join(dir, `${cleanName(name || script.title)}.mp4`);
       const voices = timeline.eras.map((e, i) => spoken[i] ? { file: spoken[i].file, lead: Plan.LEAD, dur: e.dur } : null).filter(Boolean);
-      const audio = audioPlan({ voices, music: config.music, musicVolume: config.musicVolume, total: timeline.total, introEnd: timeline.introEnd, outroSeconds: Plan.OUTRO, firstInput: 1 });   // đầu vào 0 là video đã vẽ
+      // Hiệu ứng âm thanh: chỉ kiểu hoạt hình có (tự tổng hợp, nằm trong thư mục tạm).
+      let sfx = '';
+      if (timeline.theme === 'cartoon') { sfx = path.join(temp, 'hieu-ung.wav'); await fs.writeFile(sfx, Sfx.synth(Plan.cuesOf(timeline), timeline.total)); }
+      const audio = audioPlan({ voices, music: config.music, musicVolume: config.musicVolume, total: timeline.total, introEnd: timeline.introEnd, outroSeconds: Plan.OUTRO, firstInput: 1, sfx });   // đầu vào 0 là video đã vẽ
       if (audio.hasAudio) {
         const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y', '-i', silent];
         for (const group of audio.inputs) args.push(...group);

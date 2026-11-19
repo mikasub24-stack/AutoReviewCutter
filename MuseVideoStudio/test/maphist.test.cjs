@@ -283,6 +283,63 @@ function fakeFrames({ stopAfter = 0, onStart } = {}) {
   };
 }
 
+test('hiệu ứng âm thanh: tín hiệu theo dòng thời gian, chữ dán theo ngôn ngữ, bộ lọc trộn thêm tiếng hiệu ứng', () => {
+  const g = geo;
+  const script = copy(sample); script.eras.forEach(e => { e.markers = [{ type: 'battle', name: 'X', at: [110, -7] }, { type: 'ship', name: 'Y', at: [112, -6] }]; e.routes = [{ points: [[100, -2], [110, -7]], ship: true }]; });
+  const norm = lang => Plan.normalizeScript({ ...script, lang }, g).script;
+  const tl = Plan.compile(norm('en'), g, { durations: script.eras.map(() => 9), fps: 30 });
+  const cues = Plan.cuesOf(tl);
+  assert.ok(cues.length > 20 && cues.every((c, i) => c.t >= 0 && c.t < tl.total && (i === 0 || c.t >= cues[i - 1].t)), 'đã sắp xếp theo thời gian, nằm trong video');
+  const kinds = new Set(cues.map(c => c.kind));
+  for (const k of ['whoosh', 'tick', 'swell', 'pop', 'boom', 'splash', 'coin', 'tada', 'sticker']) assert.ok(kinds.has(k), 'có tín hiệu ' + k);
+  const stickers = cues.filter(c => c.kind === 'sticker');
+  assert.equal(stickers.length, tl.eras.length, 'mỗi giai đoạn tối đa một chữ dán');
+  assert.ok(stickers.every(c => c.text === 'BOOM!' && tl.eras[c.era].markers[c.marker].type === 'battle'), 'chữ dán BOOM! đi với trận đánh');
+  assert.equal(Plan.cuesOf(Plan.compile(norm('de'), g, { durations: [], fps: 30 })).find(c => c.kind === 'sticker').text, 'BUMM!', 'chữ dán theo ngôn ngữ video');
+  assert.ok(cues.some(c => c.kind === 'tada' && c.t >= tl.outroStart), 'nhạc kết ở màn cuối');
+  // nhịp hình và tiếng dùng chung một bảng thời gian
+  assert.equal(Plan.TIMING.marker0, 1.1);
+  const Sfx = require('../src/maphist-sfx.cjs');
+  const wav = Sfx.synth(cues, tl.total);
+  assert.equal(wav.toString('ascii', 0, 4), 'RIFF'); assert.equal(wav.toString('ascii', 8, 12), 'WAVE');
+  assert.equal(wav.readUInt16LE(22), 2); assert.equal(wav.readUInt32LE(24), Sfx.RATE);
+  assert.equal(wav.readUInt32LE(40), wav.length - 44);
+  assert.ok(Math.abs((wav.length - 44) / 4 / Sfx.RATE - tl.total) < 1, 'dài bằng cả video');
+  let peak = 0, loud = 0; const n = (wav.length - 44) / 2;
+  for (let i = 0; i < n; i += 7) { const v = Math.abs(wav.readInt16LE(44 + i * 2)) / 32768; if (v > peak) peak = v; if (v > .02) loud++; }
+  assert.ok(peak > .3 && peak <= .86, 'đủ lớn nhưng không vỡ tiếng: ' + peak.toFixed(2));
+  assert.ok(loud > 200, 'có tiếng thật');
+  const silent = Sfx.synth([], 3); let max = 0; for (let i = 44; i < silent.length; i += 2) max = Math.max(max, Math.abs(silent.readInt16LE(i)));
+  assert.equal(max, 0, 'không tín hiệu thì im lặng');
+  const base = { total: 40, introEnd: 3.2, outroSeconds: 4.2, musicVolume: .2 };
+  const only = audioPlan({ ...base, voices: [], music: '', sfx: 'fx.wav', firstInput: 1 });
+  assert.ok(only.hasAudio && only.inputs.length === 1 && only.filters[0].startsWith('[1:a]') && only.filters.at(-1).endsWith('[aout]'), 'chỉ có hiệu ứng vẫn có tiếng');
+  const full = audioPlan({ ...base, voices: [{ file: 'a.wav', lead: .7, dur: 10 }], music: 'm.mp3', sfx: 'fx.wav', firstInput: 1 });
+  assert.ok(full.filters.some(f => /\[amain\]\[sfx\]amix/.test(f)) && full.filters.at(-1).endsWith('[aout]') && /sidechaincompress/.test(full.filters.join(';')), 'hiệu ứng trộn lên trên lời + nhạc đã hạ');
+  const labels = new Set(), used = [];
+  for (const f of full.filters) { for (const m of f.matchAll(/\]?\[([a-z0-9]+)\]/g)) { /* nhãn */ } }
+  const outs = full.filters.map(f => (f.match(/\[([a-z0-9]+)\]$/) || [])[1]).filter(Boolean);
+  assert.ok(outs.includes('amain') && outs.includes('sfx') && outs.at(-1) === 'aout', 'chuỗi nhãn đủ: ' + outs.join(','));
+  assert.equal(audioPlan({ ...base, voices: [], music: '' }).hasAudio, false, 'không hiệu ứng, không lời, không nhạc thì vẫn im lặng');
+});
+
+test('kiểu hoạt hình: mặc định cho kịch bản mới, kịch bản cũ vẫn dùng được, kiểu cổ giữ lại; mọi chuỗi cần cho màn mở/kết có đủ 4 ngôn ngữ', () => {
+  const g = geo;
+  assert.equal(Plan.normalizeScript(copy(sample), g).script.theme, 'cartoon');
+  assert.equal(Plan.normalizeScript({ ...copy(sample), theme: 'classic' }, g).script.theme, 'classic');
+  assert.equal(Plan.normalizeScript({ ...copy(sample), theme: 'bậy' }, g).script.theme, 'cartoon');
+  const tl = theme => Plan.compile(Plan.normalizeScript({ ...copy(sample), theme }, g).script, g, { durations: [], fps: 30 });
+  assert.equal(tl('cartoon').theme, 'cartoon'); assert.equal(tl('classic').theme, 'classic');
+  for (const id of ['en', 'de', 'fr', 'ru']) {
+    const S = Plan.strings(id);
+    for (const k of ['sub', 'est', 'fav', 'favSub']) assert.ok(typeof S[k] === 'string' && S[k].length > 1, id + '.' + k);
+    assert.ok(S.stickers.battle && S.stickers.ship, id + ' stickers');
+  }
+  const Cart = require('../src/maphist-cartoon.js');
+  assert.equal(Cart.groupDigits(17486000, ','), '17,486,000'); assert.equal(Cart.groupDigits(999, ','), '999');
+  assert.deepEqual(['sail', 'crown', 'swords', 'star', 'flag', 'scroll', 'castle', 'person', 'rocket'].filter(i => !Cart.ICON_NAMES.includes(i)), [], 'đủ biểu tượng cho huy hiệu mà Muse có thể chọn');
+});
+
 test('bộ lọc âm thanh: chỉ lời / lời + nhạc có hạ nhạc khi có lời / chỉ nhạc / im lặng', () => {
   const base = { total: 40, introEnd: 3.2, outroSeconds: 4.2, musicVolume: .2 };
   const voices = [{ file: 'a.wav', lead: .7, dur: 10 }, { file: 'b.wav', lead: .7, dur: 12 }];
@@ -339,11 +396,15 @@ test('dựng video có nhạc nền: kiểm tra định dạng nhạc, tự hạ
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('dựng không giọng đọc: video im lặng, độ dài theo lời đọc ước lượng', { skip: !ffmpegOk && 'cần ffmpeg + ffprobe' }, async () => {
+test('dựng không giọng đọc: kiểu hoạt hình có hiệu ứng âm thanh, kiểu cổ thì im lặng', { skip: !ffmpegOk && 'cần ffmpeg + ffprobe' }, async () => {
   const dir = tmp();
   const service = createMapService({ getSettings: () => ({ ffmpeg: 'ffmpeg' }), voice: null, renderFrames: fakeFrames() });
-  const result = await service.make({ runId: 'r', dir, config: {}, script: oneEra() });
-  assert.deepEqual(probe(result.output).streams.map(s => s.codec_type), ['video']);
+  const classic = await service.make({ runId: 'r', dir, config: {}, script: { ...oneEra(), theme: 'classic' } });
+  assert.deepEqual(probe(classic.output).streams.map(s => s.codec_type), ['video']);
+  const toon = await service.make({ runId: 'r2', dir, name: 'toon', config: {}, script: oneEra() });
+  const streams = probe(toon.output).streams;
+  assert.deepEqual(streams.map(s => s.codec_type), ['video', 'audio'], 'kiểu hoạt hình: có tiếng hiệu ứng dù không có giọng đọc và nhạc');
+  assert.ok(Math.abs(Number(streams[1].duration) - toon.seconds) < .6, 'tiếng dài bằng video');
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -558,7 +619,7 @@ test('nối app: mọi lệnh giao diện gọi đều có trong main.cjs và da
   const ids = new Set([...ui.matchAll(/\$\('(map\w+)'\)/g)].map(m => m[1]));
   for (const id of ids) assert.ok(html.includes(`id="${id}"`), `index.html thiếu id ${id}`);
   for (const id of ['mapPanel', 'navMap', 'navMapCount', 'mapEditor']) assert.ok(html.includes(`id="${id}"`), id);
-  for (const file of ['maphist-geo.js', 'maphist-plan.js', 'maphist-draw.js', 'maphist-ui.js']) assert.ok(html.includes(`src="${file}"`), file);
+  for (const file of ['maphist-geo.js', 'maphist-plan.js', 'maphist-cartoon.js', 'maphist-draw.js', 'maphist-ui.js']) assert.ok(html.includes(`src="${file}"`), file);
 });
 
 test('nối app: mọi việc tạo video bản đồ đều đòi gói Năm / Vĩnh viễn; xóa chỉ trong thư mục BanDo', () => {

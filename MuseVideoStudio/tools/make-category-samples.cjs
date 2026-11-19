@@ -17,7 +17,7 @@ const VOICE = 9;   // giây lời đọc giả định mỗi giai đoạn: thẻ
     const html = path.join(os.tmpdir(), 'maphist-category-samples.html');
     fs.writeFileSync(html, `<!doctype html><meta charset="utf-8"><style>@font-face{font-family:"MapLora";font-weight:400 700;font-style:normal;src:url("${font('Lora-Variable.ttf')}")}@font-face{font-family:"MapLora";font-weight:400 700;font-style:italic;src:url("${font('Lora-Italic-Variable.ttf')}")}html,body{margin:0;background:#000}canvas{display:block}</style><canvas id="c" width="1920" height="1080"></canvas>`);
     await page.goto('file://' + html.replace(/\\/g, '/'));
-    for (const f of ['maphist-geo.js', 'maphist-plan.js', 'maphist-draw.js']) await page.addScriptTag({ path: path.join(SRC, f) });
+    for (const f of ['maphist-geo.js', 'maphist-plan.js', 'maphist-cartoon.js', 'maphist-draw.js']) await page.addScriptTag({ path: path.join(SRC, f) });
     await page.evaluate(raw => { window.geo = maphistGeo.build(raw); window.cv = document.getElementById('c'); }, raw);
     await page.evaluate(() => Promise.all(['400 40px MapLora', '600 40px MapLora', '700 40px MapLora', 'italic 600 40px MapLora', 'italic 700 40px MapLora'].map(f => document.fonts.load(f))));
     for (const c of cats) {
