@@ -1474,6 +1474,19 @@ app.whenReady().then(async () => {
       const {script,issues}=mapPlan.normalizeScript(raw,await ensureMapGeo());
       return {script,issues:issues.map(x=>String(x.text||x)),meta};
     },
+    // Video dựng bằng bản cũ chưa có «gói đăng YouTube»: lập từ kịch bản đã lưu để tiêu đề đúng với bài (chương cần dựng lại mới có giờ thật).
+    mapPublish: async data => {
+      const id=String(data?.runId||''),meta=mapRuns()[id];
+      if(!meta)throw Error('Không thấy video này.');
+      const raw=await readJsonFile(mapScriptFile(id));
+      if(!raw)throw Error('Chưa có kịch bản của video này.');
+      if(meta.publish?.title)return {publish:meta.publish};
+      const {script}=mapPlan.normalizeScript(raw,await ensureMapGeo());
+      const pack=mapPlan.publishPack(script,null);
+      meta.publish={title:pack.title,description:pack.description,tags:pack.tags,chapters:[],partial:true};
+      await save();notify();
+      return {publish:meta.publish};
+    },
     // Lưu kịch bản người dùng đã sửa (kiểm lại bằng bộ chuẩn hóa, trả về chỗ còn lỗi).
     mapSaveScript: async data => {
       if(mapState.busy||mapService?.busy)throw Error('Đang làm video bản đồ, chờ xong hoặc bấm Dừng.');

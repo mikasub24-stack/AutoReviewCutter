@@ -129,8 +129,11 @@
       try { await navigator.clipboard.writeText(value); toast(done); } catch { toast('Không sao chép được. Hãy chọn chữ rồi nhấn Ctrl+C.'); }
     });
   }
-  function publishBox(meta) {
-    const p = meta.publish, title = (p && p.title) || meta.name || '', box = node('div', 'publishBox');
+  const publishAsked = new Set();
+  function publishBox(meta, id) {
+    const p = meta.publish, title = (p && p.title) || meta.title || meta.name || '', box = node('div', 'publishBox');
+    // Video cũ chưa có gói đăng: nhờ máy lập từ kịch bản (tiêu đề đúng như trên video, không phải tên dự án).
+    if (!p && id && !publishAsked.has(id)) { publishAsked.add(id); call('mapPublish', { runId: id }).then(r => { if (r) refresh(); }); }
     const input = node('input', 'publishTitle'); input.type = 'text'; input.readOnly = true; input.value = title; input.onfocus = () => input.select();
     const row = node('div', 'publishRow'); row.append(input, copyButton('Sao chép tiêu đề', title, 'Đã sao chép tiêu đề.'));
     box.append(node('strong', 'publishHead', 'Tiêu đề đăng YouTube (đúng như trên video)'), row);
@@ -139,14 +142,16 @@
       desc.readOnly = true; desc.rows = 9; desc.value = p.description || ''; tags.readOnly = true; tags.rows = 2; tags.value = (p.tags || []).join(', ');
       more.append(node('summary', '', 'Mô tả (có chương) và thẻ'), desc, copyButton('Sao chép mô tả', desc.value, 'Đã sao chép mô tả.'), tags, copyButton('Sao chép thẻ', tags.value, 'Đã sao chép thẻ.'));
       box.append(more);
-      if (meta.publishFile) box.append(node('small', 'hint', 'Cả ba đã được lưu trong file tieu-de-youtube.txt cạnh video (bấm «Mở video» để tới thư mục).'));
-    } else box.append(node('small', 'hint', 'Video này dựng bằng bản cũ nên chưa có mô tả và chương. Bấm «Dựng lại» để có đủ.'));
+      if (p.partial) box.append(node('small', 'hint', 'Video này dựng bằng bản cũ nên chưa có chương (mô tả và thẻ lập từ kịch bản). Bấm «Dựng lại» để có chương đúng giờ.'));
+      else if (meta.publishFile) box.append(node('small', 'hint', 'Cả ba đã được lưu trong file tieu-de-youtube.txt cạnh video (bấm «Mở video» để tới thư mục).'));
+    } else box.append(node('small', 'hint', 'Đang lập mô tả và thẻ từ kịch bản…'));
+    if (title.length > 70) box.append(node('small', 'hint', 'Tiêu đề hơi dài: YouTube thường chỉ hiện khoảng 60–70 ký tự. Muốn gọn hơn, bấm «Xem và sửa kịch bản», sửa tiêu đề rồi «Dựng lại» (tiêu đề trên video và tiêu đề đăng luôn khớp nhau).'));
     return box;
   }
   function renderRuns(s) {
     const info = s.maphist || {}, runs = runsOf(s), write = info.write || {}, build = info.build || {};
     const key = JSON.stringify([Boolean(s.active), Boolean(s.starting), Boolean(s.merging), info.busy, info.phase, info.progress, info.error, info.runId, write.progress, write.done, write.total, build.progress, build.done, build.total, build.previewAt || 0,
-      thumbBusy, runs.map(r => [r.id, r.meta.status || '', r.meta.output || '', r.meta.builtAt || 0, r.meta.error || '', r.meta.name || '', r.meta.thumb || '', r.meta.thumbAt || 0])]);
+      thumbBusy, runs.map(r => [r.id, r.meta.status || '', r.meta.output || '', r.meta.builtAt || 0, r.meta.error || '', r.meta.name || '', r.meta.thumb || '', r.meta.thumbAt || 0, r.meta.publish ? 1 : 0])]);
     if (key === runsKey) return;
     runsKey = key;
     const hint = $('mapRunHint');
@@ -173,7 +178,7 @@
       const extra = [];
       // Vẽ tới đâu hiện tới đó: khung hình vừa vẽ xong (một thẻ img dùng lại, đổi nguồn khi có khung mới nên không nháy).
       if (building && build.preview) { if (liveAt !== build.previewAt) { live.src = localFileUrl(build.preview); liveAt = build.previewAt; } extra.push(live); } else liveAt = 0;
-      if (meta.output && meta.status === 'done' && !building) extra.push(publishBox(meta));
+      if (meta.output && meta.status === 'done' && !building) extra.push(publishBox(meta, id));
       if (meta.output && meta.status === 'done' && !building) { const video = node('video', 'restoreVideo'); video.controls = true; video.preload = 'metadata'; video.src = localFileUrl(meta.output); extra.push(video); }
       if (meta.thumb && meta.status === 'done' && !building) { const img = node('img', 'restoreThumb'); img.alt = 'Thumbnail 16:9'; img.src = localFileUrl(meta.thumb) + '?v=' + (meta.thumbAt || 0); extra.push(img); }
       const actions = node('div', 'restoreRunActions');
@@ -208,7 +213,7 @@
           if (!pick) return;
           const r = await call('mapRemove', { runId: id, deleteFiles: pick.files });
           if (r) { runsKey = ''; render(r); toast(pick.files ? 'Đã xóa video và chuyển file đã lưu vào Thùng rác.' : 'Đã xóa video khỏi danh sách (file vẫn còn trong thư mục).'); }
-        }, busy);
+        });   // xóa video cũ được cả khi đang làm video mới (video đang chạy thì hiện «Dừng», không có nút Xóa)
         actions.append(del);
       }
       box.append(top, bar, text, ...extra, actions);
@@ -289,7 +294,7 @@
   }
   function drawEditor() {
     const s = edit.script;
-    $('mapEditTitle').value = s.title || ''; $('mapEditSubtitle').value = s.subtitle || '';
+    $('mapEditTitle').value = s.title || ''; $('mapEditSubtitle').value = s.subtitle || ''; $('mapEditHook').value = s.hook || Plan.hookOf(s).toLowerCase();
     const issues = $('mapIssues'); issues.hidden = !edit.issues.length;
     issues.replaceChildren(node('strong', '', `Cần kiểm tra (${edit.issues.length})`), ...edit.issues.slice(0, 40).map(x => node('div', '', x)));
     $('mapEras').replaceChildren(...s.eras.map(eraCard), button('+ Thêm giai đoạn cuối', 'secondary', () => { s.eras.push(eraTemplate(s.eras[s.eras.length - 1])); drawEditor(); }));
@@ -313,7 +318,7 @@
       $('mapPreviewBox').scrollIntoView({ block: 'nearest' });
     } catch (error) { status.textContent = 'Không dựng được hình xem thử: ' + error.message; $('mapPreviewBox').hidden = false; }
   }
-  function collect() { edit.script.title = $('mapEditTitle').value; edit.script.subtitle = $('mapEditSubtitle').value; return JSON.parse(JSON.stringify(edit.script, (k, v) => (k === 'units' ? undefined : v))); }
+  function collect() { edit.script.title = $('mapEditTitle').value; edit.script.subtitle = $('mapEditSubtitle').value; edit.script.hook = $('mapEditHook').value.trim(); return JSON.parse(JSON.stringify(edit.script, (k, v) => (k === 'units' ? undefined : v))); }
   async function saveEdit() {
     const r = await call('mapSaveScript', { runId: edit.runId, script: collect() });
     if (r) { edit.issues = r.issues || []; drawEditor(); toast(edit.issues.length ? `Đã lưu kịch bản. Còn ${edit.issues.length} chỗ cần kiểm tra.` : 'Đã lưu kịch bản.'); }

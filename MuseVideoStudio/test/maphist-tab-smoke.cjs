@@ -79,6 +79,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
           if (name === 'mapSaveScript') return { issues: [] };
           if (name === 'mapRender') { s.maphist.runs[data.runId].status = 'building'; Object.assign(s.maphist, { busy: true, phase: 'build', runId: data.runId }); s.maphist.build = { busy: true, progress: 'Đang vẽ khung hình 300/900 · còn khoảng 2 phút', done: 300, total: 900, preview: 'C:\\Videos\\BanDo\\History-of-Testland\\.dang-dung\\xem-truoc-0.jpg', previewAt: 111 }; setTimeout(window.push, 0); return { runId: data.runId }; }
           if (name === 'mapThumb') { Object.assign(s.maphist.runs[data.runId], { thumb: 'C:\\Videos\\BanDo\\History-of-Testland\\thumbnail-1.jpg', thumbAt: 5 }); setTimeout(window.push, 0); return { file: 'C:\\Videos\\BanDo\\History-of-Testland\\thumbnail-1.jpg', variant: 1, count: 3 }; }
+          if (name === 'mapPublish') { Object.assign(s.maphist.runs[data.runId], { publish: { title: 'Testland: The Full Story from Dust to Empire', description: 'A tale of Testland.', tags: ['history'], chapters: [], partial: true } }); setTimeout(window.push, 0); return { publish: s.maphist.runs[data.runId].publish }; }
           if (name === 'mapRemove') { delete s.maphist.runs[data.runId]; return structuredClone(s); }
           return structuredClone(s);
         }
@@ -254,13 +255,24 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.equal(await page.locator('#mapRuns img.restoreLive').count(), 1, 'đang dựng thì hiện khung hình vừa vẽ');
     assert.match(await page.locator('#mapRuns img.restoreLive').getAttribute('src'), /xem-truoc-0\.jpg$/);
 
+    // Đang dựng video mới vẫn xóa được video cũ (chỉ «Dựng lại» và «Xem và sửa» bị khóa).
+    await page.evaluate(() => { window.s.maphist.runs['Old-Video'] = { name: 'Old video', status: 'done', output: 'C:\\Videos\\BanDo\\Old-Video\\Old-Video.mp4', seconds: 100, eras: 3, builtAt: 1, createdAt: 1, publish: { title: 'Old', description: '', tags: [], chapters: [] } }; window.push(); });
+    await page.waitForFunction(() => document.querySelectorAll('#mapRuns .restoreRun').length === 2);
+    const oldRun = page.locator('#mapRuns .restoreRun', { hasText: 'Old video' });
+    assert.equal(await oldRun.locator('button', { hasText: 'Xóa' }).isDisabled(), false, 'xóa video cũ được khi đang dựng video khác');
+    assert.equal(await oldRun.locator('button', { hasText: 'Dựng lại' }).isDisabled(), true, 'dựng lại thì phải chờ');
+    await page.evaluate(() => { delete window.s.maphist.runs['Old-Video']; window.push(); });
+    await page.waitForFunction(() => document.querySelectorAll('#mapRuns .restoreRun').length === 1);
+
     // 8) Dựng xong: video, lưu, mở, dựng lại, xóa (hộp hỏi có tick xóa file).
     await page.evaluate(() => { Object.assign(window.s.maphist, { busy: false, phase: 'done' }); window.s.maphist.build = {}; Object.assign(window.s.maphist.runs['History-of-Testland'], { status: 'done', output: 'C:\\Videos\\BanDo\\History-of-Testland\\History-of-Testland.mp4', seconds: 252, eras: 3 }); window.push(); });
-    // Video bản cũ (chưa có bộ thông tin đăng): vẫn hiện tiêu đề (tên video) và báo dựng lại để có mô tả + chương.
+    // Video bản cũ (chưa có bộ thông tin đăng): máy lập từ kịch bản nên tiêu đề là tiêu đề thật của bài (không phải tên dự án), chương cần dựng lại.
     await page.waitForSelector('#mapRuns .publishBox');
-    assert.equal(await page.locator('#mapRuns input.publishTitle').inputValue(), 'History of Testland');
-    assert.match(await page.locator('#mapRuns .publishBox').textContent(), /dựng bằng bản cũ/);
-    assert.equal(await page.locator('#mapRuns .publishMore').count(), 0);
+    await page.waitForFunction(() => document.querySelector('#mapRuns input.publishTitle')?.value === 'Testland: The Full Story from Dust to Empire');
+    assert.equal((await calls('mapPublish')).length, 1, 'chỉ nhờ máy lập một lần');
+    assert.equal((await calls('mapPublish'))[0].data.runId, 'History-of-Testland');
+    assert.match(await page.locator('#mapRuns .publishBox').textContent(), /chưa có chương/);
+    assert.equal(await page.locator('#mapRuns .publishMore').count(), 1);
     // Video mới: tiêu đề đúng như trên video + mô tả có chương + thẻ, sao chép được.
     await page.evaluate(() => { Object.assign(window.s.maphist.runs['History-of-Testland'], { builtAt: 2, publish: { title: 'Testland: From Dust to Empire', description: 'A tale\n\nChapters\n0:00 1350: Start\n0:20 1400: Rise\n0:40 1500: Fall', tags: ['history', 'testland history'], chapters: [] }, publishFile: 'C:\\Videos\\BanDo\\History-of-Testland\\tieu-de-youtube.txt' }); window.push(); window.copied = []; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { window.copied.push(t); } } }); });
     await page.waitForFunction(() => document.querySelector('#mapRuns input.publishTitle')?.value === 'Testland: From Dust to Empire');
@@ -310,6 +322,31 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     await page.click('#navMap');
     assert.equal(await page.locator('#mapTopic').inputValue(), 'History of Testland');
     assert.equal(await page.locator('#mapCountry').inputValue(), 'Indonesia');
+    // 11) Ảnh bìa: ba kiểu bố cục thật sự khác nhau, màu rực; chữ duy nhất là vài từ to (hook), không nhãn nhỏ nào khác; hook trống thì không chữ.
+    const thumbs = await page.evaluate(async () => {
+      const raw = await window.nodeJson('world'), sample = await window.nodeJson('sample');
+      const geo = maphistGeo.build(raw), n = maphistPlan.normalizeScript(sample, geo);
+      const tl = maphistPlan.compile(n.script, geo, { durations: n.script.eras.map(() => 14), fps: 30 });
+      const canvas = Object.assign(document.createElement('canvas'), { width: 1920, height: 1080 });
+      const R = maphistDraw.create({ canvas, geo }); R.setTimeline(tl);
+      let textCalls = 0, said = new Set(); const proto = CanvasRenderingContext2D.prototype, f = proto.fillText, k = proto.strokeText;
+      proto.fillText = function (...a) { textCalls++; said.add(a[0]); return f.apply(this, a); }; proto.strokeText = function (...a) { textCalls++; return k.apply(this, a); };
+      const out = [];
+      try {
+        textCalls = 0; R.drawThumbnail(1, { variant: 0, hook: '' }); const none = textCalls;
+        for (let v = 0; v < 3; v++) {
+          textCalls = 0; said = new Set(); R.drawThumbnail(1, { variant: v, hook: 'AZTEC EMPIRE' });
+          const d = canvas.getContext('2d').getImageData(0, 0, 1920, 1080).data; let sat = 0, cnt = 0, hash = 0;
+          for (let i = 0; i < d.length; i += 4 * 97) { const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]); sat += mx ? (mx - mn) / mx : 0; cnt++; hash = (hash * 31 + d[i] + d[i + 2] * 7) % 1000003; }
+          out.push({ textCalls, said: [...said].join(' '), none, sat: sat / cnt, hash });
+        }
+      } finally { proto.fillText = f; proto.strokeText = k; }
+      return out;
+    });
+    assert.equal(thumbs[0].none, 0, 'hook trống thì không vẽ chữ');
+    assert.deepEqual(thumbs.map(t => t.said), ['AZTEC EMPIRE', 'AZTEC EMPIRE', 'AZTEC EMPIRE'], 'chữ duy nhất trên ảnh bìa là hook (một hoặc hai dòng)');
+    assert.ok(thumbs.every(t => t.sat > .3), 'màu rực (độ bão hòa cao): ' + thumbs.map(t => t.sat.toFixed(2)));
+    assert.equal(new Set(thumbs.map(t => t.hash)).size, 3, 'ba kiểu bố cục khác nhau');
     assert.deepEqual(errors, [], 'không lỗi script: ' + errors.join(' | '));
     console.log('maphist-tab-smoke OK');
   } finally { await browser.close(); server.close(); }

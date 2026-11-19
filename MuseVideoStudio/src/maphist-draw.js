@@ -717,6 +717,7 @@
       const started = typeof performance !== 'undefined' ? performance.now() : Date.now();
       if (profile) lapAt = performance.now();
       const st = Plan.stateAt(tl, t);
+      if (opts.cam) st.cam = opts.cam;
       if (opts.shift || opts.spanMul) { const span = st.cam.span * (opts.spanMul || 1); st.cam = { ...st.cam, span, lon: st.cam.lon - span * (opts.shift || 0) }; }
       const cam = st.cam, pr = projector(cam);
       const key = [cam.lon, cam.lat, cam.span].map(v => v.toFixed(3)).join(',');
@@ -742,7 +743,7 @@
         }
         clouds(sc, t);
         for (const r of st.era.routes) drawRoute(sc, r, pr, local, t);
-        st.era.markers.forEach((m, i) => drawMarker(sc, m, pr, local, i, t));
+        st.era.markers.forEach((m, i) => drawMarker(sc, opts.clean ? { ...m, name: '' } : m, pr, local, i, t));
         const spots = st.era.markers.map(m => pr.P(m.at[0], m.at[1]));
         st.era.realms.forEach(r => {
           if (!r.units.length) return;
@@ -751,8 +752,8 @@
           const [x, y] = pr.P(cl[0], cl[1]), ub = boxOf([key2], pr) || b, fs = clamp(Math.sqrt(ub.w * ub.h) / 260, .45, 1.15);
           const [ax, ay] = clearSpot(x, y, spots, fs, 70 * fs + 20);
           const k = (local - GROW_DELAY - GROW * .6) / 1.3;
-          if (r.face) flagAt(sc, ax, ay + 24 * fs, fs, r, t, k);
-          if (r.name && Math.min(b.w, b.h) > 60 && k > .5) tag(sc, r.name, ax, ay + 24 * fs + (r.face ? 34 * fs + 8 : 0), clamp(easeOut((k - .5) / .5), 0, 1) * clamp(fs + .35, .8, 1.15), clamp(Math.min(b.w, b.h) / 11, 17, 26));
+          if (r.face && !opts.clean) flagAt(sc, ax, ay + 24 * fs, fs, r, t, k);
+          if (r.name && !opts.clean && Math.min(b.w, b.h) > 60 && k > .5) tag(sc, r.name, ax, ay + 24 * fs + (r.face ? 34 * fs + 8 : 0), clamp(easeOut((k - .5) / .5), 0, 1) * clamp(fs + .35, .8, 1.15), clamp(Math.min(b.w, b.h) / 11, 17, 26));
         });
       }
       lap('realms+markers', sc);
@@ -819,41 +820,168 @@
     }
     // Hình mẫu chủ đề: chỉ bản đồ của giai đoạn i.
     function drawStill(i, opts = {}) { return drawFrame(stillTime(i), { bare: true, shift: opts.shift || 0, spanMul: opts.spanMul || 1 }); }
-    // Ảnh bìa 16:9: bản đồ dời sang phải, tiêu đề lớn bên trái (chữ trắng viền xanh đậm), phụ đề vàng, khoảng năm.
-    function drawThumbnail(i, { title = '', subtitle = '', years = '' } = {}) {
-      drawStill(i, { shift: .2, spanMul: 1.28 });
-      const c = ctx;
-      c.save();
-      const g = c.createLinearGradient(0, 0, width * .66, 0); g.addColorStop(0, 'rgba(5,14,26,.9)'); g.addColorStop(.62, 'rgba(5,14,26,.55)'); g.addColorStop(1, 'rgba(5,14,26,0)');
-      c.fillStyle = g; c.fillRect(0, 0, width, height);
-      const b = c.createLinearGradient(0, height * .62, 0, height); b.addColorStop(0, 'rgba(5,14,26,0)'); b.addColorStop(1, 'rgba(5,14,26,.62)');
-      c.fillStyle = b; c.fillRect(0, height * .62, width, height * .38);
+    // ---------- Ảnh bìa 16:9 «giật mắt» ----------
+    // Bản đồ phóng to vào vùng chính, màu rực; vài từ RẤT TO viền đen (chữ ngắn, không phải cả tiêu đề); nhân vật là
+    // «quả cầu cờ» mặt giận dữ (đối đầu hai bên, hoặc một nhân vật lớn) kèm mũ sắt hoặc vương miện.
+    const IMPACT = '"MapImpact", "Impact", "Arial Black", "Segoe UI Black", "Inter", "DejaVu Sans", sans-serif';
+    const unMer = y => (2 * Math.atan(Math.exp(y)) - Math.PI / 2) / DEG;
+    // Chỉnh máy quay cho các ô `keys` vừa khít khung chữ nhật (tx, ty là tâm; tw, th là cỡ), không zoom ra xa quá máy quay của giai đoạn.
+    function fitCam(cam, keys, tx, ty, tw, th) {
+      let c = { ...cam }; const far = cam.span * (keys.length > 1 ? 1.35 : 1), near = Math.max(4, cam.span * .3);
+      for (let it = 0; it < 3; it++) {
+        const b0 = boxOf(keys, projector(c));
+        if (!b0 || b0.w < 1 || b0.h < 1) return c;
+        c = { ...c, span: clamp(c.span * Math.max(b0.w / tw, b0.h / th), near, far) };
+        const pr = projector(c), b = boxOf(keys, pr);
+        c = { ...c, lon: c.lon + (b.cx - tx) / pr.S / DEG, lat: unMer(merY(c.lat) + (ty - b.cy) / pr.S) };
+      }
+      return c;
+    }
+    let thumbCv = null;
+    function rays(c, x, y, rot, color, alpha, n = 18) {
+      c.save(); c.translate(x, y); c.rotate(rot);
+      for (let k = 0; k < n; k++) {
+        const a0 = k / n * TAU, a1 = a0 + TAU / n * .5, R = Math.hypot(width, height);
+        const g = c.createRadialGradient(0, 0, 40, 0, 0, R * .75); g.addColorStop(0, `rgba(${color},${alpha})`); g.addColorStop(1, `rgba(${color},0)`);
+        c.fillStyle = g; c.beginPath(); c.moveTo(0, 0); c.lineTo(Math.cos(a0) * R, Math.sin(a0) * R); c.lineTo(Math.cos(a1) * R, Math.sin(a1) * R); c.closePath(); c.fill();
+      }
       c.restore();
-      const words = String(title || '').trim().split(/\s+/).filter(Boolean), maxW = width * .5, left = 76;
-      let size = 168, lines = [];
-      for (; size >= 72; size -= 6) {
-        c.save(); c.font = `700 ${size}px ${SERIF}`;
-        lines = []; let cur = '';
-        for (const w of words) { const next = cur ? cur + ' ' + w : w; if (cur && c.measureText(next.toUpperCase()).width > maxW) { lines.push(cur); cur = w; } else cur = next; }
-        if (cur) lines.push(cur);
-        const widest = Math.max(0, ...lines.map(l => c.measureText(l.toUpperCase()).width));
+    }
+    // Vụ nổ va chạm: sao nhiều cạnh vàng viền đỏ sẫm, lõi trắng, vài tia chớp.
+    function clash(c, x, y, r) {
+      c.save(); c.translate(x, y); c.lineJoin = 'round';
+      const star = (R, r2, spikes, off) => { c.beginPath(); for (let k = 0; k < spikes * 2; k++) { const rr = k % 2 ? r2 : R, a = off + k / (spikes * 2) * TAU; c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } c.closePath(); };
+      c.shadowColor = 'rgba(255,170,30,.9)'; c.shadowBlur = 60;
+      star(r, r * .58, 14, .2); c.fillStyle = '#ff3b1d'; c.strokeStyle = '#2b0c06'; c.lineWidth = 12; c.stroke(); c.fill(); c.shadowColor = 'transparent';
+      star(r * .82, r * .46, 14, .2); c.fillStyle = '#ffc61a'; c.fill();
+      star(r * .52, r * .3, 14, .2); c.fillStyle = '#fff6c9'; c.fill();
+      c.strokeStyle = '#2b0c06'; c.fillStyle = '#ffe14d'; c.lineWidth = 7;
+      for (const [sx, sy, sc2] of [[-1, -1, 1], [1, 1, .9]]) {
+        c.save(); c.scale(sx * sc2, sy * sc2); c.beginPath();
+        [[r * .15, r * .18], [r * .95, r * .55], [r * .62, r * .62], [r * 1.3, r * 1.12], [r * .58, r * .76], [r * .72, r * .48], [r * .1, r * .3]].forEach(([px, py], k) => k ? c.lineTo(px, py) : c.moveTo(px, py));
+        c.closePath(); c.stroke(); c.fill(); c.restore();
+      }
+      c.restore();
+    }
+    // Quả cầu cờ: mặt tròn mang màu/kiểu cờ của thế lực, viền đen dày, bóng bóng loáng, mắt to, lông mày giận dữ, miệng gầm.
+    // look: hướng nhìn của đồng tử (-1 trái … 1 phải); gear: 'helmet' | 'crown' | ''.
+    function ball(c, cx, cy, r, realm, { look = 1, gear = '', tilt = 0 } = {}) {
+      const OUT = '#140b07';
+      c.save(); c.translate(cx, cy); c.rotate(tilt); c.lineJoin = 'round'; c.lineCap = 'round';
+      c.save(); c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = r * .22; c.shadowOffsetY = r * .1; c.fillStyle = OUT; c.beginPath(); c.arc(0, 0, r, 0, TAU); c.fill(); c.restore();
+      c.save(); c.beginPath(); c.arc(0, 0, r, 0, TAU); c.clip();
+      fillFlag(c, realm, { x: -r, y: -r, w: 2 * r, h: 2 * r, cx: 0, cy: 0 });
+      const sh = c.createRadialGradient(-r * .38, -r * .42, r * .08, 0, 0, r * 1.06);
+      sh.addColorStop(0, 'rgba(255,255,255,.42)'); sh.addColorStop(.36, 'rgba(255,255,255,0)'); sh.addColorStop(.7, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,.5)');
+      c.fillStyle = sh; c.fillRect(-r, -r, 2 * r, 2 * r);
+      c.restore();
+      c.strokeStyle = OUT; c.lineWidth = r * .06; c.beginPath(); c.arc(0, 0, r - r * .03, 0, TAU); c.stroke();
+      c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.ellipse(-r * .46, -r * .62, r * .2, r * .09, -.62, 0, TAU); c.fill();   // vệt sáng
+      // mắt
+      const ex = r * .31, ey = -r * .02, rx = r * .21, ry = r * .27;
+      for (const sd of [-1, 1]) {
+        c.fillStyle = '#fff'; c.strokeStyle = OUT; c.lineWidth = r * .035; c.beginPath(); c.ellipse(sd * ex, ey, rx, ry, 0, 0, TAU); c.fill(); c.stroke();
+        const px = sd * ex + look * rx * .36, py = ey + ry * .2;
+        c.fillStyle = OUT; c.beginPath(); c.ellipse(px, py, rx * .5, ry * .52, 0, 0, TAU); c.fill();
+        c.fillStyle = '#fff'; c.beginPath(); c.arc(px - rx * .14, py - ry * .2, rx * .15, 0, TAU); c.fill();
+        // lông mày giận: dốc xuống phía giữa mặt
+        c.strokeStyle = OUT; c.lineWidth = r * .085; c.beginPath(); c.moveTo(sd * (ex + rx * 1.25), ey - ry * 1.25); c.lineTo(sd * (ex - rx * .8), ey - ry * .62); c.stroke();
+      }
+      // miệng gầm có răng
+      const mx = r * .34, my = r * .4;
+      c.beginPath(); c.moveTo(-mx, my - r * .03); c.quadraticCurveTo(0, my - r * .17, mx, my - r * .03); c.quadraticCurveTo(0, my + r * .3, -mx, my - r * .03); c.closePath();
+      c.fillStyle = '#4c0f10'; c.fill();
+      c.save(); c.clip(); c.fillStyle = '#fff'; c.fillRect(-mx, my - r * .12, 2 * mx, r * .11); c.restore();
+      c.strokeStyle = OUT; c.lineWidth = r * .04; c.stroke();
+      // mũ sắt / vương miện
+      if (gear === 'helmet') {
+        const g = c.createLinearGradient(0, -r * 1.2, 0, -r * .5); g.addColorStop(0, '#8a9a5a'); g.addColorStop(1, '#4d5a2c');
+        c.beginPath(); c.arc(0, -r * .56, r * .68, Math.PI, TAU); c.closePath(); c.fillStyle = g; c.fill(); c.strokeStyle = OUT; c.lineWidth = r * .05; c.stroke();
+        c.fillStyle = '#3c4622'; c.beginPath(); c.roundRect(-r * .8, -r * .6, r * 1.6, r * .13, r * .06); c.fill(); c.stroke();
+        c.fillStyle = 'rgba(255,255,255,.28)'; c.beginPath(); c.ellipse(-r * .24, -r * 1.05, r * .2, r * .07, -.4, 0, TAU); c.fill();
+      } else if (gear === 'crown') {
+        const g = c.createLinearGradient(0, -r * 1.4, 0, -r * .85); g.addColorStop(0, '#fff2a0'); g.addColorStop(1, '#e0a21c');
+        c.beginPath(); [[-.42, -.84], [-.46, -1.34], [-.22, -1.08], [0, -1.42], [.22, -1.08], [.46, -1.34], [.42, -.84]].forEach(([px, py], k) => k ? c.lineTo(px * r, py * r) : c.moveTo(px * r, py * r));
+        c.closePath(); c.fillStyle = g; c.fill(); c.strokeStyle = OUT; c.lineWidth = r * .05; c.stroke();
+        c.fillStyle = '#e0242a'; c.beginPath(); c.arc(0, -r * .98, r * .07, 0, TAU); c.fill(); c.lineWidth = r * .025; c.stroke();
+      }
+      c.restore();
+    }
+    // Chữ to ngắn kiểu thumbnail: nghiêng, hơi hẹp, viền đen dày + bóng đổ, chuyển màu. Tối đa hai dòng.
+    function hookText(c, hook, { maxW, maxH, x, top, rot = -.035 }) {
+      const words = String(hook || '').trim().split(/\s+/).filter(Boolean);
+      if (!words.length) return null;
+      const meas = (str, size) => { c.save(); c.font = `900 ${size}px ${IMPACT}`; const w = c.measureText(str).width * .9; c.restore(); return w; };   // .9 = hẹp bớt
+      const options = [{ lines: [words.join(' ')] }];
+      if (words.length > 1) {
+        let best = null;
+        for (let k = 1; k < words.length; k++) { const l = [words.slice(0, k).join(' '), words.slice(k).join(' ')], w = Math.max(meas(l[0], 100), meas(l[1], 100)); if (!best || w < best.w) best = { lines: l, w }; }
+        options.push(best);
+      }
+      for (const o of options) { const w = Math.max(...o.lines.map(l => meas(l, 100))); o.size = Math.min(250, maxW / w * 100, maxH / (o.lines.length * 1.02)); }
+      const pick = options.length > 1 && options[1].size >= options[0].size * .8 ? options[1] : options[0];   // thích hai dòng khi chữ không bé đi nhiều
+      const { lines, size } = pick, lineH = size * 1.0;
+      lines.forEach((ln, k) => {
+        const y = top + size * .86 + k * lineH;
+        const top2 = lines.length === 1 || k === 1;
+        c.save(); c.translate(x, y); c.rotate(rot); c.transform(1, 0, -.16, 1, 0, 0); c.scale(.9, 1);
+        c.font = `900 ${size}px ${IMPACT}`; c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.lineJoin = 'round'; c.miterLimit = 2;
+        const lw = size * .2;
+        c.save(); c.translate(0, size * .075); c.strokeStyle = 'rgba(0,0,0,.55)'; c.lineWidth = lw * 1.12; c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = size * .12; c.strokeText(ln, 0, 0); c.restore();
+        c.strokeStyle = '#0b0705'; c.lineWidth = lw; c.strokeText(ln, 0, 0);
+        const g = c.createLinearGradient(0, -size * .78, 0, size * .02);
+        if (top2) { g.addColorStop(0, '#fff27a'); g.addColorStop(.55, '#ffd21f'); g.addColorStop(1, '#ff9d0a'); } else { g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#dfe7f7'); }
+        c.fillStyle = g; c.fillText(ln, 0, 0);
         c.restore();
-        if (lines.length <= 4 && widest <= maxW && lines.length * size * 1.04 <= height * .56) break;
-      }
-      const lineH = size * 1.04, blockH = lines.length * lineH, subSize = Math.round(Math.max(38, size * .3));
-      const top = Math.max(150, (height - blockH - (subtitle ? subSize * 1.9 : 0)) / 2 + 30);
-      if (years) {
-        c.save(); c.font = `700 40px ${SERIF}`; const w = c.measureText(years).width + 56;
-        c.shadowColor = 'rgba(0,0,0,.45)'; c.shadowBlur = 12; c.shadowOffsetY = 4;
-        const gold = c.createLinearGradient(0, top - 118, 0, top - 52); gold.addColorStop(0, '#f2d58a'); gold.addColorStop(1, '#b98a2c');
-        c.fillStyle = gold; c.beginPath(); c.roundRect(left, top - 118, w, 66, 14); c.fill(); c.shadowColor = 'transparent';
-        c.fillStyle = '#2a1c10'; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText(years, left + 28, top - 84); c.restore();
-      }
-      lines.forEach((l, k) => text(c, l.toUpperCase(), left, top + size * .86 + k * lineH, { size, weight: 700, fill: '#fffaf0', align: 'left', halo: 'rgba(8,20,36,.95)', haloW: Math.max(14, size / 7), spacing: 1 }));
-      if (subtitle) {
-        const y = top + blockH + subSize * .9;
-        c.save(); c.strokeStyle = GOLD; c.lineWidth = 5; c.beginPath(); c.moveTo(left, y - subSize * 1.05); c.lineTo(left + Math.min(maxW, 360), y - subSize * 1.05); c.stroke(); c.restore();
-        text(c, subtitle, left, y + subSize * .35, { size: subSize, weight: 600, style: 'italic', fill: GOLD, align: 'left', halo: 'rgba(8,20,36,.95)', haloW: 10 });
+      });
+      return { size, lines: lines.length, height: size * (lines.length * 1.0 + .2) };
+    }
+    // i: giai đoạn; variant: 0 đối đầu (một thế lực thì nhân vật ở giữa) · 1 nhân vật lớn bên trái · 2 nhân vật lớn bên phải; hook: chữ to trên ảnh ('' = không chữ).
+    function drawThumbnail(i, { variant = 0, hook = '' } = {}) {
+      const era = tl.eras[Math.max(0, Math.min(tl.eras.length - 1, i))], t0 = stillTime(i);
+      const withUnits = (era.realms || []).filter(r => r.units && r.units.length).map(r => ({ r, n: r.units.length })).sort((a, b) => b.n - a.n).map(x => x.r);
+      const A = withUnits[0] || null, B = withUnits[1] || null, layout = ((variant % 3) + 3) % 3;
+      const duel = layout === 0 && A && B, middle = layout === 0 && !duel, left = layout === 1;   // chỉ có một thế lực thì kiểu 0 là nhân vật ở giữa (không trùng kiểu 1 và 2)
+      const gear = (era.markers || []).some(m => m.type === 'battle') ? 'helmet' : 'crown';
+      const base = Plan.stateAt(tl, t0).cam;
+      const keys = !A ? [] : duel ? [...A.units, ...B.units] : A.units;
+      const hasText = Boolean(String(hook || '').trim());
+      const my = height * (hasText ? .6 : .5), mh = height * (hasText ? .46 : .62);
+      const target = duel || middle ? [width * .5, my, width * .84, mh] : left ? [width * .64, my, width * .6, mh] : [width * .36, my, width * .6, mh];
+      const cam = keys.length ? fitCam(base, keys, ...target) : { ...base, span: base.span * .8 };
+      drawFrame(t0, { bare: true, clean: true, cam });
+      const c = ctx, W2 = width, H2 = height;
+      // 1) màu rực: chụp khung rồi vẽ lại với độ bão hòa + tương phản cao
+      thumbCv = thumbCv || mkSize(W2, H2);
+      const tc = thumbCv.getContext('2d'); tc.clearRect(0, 0, W2, H2); tc.drawImage(canvas, 0, 0);
+      c.save(); c.filter = 'saturate(1.65) contrast(1.18) brightness(1.02)'; c.drawImage(thumbCv, 0, 0); c.filter = 'none'; c.restore();
+      // 2) tia sáng + vầng sáng ấm sau vùng chính
+      const fx = target[0], fy = target[1];
+      c.save(); c.globalCompositeOperation = 'screen';
+      rays(c, fx, fy, .25, '255,222,140', .24);
+      const glow = c.createRadialGradient(fx, fy, 30, fx, fy, W2 * .5); glow.addColorStop(0, 'rgba(255,196,90,.4)'); glow.addColorStop(.55, 'rgba(255,120,40,.1)'); glow.addColorStop(1, 'rgba(255,120,40,0)');
+      c.fillStyle = glow; c.fillRect(0, 0, W2, H2); c.restore();
+      // 3) tối viền để chủ thể nổi, thêm tối đỉnh (cho chữ) và đáy (cho nhân vật)
+      c.save();
+      const vg = c.createRadialGradient(W2 / 2, H2 * .5, H2 * .34, W2 / 2, H2 * .5, W2 * .66); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(4,8,20,.7)');
+      c.fillStyle = vg; c.fillRect(0, 0, W2, H2);
+      if (hasText) { const tg = c.createLinearGradient(0, 0, 0, H2 * .5); tg.addColorStop(0, 'rgba(4,8,20,.6)'); tg.addColorStop(1, 'rgba(4,8,20,0)'); c.fillStyle = tg; c.fillRect(0, 0, W2, H2 * .5); }
+      const bt = c.createLinearGradient(0, H2 * .62, 0, H2); bt.addColorStop(0, 'rgba(4,8,20,0)'); bt.addColorStop(1, 'rgba(4,8,20,.5)');
+      c.fillStyle = bt; c.fillRect(0, H2 * .62, W2, H2 * .38); c.restore();
+      // 4) chữ to (hai dòng, giữa phía trên)
+      if (hasText) hookText(c, hook, { maxW: W2 * .9, maxH: H2 * .44, x: W2 / 2, top: 26 });
+      // 5) nhân vật quả cầu cờ (+ vụ nổ khi đối đầu)
+      if (duel) {
+        const r = 232;
+        ball(c, r + 24, H2 - r * .8, r, A, { look: 1, gear, tilt: .1 });
+        ball(c, W2 - r - 24, H2 - r * .8, r, B, { look: -1, gear, tilt: -.1 });
+        clash(c, W2 / 2, H2 * .79, 140);
+      } else if (middle && A) {
+        const r = 270;
+        ball(c, W2 / 2, H2 - r * .72, r, A, { look: 0, gear, tilt: 0 });
+      } else if (A) {
+        const r = 290;
+        ball(c, left ? r + 30 : W2 - r - 30, H2 - r * .78, r, A, { look: left ? 1 : -1, gear, tilt: left ? .07 : -.07 });
       }
     }
     return { setTimeline, drawFrame, drawStill, drawThumbnail, stillTime, stats, projector, profile: p => { profile = p; }, get timeline() { return tl; } };

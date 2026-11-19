@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.19
+
+- **Thumbnail làm lại theo kiểu các kênh bản đồ ăn view:** bản đồ phóng to vào vùng chính, màu rực, vầng sáng và tia sáng; **vài từ rất to** (2–4 từ viết hoa, viền đen, ví dụ «MONGOL EMPIRE») thay vì cả tiêu đề; nhân vật là **quả cầu cờ mặt giận dữ** đội mũ sắt (giai đoạn có trận đánh) hoặc vương miện. Bấm «Tạo thumbnail khác» để đổi giữa 3 kiểu: **đối đầu** (hai thế lực hai bên, vụ nổ ở giữa; chỉ có một thế lực thì nhân vật đứng giữa), **nhân vật lớn bên trái**, **nhân vật lớn bên phải**; mỗi kiểu lấy một giai đoạn nhiều lãnh thổ và địa danh nhất.
+- **Chữ to trên thumbnail do Muse nghĩ ra theo bài** (trường mới «hook» trong kịch bản, đúng ngôn ngữ video, 2–4 từ). Muốn đổi, bấm «Xem và sửa kịch bản», sửa ô «Chữ TO trên thumbnail» rồi tạo lại thumbnail. Kịch bản cũ chưa có thì lấy phần đầu tiêu đề (bỏ «The», «Der», «Le»…). Chữ dùng font Inter Black (giấy phép OFL, kèm trong ứng dụng), có đủ dấu tiếng Đức, Pháp và chữ Nga.
+- **Ô «Tiêu đề đăng YouTube» luôn là tiêu đề thật của bài:** video dựng bằng bản cũ từng hiện tên dự án (ví dụ «The Aztec Empire») thay vì tiêu đề trong video. Giờ máy tự lập tiêu đề, mô tả và thẻ từ kịch bản đã lưu (chương có giờ thật thì bấm «Dựng lại»). Tiêu đề dài hơn 70 ký tự thì có nhắc rút gọn, và tiêu đề trên video luôn khớp tiêu đề đăng.
+- **Xóa được video cũ khi đang dựng video mới:** nút «Xóa» không còn bị khóa (chỉ video đang chạy phải bấm «Dừng» trước).
+
 ## Update 1.9.18
 
 - **Làm video bản đồ bằng tiếng Đức, Pháp, Nga (ngoài tiếng Anh):** ở tab «Bản đồ lịch sử» có ô mới **«Ngôn ngữ video»**: English (tiếng Anh), Deutsch (tiếng Đức), Français (tiếng Pháp), Русский (tiếng Nga). Mỗi video một ngôn ngữ. Ngôn ngữ chọn xong quyết định: Muse viết tiêu đề, tên giai đoạn, chữ trên thẻ, lời đọc và tên các thế lực bằng ngôn ngữ đó; giọng đọc (danh sách giọng và giọng mặc định đổi theo ngôn ngữ; nhớ giọng riêng cho từng ngôn ngữ); các chữ cố định trên video («Cảm ơn đã xem», trước/sau Công nguyên, «triệu người»); và gói đăng YouTube (tiêu đề, mô tả có chương, thẻ, hashtag) cũng viết bằng ngôn ngữ đó.

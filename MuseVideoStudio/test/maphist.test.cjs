@@ -391,14 +391,14 @@ test('ảnh bìa 16:9: chọn giai đoạn nhiều lãnh thổ nhất, đổi �
   assert.equal(path.basename(a.file), 'thumbnail-1.jpg');
   assert.ok(fs.existsSync(a.file) && fs.statSync(a.file).size <= 1.9e6, 'JPEG nhỏ hơn 2 MB (YouTube)');
   assert.ok(asked.length >= 2 && asked[0].quality > asked.at(-1).quality, 'quá nặng thì nén thêm');
-  assert.equal(asked[0].title, sample.title);
-  assert.match(asked[0].years, /–/, 'khoảng năm đầu – cuối');
+  assert.equal(asked[0].variant, 0); assert.equal('title' in asked[0] || 'years' in asked[0], false, 'ảnh bìa chỉ nhận vài từ to (hook), không nhận cả tiêu đề');
+  assert.equal(asked[0].hook, Plan.hookOf(sample)); assert.ok(asked[0].hook.split(' ').length <= 5 && asked[0].hook === asked[0].hook.toLocaleUpperCase('en'));
   assert.equal(asked[0].timeline.W, 1920);
   assert.equal(asked[0].timeline.H, 1080);
-  assert.ok(a.count >= 1 && a.count <= 3);
+  assert.equal(a.count, 3, 'ba kiểu bố cục');
   const b = await service.thumbnail({ dir, name: 'Thử', script: copy(sample), variant: 1 });
   assert.equal(path.basename(b.file), 'thumbnail-2.jpg');
-  assert.notEqual(b.era, a.era, 'bấm lại ra giai đoạn khác');
+  assert.notEqual(b.era, a.era, 'bấm lại ra giai đoạn khác'); assert.equal(asked.at(-1).variant, 1);
   const wrapped = await service.thumbnail({ dir, name: 'Thử', script: copy(sample), variant: a.count });
   assert.equal(wrapped.variant, 0, 'hết vòng thì quay lại ảnh đầu');
   assert.equal(fs.readdirSync(dir).filter(f => f.endsWith('.tmp')).length, 0);
@@ -506,6 +506,25 @@ test('ngôn ngữ video: Anh, Đức, Pháp, Nga — kịch bản, nhãn năm, c
   assert.doesNotMatch(draw, /'Thanks for watching'|\$\{people\(n\)\} people/);
   const main = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.cjs'), 'utf8');
   assert.match(main, /function pickMapVoice\(wanted,language\)/); assert.match(main, /language:config\.language,voice/); assert.match(main, /language:meta\.language,avoid/);
+});
+
+test('chữ to trên ảnh bìa (hook): Muse viết hoặc lấy từ tiêu đề, 1–5 từ VIẾT HOA, bỏ mạo từ, theo ngôn ngữ', () => {
+  assert.equal(Plan.hookOf({ lang: 'en', title: 'The Aztec Empire: From a Lake Island to the Fall of Tenochtitlan' }), 'AZTEC EMPIRE');
+  assert.equal(Plan.hookOf({ lang: 'en', title: 'World War II', hook: 'the war that changed everything' }), 'THE WAR THAT CHANGED EVERYTHING');
+  assert.equal(Plan.hookOf({ lang: 'fr', title: 'L’Empire aztèque : d’une île du lac' }), 'EMPIRE AZTÈQUE');
+  assert.equal(Plan.hookOf({ lang: 'ru', title: 'Империя ацтеков: от острова на озере' }), 'ИМПЕРИЯ АЦТЕКОВ');
+  assert.equal(Plan.hookOf({ lang: 'de', title: 'Das Aztekenreich - Aufstieg und Fall' }), 'AZTEKENREICH');
+  assert.equal(Plan.hookOf({ lang: 'ru', title: '' }), 'ИСТОРИЯ'); assert.equal(Plan.hookOf(null), 'HISTORY');
+  const long = Plan.hookOf({ lang: 'en', hook: 'one two three four five six seven eight nine' }); assert.ok(long.split(' ').length <= 5 && long.length <= 34, long);
+  // Lời nhắc gửi Muse đòi «hook» ngắn bằng đúng ngôn ngữ video; kịch bản giữ lại hook qua chuẩn hóa và biên dịch.
+  for (const id of ['en', 'de', 'fr', 'ru']) {
+    const p = Plan.buildOutlineInstruction(Plan.options({ topic: 'History of Testland', language: id }), ['Mongolia']);
+    assert.ok(p.includes('"hook"') && p.includes(Plan.langOf(id).hookExample), id);
+    assert.equal(Plan.langOf(id).hookExample, Plan.langOf(id).hookExample.toLocaleUpperCase(id));
+  }
+  const { script } = Plan.normalizeScript({ lang: 'de', title: 'T', hook: 'Herren der Steppe', eras: [] }, null);
+  assert.equal(script.hook, 'Herren der Steppe'); assert.equal(Plan.compile(script, null, { durations: [], fps: 30 }).hook, 'HERREN DER STEPPE');
+  assert.equal(Plan.assemble({ title: 'T', subtitle: 'S', hook: 'Хук', country: 'X', eras: [{ n: 1, year: 1, title: 'x' }] }, new Map(), 'ru').hook, 'Хук');
 });
 
 test('tiêu đề mở đầu: tiêu đề dài tự xuống dòng (tối đa 3 dòng) và luôn vừa khung; dải tên giai đoạn không tràn', () => {

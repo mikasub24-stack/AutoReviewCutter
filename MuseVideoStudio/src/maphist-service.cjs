@@ -207,12 +207,14 @@ function createMapService({ getSettings = () => ({}), voice = null, ensureAllowe
     }
   }
 
+  const THUMB_STYLES = 3;
   // Giai đoạn đáng làm ảnh bìa nhất: nhiều lãnh thổ + địa danh nhất (tối đa 3 lựa chọn, tốt nhất trước).
   function pickEras(timeline) {
     const scored = timeline.eras.map((e, i) => ({ i, score: (e.realms || []).reduce((n, r) => n + ((r.units || []).length), 0) * 10 + (e.markers || []).length * 3 + (e.routes || []).length * 2 + i * .01 }));
     return scored.sort((a, b) => b.score - a.score).slice(0, 3).map(x => x.i);
   }
-  // Ảnh bìa 16:9 (1920×1080 JPEG ≤ 2 MB, đúng giới hạn YouTube) của video đã có kịch bản. variant chọn trong tối đa 3 giai đoạn đẹp nhất.
+  // Ảnh bìa 16:9 (1920×1080 JPEG ≤ 2 MB, đúng giới hạn YouTube) của video đã có kịch bản: vài từ RẤT TO (script.hook, hoặc lấy từ tiêu đề) + quả cầu cờ mặt giận dữ.
+  // 3 kiểu: đối đầu hai thế lực / nhân vật lớn bên trái / nhân vật lớn bên phải; mỗi kiểu lấy một trong các giai đoạn đẹp nhất.
   async function thumbnail({ dir, name, script: rawScript, variant = 0 }) {
     if (state.busy) throw Error('Đang dựng một video bản đồ. Chờ dựng xong rồi tạo thumbnail.');
     await ensureAllowed();
@@ -221,20 +223,17 @@ function createMapService({ getSettings = () => ({}), voice = null, ensureAllowe
     const { script } = Plan.normalizeScript(rawScript, g);
     if (!script.eras.length) throw Error('Kịch bản chưa có giai đoạn nào.');
     const timeline = Plan.compile(script, g, { durations: [], fps: FPS });
-    const picks = pickEras(timeline), k = ((Math.round(Number(variant)) || 0) % picks.length + picks.length) % picks.length;
-    const first = script.eras[0].year, last = script.eras[script.eras.length - 1].year;
-    const lang = timeline.lang || 'en';
-    const years = script.eras.length > 1 && first !== last ? `${Plan.yearLabel(first, lang)} – ${Plan.yearLabel(last, lang)}` : Plan.yearLabel(first, lang);
+    const picks = pickEras(timeline), count = THUMB_STYLES, k = ((Math.round(Number(variant)) || 0) % count + count) % count;
     let buffer = null;
     for (const quality of [.92, .86, .8, .72, .64]) {
-      buffer = Buffer.from(await renderStill({ timeline, raw: await raw(), index: picks[k], title: script.title || name || '', subtitle: script.subtitle || '', years, quality }));
+      buffer = Buffer.from(await renderStill({ timeline, raw: await raw(), index: picks[k % picks.length], variant: k, hook: Plan.hookOf(script), quality }));
       if (buffer.length <= 1.9e6) break;
     }
     await fs.mkdir(dir, { recursive: true });
     const file = path.join(dir, `thumbnail-${k + 1}.jpg`), part = file + '.tmp';
     await fs.writeFile(part, buffer);
     await fs.rename(part, file);
-    return { file, era: picks[k], variant: k, count: picks.length, bytes: buffer.length };
+    return { file, era: picks[k % picks.length], variant: k, count, bytes: buffer.length };
   }
 
   const cancel = () => controller?.abort();

@@ -42,7 +42,7 @@ function createWindowFrames({ BrowserWindow, ipcMain, quality = .92 }) {
     }
   }
   // Một ảnh bìa tĩnh: cửa sổ ẩn vẽ giai đoạn index kèm tiêu đề, trả về Buffer JPEG.
-  async function renderStill({ timeline, raw, index, title, subtitle, years, quality = .92, signal }) {
+  async function renderStill({ timeline, raw, index, variant = 0, hook = '', quality = .92, signal }) {
     const win = new BrowserWindow({
       show: false, width: timeline.W, height: timeline.H, useContentSize: true, backgroundColor: '#000000',
       webPreferences: { preload: path.join(__dirname, 'maphist-render-preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false }
@@ -53,7 +53,7 @@ function createWindowFrames({ BrowserWindow, ipcMain, quality = .92 }) {
       await win.loadFile(path.join(__dirname, 'maphist-render.html'));
       const wc = win.webContents;
       await wc.executeJavaScript('window.__mapRenderReady === true');
-      const b64 = await wc.executeJavaScript(`MapRender.thumbnail(${JSON.stringify({ raw, timeline, index, title, subtitle, years, quality })})`);
+      const b64 = await wc.executeJavaScript(`MapRender.thumbnail(${JSON.stringify({ raw, timeline, index, variant, hook, quality })})`);
       return Buffer.from(b64, 'base64');
     } finally {
       signal?.removeEventListener('abort', stop);

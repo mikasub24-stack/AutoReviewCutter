@@ -175,7 +175,7 @@
   // ---------- Ngôn ngữ video: lời đọc, chữ trên video, tiêu đề và mô tả YouTube đều theo một ngôn ngữ ----------
   const fmtNum = (x, lang, max = 1) => x.toLocaleString(lang === 'en' ? 'en-US' : lang === 'de' ? 'de-DE' : lang === 'fr' ? 'fr-FR' : 'ru-RU', { maximumFractionDigits: max });
   const LANGUAGES = [
-    { id: 'en', label: 'English', vi: 'tiếng Anh', voice: 'en-US-GuyNeural', titleExample: 'The Mongol Empire: From Steppe to Superpower',
+    { id: 'en', label: 'English', vi: 'tiếng Anh', voice: 'en-US-GuyNeural', hookExample: 'RULERS OF THE STEPPE', titleExample: 'The Mongol Empire: From Steppe to Superpower',
       sample: 'In the year thirteen fifty, a great kingdom rose from the sea and ruled the islands for generations.',
       s: { thanks: 'Thanks for watching', subscribe: 'Subscribe for more history', bc: 'BC', ad: 'AD', bcTag: 'BC', adTag: 'AD',
         yearBC: y => `${y} BC`, yearAD: y => `${y} AD`, from: (a, b) => `from ${a} to ${b}`,
@@ -183,7 +183,7 @@
       pub: { chapters: 'Chapters', about: (t, span) => `${t}: an animated history map${span ? ' ' + span : ''}, told era by era as the borders change.`,
         note: 'Borders and territories are drawn on a modern map, so they are approximate. Please check dates and details before you rely on them.',
         hash: ['#History', '#HistoryMap', '#AnimatedMap'], tags: ['history', 'history map', 'animated map', 'map history', 'historical maps'], countryTag: c => `${c} history` } },
-    { id: 'de', label: 'Deutsch', vi: 'tiếng Đức', voice: 'de-DE-ConradNeural', titleExample: 'Das Mongolische Reich: Von der Steppe zur Supermacht',
+    { id: 'de', label: 'Deutsch', vi: 'tiếng Đức', voice: 'de-DE-ConradNeural', hookExample: 'HERREN DER STEPPE', titleExample: 'Das Mongolische Reich: Von der Steppe zur Supermacht',
       sample: 'Im Jahr dreizehnhundertfünfzig erhob sich ein großes Königreich aus dem Meer und herrschte über Generationen über die Inseln.',
       s: { thanks: 'Danke fürs Zuschauen', subscribe: 'Abonniere für mehr Geschichte', bc: 'v. Chr.', ad: 'n. Chr.', bcTag: 'v. Chr.', adTag: 'n. Chr.',
         yearBC: y => `${y} v. Chr.`, yearAD: y => `${y} n. Chr.`, from: (a, b) => `von ${a} bis ${b}`,
@@ -191,7 +191,7 @@
       pub: { chapters: 'Kapitel', about: (t, span) => `${t}: eine animierte Geschichtskarte${span ? ' ' + span : ''}, Epoche für Epoche erzählt, während sich die Grenzen verändern.`,
         note: 'Grenzen und Gebiete sind auf einer modernen Karte eingezeichnet und daher nur ungefähre Angaben. Bitte prüfe Daten und Details, bevor du dich darauf verlässt.',
         hash: ['#Geschichte', '#Geschichtskarte', '#AnimierteKarte'], tags: ['geschichte', 'weltgeschichte', 'geschichtskarte', 'animierte karte', 'karte geschichte', 'historische karten'], countryTag: c => `${c} geschichte` } },
-    { id: 'fr', label: 'Français', vi: 'tiếng Pháp', voice: 'fr-FR-HenriNeural', titleExample: 'L’Empire mongol : de la steppe à la superpuissance',
+    { id: 'fr', label: 'Français', vi: 'tiếng Pháp', voice: 'fr-FR-HenriNeural', hookExample: 'MAÎTRES DE LA STEPPE', titleExample: 'L’Empire mongol : de la steppe à la superpuissance',
       sample: 'En treize cent cinquante, un grand royaume surgit de la mer et domina les îles pendant des générations.',
       s: { thanks: 'Merci d’avoir regardé', subscribe: 'Abonnez-vous pour plus d’histoire', bc: 'av. J.-C.', ad: 'apr. J.-C.', bcTag: 'av. J.-C.', adTag: 'apr. J.-C.',
         yearBC: y => `${y} av. J.-C.`, yearAD: y => `${y} apr. J.-C.`, from: (a, b) => `de ${a} à ${b}`,
@@ -199,7 +199,7 @@
       pub: { chapters: 'Chapitres', about: (t, span) => `${t} : une carte historique animée${span ? ' ' + span : ''}, racontée époque par époque au fil des frontières.`,
         note: 'Les frontières et les territoires sont tracés sur une carte moderne : ils sont donc approximatifs. Vérifiez les dates et les détails avant de vous y fier.',
         hash: ['#Histoire', '#CarteHistorique', '#CarteAnimée'], tags: ['histoire', 'histoire du monde', 'carte historique', 'carte animée', 'histoire en cartes', 'cartes historiques'], countryTag: c => `histoire ${c}` } },
-    { id: 'ru', label: 'Русский', vi: 'tiếng Nga', voice: 'ru-RU-DmitryNeural', titleExample: 'Монгольская империя: от степи до сверхдержавы',
+    { id: 'ru', label: 'Русский', vi: 'tiếng Nga', voice: 'ru-RU-DmitryNeural', hookExample: 'ВЛАСТЕЛИНЫ СТЕПИ', titleExample: 'Монгольская империя: от степи до сверхдержавы',
       sample: 'В тысяча триста пятидесятом году из моря поднялось великое королевство и столетиями правило островами.',
       s: { thanks: 'Спасибо за просмотр', subscribe: 'Подпишитесь, чтобы узнать больше истории', bc: 'до н. э.', ad: 'н. э.', bcTag: 'до н.э.', adTag: 'н.э.',
         yearBC: y => `${y} до н. э.`, yearAD: y => `${y} н. э.`, from: (a, b) => `с ${a} по ${b}`,
@@ -289,7 +289,7 @@
     });
     if (!eras.length) issues.push({ era: 0, text: 'Kịch bản chưa có giai đoạn nào.' });
     return {
-      script: { lang: langOf(src.lang).id, title: flat(src.title).slice(0, 120) || 'History', subtitle: flat(src.subtitle).slice(0, 120), country, outro: flat(src.outro).slice(0, 120), eras },
+      script: { lang: langOf(src.lang).id, title: flat(src.title).slice(0, 120) || 'History', subtitle: flat(src.subtitle).slice(0, 120), hook: flat(src.hook).slice(0, 60), country, outro: flat(src.outro).slice(0, 120), eras },
       issues
     };
   }
@@ -350,7 +350,7 @@
     const milestones = order.map((idx, k) => ({ era: idx, year: eras[idx].year, label: eras[idx].label, icon: eras[idx].icon || icons[k % icons.length] }));
     const outroStart = t;
     return {
-      lang, title: script.title, subtitle: script.subtitle, outro: script.outro, country: script.country, fps, W, H,
+      lang, title: script.title, subtitle: script.subtitle, hook: hookOf(script), outro: script.outro, country: script.country, fps, W, H,
       introEnd: INTRO, outroStart, total: outroStart + OUTRO, worldView: { ...WORLD_VIEW },
       eras, milestones,
       focus: mainHit ? mainHit.a3 : ''
@@ -424,6 +424,20 @@
     });
   }
   // Cụm đang đọc ở giây cục bộ `local` của giai đoạn và vị trí từ đang đọc.
+  // Chữ TO trên ảnh bìa: 2–4 từ VIẾT HOA. Dùng «hook» do Muse viết (hoặc bạn sửa); kịch bản cũ chưa có thì lấy phần đầu tiêu đề (trước dấu hai chấm / gạch ngang), bỏ mạo từ.
+  const HISTORY_WORD = { en: 'HISTORY', de: 'GESCHICHTE', fr: 'HISTOIRE', ru: 'ИСТОРИЯ' };
+  const ARTICLE = { en: /^(the|a|an)\s+/i, de: /^(der|die|das|ein|eine)\s+/i, fr: /^(l['’]|le\s+|la\s+|les\s+|un\s+|une\s+)/i, ru: null };
+  function hookOf(script) {
+    const lang = langOf(script && script.lang).id;
+    let h = flat(script && script.hook);
+    if (!h) {
+      h = flat(script && script.title).split(/\s*[:：—–|]\s*|\s+-\s+/)[0] || '';
+      if (ARTICLE[lang]) h = h.replace(ARTICLE[lang], '');
+    }
+    const words = h.replace(/[«»"“”]/g, ' ').split(/\s+/).filter(Boolean).slice(0, 5);
+    while (words.length > 1 && words.join(' ').length > 34) words.pop();
+    return (words.join(' ') || HISTORY_WORD[lang]).toLocaleUpperCase(lang);
+  }
   function subtitleAt(era, local) {
     if (!era.chunks) era.chunks = chunksOf(era.narration);
     const chunks = era.chunks;
@@ -458,7 +472,7 @@
         ? `4. «country» ĐÚNG là: ${config.country}.`
         : '4. «country»: nước hiện nay nằm ở trung tâm câu chuyện, ghi đúng tên tiếng Anh trong danh sách bên dưới. Nếu chủ đề trải ra nhiều nước (đế quốc, chiến tranh lớn) hãy chọn nước ở lõi câu chuyện; chỉ khi thật sự toàn cầu mới để chuỗi rỗng "".',
       '5. Năm trước Công nguyên ghi số âm (ví dụ -221). Chỉ trả lời DUY NHẤT một khối JSON, không viết thêm câu dẫn hay giải thích, đúng khuôn:',
-      `{"title":"<tiêu đề video YouTube hấp dẫn, ${L.vi}, tối đa 60 ký tự, có tên chủ đề, ví dụ: ${L.titleExample}>","subtitle":"<phụ đề ngắn>","country":"<tên nước>","eras":[{"year":-2879,"title":"<tên giai đoạn>","focus":"<một câu: chuyện gì xảy ra và bản đồ đổi ra sao>"}]}`,
+      `{"title":"<tiêu đề video YouTube hấp dẫn, ${L.vi}, tối đa 60 ký tự, có tên chủ đề, ví dụ: ${L.titleExample}>","subtitle":"<phụ đề ngắn>","hook":"<CHỮ TO trên ảnh bìa: 2–4 từ VIẾT HOA, gợi tò mò hoặc nói điều gây sốc về chủ đề, ${L.vi}, ví dụ: ${L.hookExample}>","country":"<tên nước>","eras":[{"year":-2879,"title":"<tên giai đoạn>","focus":"<một câu: chuyện gì xảy ra và bản đồ đổi ra sao>"}]}`,
       ...tail(marker),
       ...(config.country ? [] : ['', 'DANH SÁCH TÊN NƯỚC (chọn đúng một tên trong đây cho «country»):', countryNames.join(', ')]),
       ...(fix ? ['', 'SỬA LỖI – lần trước còn lỗi sau; viết lại ĐỦ toàn bộ khối JSON:', fix] : []),
@@ -530,7 +544,7 @@
     if (!config.topic && !flat(raw.title)) throw Object.assign(Error('Dàn ý thiếu tiêu đề.'), { fixable: true, fix: `Thiếu «title»: ghi chủ đề bạn đã chọn thành «title» (${langOf(config.language).vi}).` });
     if (eras.length < Math.max(3, Math.floor(want * .6))) throw Object.assign(Error('Dàn ý có quá ít giai đoạn.'), { fixable: true, fix: `Dàn ý chỉ có ${eras.length} giai đoạn hợp lệ (cần khoảng ${want}, mỗi giai đoạn đủ "year" là số và "title"). Viết lại ĐỦ.` });
     for (let i = 1; i < eras.length; i++) if (eras[i].year <= eras[i - 1].year) throw Object.assign(Error('Năm không tăng dần.'), { fixable: true, fix: `Các giai đoạn phải xếp theo năm TĂNG DẦN; giai đoạn ${i + 1} (năm ${eras[i].year}) không lớn hơn giai đoạn ${i} (năm ${eras[i - 1].year}). Sửa rồi viết lại ĐỦ.` });
-    return { lang: langOf(config.language).id, title: flat(raw.title).slice(0, 120) || config.topic, subtitle: flat(raw.subtitle).slice(0, 120), country: config.country || flat(raw.country).slice(0, 80), eras: eras.slice(0, MAX_ERAS) };
+    return { lang: langOf(config.language).id, title: flat(raw.title).slice(0, 120) || config.topic, subtitle: flat(raw.subtitle).slice(0, 120), hook: flat(raw.hook).slice(0, 60), country: config.country || flat(raw.country).slice(0, 80), eras: eras.slice(0, MAX_ERAS) };
   }
 
   // Đọc lượt «chi tiết giai đoạn»: trả về Map số thứ tự → giai đoạn thô (chưa chuẩn hóa).
@@ -571,7 +585,7 @@
       if (!raw) return;
       eras.push({ ...raw, year: raw.year != null ? raw.year : o.year, title: raw.title || o.title });
     });
-    return { lang, title: outline.title, subtitle: outline.subtitle, country: outline.country, outro: strings(lang).subscribe, eras };
+    return { lang, title: outline.title, subtitle: outline.subtitle, hook: outline.hook || '', country: outline.country, outro: strings(lang).subscribe, eras };
   }
 
 
@@ -621,6 +635,6 @@
   return {
     W, H, CY, INTRO, OUTRO, LEAD, TAIL, MIN_ERA, ERA_SECONDS, MIN_MINUTES, MAX_MINUTES, DEFAULT_MINUTES, LENGTHS, MAX_ERAS, CATEGORIES, categoryOf, MOODS, FLAGS, MARKERS, ICONS, PALETTE,
     BATCH, NARRATION_MIN, NARRATION_MAX, buildOutlineInstruction, buildErasInstruction, extractJson, parseOutline, parseEras, checkEras, fixText, assemble,
-    eraCount, options, problems, yearLabel, publishPack, clock, LANGUAGES, langOf, strings, normalizeScript, compile, stateAt, counterAt, chunksOf, subtitleAt, flyCam, fit, speakSeconds, bigRingsBox, easeInOut, clamp, lerp, mer, unmerLat, hex, num, words, flat, WORLD_VIEW
+    eraCount, options, problems, yearLabel, publishPack, hookOf, clock, LANGUAGES, langOf, strings, normalizeScript, compile, stateAt, counterAt, chunksOf, subtitleAt, flyCam, fit, speakSeconds, bigRingsBox, easeInOut, clamp, lerp, mer, unmerLat, hex, num, words, flat, WORLD_VIEW
   };
 });

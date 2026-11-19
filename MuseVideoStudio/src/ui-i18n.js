@@ -2,6 +2,10 @@
 (()=>{
   const dictionary=Object.fromEntries(`
 Kể chuyện|Story
+Chữ TO trên thumbnail (2–4 từ, tự viết hoa)|BIG thumbnail text (2–4 words, capitalised automatically)
+Video này dựng bằng bản cũ nên chưa có chương (mô tả và thẻ lập từ kịch bản). Bấm «Dựng lại» để có chương đúng giờ.|This video was built with an older version, so it has no chapters yet (description and tags were made from the script). Click “Rebuild” to get chapters with the right times.
+Đang lập mô tả và thẻ từ kịch bản…|Preparing the description and tags from the script…
+Tiêu đề hơi dài: YouTube thường chỉ hiện khoảng 60–70 ký tự. Muốn gọn hơn, bấm «Xem và sửa kịch bản», sửa tiêu đề rồi «Dựng lại» (tiêu đề trên video và tiêu đề đăng luôn khớp nhau).|The title is a little long: YouTube usually shows only about 60–70 characters. To shorten it, click “View and edit script”, edit the title and then “Rebuild” (the on-video title and the publish title always match).
 Ngôn ngữ video (tiếng Anh, Đức, Pháp, Nga)|Video language (English, German, French, Russian)
 English (tiếng Anh)|English
 Deutsch (tiếng Đức)|Deutsch (German)
