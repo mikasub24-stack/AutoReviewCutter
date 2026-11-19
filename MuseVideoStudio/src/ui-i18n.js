@@ -9,7 +9,6 @@ Chỉ cần gõ chủ đề. Muse tự chọn đất nước, các giai đoạn 
 Chủ đề (tiếng Anh càng rõ càng tốt)|Topic (the clearer the English, the better)
 Nước làm trung tâm (không bắt buộc, để trống thì Muse tự chọn)|Focus country (optional; leave empty and Muse chooses)
 Giọng đọc (tiếng Anh)|Narration voice (English)
-▶ Nghe thử giọng|▶ Preview voice
 Không nhạc nền (chỉ có giọng đọc).|No background music (narration only).
 Âm lượng nhạc|Music volume
 Tự động làm hết: soạn kịch bản, vẽ, đọc, ghép nhạc, xuất video (bỏ tick để dừng ở kịch bản và xem, sửa trước khi dựng)|Do everything automatically: script, map, narration, music, export (untick to stop at the script and review or edit it before building)
