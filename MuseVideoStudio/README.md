@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.11
+
+- **Ảnh tham chiếu giữ nguyên người và quần áo trong ảnh.** Trước đây khi bạn chọn ảnh có người nhưng để «Nữ» / «Nam» mặc định, prompt vẫn ghi sẵn trang phục mặc định (áo khoác xanh lá, mũ len xám, quần túi hộp…) cả ở bước nhờ Muse sửa ảnh lẫn trong từng clip, nên Muse thay quần áo trong ảnh của bạn. Giờ khi có ảnh, người trong ảnh được ưu tiên (mặt, tóc, dáng và đúng bộ quần áo, mũ, găng tay): mô tả mặc định chỉ dùng khi ảnh không có người nào. Bạn tự gõ mô tả người thì app nghe theo mô tả của bạn; chọn «Giống người trong ảnh» thì như cũ.
+- Dòng PERSON trong mỗi clip nhấn mạnh trang phục không đổi, không thêm / bớt / đổi món nào.
+- Câu tả mồ hôi không còn nhắc «áo thấm mồ hôi» (chỉ mồ hôi ở mặt, cổ, tay) để không làm áo của người trong ảnh bị đổi màu hay ướt.
+- Video đã tạo bằng bản cũ vẫn dùng prompt cũ: hãy tạo video mới (hoặc «Thử TK khác» cho ảnh mốc) sau khi cập nhật.
+
 ## Update 1.9.10
 
 - **Tab Kể chuyện có danh sách «Truyện đã tạo»: mỗi câu chuyện là MỘT dòng** (không phải từng thẻ cảnh trong hàng đợi), hiện tên truyện, số cảnh xong, trạng thái (đang tạo / đang dừng / đã xuất MP4 / ghép chưa xong) và các nút:

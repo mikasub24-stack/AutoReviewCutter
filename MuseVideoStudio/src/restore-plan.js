@@ -36,6 +36,10 @@
   const SURVIVOR_F = 'a 28-year-old woman with fair light skin, long dark brown hair in a neat braid, brown eyes and a pretty, youthful, friendly natural face, wearing a green work jacket, brown cargo trousers, black boots and a grey beanie';
   const WORKER_F = 'a 27-year-old woman with fair light skin, long dark brown hair tied back in a ponytail, brown eyes and a pretty, youthful, friendly natural face, wearing a fitted grey work shirt, blue jeans, brown work gloves, black boots and a yellow hard hat';
   const PHOTO_PERSON = 'the same single person who appears in the attached reference photo, with exactly the same face, hairstyle, hair color, skin tone, apparent age, gender, body shape and clothes as in that photo; do not change how this person looks';
+  // Có ảnh tham chiếu mà người dùng không tự gõ mô tả người: người và quần áo TRONG ẢNH được ưu tiên (không ép trang phục mặc định lên ảnh của họ).
+  // Mô tả mặc định chỉ dùng khi ảnh không có người (ảnh chỉ có nơi chốn).
+  const PHOTO_FIRST = 'the person already shown in the attached photo, kept exactly as in that photo (same face, hairstyle, hair color, skin tone, apparent age, gender, body shape and the very same clothes, hat and gloves: never change, add or remove any garment). Only if the attached photo shows no person at all, the person is ';
+  const withPhoto = (config, photo) => (!photo || !config.person || config.who === 'photo' || config.personTyped) ? config : { ...config, personDesc: PHOTO_FIRST + config.personDesc };
   const WHO = ['female', 'male', 'photo'];
   // Người mặc định theo chủ đề và lựa chọn nữ / nam / giống ảnh gốc.
   const personFor = (theme, who) => {
@@ -453,6 +457,7 @@
       provider, minutes, seconds: provider === 'flow' ? 8 : minutes >= LONG_MINUTES ? MAX_SECONDS : Math.min(MAX_SECONDS, seconds),
       aspect: ASPECTS.includes(input.aspect) ? input.aspect : '16:9',
       person, who: WHO.includes(input.who) ? input.who : 'female', personDesc: clean(input.personDesc, 300) || personFor(theme, WHO.includes(input.who) ? input.who : 'female'),
+      personTyped: Boolean(clean(input.personDesc, 300)),
       lang: input.lang === 'en' ? 'en' : 'vi',
       light: clean(input.light, 200) || DEFAULT_LIGHT,
       anchor: Boolean(input.anchor),
@@ -519,7 +524,7 @@
       themeOf(config.theme).survival ? LOCKED_BUILD : LOCKED
     ];
     if (config.person) {
-      lines.push(`PERSON (the same single person in every clip, same hair, body and clothes${config.faceless ? '' : ', same face and facial features'}): ${config.personDesc}.`);
+      lines.push(`PERSON (the same single person in every clip, same hair, body and the very same clothes, hat and gloves with nothing added, removed or swapped${config.faceless ? '' : ', same face and facial features'}): ${config.personDesc}.`);
       if (!config.faceless) lines.push('The face is clearly visible and looks natural, ordinary and realistic, and stays exactly the same person in every clip.');
       if (config.faceless) lines.push(FACELESS);
     }
@@ -597,16 +602,16 @@
       ? ' Once, in the middle of the clip, the person pauses for a moment to wipe the sweat from the face with the forearm and catch their breath, then goes straight back to work.'
       : ' The person keeps working without stopping the whole clip: no wiping the face, no pausing to rest.';
     const work = heavy
-      ? `This is HARD physical labour: the person strains visibly, muscles tense, jaw clenched, frowning with effort, breathing heavily, sweat running down the forehead and neck, shirt dark with sweat, dirty sweaty hands.${rest}`
+      ? `This is HARD physical labour: the person strains visibly, muscles tense, jaw clenched, frowning with effort, breathing heavily, sweat running down the forehead and neck, dirty sweaty hands.${rest}`
       : light
         ? 'The person works calmly and carefully with a relaxed, pleased expression, still a little sweaty and tired from the long work, with a small satisfied smile when the result looks good.'
         : `The person works steadily with a focused, serious face, sweat on the forehead, breathing a little heavily.${rest}`;
     const tired = r < 0.25 ? 'The job has just started: the person is fresh but already starting to sweat.'
-      : r < 0.6 ? 'Several hours into the job: hair damp, shirt dark with sweat, clearly warm and breathing hard between actions.'
+      : r < 0.6 ? 'Several hours into the job: hair damp, sweat on the face and neck, clearly warm and breathing hard between actions.'
       : r < 0.9 ? `Many hours into the job: soaked in sweat, dirty and visibly tired, slower breaths${wipe ? ', rubbing the sore back or shoulder for a moment' : ''}, but pushing on.`
       : 'The job is almost done: exhausted and soaked in sweat but proud, with a tired relieved smile when looking at the result.';
     const how = config.faceless
-      ? `Show the effort and the tiredness with the body only: heaving breath, sweat-dark back and shirt, slumped shoulders${wipe ? ', wiping the neck once' : ''}.`
+      ? `Show the effort and the tiredness with the body only: heaving breath, sweat on the neck and arms, slumped shoulders${wipe ? ', wiping the neck once' : ''}.`
       : 'Show real human emotion in the face and the body, clearly visible in the medium or wide view (effort, tiredness, relief), and never by moving the camera to the face.';
     return [`Emotion and effort (the person is a real tired human, never a calm robot): ${work} ${tired} ${how}`];
   }
@@ -769,7 +774,7 @@
     const sv = Boolean(themeOf(config.theme).survival), r = clipIndex / total, lock = sv ? lockOf(config, step) : '';
     const mood = sv
       ? (r < 0.6 ? 'calm and fresh, at most a faint shine of sweat' : 'calm, with slightly damp hair and a little tired')
-      : (r < 0.25 ? 'fresh with a little sweat' : r < 0.6 ? 'sweaty, hair damp, shirt dark with sweat' : 'soaked in sweat, dirty and visibly tired');
+      : (r < 0.25 ? 'fresh with a little sweat' : r < 0.6 ? 'sweaty, hair damp, sweat on the face and neck' : 'soaked in sweat, dirty and visibly tired');
     return [
       'Edit the attached photo. Keep exactly the same place, the same building or object, the same viewpoint and framing, the same light and the same person (same face, hair, body and clothes) as in the attached photo.',
       config.person ? `The person in the picture is ${config.personDesc}, ${config.faceless ? 'seen from behind or from far away' : 'seen clearly'}, working in the scene, ${mood}. The person holds only the one tool that this moment of the work needs, and nothing else in the hands.` : '',
@@ -788,6 +793,7 @@
 
   // Việc đưa vào hàng đợi. Cảnh 1 làm từ ảnh gốc (ảnh người dùng chọn, hoặc ảnh Muse tạo trước); cảnh k>1 làm từ KHUNG CUỐI THẬT của cảnh k-1 (tool tự cắt bằng FFmpeg).
   function buildJobs(config, { storyId, photo = '', accounts = 1 } = {}) {
+    config = withPhoto(config, photo);
     const steps = stepsOf(config), total = steps.length, jobs = [];
     const starts = segmentsOf(config, accounts), startSet = new Set(starts.slice(1));
     const source = photo ? { file: photo } : { phase: 'image', number: 1 };

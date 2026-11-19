@@ -687,3 +687,35 @@ test('ảnh mốc và chia lại truyện bếp: ảnh mốc cũng khóa chất 
   const { jobs: hj } = liveStory(3), hp = P.resegment(hj, 5);
   assert.ok(hp.images.every(im => /The building keeps its exact architecture/.test(im.prompt) && !/OBJECT LOCK/.test(im.prompt)));
 });
+
+test('có ảnh tham chiếu: người và quần áo trong ảnh được giữ nguyên, không ép trang phục mặc định; khóa trang phục trong dòng PERSON; chữ mồ hôi không nhắc áo', () => {
+  const all = jobs => jobs.map(j => j.prompt).join('\n');
+  const defaultOutfit = /green work jacket.*grey beanie/;
+  for (const theme of ['stove_brick', 'cabin', 'house_full']) {
+    const photoJobs = P.buildJobs(P.options({ theme, minutes: 4 }), { storyId: 's', photo: 'C:\\anh-nguoi.png', accounts: 3 });
+    const text = all(photoJobs);
+    assert.match(text, /the person already shown in the attached photo, kept exactly as in that photo/, theme);
+    assert.match(text, /the very same clothes, hat and gloves: never change, add or remove any garment/, theme);
+    assert.match(text, /Only if the attached photo shows no person at all, the person is a 2\d-year-old woman/, theme + ': mô tả mặc định chỉ là phương án khi ảnh không có người');
+    assert.ok(photoJobs.filter(j => j.phase === 'image').every(j => /The person in the picture is the person already shown in the attached photo/.test(j.prompt)), theme + ': ảnh mốc sửa từ ảnh gốc cũng giữ người trong ảnh');
+    assert.ok(photoJobs.filter(j => j.phase === 'clip').every(j => /the very same clothes, hat and gloves with nothing added, removed or swapped/.test(j.prompt)), theme);
+    // không ảnh: như cũ
+    const plain = all(P.buildJobs(P.options({ theme, minutes: 4 }), { storyId: 's' }));
+    assert.doesNotMatch(plain, /already shown in the attached photo/, theme);
+    assert.match(plain, /the very same clothes, hat and gloves with nothing added, removed or swapped/, theme);
+  }
+  // người dùng tự gõ mô tả người: nghe theo mô tả, không chèn «giống ảnh»
+  const typed = all(P.buildJobs(P.options({ theme: 'cabin', minutes: 2, personDesc: 'a woman in a blue raincoat' }), { storyId: 's', photo: 'p.png' }));
+  assert.doesNotMatch(typed, /already shown in the attached photo/);
+  assert.match(typed, /a woman in a blue raincoat/);
+  // «Giống người trong ảnh» vẫn dùng câu riêng, không lặp ghép
+  const same = all(P.buildJobs(P.options({ theme: 'cabin', minutes: 2, who: 'photo' }), { storyId: 's', photo: 'p.png' }));
+  assert.doesNotMatch(same, /Only if the attached photo shows no person/);
+  assert.match(same, /exactly the same face, hairstyle, hair color/);
+  // chữ mồ hôi không nhắc «áo thấm mồ hôi» (áo của người trong ảnh có thể là loại mỏng / sáng màu)
+  for (const theme of ['stove_brick', 'cabin', 'house_full']) {
+    const text = all(P.buildJobs(P.options({ theme, minutes: 8 }), { storyId: 's', photo: 'p.png', accounts: 2 }));
+    assert.doesNotMatch(text, /shirt dark with sweat|sweat-dark back and shirt/, theme);
+  }
+  assert.doesNotMatch(all(P.buildJobs(P.options({ theme: 'house_full', minutes: 8, faceless: true }), { storyId: 's' })), /sweat-dark back and shirt/);
+});
