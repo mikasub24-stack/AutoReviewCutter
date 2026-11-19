@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.10.1
+
+- **Đổi màu số, màu chữ và phông chữ cho khác video mẫu:** số năm **hồng kẹo** (chuyển sắc) có vòng trắng và viền chàm; nhãn địa danh màu kem viền chàm; tên giai đoạn xanh chàm đậm trên cuộn giấy, dòng chú thích xanh xám; nút Subscribe vẫn đỏ.
+- **Phông mới (giấy phép tự do SIL OFL, kèm sẵn trong app):** Erica One cho tiêu đề mở đầu và chữ dán «BOOM!», «LAND HO!»; Bricolage Grotesque Bold cho số năm, dân số, tên giai đoạn, nhãn; chú thích vẫn là Lora. Chữ Nga tự dùng Inter Black vì hai phông mới không có chữ Cyrillic.
+- Màn mở đầu: tiêu đề thu nhỏ khi thoát (không mờ dần nữa nên không lộ lớp viền).
+
 ## Update 1.10.0
 
 - **Video bản đồ kiểu «hoạt hình sáng»** (giống video mẫu): biển xanh phẳng có sóng bọt, đất xanh lá có quầng bọt quanh bờ, lãnh thổ tô đúng lá cờ viền đen dày; mỗi thế lực có **đôi mắt to** (chớp mắt, nhìn quanh, nét mặt theo tâm trạng: vui, giận, buồn, mệt, tự hào).

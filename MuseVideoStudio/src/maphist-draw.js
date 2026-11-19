@@ -831,21 +831,21 @@
       }
     }
     function toonIntro(c, st, t) {
-      const S = Plan.strings(tl.lang), p = st.p, fade = clamp(1 - (p - .76) / .24, 0, 1);
-      c.save(); c.globalAlpha = fade;
-      const vg = c.createRadialGradient(width / 2, height * .45, 140, width / 2, height * .45, width * .7); vg.addColorStop(0, 'rgba(0,50,110,.34)'); vg.addColorStop(1, 'rgba(0,40,90,.08)');
+      const S = Plan.strings(tl.lang), p = st.p, fade = clamp(1 - (p - .76) / .24, 0, 1), out = 1 - easeOut(clamp((p - .76) / .24, 0, 1));   // chữ nhiều lớp: thoát bằng thu nhỏ, không mờ dần (mờ làm lộ các lớp viền)
+      c.save();
+      const vg = c.createRadialGradient(width / 2, height * .45, 140, width / 2, height * .45, width * .7); vg.addColorStop(0, `rgba(0,50,110,${.34 * fade})`); vg.addColorStop(1, `rgba(0,40,90,${.08 * fade})`);
       c.fillStyle = vg; c.fillRect(0, 0, width, height);
       const fit = Cart.layout(c, tl.title, 1640, { maxLines: 3, maxSize: 160 }), size = fit.size, lh = Math.round(size * 1.06), n = fit.lines.length, y0 = height * .4 - (n - 1) * lh / 2 + size * .3;
       fit.lines.forEach((ln, i) => {
         const kk = Cart.easeBack(clamp(p / .15 - i * .25, 0, 1)); if (kk <= 0) return;
-        const g = c.createLinearGradient(0, -size * .8, 0, size * .15); g.addColorStop(0, '#ffe566'); g.addColorStop(1, '#f2a900');
-        c.save(); c.translate(width / 2, y0 + i * lh); c.rotate(-.03 + i * .012); c.scale(kk, kk);
-        Cart.heavy(c, ln, 0, 0, { size, fill: i % 2 ? g : '#fff', stroke: Cart.INK, sw: Math.max(14, size * .18), shadow: { dx: 0, dy: size * .07, color: 'rgba(0,25,60,.45)' } });
+        const g = Cart.pink(c, -size * .8, size * .15);
+        c.save(); c.translate(width / 2, y0 + i * lh); c.rotate(-.03 + i * .012); c.scale(kk * out, kk * out);
+        Cart.heavy(c, ln, 0, 0, { kind: 'display', size, fill: i % 2 ? g : Cart.CREAM, stroke: Cart.OUT, sw: Math.max(14, size * .2), shadow: { dx: 0, dy: size * .07, color: 'rgba(0,15,50,.45)' } });
         c.restore();
       });
       if (tl.subtitle) {
         const lines = Cart.wrap(c, tl.subtitle, 880, 30, 700, Cart.TEXT, 2);
-        Cart.scroll(c, width, height, { cx: width / 2, bottom: height - 70, title: '', lines, flag: null, slide: clamp((p - .3) / .22, 0, 1), t, center: true });
+        Cart.scroll(c, width, height, { cx: width / 2, bottom: height - 70, title: '', lines, flag: null, slide: clamp((p - .3) / .22, 0, 1) * out, t, center: true });
       }
       c.restore();
     }

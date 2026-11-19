@@ -310,7 +310,7 @@
       const cv = $('mapPreview');
       if (!previewDraw || previewDraw.geo !== geo) previewDraw = { geo, lib: Draw.create({ canvas: cv, geo }) };
       previewDraw.lib.setTimeline(tl);
-      await Promise.all(['700 40px MapLora', '900 40px MapImpact'].map(f => document.fonts.load(f)));
+      await Promise.all(['700 40px MapLora', '900 40px MapImpact', '400 40px MapDisplay', '700 40px MapLabel'].map(f => document.fonts.load(f)));
       const e = tl.eras[Math.min(i, tl.eras.length - 1)];
       const t = e.start + Math.min(e.dur - 1.2, 7);
       previewDraw.lib.drawFrame(t);

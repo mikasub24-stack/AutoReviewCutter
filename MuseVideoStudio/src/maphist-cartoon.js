@@ -11,9 +11,15 @@
   const lerp = (a, b, t) => a + (b - a) * t;
   const easeOut = t => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
   const easeBack = t => { t = clamp(t, 0, 1); const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
-  const HEAVY = '"MapImpact","Impact","Arial Black","Segoe UI Black","Inter","DejaVu Sans",sans-serif';
+  // Phông riêng: «MapDisplay» (Erica One) cho số năm, chữ dán, tiêu đề mở đầu; «MapLabel» (Bricolage Grotesque Bold) cho nhãn, tên giai đoạn, nút;
+  // «MapLora» cho dòng chú thích. Ký tự mà phông riêng không có (chữ Nga) tự chuyển sang Inter Black.
+  const FALLBACK = '"MapImpact","Impact","Arial Black","Segoe UI Black","Inter","DejaVu Sans",sans-serif';
+  const DISPLAY = '"MapDisplay",' + FALLBACK, LABEL = '"MapLabel",' + FALLBACK, HEAVY = LABEL;
+  const FACES = { display: { font: DISPLAY, weight: 400 }, label: { font: LABEL, weight: 700 } };
   const TEXT = '"MapLora","Lora",Georgia,"DejaVu Serif",serif';
-  const INK = '#171009', GOLD = '#ffd23f', GOLD_DEEP = '#f0a500', BROWN = '#4a2c0e';
+  // Màu chữ: số năm hồng kẹo viền chàm; nhãn kem viền chàm; tên giai đoạn xanh chàm đậm trên giấy da.
+  const INK = '#171009', OUT = '#1a1446', CREAM = '#fff4c2', NAVY = '#1c1d5a', CAP = '#34406e', GOLD = '#ffd23f', GOLD_DEEP = '#f0a500', BROWN = '#4a2c0e';
+  const pink = (c, y0, y1) => { const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, '#ffa3cf'); g.addColorStop(.5, '#ff4f9f'); g.addColorStop(1, '#d92a83'); return g; };
   const hexRgb = h => { const m = /^#([0-9a-f]{6})$/i.exec(h || ''); const n = m ? parseInt(m[1], 16) : 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
   const mixHex = (a, b, k) => { const x = hexRgb(a), y = hexRgb(b); return 'rgb(' + x.map((v, i) => Math.round(v + (y[i] - v) * k)).join(',') + ')'; };
   const lum = hex => { const [r, g, b] = hexRgb(hex); return (.3 * r + .59 * g + .11 * b) / 255; };
@@ -21,14 +27,16 @@
   // ---------- Chữ ----------
   // Chữ dày viền đậm. fill có thể là màu hoặc CanvasGradient; shadow = { dx, dy, color } đổ bóng cùng viền.
   function heavy(c, str, x, y, o = {}) {
-    const { size = 40, fill = '#fff', stroke = INK, sw = 0, align = 'center', spacing = 0, shadow = null, base = 'alphabetic', alpha = 1, font = HEAVY, weight = 900, style = '' } = o;
+    const { size = 40, fill = CREAM, stroke = OUT, sw = 0, align = 'center', spacing = 0, shadow = null, base = 'alphabetic', alpha = 1, kind = 'label', style = '' } = o;
+    const face = FACES[kind] || FACES.label, font = o.font || face.font, weight = o.weight || face.weight;
     c.save(); c.globalAlpha *= alpha; c.font = `${style} ${weight} ${size}px ${font}`.trim(); c.textAlign = align; c.textBaseline = base; c.lineJoin = 'round'; c.miterLimit = 2;
     if ('letterSpacing' in c) c.letterSpacing = spacing + 'px';
     if (shadow) { c.save(); c.translate(shadow.dx || 0, shadow.dy || 0); c.fillStyle = c.strokeStyle = shadow.color; if (sw) { c.lineWidth = sw; c.strokeText(str, x, y); } c.fillText(str, x, y); c.restore(); }
     if (sw) { c.lineWidth = sw; c.strokeStyle = stroke; c.strokeText(str, x, y); }
     c.fillStyle = fill; c.fillText(str, x, y); c.restore();
   }
-  function measure(c, str, size, weight = 900, font = HEAVY, spacing = 0, style = '') {
+  function measure(c, str, size, face = 'label', spacing = 0, style = '') {
+    const f = typeof face === 'string' ? FACES[face] || FACES.label : face, weight = f.weight, font = f.font;
     c.save(); c.font = `${style} ${weight} ${size}px ${font}`.trim(); if ('letterSpacing' in c) c.letterSpacing = spacing + 'px'; const w = c.measureText(str).width; c.restore(); return w;
   }
   function wrap(c, str, maxW, size, weight = 600, font = TEXT, maxLines = 2) {
@@ -36,20 +44,20 @@
     let line = '';
     for (const w of words) {
       const next = line ? line + ' ' + w : w;
-      if (line && measure(c, next, size, weight, font) > maxW) { lines.push(line); line = w; } else line = next;
+      if (line && measure(c, next, size, { font, weight }) > maxW) { lines.push(line); line = w; } else line = next;
     }
     if (line) lines.push(line);
-    if (lines.length > maxLines) { const keep = lines.slice(0, maxLines); let last = keep[maxLines - 1]; while (last.length > 3 && measure(c, last + '…', size, weight, font) > maxW) last = last.slice(0, -1); keep[maxLines - 1] = last.replace(/[\s,;:]+$/, '') + '…'; return keep; }
+    if (lines.length > maxLines) { const keep = lines.slice(0, maxLines); let last = keep[maxLines - 1]; while (last.length > 3 && measure(c, last + '…', size, { font, weight }) > maxW) last = last.slice(0, -1); keep[maxLines - 1] = last.replace(/[\s,;:]+$/, '') + '…'; return keep; }
     return lines;
   }
   const groupDigits = (n, sep) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, sep);
 
 
   // Chia tiêu đề thành 1–3 dòng cân đối bằng chữ dày; chọn cỡ chữ lớn nhất cho vừa maxW (ít dòng hơn được ưu tiên nếu chữ còn đủ to).
-  function layout(c, title, maxW, { maxLines = 3, maxSize = 150, minSize = 56 } = {}) {
+  function layout(c, title, maxW, { maxLines = 3, maxSize = 150, minSize = 56, kind = 'display' } = {}) {
     const words = String(title || '').trim().split(/\s+/).filter(Boolean);
     if (!words.length) return { lines: [''], size: maxSize };
-    const W100 = s => measure(c, s, 100), cuts = n => { const out = []; const go = (from, left, acc) => { if (left === 1) { out.push([...acc, words.slice(from).join(' ')]); return; } for (let i = from + 1; i <= words.length - left + 1; i++) go(i, left - 1, [...acc, words.slice(from, i).join(' ')]); }; go(0, n, []); return out; };
+    const W100 = s => measure(c, s, 100, kind), cuts = n => { const out = []; const go = (from, left, acc) => { if (left === 1) { out.push([...acc, words.slice(from).join(' ')]); return; } for (let i = from + 1; i <= words.length - left + 1; i++) go(i, left - 1, [...acc, words.slice(from, i).join(' ')]); }; go(0, n, []); return out; };
     let best = null;
     for (let n = 1; n <= Math.min(maxLines, words.length); n++) {
       let pick = null;
@@ -192,15 +200,17 @@
   // ---------- Số năm + dân số ----------
   function year(c, value, suffix, cx, baseY, { size = 150, pop = 0, slide = 1 } = {}) {
     if (slide <= 0) return;
-    const str = String(value), dw = measure(c, '0', size) * .96, sufSize = size * .4, sufW = suffix ? measure(c, suffix, sufSize) : 0, gap = suffix ? size * .14 : 0;
-    const total = str.length * dw + (suffix ? gap + sufW : 0), s = 1 + .1 * Math.sin(clamp(pop, 0, 1) * Math.PI);
+    const str = String(value), sufSize = size * .4, sufW = suffix ? measure(c, suffix, sufSize, 'label') : 0, gap = suffix ? size * .14 : 0;
+    const adv = [...str].map(ch => measure(c, ch, size, 'label') + size * .035), digitsW = adv.reduce((a, b) => a + b, 0);
+    const total = digitsW + (suffix ? gap + sufW : 0), s = 1 + .1 * Math.sin(clamp(pop, 0, 1) * Math.PI);
     c.save(); c.translate(cx, baseY - (1 - slide) * 260); c.scale(s, s); c.globalAlpha *= clamp(slide * 1.4, 0, 1);
-    const left = -total / 2, gold = c.createLinearGradient(0, -size * .78, 0, 0); gold.addColorStop(0, '#ffe566'); gold.addColorStop(.55, GOLD); gold.addColorStop(1, GOLD_DEEP);
-    const glyphs = [...str].map((ch, i) => [ch, left + i * dw + dw / 2, 0, size, 'center']);
-    if (suffix) glyphs.push([suffix, left + str.length * dw + gap, 0, sufSize, 'left']);
-    for (const [ch, x, y, sz, al] of glyphs) heavy(c, ch, x, y, { size: sz, align: al, fill: 'rgba(0,25,60,.35)', stroke: 'rgba(0,25,60,.35)', sw: sz * .2, shadow: null, alpha: 1 });
-    for (const [ch, x, y, sz, al] of glyphs) heavy(c, ch, x + 0, y - 5, { size: sz, align: al, fill: '#fff', stroke: '#fff', sw: sz * .17 });
-    for (const [ch, x, y, sz, al] of glyphs) heavy(c, ch, x, y - 5, { size: sz, align: al, fill: gold, stroke: '#8a5200', sw: Math.max(2, sz * .02) });
+    const left = -total / 2, fillG = pink(c, -size * .8, 0);
+    let gx = left; const glyphs = [...str].map((ch, i) => { const g = [ch, gx + adv[i] / 2, 0, size, 'center']; gx += adv[i]; return g; });
+    if (suffix) glyphs.push([suffix, left + digitsW + gap, 0, sufSize, 'left']);
+    for (const [ch, x, y, sz, al] of glyphs) heavy(c, ch, x, y + 4, { kind: 'label', size: sz, align: al, fill: 'rgba(0,15,50,.38)', stroke: 'rgba(0,15,50,.38)', sw: sz * .24 });
+    for (const [ch, x, y, sz, al] of glyphs) heavy(c, ch, x, y - 5, { kind: 'label', size: sz, align: al, fill: OUT, stroke: OUT, sw: sz * .22 });
+    for (const [ch, x, y, sz, al] of glyphs) heavy(c, ch, x, y - 5, { kind: 'label', size: sz, align: al, fill: '#fff', stroke: '#fff', sw: sz * .1 });
+    for (const [ch, x, y, sz, al] of glyphs) heavy(c, ch, x, y - 5, { kind: 'label', size: sz, align: al, fill: fillG, stroke: fillG, sw: 0 });
     c.restore();
   }
   function person(c, x, y, s, fill = '#fff') {
@@ -210,11 +220,11 @@
   }
   function population(c, n, est, sep, cx, y, slide = 1) {
     if (!n || slide <= 0) return;
-    const str = groupDigits(n, sep), size = 50, w = measure(c, str, size), ew = measure(c, est, 24), total = 44 + w + 10 + ew;
+    const str = groupDigits(n, sep), size = 50, w = measure(c, str, size, 'label'), ew = measure(c, est, 24, 'label'), total = 44 + w + 10 + ew;
     c.save(); c.globalAlpha *= clamp(slide * 1.3, 0, 1); c.translate(cx - total / 2, y + (1 - slide) * -60);
     person(c, 16, 14, 1.15);
-    heavy(c, str, 44, 0, { size, align: 'left', sw: 9, shadow: { dx: 0, dy: 4, color: 'rgba(0,25,60,.3)' } });
-    heavy(c, est, 44 + w + 10, 0, { size: 24, align: 'left', sw: 6 });
+    heavy(c, str, 44, 0, { kind: 'label', size, align: 'left', sw: 10, shadow: { dx: 0, dy: 4, color: 'rgba(0,15,50,.3)' } });
+    heavy(c, est, 44 + w + 10, 0, { kind: 'label', size: 24, align: 'left', sw: 7 });
     c.restore();
   }
 
@@ -222,11 +232,11 @@
   // Giấy da giữa hai trục gỗ: cờ trong khung trắng, tên in đậm giãn chữ, dòng chú thích. slide 0..1 (nảy lên từ dưới).
   function scroll(c, w, h, { cx, bottom, w: bw = 1180, title = '', lines = [], flag = null, slide = 1, arrow = 0, t = 0, center = false }) {
     if (slide <= 0) return;
-    if (center && !title && !flag && lines.length) { const widest = Math.max(...lines.map(l => measure(c, l, 30, 700, TEXT))); bw = Math.min(bw, Math.max(520, widest + 2 * (34 + 54))); }
+    if (center && !title && !flag && lines.length) { const widest = Math.max(...lines.map(l => measure(c, l, 30, { font: TEXT, weight: 700 }))); bw = Math.min(bw, Math.max(520, widest + 2 * (34 + 54))); }
     const roll = 34, titleSize = 44, capSize = 30;
     let ts = titleSize;
     const hasFlag = Boolean(flag), leftPad = roll + 30 + (hasFlag ? 94 + 32 : 6), rightPad = roll + 36 + (arrow ? 70 : 0), maxW = bw - leftPad - rightPad;
-    if (title) { const tw = measure(c, title, ts, 900, HEAVY, 5); if (tw > maxW) ts = Math.max(24, Math.floor(ts * maxW / tw)); }
+    if (title) { const tw = measure(c, title, ts, 'label', 4); if (tw > maxW) ts = Math.max(24, Math.floor(ts * maxW / tw)); }
     const bh = Math.max(150, 44 + (title ? ts + 14 : 0) + lines.length * (capSize + 8) + 30), y = bottom - bh;
     const off = (1 - easeOut(slide)) * (bh + 40);
     c.save(); c.translate(cx - bw / 2, y + off); c.globalAlpha *= clamp(slide * 1.5, 0, 1); c.lineJoin = 'round';
@@ -249,8 +259,8 @@
       tx += fw + 32;
     }
     const titleH = title ? ts + 14 : 0, linesH = lines.length * (capSize + 8), top0 = (bh - titleH - linesH) / 2;
-    if (title) heavy(c, title, tx, top0 + ts * .86, { size: ts, align: 'left', fill: '#3a2210', stroke: '#3a2210', sw: 0, spacing: 5 });
-    lines.forEach((ln, i) => heavy(c, ln, center && !title && !flag ? bw / 2 : tx, top0 + titleH + i * (capSize + 8) + capSize * .82, { size: capSize, align: center && !title && !flag ? 'center' : 'left', fill: '#4f351b', stroke: '#4f351b', sw: 0, font: TEXT, weight: 700 }));
+    if (title) heavy(c, title, tx, top0 + ts * .86, { size: ts, align: 'left', fill: NAVY, stroke: NAVY, sw: 0, spacing: 4 });
+    lines.forEach((ln, i) => heavy(c, ln, center && !title && !flag ? bw / 2 : tx, top0 + titleH + i * (capSize + 8) + capSize * .82, { size: capSize, align: center && !title && !flag ? 'center' : 'left', fill: CAP, stroke: CAP, sw: 0, font: TEXT, weight: 700 }));
     if (arrow) {
       const ax = bw - roll - 70, ay = bh / 2 + Math.sin(t * 5) * 7;
       c.fillStyle = '#e8343a'; c.strokeStyle = INK; c.lineWidth = 4; c.beginPath(); c.moveTo(ax - 12, ay - 22); c.lineTo(ax + 12, ay - 22); c.lineTo(ax + 12, ay); c.lineTo(ax + 26, ay); c.lineTo(ax, ay + 28); c.lineTo(ax - 26, ay); c.lineTo(ax - 12, ay); c.closePath(); c.fill(); c.stroke();
@@ -260,7 +270,7 @@
   }
 
   // ---------- Ký hiệu trên bản đồ ----------
-  function label(c, str, x, y, size = 24) { if (str) heavy(c, String(str).toUpperCase(), x, y, { size, sw: size * .3, spacing: 1.5 }); }
+  function label(c, str, x, y, size = 24) { if (str) heavy(c, String(str).toUpperCase(), x, y, { size, sw: size * .3, spacing: 1.2 }); }
   function pin(c, x, y, s = 1) {
     c.save(); c.translate(x, y); c.scale(s, s); c.lineJoin = 'round';
     c.fillStyle = 'rgba(0,30,60,.25)'; c.beginPath(); c.ellipse(0, 2, 12, 5, 0, 0, TAU); c.fill();
@@ -314,27 +324,27 @@
   // ---------- Chữ dán (sticker) và nút Subscribe ----------
   function sticker(c, str, x, y, { k = 1, rot = -.07, size = 84, a = '#ffd23f', b = '#ff6a2b', t = 0 } = {}) {
     if (k <= 0) return;
-    const w = measure(c, str, size) + size * .9, h = size * 1.5, sc = easeBack(k) * (1 + .03 * Math.sin(t * 9));
+    const w = measure(c, str, size, 'display') + size * .9, h = size * 1.5, sc = easeBack(k) * (1 + .03 * Math.sin(t * 9));
     c.save(); c.translate(x, y); c.rotate(rot + Math.sin(t * 7) * .015); c.scale(sc, sc); c.lineJoin = 'round';
     const spikes = 16, rx = w / 2 + 34, ry = h / 2 + 26;
     const burst = () => { c.beginPath(); for (let i = 0; i < spikes * 2; i++) { const ang = i / (spikes * 2) * TAU, f = i % 2 ? .82 : 1; c.lineTo(Math.cos(ang) * rx * f, Math.sin(ang) * ry * f); } c.closePath(); };
     c.fillStyle = 'rgba(0,30,60,.3)'; c.save(); c.translate(6, 9); burst(); c.fill(); c.restore();
     const g = c.createLinearGradient(0, -ry, 0, ry); g.addColorStop(0, a); g.addColorStop(1, b);
-    c.fillStyle = g; c.strokeStyle = INK; c.lineWidth = 8; burst(); c.fill(); c.stroke();
-    heavy(c, str, 0, size * .34, { size, fill: '#fff', stroke: INK, sw: size * .2, shadow: { dx: 0, dy: 5, color: 'rgba(0,0,0,.35)' } });
+    c.fillStyle = g; c.strokeStyle = OUT; c.lineWidth = 8; burst(); c.fill(); c.stroke();
+    heavy(c, str, 0, size * .34, { kind: 'display', size, fill: '#fff', stroke: OUT, sw: size * .2, shadow: { dx: 0, dy: 5, color: 'rgba(0,0,40,.35)' } });
     c.restore();
   }
   function subscribe(c, w, str, k, t = 0) {
     if (k <= 0) return;
-    const size = 28, tw = measure(c, str, size, 900, HEAVY, 1), bw = tw + 96, bh = 62, x = w - 36 - bw, y = 124, s = easeBack(k) * (1 + .04 * Math.sin(t * 6));
+    const size = 28, tw = measure(c, str, size, 'label', 1), bw = tw + 96, bh = 62, x = w - 36 - bw, y = 124, s = easeBack(k) * (1 + .04 * Math.sin(t * 6));
     c.save(); c.translate(x + bw / 2, y + bh / 2); c.scale(s, s); c.translate(-bw / 2, -bh / 2); c.lineJoin = 'round';
     c.fillStyle = 'rgba(0,30,60,.3)'; c.beginPath(); c.roundRect(0, 6, bw, bh, 16); c.fill();
     const g = c.createLinearGradient(0, 0, 0, bh); g.addColorStop(0, '#ff4b4b'); g.addColorStop(1, '#d4161d');
     c.fillStyle = g; c.strokeStyle = INK; c.lineWidth = 5; c.beginPath(); c.roundRect(0, 0, bw, bh, 16); c.fill(); c.stroke();
     c.fillStyle = '#fff'; c.beginPath(); c.moveTo(26, 18); c.lineTo(26, bh - 18); c.lineTo(48, bh / 2); c.closePath(); c.fill(); c.lineWidth = 2.4; c.stroke();
-    heavy(c, str, 62, bh / 2 + 10, { size, align: 'left', sw: 0, fill: '#fff', spacing: 1 });
+    heavy(c, str, 62, bh / 2 + 10, { kind: 'label', size, align: 'left', sw: 0, fill: '#fff', spacing: 1 });
     c.restore();
   }
 
-  return { HEAVY, TEXT, INK, GOLD, ICON_NAMES, mixHex, lum, heavy, measure, wrap, layout, groupDigits, sea, clouds, rainCloud, eyes, medal, timeline, year, person, population, scroll, label, pin, battleMedal, townDot, pyramid, fort, boat, sticker, subscribe, easeBack };
+  return { HEAVY, DISPLAY, LABEL, TEXT, INK, OUT, CREAM, pink, GOLD, ICON_NAMES, mixHex, lum, heavy, measure, wrap, layout, groupDigits, sea, clouds, rainCloud, eyes, medal, timeline, year, person, population, scroll, label, pin, battleMedal, townDot, pyramid, fort, boat, sticker, subscribe, easeBack };
 });

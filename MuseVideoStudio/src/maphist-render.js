@@ -10,7 +10,7 @@
       const geo = window.maphistGeo.build(raw);
       R = window.maphistDraw.create({ canvas, geo });
       tl = timeline; R.setTimeline(tl);
-      await Promise.all(['400 40px MapLora', '600 40px MapLora', '700 40px MapLora', 'italic 600 40px MapLora', 'italic 700 40px MapLora', '900 40px MapImpact'].map(f => document.fonts.load(f)));
+      await Promise.all(['400 40px MapLora', '600 40px MapLora', '700 40px MapLora', 'italic 600 40px MapLora', 'italic 700 40px MapLora', '900 40px MapImpact', '400 40px MapDisplay', '700 40px MapLabel'].map(f => document.fonts.load(f)));
       return { frames: Math.ceil(tl.total * tl.fps) };
     },
     // Vẽ khung i/fps. Mã hóa JPEG của khung i chạy song song với việc vẽ khung i+1.
