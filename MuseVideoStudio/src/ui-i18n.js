@@ -5,15 +5,56 @@ Kể chuyện|Story
 Tạo thumbnail 16:9|Create 16:9 thumbnail
 Tạo thumbnail khác|Create another thumbnail
 Đang tạo thumbnail…|Creating thumbnail…
+Khung hình đang vẽ|Frame being drawn
+Lưu thumbnail…|Save thumbnail…
 Mở thumbnail|Open thumbnail
 Muse tự chọn|Let Muse choose
 Muse tự chọn chủ đề và làm video|Let Muse choose the topic and make the video
 Muse tự chọn chủ đề|Muse chooses the topic
+Chọn một nhóm chủ đề: Muse tự chọn đề tài hay trong nhóm đó. Mỗi hình là một khung video mẫu của nhóm. Bấm lại để bỏ chọn.|Pick a topic group: Muse chooses a good subject inside it. Each picture is a sample frame of that group’s video. Click again to deselect.
+Gợi ý đề tài|Subject suggestions
+Chọn một nhóm ở trên để xem các đề tài gợi ý, hoặc gõ đề tài của riêng bạn.|Pick a group above to see suggested subjects, or type your own.
+Làm video bản đồ|Make map video
+Lịch sử một nước|History of a country
+Cả hành trình của một quốc gia, từ thuở lập quốc đến nay|A whole nation’s journey, from its founding to today
+Muse chọn đề tài «Lịch sử một nước» và làm video|Let Muse choose a «History of a country» subject and make the video
+Đề tài gợi ý của nhóm «Lịch sử một nước» (bấm để chọn):|Suggested subjects in «History of a country» (click to choose):
+Muse tự chọn: Lịch sử một nước|Muse chooses: History of a country
+Đế chế|Empire
+Từ lúc hình thành, lên đỉnh cao đến lúc suy tàn|From its rise to its peak and its fall
+Muse chọn đề tài «Đế chế» và làm video|Let Muse choose a «Empire» subject and make the video
+Đề tài gợi ý của nhóm «Đế chế» (bấm để chọn):|Suggested subjects in «Empire» (click to choose):
+Muse tự chọn: Đế chế|Muse chooses: Empire
+Triều đại|Dynasty
+Các triều đại thay nhau cai trị một vùng đất|Dynasties succeeding one another over a land
+Muse chọn đề tài «Triều đại» và làm video|Let Muse choose a «Dynasty» subject and make the video
+Đề tài gợi ý của nhóm «Triều đại» (bấm để chọn):|Suggested subjects in «Dynasty» (click to choose):
+Muse tự chọn: Triều đại|Muse chooses: Dynasty
+Chiến tranh|War
+Những cuộc chiến làm biên giới đổi hình|Wars that redrew the borders
+Muse chọn đề tài «Chiến tranh» và làm video|Let Muse choose a «War» subject and make the video
+Đề tài gợi ý của nhóm «Chiến tranh» (bấm để chọn):|Suggested subjects in «War» (click to choose):
+Muse tự chọn: Chiến tranh|Muse chooses: War
+Khám phá và thương mại|Exploration and trade
+Hải trình, đường tơ lụa, những chuyến đi vòng quanh thế giới|Sea voyages, the Silk Road, journeys around the world
+Muse chọn đề tài «Khám phá và thương mại» và làm video|Let Muse choose a «Exploration and trade» subject and make the video
+Đề tài gợi ý của nhóm «Khám phá và thương mại» (bấm để chọn):|Suggested subjects in «Exploration and trade» (click to choose):
+Muse tự chọn: Khám phá và thương mại|Muse chooses: Exploration and trade
+Văn minh cổ đại|Ancient civilization
+Ai Cập, Hy Lạp, La Mã, Lưỡng Hà…|Egypt, Greece, Rome, Mesopotamia…
+Muse chọn đề tài «Văn minh cổ đại» và làm video|Let Muse choose a «Ancient civilization» subject and make the video
+Đề tài gợi ý của nhóm «Văn minh cổ đại» (bấm để chọn):|Suggested subjects in «Ancient civilization» (click to choose):
+Muse tự chọn: Văn minh cổ đại|Muse chooses: Ancient civilization
+Độc lập và cách mạng|Independence and revolution
+Giành độc lập, lật đổ chế độ cũ, lập quốc gia mới|Winning independence, overthrowing the old order, founding a new state
+Muse chọn đề tài «Độc lập và cách mạng» và làm video|Let Muse choose a «Independence and revolution» subject and make the video
+Đề tài gợi ý của nhóm «Độc lập và cách mạng» (bấm để chọn):|Suggested subjects in «Independence and revolution» (click to choose):
+Muse tự chọn: Độc lập và cách mạng|Muse chooses: Independence and revolution
 🎲 Muse tự chọn|🎲 Let Muse choose
-Gợi ý chủ đề|Topic suggestions
-Chủ đề (để trống thì Muse tự chọn; tiếng Anh càng rõ càng tốt)|Topic (leave empty and Muse chooses; the clearer the English, the better)
-Để trống: Muse tự chọn chủ đề. Hoặc gõ, hoặc bấm một chủ đề trong danh sách bên dưới|Leave empty: Muse chooses a topic. Or type one, or click a topic in the list below
-Chỉ cần bấm một nút. Chọn một chủ đề gợi ý hoặc tự gõ; để trống thì Muse tự chọn một chủ đề hay. Muse chọn đất nước, các giai đoạn và vùng lãnh thổ, soạn lời đọc tiếng Anh; tool vẽ bản đồ động (đất liền biến đổi theo từng thời kỳ, lá cờ có mặt cắm xuống, đồng hồ năm, địa cầu nhỏ chỉ vùng đang xem), đọc lời, thêm nhạc rồi xuất MP4. Bạn có thể xem và sửa kịch bản trước khi dựng.|Just click one button. Pick a suggested topic or type your own; leave it empty and Muse picks a good topic. Muse chooses the country, the eras and the territories and writes the English narration; the tool draws the animated map (land that changes era by era, planted flags with faces, a year counter, a small globe showing the region), reads the narration, adds music and exports an MP4. You can review and edit the script before it is built.
+Gợi ý đề tài|Subject suggestions
+Đề tài cụ thể (không bắt buộc; để trống thì Muse tự chọn trong nhóm, tiếng Anh càng rõ càng tốt)|Specific subject (optional; leave empty and Muse chooses inside the group; the clearer the English, the better)
+Để trống: Muse tự chọn. Hoặc gõ, hoặc bấm một đề tài gợi ý bên dưới|Leave empty: Muse chooses. Or type one, or click a suggested subject below
+Chỉ cần bấm một nút. Chọn một nhóm chủ đề (hoặc gõ đề tài của riêng bạn); Muse chọn đất nước, các giai đoạn và vùng lãnh thổ, soạn lời đọc tiếng Anh; tool vẽ bản đồ động (đất liền biến đổi theo từng thời kỳ, lá cờ có mặt cắm xuống, đồng hồ năm, địa cầu nhỏ chỉ vùng đang xem), đọc lời, thêm nhạc rồi xuất MP4. Bạn có thể xem và sửa kịch bản trước khi dựng.|Just click one button. Pick a topic group (or type your own subject). Muse chooses the country, the eras and the territories and writes the English narration; the tool draws the animated map (land that changes era by era, planted flags with faces, a year counter, a small globe showing the region), reads the narration, adds music and exports an MP4. You can review and edit the script before it is built.
 Giọng đọc, nhạc nền, nước làm trung tâm (đã chọn sẵn, không cần chỉnh)|Voice, background music, focus country (already chosen, no need to change)
 Chủ đề quá ngắn. Gõ rõ hơn (ví dụ: History of Vietnam, The Mongol Empire) hoặc để trống cho Muse tự chọn.|The topic is too short. Type it more clearly (for example: History of Vietnam, The Mongol Empire) or leave it empty and let Muse choose.
 Muse đang chọn chủ đề và soạn kịch bản. Tên video sẽ hiện ở danh sách ngay khi có dàn ý.|Muse is choosing a topic and writing the script. The video name appears in the list as soon as the outline is ready.
@@ -940,6 +981,7 @@ Clip còn nguyên, không phải tạo lại. Giọng đã đọc xong được 
       [/^Đã gỡ câu khóa hình dạng nhân vật khỏi (\d+) cảnh \(không còn ảnh tham chiếu\)\.$/,m=>'Removed the character shape lock from '+m[1]+' scene(s) (no reference image any more).'],
       [/^Đã gắn khóa vào (\d+) cảnh\.$/,m=>'Added the lock to '+m[1]+' scene(s).'],
       [/^Đã lưu video: (.+)$/,m=>'Video saved: '+m[1]],
+      [/^Đã lưu thumbnail: (.+)$/,m=>'Thumbnail saved: '+m[1]],
       [/^(✓ .+) · đang bỏ khỏi video$/,m=>m[1]+' · left out of the video'],
       [/^· đang bỏ khỏi video$/,()=>'· left out of the video'],
       [/^Đã thấy tin nhắn · chờ Muse phản hồi \((.+)\)$/,m=>'Message found · Waiting for Muse response ('+t(m[1])+')'],

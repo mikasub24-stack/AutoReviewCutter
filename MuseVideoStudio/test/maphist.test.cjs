@@ -304,8 +304,8 @@ test('bộ lọc âm thanh: chỉ lời / lời + nhạc có hạ nhạc khi có
 });
 
 test('dựng video: giọng → khung → MP4 có hình + tiếng, đúng độ dài và số khung, dọn thư mục tạm', { skip: !ffmpegOk && 'cần ffmpeg + ffprobe' }, async () => {
-  const dir = tmp(), voice = fakeVoice(2), progress = [];
-  const service = createMapService({ getSettings: () => ({ ffmpeg: 'ffmpeg' }), voice, renderFrames: fakeFrames(), notify: () => progress.push(service.status().progress) });
+  const dir = tmp(), voice = fakeVoice(2), progress = [], previews = [];
+  const service = createMapService({ getSettings: () => ({ ffmpeg: 'ffmpeg' }), voice, renderFrames: fakeFrames(), notify: () => { const st = service.status(); progress.push(st.progress); if (st.preview) previews.push({ file: st.preview, ok: fs.existsSync(st.preview) && fs.readFileSync(st.preview)[0] === 0xff }); } });
   const result = await service.make({ runId: 'r1', dir, name: 'Thử nghiệm', config: { voice: 'en-US-GuyNeural', tempo: 1.1 }, script: oneEra() });
   assert.equal(path.basename(result.output), 'Thu-nghiem.mp4');
   assert.equal(voice.calls[0].engine, 'edge');
@@ -318,6 +318,9 @@ test('dựng video: giọng → khung → MP4 có hình + tiếng, đúng độ 
   assert.ok(Math.abs(Number(info.format.duration) - expected) < .6, `duration ${info.format.duration} vs ${expected}`);
   assert.equal(Number(info.streams.find(s => s.codec_type === 'video').nb_frames), Math.ceil(expected * FPS));
   assert.ok(!fs.existsSync(path.join(dir, '.dang-dung')), 'xóa thư mục tạm');
+  assert.ok(previews.length >= 3 && previews.every(p => p.ok), 'vẽ tới đâu có khung xem trước tới đó, file đọc được ngay khi báo');
+  assert.deepEqual([...new Set(previews.map(p => path.basename(p.file)))].sort(), ['xem-truoc-0.jpg', 'xem-truoc-1.jpg'], 'ghi luân phiên hai file để khung đang hiện không bị ghi đè');
+  assert.equal(service.status().preview, '', 'dựng xong thì bỏ xem trước');
   assert.ok(progress.some(p => /khung hình/.test(p)) && service.status().phase === 'done' && !service.busy);
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -408,23 +411,33 @@ test('ảnh bìa: đòi đúng gói, không chạy khi đang dựng, báo khi th
   await assert.rejects(ok.thumbnail({ dir, script: { title: 'x', eras: [] } }), /chưa có giai đoạn/i);
 });
 
-test('hình mẫu chủ đề: mỗi chủ đề trong giao diện có đúng một hình riêng, khác nhau, nhẹ, và có khai báo vùng/địa danh', () => {
-  const ui = fs.readFileSync(path.join(__dirname, '../src/maphist-ui.js'), 'utf8');
-  const listed = [...(/const TOPICS = \[([^\]]+)\];/.exec(ui)[1]).matchAll(/'((?:[^'\\]|\\.)*)'/g)].map(m => m[1].replace(/\\'/g, "'"));
-  const spec = JSON.parse(fs.readFileSync(path.join(__dirname, '../tools/maphist-topics.json'), 'utf8'));
-  assert.deepEqual([...listed].sort(), spec.map(t => t.topic).sort(), 'danh sách trong giao diện = danh sách vẽ hình mẫu');
-  const slug = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  const hashes = new Set();
-  for (const topic of listed) {
-    const file = path.join(__dirname, '../src/assets/maphist/topics', slug(topic) + '.jpg'), buf = fs.readFileSync(file);
-    assert.ok(buf.length > 8000 && buf.length < 80000, `${topic}: cỡ hình ${buf.length}`);
+test('nhóm chủ đề: bảy nhóm, mỗi nhóm có đề tài gợi ý và một khung video mẫu riêng, nhẹ, đúng định dạng', () => {
+  const spec = JSON.parse(fs.readFileSync(path.join(__dirname, '../tools/maphist-categories.json'), 'utf8'));
+  assert.deepEqual(Plan.CATEGORIES.map(c => c.id), spec.map(c => c.id), 'thứ tự nhóm trong giao diện = trong bộ vẽ hình mẫu');
+  assert.equal(Plan.CATEGORIES.length, 7);
+  const hashes = new Set(), allTopics = new Set();
+  for (const c of Plan.CATEGORIES) {
+    const sp = spec.find(x => x.id === c.id);
+    assert.deepEqual(c.topics, sp.topics, `${c.id}: đề tài trong giao diện = đề tài khai báo`);
+    assert.ok(c.label && c.desc && c.ask, `${c.id}: đủ tên, mô tả, lời dặn Muse`);
+    assert.ok(c.topics.length >= 5, `${c.id}: đủ đề tài gợi ý`);
+    for (const t of c.topics) { assert.ok(Plan.problems({ topic: t }).length === 0, `${t}: đề tài hợp lệ`); allTopics.add(t); }
+    assert.ok(sp.sample && sp.sample.script && sp.sample.script.eras.length >= 2, `${c.id}: có kịch bản mẫu để vẽ hình`);
+    const buf = fs.readFileSync(path.join(__dirname, '../src/assets/maphist/categories', c.id + '.jpg'));
+    assert.ok(buf.length > 20000 && buf.length < 150000, `${c.id}: cỡ hình ${buf.length}`);
     assert.equal(buf[0], 0xff); assert.equal(buf[1], 0xd8);
     hashes.add(require('node:crypto').createHash('sha1').update(buf).digest('hex'));
   }
-  assert.equal(hashes.size, listed.length, 'không có hai chủ đề dùng hình giống hệt nhau');
-  const views = new Set(spec.map(t => JSON.stringify([t.view || null, t.regions.slice().sort()])));
-  assert.equal(views.size, spec.length, 'mỗi chủ đề có vùng nhìn/vùng tô khác nhau');
-  for (const t of spec) assert.ok((t.markers || []).length || (t.routes || []).length, `${t.topic} cần ít nhất một địa danh hoặc đường đi để hình mẫu khác biệt`);
+  assert.equal(hashes.size, 7, 'không có hai nhóm dùng hình giống hệt nhau');
+  assert.ok(allTopics.size >= 40, 'danh sách đề tài đủ dài: ' + allTopics.size);
+  assert.equal(Plan.categoryOf('empire').label, 'Đế chế');
+  assert.equal(Plan.categoryOf('nope'), null);
+  assert.equal(Plan.options({ category: 'war' }).category, 'war');
+  assert.equal(Plan.options({ category: 'nope' }).category, '', 'nhóm lạ thì bỏ');
+  const ask = Plan.buildOutlineInstruction(Plan.options({ topic: '', category: 'dynasty', minutes: 8 }));
+  assert.match(ask, /Triều đại/); assert.match(ask, /TRIỀU ĐẠI/); assert.match(ask, /TỰ CHỌN/);
+  const own = Plan.buildOutlineInstruction(Plan.options({ topic: 'The Han Dynasty', category: 'dynasty', minutes: 8 }));
+  assert.doesNotMatch(own, /CHƯA chọn đề tài/, 'đã gõ đề tài thì không bảo Muse tự chọn');
 });
 
 test('nối app: mọi lệnh giao diện gọi đều có trong main.cjs và danh sách cho phép của preload; mọi id đều có trong index.html', () => {
@@ -449,6 +462,10 @@ test('nối app: mọi việc tạo video bản đồ đều đòi gói Năm / V
   const block = name => { const i = main.indexOf(`    ${name}:`); return main.slice(i, main.indexOf('\n    },', i)); };
   for (const name of ['mapMake', 'mapRender']) assert.match(block(name), /await mapChecks\(\)/, name);
   assert.match(block('mapSaveScript'), /requireLongTerm\(\)/);
+  const save = block('mapSave');
+  assert.match(save, /data\?\.thumb/, 'lưu được cả thumbnail');
+  assert.match(save, /meta\?\.thumb:meta\?\.output/, 'thumbnail lấy từ ảnh đã tạo, video lấy từ file đã dựng');
+  assert.match(save, /extensions:thumb\?\['jpg','jpeg'\]:\['mp4'\]/);
   assert.match(main, /createMapService\(\{[^}]*ensureAllowed:\(\)=>licenseManager\.requireLongTerm\(\)/);
   assert.match(main, /createMapWriter\(\{[^}]*ensureAllowed:\(\)=>licenseManager\.requireLongTerm\(\)/);
   assert.match(main, /roots=\[path\.join\(out,'DonNha'\),path\.join\(out,'DongVat'\),path\.join\(out,'BanDo'\)\]/);

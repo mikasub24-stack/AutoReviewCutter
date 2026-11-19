@@ -17,7 +17,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
   const server = http.createServer(async (req, res) => {
     if (req.url === '/world.json') { res.setHeader('Content-Type', 'application/json'); return res.end(world); }
     if (req.url === '/sample.json') { res.setHeader('Content-Type', 'application/json'); return res.end(sample); }
-    if (/^\/assets\/maphist\/topics\/[\w.-]+\.jpg$/.test(req.url)) { res.setHeader('Content-Type', 'image/jpeg'); return res.end(await fs.readFile(path.join(src, req.url.slice(1)))); }
+    if (/^\/assets\/maphist\/categories\/[\w.-]+\.jpg$/.test(req.url)) { res.setHeader('Content-Type', 'image/jpeg'); return res.end(await fs.readFile(path.join(src, req.url.slice(1)))); }
     const name = files[req.url];
     if (!name) { res.writeHead(404); return res.end(); }
     res.setHeader('Content-Type', type(name));
@@ -56,7 +56,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
           window.calls.push({ name, data: JSON.parse(JSON.stringify(data ?? null)) });
           if (name === 'mapMake') {
             const runId = data.resumeId || 'History-of-Testland';
-            s.maphist.runs[runId] = s.maphist.runs[runId] || { name: data.topic || 'Muse tự chọn chủ đề', topic: data.topic, minutes: data.minutes, status: 'writing', createdAt: 1 };
+            s.maphist.runs[runId] = s.maphist.runs[runId] || { name: data.topic || (data.category ? 'Muse tự chọn: ' + data.category : 'Muse tự chọn chủ đề'), topic: data.topic, category: data.category || '', minutes: data.minutes, status: 'writing', createdAt: 1 };
             s.maphist.runs[runId].status = 'writing';
             Object.assign(s.maphist, { busy: true, phase: 'write', runId, progress: 'Muse đang soạn kịch bản…', error: '' });
             s.maphist.write = { busy: true, progress: 'Soạn kịch bản 2/3 (giai đoạn 6–10) · Muse đang viết…', done: 5, total: 12 };
@@ -74,7 +74,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
             return { script: n.script, issues: ['Giai đoạn 2: không tìm thấy vùng «Atlantis Prime».'], meta: s.maphist.runs[data.runId] };
           }
           if (name === 'mapSaveScript') return { issues: [] };
-          if (name === 'mapRender') { s.maphist.runs[data.runId].status = 'building'; Object.assign(s.maphist, { busy: true, phase: 'build', runId: data.runId }); s.maphist.build = { busy: true, progress: 'Đang vẽ khung hình 300/900 · còn khoảng 2 phút', done: 300, total: 900 }; setTimeout(window.push, 0); return { runId: data.runId }; }
+          if (name === 'mapRender') { s.maphist.runs[data.runId].status = 'building'; Object.assign(s.maphist, { busy: true, phase: 'build', runId: data.runId }); s.maphist.build = { busy: true, progress: 'Đang vẽ khung hình 300/900 · còn khoảng 2 phút', done: 300, total: 900, preview: 'C:\\Videos\\BanDo\\History-of-Testland\\.dang-dung\\xem-truoc-0.jpg', previewAt: 111 }; setTimeout(window.push, 0); return { runId: data.runId }; }
           if (name === 'mapThumb') { Object.assign(s.maphist.runs[data.runId], { thumb: 'C:\\Videos\\BanDo\\History-of-Testland\\thumbnail-1.jpg', thumbAt: 5 }); setTimeout(window.push, 0); return { file: 'C:\\Videos\\BanDo\\History-of-Testland\\thumbnail-1.jpg', variant: 1, count: 3 }; }
           if (name === 'mapRemove') { delete s.maphist.runs[data.runId]; return structuredClone(s); }
           return structuredClone(s);
@@ -120,36 +120,53 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.match(await page.locator('#mapMusicName').textContent(), /epic\.mp3/);
     await page.click('#mapAdvanced summary');
 
-    // 3) Chủ đề: hàng gợi ý bấm chọn; để trống thì Muse tự chọn (một lệnh duy nhất, chủ đề rỗng).
+    // 3) Chủ đề theo NHÓM: 7 thẻ, mỗi thẻ một khung video mẫu thật; chọn nhóm thì Muse tự chọn đề tài trong nhóm.
+    const groups = await page.locator('#mapGroups button.groupCard').count();
+    assert.equal(groups, 7, 'bảy nhóm chủ đề');
+    const ids = ['country', 'empire', 'dynasty', 'war', 'explore', 'ancient', 'independence'];
+    for (const id of ids) {
+      const img = page.locator(`#mapGroups button[data-group="${id}"] img`);
+      assert.equal(await img.getAttribute('src'), `assets/maphist/categories/${id}.jpg`);
+      assert.ok(await img.evaluate(el => el.complete && el.naturalWidth >= 400 && el.naturalHeight >= 225), `hình mẫu nhóm ${id} tải được`);
+    }
+    assert.match(await page.locator('#mapGroups button[data-group="empire"]').textContent(), /Đế chế/);
+    assert.equal(await page.locator('#mapGroups button.active').count(), 0, 'chưa chọn nhóm nào');
     const topicCount = await page.locator('#mapTopicList option').count();
-    assert.ok(topicCount >= 24, 'danh sách chủ đề ghi sẵn đủ dài: ' + topicCount);
-    assert.equal(await page.locator('#mapTopics button').count(), topicCount + 1, 'mỗi chủ đề một nút + nút Muse tự chọn');
-    assert.equal(await page.locator('#mapTopics button.topicCard img').count(), topicCount, 'mỗi chủ đề có hình mẫu cạnh bên');
-    assert.equal(await page.locator('#mapTopics button', { hasText: 'The Mongol Empire' }).locator('img').getAttribute('src'), 'assets/maphist/topics/the-mongol-empire.jpg');
-    assert.equal(await page.locator('#mapTopic').getAttribute('list'), 'mapTopicList', 'bấm vào ô chủ đề cũng xổ danh sách');
-    assert.match(await page.locator('#mapTopics button').first().textContent(), /Muse tự chọn/);
-    await page.fill('#mapTopic', '');
-    await page.locator('#mapTopic').dispatchEvent('input');
-    assert.equal(await page.locator('#mapTopics button.active').count(), 1);
-    assert.match(await page.locator('#mapTopics button.active').textContent(), /Muse tự chọn/);
+    assert.ok(topicCount >= 40, 'danh sách đề tài ghi sẵn đủ dài: ' + topicCount);
+    assert.equal(await page.locator('#mapTopic').getAttribute('list'), 'mapTopicList', 'bấm vào ô đề tài cũng xổ danh sách');
+    assert.equal(await page.locator('#mapTopics button').count(), 0, 'chưa chọn nhóm thì chưa có chữ gợi ý');
     assert.match(await page.locator('#mapCreate').textContent(), /Muse tự chọn chủ đề và làm video/);
+    await page.click('#mapGroups button[data-group="empire"]');
+    assert.equal(await page.locator('#mapGroups button.active').count(), 1);
+    assert.equal(await page.locator('#mapGroups button[data-group="empire"]').getAttribute('aria-pressed'), 'true');
+    assert.match(await page.locator('#mapCreate').textContent(), /Muse chọn đề tài «Đế chế» và làm video/);
+    assert.ok(await page.locator('#mapTopics button.topicChip').count() >= 10, 'nhóm Đế chế có nhiều đề tài gợi ý');
     await page.click('#mapTopics button:has-text("The Mongol Empire")');
     assert.equal(await page.locator('#mapTopic').inputValue(), 'The Mongol Empire');
     assert.match(await page.locator('#mapTopics button.active').textContent(), /Mongol/);
     assert.equal((await page.locator('#mapCreate').textContent()).trim(), 'Làm video bản đồ');
+    await page.click('#mapGroups button[data-group="war"]');
+    assert.equal(await page.locator('#mapTopic').inputValue(), '', 'đổi sang nhóm khác thì bỏ đề tài của nhóm cũ');
+    assert.match(await page.locator('#mapCreate').textContent(), /«Chiến tranh»/);
     await page.fill('#mapTopic', 'ab');
     await page.click('#mapCreate'); await flush();
-    assert.equal((await calls('mapMake')).length, 0, 'chủ đề quá ngắn thì không gửi');
+    assert.equal((await calls('mapMake')).length, 0, 'đề tài quá ngắn thì không gửi');
     assert.match(await page.locator('#toast').textContent(), /quá ngắn/);
-    await page.click('#mapTopics button:has-text("Muse tự chọn")');
-    assert.equal(await page.locator('#mapTopic').inputValue(), '');
+    await page.fill('#mapTopic', '');
+    await page.locator('#mapTopic').dispatchEvent('input');
     await page.click('#mapCreate');
     await page.waitForSelector('#mapRuns .restoreRun');
     const auto = await calls('mapMake');
     assert.equal(auto.length, 1);
-    assert.equal(auto[0].data.topic, '', 'chủ đề trống = Muse tự chọn');
+    assert.equal(auto[0].data.topic, '', 'đề tài trống = Muse tự chọn trong nhóm');
+    assert.equal(auto[0].data.category, 'war', 'gửi đúng nhóm đã chọn');
     assert.equal(auto[0].data.minutes, 6);
-    assert.match(await page.locator('#mapRuns .restoreRun').first().textContent(), /Muse tự chọn chủ đề/);
+    assert.match(await page.locator('#mapRuns .restoreRun').first().textContent(), /Muse tự chọn: war/);
+    // Bấm lại thẻ đang chọn thì bỏ chọn (về «Muse tự chọn hoàn toàn»).
+    await page.evaluate(() => { document.querySelector('#mapForm').open = true; });
+    await page.click('#mapGroups button[data-group="war"]');
+    assert.equal(await page.locator('#mapGroups button.active').count(), 0);
+    assert.match(await page.locator('#mapCreate').textContent(), /Muse tự chọn chủ đề và làm video/);
     await page.evaluate(() => { window.calls.length = 0; window.s.maphist.runs = {}; Object.assign(window.s.maphist, { busy: false, phase: '', runId: '', progress: '', error: '' }); window.s.maphist.write = {}; window.push(); });
     await page.waitForFunction(() => !document.querySelector('#mapRuns .restoreRun') && !document.querySelector('#mapCreate').disabled);
     await page.evaluate(() => { document.querySelector('#mapForm').open = true; });
@@ -163,7 +180,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     await page.waitForSelector('#mapRuns .restoreRun');
     const made = await calls('mapMake');
     assert.equal(made.length, 1);
-    assert.deepEqual(made[0].data, { topic: 'History of Testland', country: 'Indonesia', minutes: 6, voice: 'en-US-GuyNeural', tempo: 1, music: 'C:\\Music\\epic.mp3', musicVolume: 0.2, auto: true });
+    assert.deepEqual(made[0].data, { topic: 'History of Testland', category: '', country: 'Indonesia', minutes: 6, voice: 'en-US-GuyNeural', tempo: 1, music: 'C:\\Music\\epic.mp3', musicVolume: 0.2, auto: true });
     assert.match(await page.locator('#mapRuns .restoreRunText').first().textContent(), /Soạn kịch bản 2\/3/);
     assert.match(await page.locator('#mapRunHint').textContent(), /Đang soạn kịch bản · 5\/12 giai đoạn/);
     assert.equal(await page.locator('#mapCreate').isDisabled(), true);
@@ -214,6 +231,8 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     await page.waitForFunction(() => /Đang vẽ khung hình 300\/900/.test(document.querySelector('#mapRuns .restoreRunText')?.textContent || ''));
     assert.match(await page.locator('#mapRunHint').textContent(), /Đang dựng video · 33%/);
     assert.equal(await page.locator('#mapRuns button', { hasText: 'Dừng dựng' }).count(), 1);
+    assert.equal(await page.locator('#mapRuns img.restoreLive').count(), 1, 'đang dựng thì hiện khung hình vừa vẽ');
+    assert.match(await page.locator('#mapRuns img.restoreLive').getAttribute('src'), /xem-truoc-0\.jpg$/);
 
     // 8) Dựng xong: video, lưu, mở, dựng lại, xóa (hộp hỏi có tick xóa file).
     await page.evaluate(() => { Object.assign(window.s.maphist, { busy: false, phase: 'done' }); window.s.maphist.build = {}; Object.assign(window.s.maphist.runs['History-of-Testland'], { status: 'done', output: 'C:\\Videos\\BanDo\\History-of-Testland\\History-of-Testland.mp4', seconds: 252, eras: 3 }); window.push(); });
@@ -231,6 +250,8 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.deepEqual((await calls('mapThumb'))[0].data, { runId: 'History-of-Testland' });
     assert.match(await page.locator('#toast').textContent(), /thumbnail 1920×1080/);
     assert.equal(await page.locator('#mapRuns button', { hasText: 'Tạo thumbnail khác' }).count(), 1);
+    await page.click('#mapRuns button:has-text("Lưu thumbnail…")'); await flush();
+    assert.deepEqual((await calls('mapSave')).at(-1).data, { runId: 'History-of-Testland', thumb: true }, 'có nút lưu thumbnail như nút lưu video');
     await page.click('#mapRuns button:has-text("Mở thumbnail")'); await flush();
     assert.deepEqual((await calls('mapReveal')).at(-1).data, { runId: 'History-of-Testland', thumb: true });
     await page.click('#mapRuns button:has-text("Xóa")');

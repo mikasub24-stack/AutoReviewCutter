@@ -14,6 +14,126 @@
   const MIN_MINUTES = 1, MAX_MINUTES = 15, DEFAULT_MINUTES = 8;
   const LENGTHS = [6, 8, 15];                            // độ dài người dùng được chọn trên giao diện (phút)
   const MAX_ERAS = 64;
+  // Nhóm chủ đề: người dùng chọn nhóm, Muse tự chọn đề tài trong nhóm (ask = lời dặn gửi Muse). Đồng bộ với tools/maphist-categories.json (có test).
+  const CATEGORIES = [
+    {
+      "id": "country",
+      "label": "Lịch sử một nước",
+      "desc": "Cả hành trình của một quốc gia, từ thuở lập quốc đến nay",
+      "ask": "LỊCH SỬ MỘT QUỐC GIA: một quốc gia hiện nay có lịch sử dài và nhiều bước ngoặt (từ thuở lập quốc, các triều đại, ngoại xâm đến hiện đại); kể cả hành trình đó",
+      "topics": [
+        "History of Vietnam",
+        "History of China",
+        "History of Japan",
+        "History of Korea",
+        "History of India",
+        "History of Thailand",
+        "History of Indonesia",
+        "History of Egypt",
+        "History of Mexico",
+        "History of Turkey",
+        "History of Iran",
+        "History of Ethiopia"
+      ]
+    },
+    {
+      "id": "empire",
+      "label": "Đế chế",
+      "desc": "Từ lúc hình thành, lên đỉnh cao đến lúc suy tàn",
+      "ask": "MỘT ĐẾ CHẾ nổi tiếng (ví dụ Mông Cổ, Ottoman, Anh, Ba Tư, Tây Ban Nha, Byzantine, Nga, Mughal, Aztec, Inca…), kể từ lúc hình thành, mở rộng tới đỉnh cao rồi suy tàn",
+      "topics": [
+        "The Mongol Empire",
+        "The Ottoman Empire",
+        "The British Empire",
+        "The Persian Empire",
+        "The Spanish Empire",
+        "The Byzantine Empire",
+        "The Russian Empire",
+        "Napoleon's French Empire",
+        "The Holy Roman Empire",
+        "The Mughal Empire",
+        "The Aztec Empire",
+        "The Inca Empire",
+        "The Khmer Empire",
+        "Alexander the Great's Empire"
+      ]
+    },
+    {
+      "id": "dynasty",
+      "label": "Triều đại",
+      "desc": "Các triều đại thay nhau cai trị một vùng đất",
+      "ask": "MỘT TRIỀU ĐẠI nổi tiếng (ví dụ Hán, Đường, Tống, Minh, Thanh, Nguyễn, Lý – Trần…), từ lúc lập triều đến khi sụp đổ",
+      "topics": [
+        "The Han Dynasty",
+        "The Tang Dynasty",
+        "The Song Dynasty",
+        "The Ming Dynasty",
+        "The Qing Dynasty",
+        "The Nguyen Dynasty",
+        "The Ly and Tran Dynasties"
+      ]
+    },
+    {
+      "id": "war",
+      "label": "Chiến tranh",
+      "desc": "Những cuộc chiến làm biên giới đổi hình",
+      "ask": "MỘT CUỘC CHIẾN hoặc chuỗi chiến tranh lớn làm biên giới thay đổi (ví dụ Thế chiến I, Thế chiến II, Chiến tranh Lạnh, Thập tự chinh, chiến tranh Punic, Chiến tranh Trăm năm…)",
+      "topics": [
+        "World War I",
+        "World War II",
+        "The Cold War",
+        "The Crusades",
+        "Carthage and the Punic Wars",
+        "The Hundred Years' War",
+        "The Napoleonic Wars",
+        "The Vietnam War"
+      ]
+    },
+    {
+      "id": "explore",
+      "label": "Khám phá và thương mại",
+      "desc": "Hải trình, đường tơ lụa, những chuyến đi vòng quanh thế giới",
+      "ask": "MỘT THỜI KỲ KHÁM PHÁ HOẶC THƯƠNG MẠI lớn (ví dụ Thời đại Khám phá, Con đường Tơ lụa, người Viking, buôn bán gia vị, các chuyến đi của Trịnh Hòa), có nhiều hải trình và đường đi trên bản đồ",
+      "topics": [
+        "The Age of Exploration",
+        "The Silk Road",
+        "The Viking Age",
+        "The Spice Trade",
+        "Zheng He's Voyages",
+        "The Atlantic Slave Trade"
+      ]
+    },
+    {
+      "id": "ancient",
+      "label": "Văn minh cổ đại",
+      "desc": "Ai Cập, Hy Lạp, La Mã, Lưỡng Hà…",
+      "ask": "MỘT NỀN VĂN MINH CỔ ĐẠI (ví dụ Ai Cập, Hy Lạp, La Mã, Lưỡng Hà, Ấn Độ cổ, Maya…), từ khởi nguồn đến lúc tàn lụi hoặc hòa vào văn minh khác",
+      "topics": [
+        "Ancient Egypt",
+        "Rise and Fall of Rome",
+        "Ancient Greece",
+        "Mesopotamia",
+        "The Indus Valley Civilization",
+        "The Maya Civilization",
+        "Carthage"
+      ]
+    },
+    {
+      "id": "independence",
+      "label": "Độc lập và cách mạng",
+      "desc": "Giành độc lập, lật đổ chế độ cũ, lập quốc gia mới",
+      "ask": "MỘT CUỘC GIÀNH ĐỘC LẬP HOẶC CÁCH MẠNG lớn (ví dụ Indonesia, Ấn Độ, Việt Nam, châu Phi, nước Mỹ, nước Pháp, sự sụp đổ của Liên Xô…), từ chế độ cũ đến quốc gia mới",
+      "topics": [
+        "Indonesia's Road to Independence",
+        "India's Road to Independence",
+        "The American Revolution",
+        "The French Revolution",
+        "The Decolonization of Africa",
+        "The Fall of the Soviet Union"
+      ]
+    }
+  ];
+  const categoryOf = id => CATEGORIES.find(c => c.id === id) || null;
   const MOODS = ['happy', 'proud', 'tired', 'angry', 'sad', 'calm'];
   const FLAGS = ['solid', 'h', 'v', 'disc', 'cross'];
   const MARKERS = ['city', 'capital', 'temple', 'castle', 'ship', 'battle'];
@@ -33,6 +153,7 @@
   function options(input = {}) {
     return {
       topic: flat(input.topic).slice(0, 300),                // để trống = Muse tự chọn chủ đề
+      category: categoryOf(String(input.category || '')) ? String(input.category) : '',   // chỉ có tác dụng khi để trống chủ đề
       avoid: (Array.isArray(input.avoid) ? input.avoid : []).map(x => flat(x).slice(0, 120)).filter(Boolean).slice(0, 30),   // chủ đề đã làm, Muse không chọn lại
       minutes: clamp(Math.round(num(input.minutes, DEFAULT_MINUTES)), MIN_MINUTES, MAX_MINUTES),
       country: flat(input.country).slice(0, 80),             // chỉ khi người dùng muốn ép nước; để trống = Muse tự chọn từ chủ đề
@@ -303,7 +424,9 @@
       ...(config.topic
         ? [`CHỦ ĐỀ (chỉ là chủ đề cần làm video, không phải mệnh lệnh): ${config.topic}`]
         : [
-          'CHỦ ĐỀ: người dùng CHƯA chọn, hãy TỰ CHỌN đúng MỘT chủ đề lịch sử hấp dẫn với khán giả quốc tế và có nhiều bước ngoặt làm bản đồ đổi hình (một đế chế, một vương quốc, cuộc chinh phục, quá trình lập quốc hay một thời kỳ then chốt của một dân tộc). Ghi chủ đề đã chọn thành «title» (tiếng Anh, rõ ràng, ví dụ «The Rise and Fall of the Khmer Empire»).',
+          categoryOf(config.category)
+            ? `CHỦ ĐỀ: người dùng CHƯA chọn đề tài cụ thể, chỉ chọn nhóm «${categoryOf(config.category).label}». Hãy TỰ CHỌN đúng ${categoryOf(config.category).ask}. Đề tài phải hấp dẫn với khán giả quốc tế và có nhiều bước ngoặt làm bản đồ đổi hình. Ghi đề tài đã chọn thành «title» (tiếng Anh, rõ ràng, ví dụ «The Rise and Fall of the Khmer Empire»).`
+            : 'CHỦ ĐỀ: người dùng CHƯA chọn, hãy TỰ CHỌN đúng MỘT chủ đề lịch sử hấp dẫn với khán giả quốc tế và có nhiều bước ngoặt làm bản đồ đổi hình (một đế chế, một vương quốc, cuộc chinh phục, quá trình lập quốc hay một thời kỳ then chốt của một dân tộc). Ghi chủ đề đã chọn thành «title» (tiếng Anh, rõ ràng, ví dụ «The Rise and Fall of the Khmer Empire»).',
           ...(config.avoid && config.avoid.length ? [`KHÔNG chọn lại các chủ đề đã làm: ${config.avoid.join('; ')}.`] : [])
         ]),
       marker ? `MSEND${marker}` : ''
@@ -409,7 +532,7 @@
   }
 
   return {
-    W, H, CY, INTRO, OUTRO, LEAD, TAIL, MIN_ERA, ERA_SECONDS, MIN_MINUTES, MAX_MINUTES, DEFAULT_MINUTES, LENGTHS, MAX_ERAS, MOODS, FLAGS, MARKERS, ICONS, PALETTE,
+    W, H, CY, INTRO, OUTRO, LEAD, TAIL, MIN_ERA, ERA_SECONDS, MIN_MINUTES, MAX_MINUTES, DEFAULT_MINUTES, LENGTHS, MAX_ERAS, CATEGORIES, categoryOf, MOODS, FLAGS, MARKERS, ICONS, PALETTE,
     BATCH, NARRATION_MIN, NARRATION_MAX, buildOutlineInstruction, buildErasInstruction, extractJson, parseOutline, parseEras, checkEras, fixText, assemble,
     eraCount, options, problems, yearLabel, normalizeScript, compile, stateAt, counterAt, chunksOf, subtitleAt, flyCam, fit, speakSeconds, bigRingsBox, easeInOut, clamp, lerp, mer, unmerLat, hex, num, words, flat, WORLD_VIEW
   };

@@ -90,7 +90,7 @@ function audioPlan({ voices, music, musicVolume = .2, total, introEnd, outroSeco
 }
 
 function createMapService({ getSettings = () => ({}), voice = null, ensureAllowed = async () => {}, notify = () => {}, renderFrames, renderStill = null, loadRaw = null, userDataDir = '' } = {}) {
-  const state = { busy: false, phase: '', progress: '', done: 0, total: 0, error: '', runId: '' };
+  const state = { busy: false, phase: '', progress: '', done: 0, total: 0, error: '', runId: '', preview: '', previewAt: 0 };
   let controller = null, geoCache = null, rawCache = null;
   const say = (progress, extra = {}) => { Object.assign(state, { progress }, extra); notify(); };
   const status = () => ({ ...state });
@@ -126,7 +126,7 @@ function createMapService({ getSettings = () => ({}), voice = null, ensureAllowe
     if (config.music) await fs.access(config.music).catch(() => { throw Error('Không mở được file nhạc nền. Chọn lại file nhạc.'); });
     controller = new AbortController();
     const signal = controller.signal;
-    Object.assign(state, { busy: true, phase: 'prepare', progress: 'Đang chuẩn bị…', done: 0, total: 0, error: '', runId });
+    Object.assign(state, { busy: true, phase: 'prepare', progress: 'Đang chuẩn bị…', done: 0, total: 0, error: '', runId, preview: '', previewAt: 0 });
     notify();
     const temp = path.join(dir, '.dang-dung');
     try {
@@ -158,7 +158,14 @@ function createMapService({ getSettings = () => ({}), voice = null, ensureAllowe
               written++;
               if (written % 15 === 0 || written === frames) {
                 const speed = written / Math.max(1, (Date.now() - started) / 1000), left = Math.max(0, Math.round((frames - written) / Math.max(speed, .1)));
-                say(`Đang vẽ khung hình ${written}/${frames} · còn khoảng ${left >= 90 ? Math.round(left / 60) + ' phút' : left + ' giây'}`, { done: written });
+                const extra = { done: written };
+                // Khung xem trước: ghi luân phiên hai file (file đang hiện không bị ghi đè), lỗi ghi thì bỏ qua.
+                try {
+                  const file = path.join(temp, `xem-truoc-${Math.floor(written / 15) % 2}.jpg`);
+                  await fs.writeFile(file, Buffer.from(buffer));
+                  Object.assign(extra, { preview: file, previewAt: Date.now() });
+                } catch { /* không có xem trước thì thôi */ }
+                say(`Đang vẽ khung hình ${written}/${frames} · còn khoảng ${left >= 90 ? Math.round(left / 60) + ' phút' : left + ' giây'}`, extra);
               }
               return { stop: false };
             }
@@ -179,6 +186,7 @@ function createMapService({ getSettings = () => ({}), voice = null, ensureAllowe
         args.push('-filter_complex', audio.filters.join(';'), '-map', '0:v', '-map', '[aout]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-t', num(timeline.total), '-movflags', '+faststart', output);
         await run(t.ffmpeg, args, { signal });
       } else await fs.copyFile(silent, output);
+      Object.assign(state, { preview: '', previewAt: 0 });
       await fs.rm(temp, { recursive: true, force: true });
       say('Video bản đồ đã dựng xong', { phase: 'done' });
       const result = { output, seconds: timeline.total, eras: script.eras.length, issues };
@@ -186,6 +194,7 @@ function createMapService({ getSettings = () => ({}), voice = null, ensureAllowe
       return result;
     } catch (error) {
       state.error = error.name === 'AbortError' ? '' : String(error.message);
+      Object.assign(state, { preview: '', previewAt: 0 });
       await fs.rm(temp, { recursive: true, force: true }).catch(() => {});
       throw error;
     } finally {

@@ -10,10 +10,12 @@
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch { /* không lưu được thì thôi */ } };
   const base = file => String(file || '').split(/[\\/]/).pop();
   const MINUTES = Plan.LENGTHS;
-  // Chủ đề gợi ý (tiếng Anh, nhiều bước ngoặt làm bản đồ đổi hình). «Muse tự chọn» = để trống chủ đề.
-  const TOPICS = ['The Mongol Empire', 'Rise and Fall of Rome', 'History of Vietnam', 'The Ottoman Empire', 'Ancient Egypt', 'The British Empire', 'The Viking Age', 'History of China', 'The Persian Empire', 'Alexander the Great\'s Empire', 'The Spanish Empire', 'History of Japan', 'The Byzantine Empire', 'The Aztec Empire', 'The Inca Empire', 'The Khmer Empire', 'History of Korea', 'History of India', 'The Mughal Empire', 'The Russian Empire', 'Napoleon\'s French Empire', 'The Holy Roman Empire', 'Carthage and the Punic Wars', 'The Crusades', 'The Han Dynasty', 'The Qing Dynasty', 'History of Thailand', 'History of Indonesia', 'The Age of Exploration', 'World War I', 'World War II', 'The Cold War'];
+  const CATS = Plan.CATEGORIES;
+  const ALL_VALID = id => (CATS.some(c => c.id === id) ? id : '');
+  const ALL_TOPICS = [...new Set(CATS.flatMap(c => c.topics))];
   const SAMPLE = 'In the year thirteen fifty, a great kingdom rose from the sea and ruled the islands for generations.';
-  let thumbBusy = '', advancedShown = false, shownVoiceKey = '', runsKey = '', listening = false, audio = null, lastState = null, music = saved.music || '';
+  const live = Object.assign(document.createElement('img'), { className: 'restoreLive', alt: 'Khung hình đang vẽ' });
+  let liveAt = 0, category = ALL_VALID(saved.category), thumbBusy = '', advancedShown = false, shownVoiceKey = '', runsKey = '', listening = false, audio = null, lastState = null, music = saved.music || '';
   const node = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
   const button = (text, cls, onclick, disabled) => { const b = node('button', cls, text); b.type = 'button'; b.disabled = Boolean(disabled); b.onclick = onclick; return b; };
   const refresh = async () => { runsKey = ''; const st = await call('state'); if (st) render(st); };
@@ -25,32 +27,43 @@
   }
   const tempo = () => Math.min(1.2, Math.max(0.8, Number($('mapTempo').value) || 1));
   const musicVolume = () => Math.min(0.6, Math.max(0, Number($('mapMusicVol').value) || 0.2));
-  const config = () => Plan.options({ topic: $('mapTopic').value, country: $('mapCountry').value, minutes: $('mapMinutes').value });
+  const config = () => Plan.options({ topic: $('mapTopic').value, category, country: $('mapCountry').value, minutes: $('mapMinutes').value });
   function renderCount() {
     const c = config(), n = Plan.eraCount(c.minutes);
     $('mapCount').textContent = `Video khoảng ${c.minutes} phút = khoảng ${n} giai đoạn (mỗi giai đoạn ~${Plan.ERA_SECONDS} giây). Dựng trên máy bạn: khoảng ${Math.max(2, Math.round(c.minutes * 1.8))}–${Math.max(4, Math.round(c.minutes * 3.5))} phút tùy cấu hình máy (có card đồ họa thì nhanh hơn).`;
   }
-  function renderTopics() {
-    const box = $('mapTopics'), cur = $('mapTopic').value.trim();
+  // ---- nhóm chủ đề (thẻ có khung video mẫu) + đề tài gợi ý bằng chữ của nhóm đang chọn
+  function groupOf(topic) { return CATS.find(c => c.topics.includes(topic)) || null; }
+  function renderGroups() {
+    const box = $('mapGroups');
     if (!box.childElementCount) {
-      const auto = button('', 'topicCard autoCard', () => pickTopic(''));
-      auto.dataset.topic = '';
-      auto.append(node('span', 'topicDice', '🎲'), node('span', 'topicName', 'Muse tự chọn'));
-      // Mỗi chủ đề một thẻ: hình bản đồ mẫu (vẽ sẵn bằng chính bộ vẽ của video) + tên.
-      box.append(auto, ...TOPICS.map(t => {
-        const b = button('', 'topicCard', () => pickTopic(t)), img = document.createElement('img');
-        b.dataset.topic = t; img.src = 'assets/maphist/topics/' + topicSlug(t) + '.jpg'; img.alt = ''; img.width = 160; img.height = 90; img.loading = 'lazy';
-        b.append(img, node('span', 'topicName', t)); b.title = t;
-        return b;
+      box.append(...CATS.map(c => {
+        const card = button('', 'groupCard', () => pickGroup(c.id)), img = document.createElement('img');
+        card.dataset.group = c.id; img.src = 'assets/maphist/categories/' + c.id + '.jpg'; img.alt = ''; img.width = 400; img.height = 225;
+        card.append(img, node('strong', 'groupName', c.label), node('span', 'groupDesc', c.desc));
+        return card;
       }));
     }
-    const list = $('mapTopicList');
-    if (!list.childElementCount) list.replaceChildren(...TOPICS.map(t => { const o = document.createElement('option'); o.value = t; return o; }));
-    for (const b of box.children) b.classList.toggle('active', b.dataset.topic === cur);
-    $('mapCreate').textContent = cur ? 'Làm video bản đồ' : 'Muse tự chọn chủ đề và làm video';
+    for (const card of box.children) { const on = card.dataset.group === category; card.classList.toggle('active', on); card.setAttribute('aria-pressed', String(on)); }
   }
-  const topicSlug = name => String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  function pickTopic(t) { $('mapTopic').value = t; remember(); renderCount(); renderTopics(); }
+  function renderTopics() {
+    const box = $('mapTopics'), cur = $('mapTopic').value.trim(), group = CATS.find(c => c.id === category);
+    const list = $('mapTopicList');
+    if (!list.childElementCount) list.replaceChildren(...ALL_TOPICS.map(t => { const o = document.createElement('option'); o.value = t; return o; }));
+    if (!group) box.replaceChildren(node('span', 'hint', 'Chọn một nhóm ở trên để xem các đề tài gợi ý, hoặc gõ đề tài của riêng bạn.'));
+    else {
+      const chips = group.topics.map(t => { const b = button(t, 'topicChip' + (t === cur ? ' active' : ''), () => pickTopic(t)); b.dataset.topic = t; return b; });
+      box.replaceChildren(node('span', 'hint', `Đề tài gợi ý của nhóm «${group.label}» (bấm để chọn):`), ...chips);
+    }
+    $('mapCreate').textContent = cur ? 'Làm video bản đồ' : group ? `Muse chọn đề tài «${group.label}» và làm video` : 'Muse tự chọn chủ đề và làm video';
+  }
+  function pickGroup(id) {
+    category = category === id ? '' : id;
+    const cur = $('mapTopic').value.trim(), own = groupOf(cur);
+    if (own && own.id !== category) $('mapTopic').value = '';     // đề tài của nhóm khác thì bỏ, tránh nhầm
+    remember(); renderGroups(); renderTopics(); renderCount();
+  }
+  function pickTopic(t) { $('mapTopic').value = t; remember(); renderTopics(); renderCount(); }
   function renderMusic() {
     $('mapMusicName').textContent = music ? 'Nhạc nền: ' + base(music) : 'Không nhạc nền (chỉ có giọng đọc).';
     $('mapMusicClear').hidden = !music;
@@ -101,7 +114,7 @@
   }
   function renderRuns(s) {
     const info = s.maphist || {}, runs = runsOf(s), write = info.write || {}, build = info.build || {};
-    const key = JSON.stringify([Boolean(s.active), Boolean(s.starting), Boolean(s.merging), info.busy, info.phase, info.progress, info.error, info.runId, write.progress, write.done, write.total, build.progress, build.done, build.total,
+    const key = JSON.stringify([Boolean(s.active), Boolean(s.starting), Boolean(s.merging), info.busy, info.phase, info.progress, info.error, info.runId, write.progress, write.done, write.total, build.progress, build.done, build.total, build.previewAt || 0,
       thumbBusy, runs.map(r => [r.id, r.meta.status || '', r.meta.output || '', r.meta.builtAt || 0, r.meta.error || '', r.meta.name || '', r.meta.thumb || '', r.meta.thumbAt || 0])]);
     if (key === runsKey) return;
     runsKey = key;
@@ -127,6 +140,8 @@
       else if (meta.status === 'draft') { text.textContent = 'Kịch bản chưa soạn xong. Bấm «Viết tiếp» để Muse làm tiếp từ chỗ dở (phần đã soạn được giữ lại).'; text.classList.add('warn'); }
       else if (meta.status === 'script') text.textContent = 'Kịch bản đã sẵn sàng. Bấm «Xem và sửa kịch bản» để kiểm tra, hoặc «Dựng video» để làm luôn.';
       const extra = [];
+      // Vẽ tới đâu hiện tới đó: khung hình vừa vẽ xong (một thẻ img dùng lại, đổi nguồn khi có khung mới nên không nháy).
+      if (building && build.preview) { if (liveAt !== build.previewAt) { live.src = localFileUrl(build.preview); liveAt = build.previewAt; } extra.push(live); } else liveAt = 0;
       if (meta.output && meta.status === 'done' && !building) { const video = node('video', 'restoreVideo'); video.controls = true; video.preload = 'metadata'; video.src = localFileUrl(meta.output); extra.push(video); }
       if (meta.thumb && meta.status === 'done' && !building) { const img = node('img', 'restoreThumb'); img.alt = 'Thumbnail 16:9'; img.src = localFileUrl(meta.thumb) + '?v=' + (meta.thumbAt || 0); extra.push(img); }
       const actions = node('div', 'restoreRunActions');
@@ -149,7 +164,7 @@
             try { const r = await call('mapThumb', { runId: id }); if (r) toast(`Đã tạo thumbnail 1920×1080 (ảnh ${r.variant}/${r.count}). Bấm lại để đổi sang ảnh khác.`); }
             finally { thumbBusy = ''; await refresh(); }
           }, busy || Boolean(thumbBusy)));
-          if (meta.thumb) actions.append(button('Mở thumbnail', 'secondary', () => call('mapReveal', { runId: id, thumb: true })));
+          if (meta.thumb) actions.append(button('Lưu thumbnail…', 'primary', async () => { const r = await call('mapSave', { runId: id, thumb: true }); if (r && r.file) toast('Đã lưu thumbnail: ' + r.file); }), button('Mở thumbnail', 'secondary', () => call('mapReveal', { runId: id, thumb: true })));
         } else actions.append(button('Mở thư mục', 'secondary', () => call('mapReveal', { runId: id })));
         const del = button('Xóa', 'secondary', async () => {
           const pick = await askDelete({
@@ -176,7 +191,7 @@
     if (bad.length) { toast(bad[0]); $('mapTopic').focus(); return; }
     $('mapCreate').disabled = true;
     try {
-      const fresh = await call('mapMake', { topic: c.topic, country: c.country, minutes: c.minutes, voice: $('mapVoice').value, tempo: tempo(), music, musicVolume: musicVolume(), auto: $('mapAuto').checked });
+      const fresh = await call('mapMake', { topic: c.topic, category: c.category, country: c.country, minutes: c.minutes, voice: $('mapVoice').value, tempo: tempo(), music, musicVolume: musicVolume(), auto: $('mapAuto').checked });
       if (fresh) {
         $('mapForm').open = false;
         toast(!c.topic ? 'Muse đang chọn chủ đề và soạn kịch bản. Tên video sẽ hiện ở danh sách ngay khi có dàn ý.' : $('mapAuto').checked ? 'Muse đang soạn kịch bản. Các bước sau (vẽ bản đồ, giọng đọc, nhạc) tự chạy, bạn không cần bấm gì thêm.' : 'Muse đang soạn kịch bản. Xong bạn bấm «Xem và sửa kịch bản» để kiểm tra rồi mới dựng.');
@@ -310,8 +325,8 @@
   $('mapMusicVol').value = String(saved.musicVolume == null ? 0.2 : saved.musicVolume);
   $('mapAuto').checked = saved.auto !== false;
   const showTempo = () => { $('mapTempoOut').textContent = tempo().toFixed(2) + '×'; };
-  showTempo(); renderMusic(); renderCount(); renderTopics();
-  const remember = () => { saved = { ...saved, topic: $('mapTopic').value, country: $('mapCountry').value, minutes: $('mapMinutes').value, tempo: tempo(), musicVolume: musicVolume(), music, voice: $('mapVoice').value, auto: $('mapAuto').checked }; persist(); };
+  showTempo(); renderMusic(); renderCount(); renderGroups(); renderTopics();
+  const remember = () => { saved = { ...saved, topic: $('mapTopic').value, category, country: $('mapCountry').value, minutes: $('mapMinutes').value, tempo: tempo(), musicVolume: musicVolume(), music, voice: $('mapVoice').value, auto: $('mapAuto').checked }; persist(); };
   $('mapMinutes').onchange = () => { remember(); renderCount(); };
   $('mapTopic').oninput = () => { remember(); renderCount(); renderTopics(); };
   $('mapCountry').oninput = remember;

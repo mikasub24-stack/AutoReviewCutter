@@ -861,7 +861,7 @@ async function runMapWrite(runId,{auto}){
     mapGeoObject=await ensureMapGeo();
     const draft=await readJsonFile(mapDraftFile(runId));
     const avoid=Object.entries(mapRuns()).filter(([id,r])=>id!==runId&&r&&(r.topic||r.title)).map(([,r])=>r.topic||r.title);
-    const result=await mapWriter.write({options:{topic:meta.topic,minutes:meta.minutes,country:meta.country,avoid},resume:draft&&draft.outline?draft:null,onDraft:d=>{void saveMapDraft(runId,d);},onOutline:o=>{
+    const result=await mapWriter.write({options:{topic:meta.topic,category:meta.category,minutes:meta.minutes,country:meta.country,avoid},resume:draft&&draft.outline?draft:null,onDraft:d=>{void saveMapDraft(runId,d);},onOutline:o=>{
       // Chủ đề do Muse tự chọn: đặt tên video theo tiêu đề dàn ý ngay để danh sách hiện đúng tên.
       if(!meta.topic&&o&&o.title){meta.topic=o.title;meta.name=o.title;meta.auto=true;void save();notify();}
     }});
@@ -1454,7 +1454,8 @@ app.whenReady().then(async () => {
         const voice=pickMapVoice(config.voice);
         const base=(config.topic||'Tu-chon').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/gi,'d').replace(/[^A-Za-z0-9]+/g,'-').slice(0,30);
         runId=await freeStoryId(base,{output:settings.output,jobs:[],folderOf:mapFolder,fallback:'BanDo'});
-        all[runId]={name:config.topic||'Muse tự chọn chủ đề',topic:config.topic,minutes:config.minutes,country:config.country,voice,tempo:config.tempo,music:mapMusicOf(config.music),musicVolume:config.musicVolume,status:'writing',createdAt:Date.now(),error:''};
+        const group=mapPlan.categoryOf(config.category);
+        all[runId]={name:config.topic||(group?'Muse tự chọn: '+group.label:'Muse tự chọn chủ đề'),topic:config.topic,category:config.topic?'':config.category,minutes:config.minutes,country:config.country,voice,tempo:config.tempo,music:mapMusicOf(config.music),musicVolume:config.musicVolume,status:'writing',createdAt:Date.now(),error:''};
         for(const id of Object.keys(all).slice(0,Math.max(0,Object.keys(all).length-40)))delete all[id];
       }
       await fs.mkdir(mapFolder(settings.output,runId),{recursive:true});
@@ -1535,11 +1536,12 @@ app.whenReady().then(async () => {
       return {file:r.file,variant:r.variant+1,count:r.count};
     },
     mapSave: async data => {
-      const out=mapRuns()[String(data?.runId||'')]?.output;
-      if(!out||!await fs.stat(out).then(s=>s.isFile(),()=>false))throw Error(ui('Chưa có video hoàn chỉnh để lưu.','There is no finished video to save yet.'));
-      const picked=await dialog.showSaveDialog(main,{title:ui('Lưu video về','Save video'),defaultPath:path.join(app.getPath('downloads'),path.basename(out)),filters:[{name:'MP4',extensions:['mp4']}]});
+      const meta=mapRuns()[String(data?.runId||'')],thumb=Boolean(data?.thumb),out=thumb?meta?.thumb:meta?.output;
+      if(!out||!await fs.stat(out).then(s=>s.isFile(),()=>false))throw Error(thumb?ui('Chưa có thumbnail để lưu. Bấm «Tạo thumbnail 16:9» trước.','There is no thumbnail to save yet. Press “Create 16:9 thumbnail” first.'):ui('Chưa có video hoàn chỉnh để lưu.','There is no finished video to save yet.'));
+      const ext=thumb?'jpg':'mp4',base=thumb?path.basename(out).replace(/^thumbnail-\d+/i,String(meta.name||'video').replace(/[\\/:*?"<>|\x00-\x1f]+/g,' ').trim().slice(0,60)+' - thumbnail'):path.basename(out);
+      const picked=await dialog.showSaveDialog(main,{title:thumb?ui('Lưu thumbnail về','Save thumbnail'):ui('Lưu video về','Save video'),defaultPath:path.join(app.getPath('downloads'),base),filters:[{name:thumb?'JPEG':'MP4',extensions:thumb?['jpg','jpeg']:['mp4']}]});
       if(picked.canceled||!picked.filePath)return false;
-      const dest=/\.mp4$/i.test(picked.filePath)?picked.filePath:picked.filePath+'.mp4';
+      const dest=(thumb?/\.jpe?g$/i:/\.mp4$/i).test(picked.filePath)?picked.filePath:picked.filePath+'.'+ext;
       if(path.resolve(dest).toLowerCase()!==path.resolve(out).toLowerCase())await fs.copyFile(out,dest);
       shell.showItemInFolder(dest);return{file:dest};
     },

@@ -142,6 +142,15 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.9.15
+
+- **Chủ đề chọn theo NHÓM, mỗi nhóm có khung video mẫu thật:** 7 nhóm: Lịch sử một nước, Đế chế, Triều đại, Chiến tranh, Khám phá và thương mại, Văn minh cổ đại, Độc lập và cách mạng. Mỗi thẻ là một khung hình lấy từ chính bộ vẽ video (bản đồ, cờ, đồng hồ năm, lời chú), nên bạn thấy trước video của nhóm đó trông thế nào. Bấm một thẻ rồi bấm nút tạo: Muse tự chọn một đề tài hay trong nhóm (tránh những đề tài đã làm). Bấm lại thẻ để bỏ chọn.
+- **Vẫn gõ được đề tài riêng:** ô «Đề tài cụ thể» không bắt buộc; bên dưới hiện các đề tài gợi ý của nhóm đang chọn (bấm để điền), và ô gõ vẫn xổ danh sách tất cả đề tài. Chọn đề tài của nhóm khác thì đề tài cũ tự bỏ để khỏi nhầm.
+- **Nút «Lưu thumbnail…»** cạnh «Lưu video…»: chọn nơi lưu ảnh bìa 16:9 (JPG) như khi lưu video; «Mở thumbnail» vẫn mở thư mục chứa ảnh.
+- **Vẽ tới đâu hiện tới đó:** khi đang dựng video, ô tiến độ hiện luôn khung hình bản đồ vừa vẽ xong (làm mới khoảng nửa giây video một lần), nên bạn thấy video thành hình thay vì chỉ thấy thanh phần trăm. Khung xem trước nằm trong thư mục tạm và tự xóa khi dựng xong.
+- Thay 32 hình bản đồ theo từng đề tài của bản 1.9.14 (bị nhầm với «cả thế giới»).
+- Tạo lại hình mẫu nhóm: `node tools/make-category-samples.cjs` (đọc `tools/maphist-categories.json`, ghi `src/assets/maphist/categories/`).
+
 ## Update 1.9.14
 
 - **Nút «Tạo thumbnail 16:9» khi video bản đồ đã dựng xong:** tạo ảnh bìa YouTube 1920×1080 (JPEG dưới 2 MB) từ đúng bản đồ của video: giai đoạn nhiều lãnh thổ nhất, tiêu đề lớn bên trái, khoảng năm, phụ đề vàng. Bấm lại để đổi sang ảnh khác (tối đa 3 ảnh, lưu `thumbnail-1.jpg`…`thumbnail-3.jpg` trong thư mục `BanDo/<tên>`). Có hình xem trước ngay trong thẻ video và nút «Mở thumbnail».

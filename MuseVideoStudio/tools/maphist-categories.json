@@ -1,0 +1,1315 @@
+[
+ {
+  "id": "country",
+  "label": "Lịch sử một nước",
+  "desc": "Cả hành trình của một quốc gia, từ thuở lập quốc đến nay",
+  "ask": "LỊCH SỬ MỘT QUỐC GIA: một quốc gia hiện nay có lịch sử dài và nhiều bước ngoặt (từ thuở lập quốc, các triều đại, ngoại xâm đến hiện đại); kể cả hành trình đó",
+  "topics": [
+   "History of Vietnam",
+   "History of China",
+   "History of Japan",
+   "History of Korea",
+   "History of India",
+   "History of Thailand",
+   "History of Indonesia",
+   "History of Egypt",
+   "History of Mexico",
+   "History of Turkey",
+   "History of Iran",
+   "History of Ethiopia"
+  ],
+  "sample": {
+   "frame": 1,
+   "script": {
+    "title": "History of Vietnam",
+    "subtitle": "A thousand years of independence",
+    "country": "Vietnam",
+    "eras": [
+     {
+      "year": 1010,
+      "title": "Thang Long",
+      "caption": "Ly Thai To moves the capital to Thang Long",
+      "narration": "In ten ten the emperor Ly Thai To moved his capital to Thang Long, today's Hanoi, and the young kingdom of Dai Viet began to flourish along the Red River.",
+      "population": 1500000,
+      "icon": "crown",
+      "realms": [
+       {
+        "name": "Dai Viet",
+        "regions": [
+         "Ha Noi",
+         "Hải Phòng",
+         "Nam Định",
+         "Thái Bình",
+         "Ninh Bình",
+         "Hà Nam",
+         "Bắc Ninh",
+         "Hải Dương",
+         "Thanh Hóa",
+         "Nghệ An"
+        ],
+        "colors": [
+         "#da251d"
+        ],
+        "flag": "solid",
+        "mood": "proud",
+        "face": true
+       }
+      ],
+      "markers": [
+       {
+        "type": "capital",
+        "name": "Thang Long",
+        "at": [
+         105.85,
+         21.03
+        ]
+       }
+      ],
+      "routes": [],
+      "view": null
+     },
+     {
+      "year": 1471,
+      "title": "March to the South",
+      "caption": "Dai Viet pushes south and absorbs Champa",
+      "narration": "By fourteen seventy one Dai Viet had crushed the kingdom of Champa and pushed its border far to the south, stretching the country down the long coast of the sea.",
+      "population": 4000000,
+      "icon": "swords",
+      "realms": [
+       {
+        "name": "Dai Viet",
+        "regions": [
+         "Ha Noi",
+         "Hải Phòng",
+         "Nam Định",
+         "Thái Bình",
+         "Ninh Bình",
+         "Hà Nam",
+         "Bắc Ninh",
+         "Hải Dương",
+         "Thanh Hóa",
+         "Nghệ An",
+         "Ha Tinh",
+         "Quảng Bình",
+         "Quảng Trị",
+         "Thừa Thiên - Huế",
+         "Đà Nẵng",
+         "Quàng Nam",
+         "Quảng Ngãi",
+         "Bình Định"
+        ],
+        "colors": [
+         "#da251d"
+        ],
+        "flag": "solid",
+        "mood": "proud",
+        "face": true
+       },
+       {
+        "name": "Champa",
+        "regions": [
+         "Phú Yên",
+         "Khánh Hòa",
+         "Ninh Thuận",
+         "Bình Thuận"
+        ],
+        "colors": [
+         "#2f7f78",
+         "#c9a227"
+        ],
+        "flag": "h",
+        "mood": "sad",
+        "face": false
+       }
+      ],
+      "markers": [
+       {
+        "type": "capital",
+        "name": "Thang Long",
+        "at": [
+         105.85,
+         21.03
+        ]
+       },
+       {
+        "type": "battle",
+        "name": "Vijaya",
+        "at": [
+         109.0,
+         13.9
+        ]
+       }
+      ],
+      "routes": [
+       {
+        "points": [
+         [
+          105.85,
+          21.03
+         ],
+         [
+          106,
+          18
+         ],
+         [
+          107.6,
+          16.5
+         ],
+         [
+          109,
+          13.9
+         ]
+        ],
+        "ship": false
+       }
+      ],
+      "view": null
+     },
+     {
+      "year": 1802,
+      "title": "Unified Nation",
+      "caption": "Gia Long unifies the land from north to south",
+      "narration": "In eighteen oh two Emperor Gia Long unified the whole country from the northern mountains to the southern delta and made Hue the capital of the new Nguyen dynasty.",
+      "population": 6000000,
+      "icon": "crown",
+      "realms": [
+       {
+        "name": "Vietnam",
+        "regions": [
+         "Vietnam"
+        ],
+        "colors": [
+         "#da251d"
+        ],
+        "flag": "solid",
+        "mood": "proud",
+        "face": true
+       }
+      ],
+      "markers": [
+       {
+        "type": "capital",
+        "name": "Hue",
+        "at": [
+         107.6,
+         16.46
+        ]
+       }
+      ],
+      "routes": [],
+      "view": null
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": "empire",
+  "label": "Đế chế",
+  "desc": "Từ lúc hình thành, lên đỉnh cao đến lúc suy tàn",
+  "ask": "MỘT ĐẾ CHẾ nổi tiếng (ví dụ Mông Cổ, Ottoman, Anh, Ba Tư, Tây Ban Nha, Byzantine, Nga, Mughal, Aztec, Inca…), kể từ lúc hình thành, mở rộng tới đỉnh cao rồi suy tàn",
+  "topics": [
+   "The Mongol Empire",
+   "The Ottoman Empire",
+   "The British Empire",
+   "The Persian Empire",
+   "The Spanish Empire",
+   "The Byzantine Empire",
+   "The Russian Empire",
+   "Napoleon's French Empire",
+   "The Holy Roman Empire",
+   "The Mughal Empire",
+   "The Aztec Empire",
+   "The Inca Empire",
+   "The Khmer Empire",
+   "Alexander the Great's Empire"
+  ],
+  "sample": {
+   "frame": 1,
+   "script": {
+    "title": "The Mongol Empire",
+    "subtitle": "The largest land empire in history",
+    "country": "Mongolia",
+    "eras": [
+     {
+      "year": 1206,
+      "title": "The Great Khan",
+      "caption": "Temujin unites the tribes and becomes Genghis Khan",
+      "narration": "In twelve oh six a chieftain named Temujin united the warring tribes of the steppe and took the title Genghis Khan, ruler of all the people who live in felt tents.",
+      "population": 0,
+      "icon": "crown",
+      "realms": [
+       {
+        "name": "Mongols",
+        "regions": [
+         "Mongolia"
+        ],
+        "colors": [
+         "#c0392b",
+         "#1f4e8c"
+        ],
+        "flag": "v",
+        "mood": "proud",
+        "face": true
+       }
+      ],
+      "markers": [
+       {
+        "type": "capital",
+        "name": "Karakorum",
+        "at": [
+         102.8,
+         47.2
+        ]
+       }
+      ],
+      "routes": [],
+      "view": null
+     },
+     {
+      "year": 1227,
+      "title": "Storm from the Steppe",
+      "caption": "Mongol horsemen sweep across Central Asia",
+      "narration": "By twelve twenty seven the horsemen of Genghis Khan had swept across Central Asia, toppling great cities and linking east and west under a single rule.",
+      "population": 100000000,
+      "icon": "swords",
+      "realms": [
+       {
+        "name": "Mongol Empire",
+        "regions": [
+         "Mongolia",
+         "China",
+         "Kazakhstan",
+         "Kyrgyzstan",
+         "Uzbekistan",
+         "Turkmenistan",
+         "Tajikistan",
+         "Afghanistan",
+         "Iran"
+        ],
+        "colors": [
+         "#c0392b",
+         "#1f4e8c"
+        ],
+        "flag": "v",
+        "mood": "proud",
+        "face": true
+       }
+      ],
+      "markers": [
+       {
+        "type": "capital",
+        "name": "Karakorum",
+        "at": [
+         102.8,
+         47.2
+        ]
+       },
+       {
+        "type": "battle",
+        "name": "Samarkand",
+        "at": [
+         67,
+         39.6
+        ]
+       }
+      ],
+      "routes": [
+       {
+        "points": [
+         [
+          102.8,
+          47.2
+         ],
+         [
+          85,
+          46
+         ],
+         [
+          70,
+          43
+         ],
+         [
+          60,
+          38
+         ],
+         [
+          52,
+          34
+         ]
+        ],
+        "ship": false
+       }
+      ],
+      "view": null
+     },
+     {
+      "year": 1279,
+      "title": "Khans of Eurasia",
+      "caption": "The empire reaches from Korea to Hungary",
+      "narration": "In twelve seventy nine the empire stretched from Korea to Hungary, the largest land empire the world had ever seen, and the Silk Road was safe for merchants once again.",
+      "population": 0,
+      "icon": "crown",
+      "realms": [
+       {
+        "name": "Mongol Empire",
+        "regions": [
+         "Mongolia",
+         "China",
+         "Kazakhstan",
+         "Kyrgyzstan",
+         "Uzbekistan",
+         "Turkmenistan",
+         "Tajikistan",
+         "Afghanistan",
+         "Iran",
+         "Iraq",
+         "Russia",
+         "Ukraine",
+         "North Korea",
+         "South Korea"
+        ],
+        "colors": [
+         "#c0392b",
+         "#1f4e8c"
+        ],
+        "flag": "v",
+        "mood": "proud",
+        "face": true
+       }
+      ],
+      "markers": [],
+      "routes": [],
+      "view": null
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": "dynasty",
+  "label": "Triều đại",
+  "desc": "Các triều đại thay nhau cai trị một vùng đất",
+  "ask": "MỘT TRIỀU ĐẠI nổi tiếng (ví dụ Hán, Đường, Tống, Minh, Thanh, Nguyễn, Lý – Trần…), từ lúc lập triều đến khi sụp đổ",
+  "topics": [
+   "The Han Dynasty",
+   "The Tang Dynasty",
+   "The Song Dynasty",
+   "The Ming Dynasty",
+   "The Qing Dynasty",
+   "The Nguyen Dynasty",
+   "The Ly and Tran Dynasties"
+  ],
+  "sample": {
+   "frame": 1,
+   "script": {
+    "title": "The Tang Dynasty",
+    "subtitle": "The golden age of China",
+    "country": "China",
+    "eras": [
+     {
+      "year": 618,
+      "title": "A New Dynasty",
+      "caption": "Li Yuan founds the Tang dynasty",
+      "narration": "In six eighteen Li Yuan seized the throne and founded the Tang dynasty, bringing order to a land that had been torn by war for generations.",
+      "population": 0,
+      "icon": "crown",
+      "realms": [
+       {
+        "name": "Tang Dynasty",
+        "regions": [
+         "China"
+        ],
+        "colors": [
+         "#c9a227",
+         "#b5412f"
+        ],
+        "flag": "h",
+        "mood": "proud",
+        "face": true
+       }
+      ],
+      "markers": [
+       {
+        "type": "capital",
+        "name": "Chang'an",
+        "at": [
+         108.9,
+         34.3
+        ]
+       }
+      ],
+      "routes": [],
+      "view": null
+     },
+     {
+      "year": 755,
+      "title": "Golden Age",
+      "caption": "The Tang capital is the largest city on earth",
+      "narration": "At the height of the Tang dynasty in seven fifty five the capital Chang an was the largest city on earth and caravans carried silk along roads reaching all the way to Persia.",
+      "population": 52000000,
+      "icon": "scroll",
+      "realms": [
+       {
+        "name": "Tang Dynasty",
+        "regions": [
+         "China",
+         "Vietnam",
+         "Kyrgyzstan",
+         "Kazakhstan"
+        ],
+        "colors": [
+         "#c9a227",
+         "#b5412f"
+        ],
+        "flag": "h",
+        "mood": "proud",
+        "face": true
+       }
+      ],
+      "markers": [
+       {
+        "type": "capital",
+        "name": "Chang'an",
+        "at": [
+         108.9,
+         34.3
+        ]
+       },
+       {
+        "type": "city",
+        "name": "Kashgar",
+        "at": [
+         76,
+         39.5
+        ]
+       }
+      ],
+      "routes": [
+       {
+        "points": [
+         [
+          108.9,
+          34.3
+         ],
+         [
+          100,
+          38
+         ],
+         [
+          94.7,
+          40.1
+         ],
+         [
+          76,
+          39.5
+         ],
+         [
+          67,
+          39.6
+         ]
+        ],
+        "ship": false
+       }
+      ],
+      "view": null
+     },
+     {
+      "year": 907,
+      "title": "The Last Emperor",
+      "caption": "Rebels and warlords end the dynasty",
+      "narration": "In nine oh seven the last Tang emperor was forced from the throne, and China split into rival kingdoms that would fight for half a century.",
+      "population": 0,
+      "icon": "crown",
+      "realms": [
+       {
+        "name": "Fragmented China",
+        "regions": [
+         "China"
+        ],
+        "colors": [
+         "#7a3b69",
+         "#c9a227"
+        ],
+        "flag": "v",
+        "mood": "sad",
+        "face": true
+       }
+      ],
+      "markers": [],
+      "routes": [],
+      "view": null
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": "war",
+  "label": "Chiến tranh",
+  "desc": "Những cuộc chiến làm biên giới đổi hình",
+  "ask": "MỘT CUỘC CHIẾN hoặc chuỗi chiến tranh lớn làm biên giới thay đổi (ví dụ Thế chiến I, Thế chiến II, Chiến tranh Lạnh, Thập tự chinh, chiến tranh Punic, Chiến tranh Trăm năm…)",
+  "topics": [
+   "World War I",
+   "World War II",
+   "The Cold War",
+   "The Crusades",
+   "Carthage and the Punic Wars",
+   "The Hundred Years' War",
+   "The Napoleonic Wars",
+   "The Vietnam War"
+  ],
+  "sample": {
+   "frame": 1,
+   "script": {
+    "title": "World War II",
+    "subtitle": "The war that redrew the map",
+    "country": "Germany",
+    "eras": [
+     {
+      "year": 1939,
+      "title": "War Begins",
+      "caption": "Germany invades Poland",
+      "narration": "In nineteen thirty nine German armies crossed the Polish border, and within days Britain and France declared war on Germany.",
+      "population": 0,
+      "icon": "crown",
+      "realms": [
+       {
+        "name": "Germany",
+        "regions": [
+         "Germany",
+         "Austria",
+         "Czechia",
+         "Poland"
+        ],
+        "colors": [
+         "#4a4a4a",
+         "#c0392b"
+        ],
+        "flag": "h",
+        "mood": "angry",
+        "face": true
+       }
+      ],
+      "markers": [
+       {
+        "type": "battle",
+        "name": "Warsaw",
+        "at": [
+         21,
+         52.2
+        ]
+       }
+      ],
+      "routes": [],
+      "view": {
+       "lon": 18,
+       "lat": 52,
+       "span": 60
+      }
+     },
+     {
+      "year": 1942,
+      "title": "Axis at its Height",
+      "caption": "The Axis controls most of Europe",
+      "narration": "By nineteen forty two the Axis powers controlled most of Europe, but the tide turned at Stalingrad, where a long and terrible battle broke the German advance.",
+      "population": 0,
+      "icon": "swords",
+      "realms": [
+       {
+        "name": "Axis Powers",
+        "regions": [
+         "Germany",
+         "Austria",
+         "Italy",
+         "Poland",
+         "Czechia",
+         "France",
+         "Norway",
+         "Denmark",
+         "Greece",
+         "Hungary",
+         "Romania",
+         "Bulgaria"
+        ],
+        "colors": [
+         "#4a4a4a",
+         "#c0392b"
+        ],
+        "flag": "h",
+        "mood": "angry",
+        "face": true
+       },
+       {
+        "name": "Allies",
+        "regions": [
+         "United Kingdom",
+         "Russia"
+        ],
+        "colors": [
+         "#2f5fa3",
+         "#c0392b"
+        ],
+        "flag": "h",
+        "mood": "angry",
+        "face": false
+       }
+      ],
+      "markers": [
+       {
+        "type": "battle",
+        "name": "Stalingrad",
+        "at": [
+         44.5,
+         48.7
+        ]
+       },
+       {
+        "type": "capital",
+        "name": "Berlin",
+        "at": [
+         13.4,
+         52.5
+        ]
+       }
+      ],
+      "routes": [
+       {
+        "points": [
+         [
+          13.4,
+          52.5
+         ],
+         [
+          21,
+          52
+         ],
+         [
+          30,
+          53
+         ],
+         [
+          37.6,
+          55.75
+         ]
+        ],
+        "ship": false
+       }
+      ],
+      "view": {
+       "lon": 22,
+       "lat": 52,
+       "span": 84
+      }
+     },
+     {
+      "year": 1945,
+      "title": "Collapse",
+      "caption": "Germany surrenders and Europe is divided",
+      "narration": "In nineteen forty five Germany surrendered, and Europe was divided between east and west as a new age began.",
+      "population": 0,
+      "icon": "crown",
+      "realms": [
+       {
+        "name": "Allies",
+        "regions": [
+         "United Kingdom",
+         "France",
+         "Germany",
+         "Russia",
+         "Poland"
+        ],
+        "colors": [
+         "#2f5fa3",
+         "#c0392b"
+        ],
+        "flag": "h",
+        "mood": "calm",
+        "face": true
+       }
+      ],
+      "markers": [],
+      "routes": [],
+      "view": {
+       "lon": 22,
+       "lat": 52,
+       "span": 84
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": "explore",
+  "label": "Khám phá và thương mại",
+  "desc": "Hải trình, đường tơ lụa, những chuyến đi vòng quanh thế giới",
+  "ask": "MỘT THỜI KỲ KHÁM PHÁ HOẶC THƯƠNG MẠI lớn (ví dụ Thời đại Khám phá, Con đường Tơ lụa, người Viking, buôn bán gia vị, các chuyến đi của Trịnh Hòa), có nhiều hải trình và đường đi trên bản đồ",
+  "topics": [
+   "The Age of Exploration",
+   "The Silk Road",
+   "The Viking Age",
+   "The Spice Trade",
+   "Zheng He's Voyages",
+   "The Atlantic Slave Trade"
+  ],
+  "sample": {
+   "frame": 1,
+   "script": {
+    "title": "The Age of Exploration",
+    "subtitle": "Sea roads that connected the world",
+    "country": "Portugal",
+    "eras": [
+     {
+      "year": 1488,
+      "title": "Cape of Storms",
+      "caption": "Bartolomeu Dias rounds the southern tip of Africa",
+      "narration": "In fourteen eighty eight Bartolomeu Dias sailed past the southern tip of Africa, proving that a sea road to the East was possible.",
+      "population": 0,
+      "icon": "sail",
+      "realms": [
+       {
+        "name": "Portugal",
+        "regions": [
+         "Portugal",
+         "Angola"
+        ],
+        "colors": [
+         "#2f7f3a",
+         "#c0392b"
+        ],
+        "flag": "v",
+        "mood": "proud",
+        "face": true
+       }
+      ],
+      "markers": [
+       {
+        "type": "ship",
+        "name": "Lisbon",
+        "at": [
+         -9.1,
+         38.7
+        ]
+       }
+      ],
+      "routes": [
+       {
+        "points": [
+         [
+          -9.1,
+          38.7
+         ],
+         [
+          -17,
+          24
+         ],
+         [
+          -14,
+          5
+         ],
+         [
+          -5,
+          -24
+         ],
+         [
+          18.4,
+          -34.4
+         ]
+        ],
+        "ship": true
+       }
+      ],
+      "view": {
+       "lon": 0,
+       "lat": 0,
+       "span": 130
+      }
+     },
+     {
+      "year": 1498,
+      "title": "Road to India",
+      "caption": "Vasco da Gama reaches India",
+      "narration": "In fourteen ninety eight Vasco da Gama rounded the Cape of Good Hope and reached the shores of India, opening a sea road that would reshape world trade.",
+      "population": 0,
+      "icon": "sail",
+      "realms": [
+       {
+        "name": "Portugal",
+        "regions": [
+         "Portugal",
+         "Angola",
+         "Mozambique"
+        ],
+        "colors": [
+         "#2f7f3a",
+         "#c0392b"
+        ],
+        "flag": "v",
+        "mood": "proud",
+        "face": true
+       },
+       {
+        "name": "Spain",
+        "regions": [
+         "Spain",
+         "Cuba"
+        ],
+        "colors": [
+         "#aa151b",
+         "#f1bf00"
+        ],
+        "flag": "h",
+        "mood": "proud",
+        "face": false
+       }
+      ],
+      "markers": [
+       {
+        "type": "ship",
+        "name": "Lisbon",
+        "at": [
+         -9.1,
+         38.7
+        ]
+       },
+       {
+        "type": "city",
+        "name": "Calicut",
+        "at": [
+         75.8,
+         11.2
+        ]
+       }
+      ],
+      "routes": [
+       {
+        "points": [
+         [
+          -9.1,
+          38.7
+         ],
+         [
+          -17,
+          24
+         ],
+         [
+          -14,
+          5
+         ],
+         [
+          -5,
+          -24
+         ],
+         [
+          18.4,
+          -34.4
+         ],
+         [
+          40,
+          -15
+         ],
+         [
+          58,
+          2
+         ],
+         [
+          75.8,
+          11.2
+         ]
+        ],
+        "ship": true
+       }
+      ],
+      "view": {
+       "lon": 25,
+       "lat": 5,
+       "span": 150
+      }
+     },
+     {
+      "year": 1522,
+      "title": "Around the World",
+      "caption": "Magellan's fleet completes the first circumnavigation",
+      "narration": "In fifteen twenty two the one surviving ship of Magellan's fleet returned to Spain, completing the first voyage around the whole world.",
+      "population": 0,
+      "icon": "sail",
+      "realms": [
+       {
+        "name": "Spain",
+        "regions": [
+         "Spain",
+         "Mexico",
+         "Peru",
+         "Philippines"
+        ],
+        "colors": [
+         "#aa151b",
+         "#f1bf00"
+        ],
+        "flag": "h",
+        "mood": "proud",
+        "face": true
+       }
+      ],
+      "markers": [
+       {
+        "type": "ship",
+        "name": "Seville",
+        "at": [
+         -6,
+         37.4
+        ]
+       }
+      ],
+      "routes": [
+       {
+        "points": [
+         [
+          -6,
+          37.4
+         ],
+         [
+          -35,
+          -5
+         ],
+         [
+          -70,
+          -52
+         ],
+         [
+          -140,
+          -10
+         ],
+         [
+          121,
+          14.6
+         ],
+         [
+          18.4,
+          -34.4
+         ],
+         [
+          -6,
+          37.4
+         ]
+        ],
+        "ship": true
+       }
+      ],
+      "view": {
+       "lon": 10,
+       "lat": 0,
+       "span": 280
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": "ancient",
+  "label": "Văn minh cổ đại",
+  "desc": "Ai Cập, Hy Lạp, La Mã, Lưỡng Hà…",
+  "ask": "MỘT NỀN VĂN MINH CỔ ĐẠI (ví dụ Ai Cập, Hy Lạp, La Mã, Lưỡng Hà, Ấn Độ cổ, Maya…), từ khởi nguồn đến lúc tàn lụi hoặc hòa vào văn minh khác",
+  "topics": [
+   "Ancient Egypt",
+   "Rise and Fall of Rome",
+   "Ancient Greece",
+   "Mesopotamia",
+   "The Indus Valley Civilization",
+   "The Maya Civilization",
+   "Carthage"
+  ],
+  "sample": {
+   "frame": 1,
+   "script": {
+    "title": "Ancient Egypt",
+    "subtitle": "Gift of the Nile",
+    "country": "Egypt",
+    "eras": [
+     {
+      "year": -3100,
+      "title": "Two Lands United",
+      "caption": "Narmer unites Upper and Lower Egypt",
+      "narration": "Around thirty one hundred before our era a king called Narmer joined Upper and Lower Egypt into one land, and the age of the pharaohs began.",
+      "population": 0,
+      "icon": "crown",
+      "realms": [
+       {
+        "name": "Egypt",
+        "regions": [
+         "Egypt"
+        ],
+        "colors": [
+         "#c9a227",
+         "#1f4e8c"
+        ],
+        "flag": "h",
+        "mood": "proud",
+        "face": true
+       }
+      ],
+      "markers": [
+       {
+        "type": "capital",
+        "name": "Memphis",
+        "at": [
+         31.25,
+         29.85
+        ]
+       }
+      ],
+      "routes": [],
+      "view": {
+       "lon": 31,
+       "lat": 27,
+       "span": 22
+      }
+     },
+     {
+      "year": -2560,
+      "title": "Age of the Pyramids",
+      "caption": "Khufu raises the Great Pyramid at Giza",
+      "narration": "Around twenty five sixty before our era the pharaoh Khufu raised the Great Pyramid at Giza, a tomb so vast that it stood as the tallest building on earth for nearly four thousand years.",
+      "population": 0,
+      "icon": "scroll",
+      "realms": [
+       {
+        "name": "Old Kingdom",
+        "regions": [
+         "Egypt"
+        ],
+        "colors": [
+         "#c9a227",
+         "#1f4e8c"
+        ],
+        "flag": "h",
+        "mood": "proud",
+        "face": true
+       }
+      ],
+      "markers": [
+       {
+        "type": "temple",
+        "name": "Giza",
+        "at": [
+         31.13,
+         29.98
+        ]
+       },
+       {
+        "type": "temple",
+        "name": "Luxor",
+        "at": [
+         32.64,
+         25.7
+        ]
+       }
+      ],
+      "routes": [
+       {
+        "points": [
+         [
+          32.9,
+          24.1
+         ],
+         [
+          32.6,
+          25.7
+         ],
+         [
+          31.2,
+          30.0
+         ]
+        ],
+        "ship": true
+       }
+      ],
+      "view": {
+       "lon": 31,
+       "lat": 27,
+       "span": 22
+      }
+     },
+     {
+      "year": -1250,
+      "title": "Empire on the Nile",
+      "caption": "Ramesses the Great rules at the peak of Egyptian power",
+      "narration": "Around twelve fifty before our era Ramesses the Great ruled an empire that reached from Nubia to Syria and filled the Nile valley with towering temples.",
+      "population": 0,
+      "icon": "crown",
+      "realms": [
+       {
+        "name": "New Kingdom",
+        "regions": [
+         "Egypt",
+         "Sudan",
+         "Israel",
+         "Lebanon",
+         "Syria"
+        ],
+        "colors": [
+         "#c9a227",
+         "#1f4e8c"
+        ],
+        "flag": "h",
+        "mood": "proud",
+        "face": true
+       }
+      ],
+      "markers": [
+       {
+        "type": "temple",
+        "name": "Abu Simbel",
+        "at": [
+         31.6,
+         22.35
+        ]
+       }
+      ],
+      "routes": [],
+      "view": {
+       "lon": 33,
+       "lat": 27,
+       "span": 42
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": "independence",
+  "label": "Độc lập và cách mạng",
+  "desc": "Giành độc lập, lật đổ chế độ cũ, lập quốc gia mới",
+  "ask": "MỘT CUỘC GIÀNH ĐỘC LẬP HOẶC CÁCH MẠNG lớn (ví dụ Indonesia, Ấn Độ, Việt Nam, châu Phi, nước Mỹ, nước Pháp, sự sụp đổ của Liên Xô…), từ chế độ cũ đến quốc gia mới",
+  "topics": [
+   "Indonesia's Road to Independence",
+   "India's Road to Independence",
+   "The American Revolution",
+   "The French Revolution",
+   "The Decolonization of Africa",
+   "The Fall of the Soviet Union"
+  ],
+  "sample": {
+   "frame": 2,
+   "script": {
+    "title": "Indonesia's Road to Independence",
+    "subtitle": "From colony to nation",
+    "country": "Indonesia",
+    "eras": [
+     {
+      "year": 1602,
+      "title": "Dutch East India Company",
+      "caption": "Dutch merchants build a trading empire on Java",
+      "narration": "In sixteen oh two the Dutch East India Company arrived in the islands and slowly built a colony that would last for more than three hundred years.",
+      "population": 0,
+      "icon": "sail",
+      "realms": [
+       {
+        "name": "Dutch East Indies",
+        "regions": [
+         "Jawa Barat",
+         "Jawa Tengah",
+         "Jawa Timur",
+         "Banten",
+         "Jakarta Raya"
+        ],
+        "colors": [
+         "#ff6a13",
+         "#ffffff"
+        ],
+        "flag": "h",
+        "mood": "proud",
+        "face": true
+       }
+      ],
+      "markers": [
+       {
+        "type": "capital",
+        "name": "Batavia",
+        "at": [
+         106.8,
+         -6.2
+        ]
+       }
+      ],
+      "routes": [],
+      "view": null
+     },
+     {
+      "year": 1908,
+      "title": "Awakening",
+      "caption": "Students and workers begin to demand a nation of their own",
+      "narration": "In nineteen oh eight students and workers began to dream of a nation of their own, and the ideas of freedom spread from island to island.",
+      "population": 0,
+      "icon": "scroll",
+      "realms": [
+       {
+        "name": "Dutch East Indies",
+        "regions": [
+         "Indonesia"
+        ],
+        "colors": [
+         "#ff6a13",
+         "#ffffff"
+        ],
+        "flag": "h",
+        "mood": "tired",
+        "face": true
+       }
+      ],
+      "markers": [
+       {
+        "type": "city",
+        "name": "Batavia",
+        "at": [
+         106.8,
+         -6.2
+        ]
+       }
+      ],
+      "routes": [],
+      "view": null
+     },
+     {
+      "year": 1945,
+      "title": "Independence",
+      "caption": "Sukarno proclaims the Republic of Indonesia",
+      "narration": "In nineteen forty five Indonesia declared its independence, and a new nation was born after more than three centuries of colonial rule.",
+      "population": 70000000,
+      "icon": "star",
+      "realms": [
+       {
+        "name": "Indonesia",
+        "regions": [
+         "Indonesia"
+        ],
+        "colors": [
+         "#ce1126",
+         "#ffffff"
+        ],
+        "flag": "h",
+        "mood": "happy",
+        "face": true
+       }
+      ],
+      "markers": [
+       {
+        "type": "capital",
+        "name": "Jakarta",
+        "at": [
+         106.8,
+         -6.2
+        ]
+       }
+      ],
+      "routes": [],
+      "view": null
+     }
+    ]
+   }
+  }
+ }
+]
