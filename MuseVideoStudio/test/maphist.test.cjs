@@ -195,6 +195,10 @@ test('thiếu chủ đề / đang bận / không đủ gói thì không hỏi Mu
   const fake = fakeMapMuse();
   await assert.rejects(writer(fake).write({ options: { topic: 'a' } }), /chủ đề/i);
   await assert.rejects(writer(fake, { isBusy: () => true }).write({ options: { topic: 'History of X' } }), /Dừng hàng đợi/);
+  // Có hàm chọn tài khoản rảnh: không còn tài khoản nào rảnh thì báo lỗi rõ ràng và không đánh dấu bận.
+  const w2 = writer(fake, { leaseAccount: () => null });
+  await assert.rejects(w2.write({ options: { topic: 'History of X' } }), /Mọi tài khoản Muse đang mở đều bận/);
+  assert.equal(w2.status().busy, false);
   await assert.rejects(writer(fake, { ensureAllowed: async () => { throw Error('Cần gói Năm'); } }).write({ options: { topic: 'History of X' } }), /gói Năm/);
   assert.equal(fake.log.instructions.length, 0);
   let release; const gate = new Promise(r => { release = r; });
@@ -637,4 +641,37 @@ test('nối app: mọi việc tạo video bản đồ đều đòi gói Năm / V
   assert.match(main, /createMapWriter\(\{[^}]*ensureAllowed:\(\)=>licenseManager\.requireLongTerm\(\)/);
   assert.match(main, /roots=\[path\.join\(out,'DonNha'\),path\.join\(out,'DongVat'\),path\.join\(out,'BanDo'\)\]/);
   assert.match(main, /maphist:\{\.\.\.mapState,runs:settings\.mapRuns\|\|\{\},write:mapWriter\?\.status\(\)\|\|\{\},build:mapService\?\.status\(\)\|\|\{\}\}/);
+});
+
+test('viết kịch bản: tài khoản rảnh được thuê và trả lại sau khi xong hoặc khi lỗi', async () => {
+  let released = 0;
+  const lease = () => ({ index: 2, release: () => { released++; } });
+  await writer(fakeMapMuse({ eras: 12 }), { leaseAccount: lease }).write({ options: { topic: 'History of Testland', minutes: 3 } });
+  assert.equal(released, 1, 'trả lại sau khi xong');
+  await assert.rejects(writer(fakeMapMuse({ eras: 12, drop: n => n === 8 }), { leaseAccount: lease }).write({ options: { topic: 'x y z', minutes: 3 } }), /giai đoạn 8/);
+  assert.equal(released, 2, 'trả lại cả khi lỗi');
+});
+
+test('chọn tài khoản Muse rảnh: tài khoản 1 bận thì dùng tài khoản đang mở khác; hàng đợi còn việc thì giữ nguyên các tài khoản chạy song song', () => {
+  const { takenAccounts, pickAccount } = require('../src/account-pick.cjs');
+  const open = set => i => set.includes(i);
+  // Không bận gì: dùng tài khoản đang mở đầu tiên (hoặc tài khoản 1 nếu chưa mở gì).
+  assert.equal(pickAccount({ taken: takenAccounts({}), isOpen: open([0, 1]) }), 0);
+  assert.equal(pickAccount({ taken: takenAccounts({}), isOpen: open([]) }), 0);
+  // Tài khoản 1 đang phân tích truyện: dùng tài khoản 2 nếu đang mở, không có thì không còn gì rảnh.
+  assert.equal(pickAccount({ taken: takenAccounts({ accountOneBusy: true }), isOpen: open([0, 1]) }), 1);
+  assert.equal(pickAccount({ taken: takenAccounts({ accountOneBusy: true }), isOpen: open([0]) }), -1);
+  // Hàng đợi đang chạy ba tài khoản và còn việc chờ: chỉ tài khoản thứ 4 (ngoài «Chạy song song») rảnh.
+  const jobs = [{ status: 'running', account: 1 }, { status: 'running', account: 2 }, { status: 'pending' }];
+  assert.equal(pickAccount({ taken: takenAccounts({ queueActive: true, jobs, accountCount: 3 }), isOpen: open([0, 1, 2]) }), -1);
+  assert.equal(pickAccount({ taken: takenAccounts({ queueActive: true, jobs, accountCount: 3 }), isOpen: open([0, 1, 2, 3]) }), 3);
+  // Hết việc chờ: tài khoản không chạy việc nào rảnh ngay cả trong «Chạy song song».
+  const last = [{ status: 'running', account: 1 }, { status: 'running', account: 2 }, { status: 'completed', account: 3 }];
+  assert.equal(pickAccount({ taken: takenAccounts({ queueActive: true, jobs: last, accountCount: 3 }), isOpen: open([0, 1, 2]) }), 2);
+  // Việc đang chạy chưa rõ tài khoản: coi mọi tài khoản song song là bận.
+  assert.equal(pickAccount({ taken: takenAccounts({ queueActive: true, jobs: [{ status: 'running' }], accountCount: 2 }), isOpen: open([0, 1]) }), -1);
+  // Tài khoản đang được thuê (ví dụ đang viết) không được thuê lần nữa.
+  assert.equal(pickAccount({ taken: takenAccounts({ leases: [0, 1] }), isOpen: open([0, 1, 2]) }), 2);
+  const main = fs.readFileSync(path.join(__dirname, '../src/main.cjs'), 'utf8');
+  assert.match(main, /createMapWriter\(\{[^}]*leaseAccount:owner=>leaseMuseAccount\(owner\)/);
 });

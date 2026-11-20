@@ -29,6 +29,7 @@ const chainFolder=job=>job.kind==='wild'?wildFolder(settings.output,job.storyId)
 const {createStoryAnalyzer}=require('./story-analyze.cjs');
 const mapPlan=require('./maphist-plan.js');
 const {createMapWriter}=require('./maphist-write.cjs');
+const {takenAccounts,pickAccount}=require('./account-pick.cjs');
 const {createMapService}=require('./maphist-service.cjs');
 const {createWindowFrames}=require('./maphist-frames.cjs');
 // Tab «Bản đồ lịch sử»: mỗi video một thư mục BanDo/<mã>.
@@ -165,6 +166,17 @@ async function openMuse(index = 0) {
 
 function accountOperationBusy() {
   return testing || queue.active || starting || stopping || merging || packaging || opening.size || externalLaunches.size || Boolean(storyAnalyzer?.busy) || Boolean(wildWriter?.busy) || Boolean(mapWriter?.busy);
+}
+// Tài khoản Muse đang mở mà rảnh để viết kịch bản bản đồ: tài khoản 1 bận (hàng đợi, phân tích truyện…) thì dùng tài khoản khác (xem account-pick.cjs).
+const museLeases = new Map();
+function leaseMuseAccount(owner) {
+  if (testing || starting || stopping || externalLaunches.size || resettingAccounts.size || opening.size) return null;
+  const taken = takenAccounts({ leases: [...museLeases.keys()], accountOneBusy: Boolean(storyAnalyzer?.busy || wildWriter?.busy), queueActive: queue.active, jobs: queue.jobs, accountCount: settings.accountCount });
+  const pick = pickAccount({ taken, max: MAX_ACCOUNTS, isOpen: i => { const browser = browsers.get(i); return Boolean(browser && !browser.isDestroyed() && browser.museStarted); } });
+  if (pick < 0) return null;
+  museLeases.set(pick, owner); notify();
+  let released = false;
+  return { index: pick, release() { if (released) return; released = true; if (museLeases.get(pick) === owner) museLeases.delete(pick); notify(); } };
 }
 function logoutAccount(index) {
   validLoginAccount(index);
@@ -998,7 +1010,7 @@ app.whenReady().then(async () => {
   wildBuilder=createStoryService({getSettings:()=>settings,getJobs:()=>queue.jobs,voice:voiceService,ensureAllowed:()=>licenseManager.requireLongTerm(),notify,userDataDir:app.getPath('userData'),kind:'wild',folderOf:wildFolder,runName:'wild-run'});
   wildWriter=createWildWriter({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.requireLongTerm()});
   mapService=createMapService({getSettings:()=>settings,voice:voiceService,ensureAllowed:()=>licenseManager.requireLongTerm(),notify,...(()=>{const f=createWindowFrames({BrowserWindow,ipcMain});return{renderFrames:f.renderFrames,renderStill:f.renderStill};})(),userDataDir:app.getPath('userData')});
-  mapWriter=createMapWriter({geo:()=>mapGeoObject,dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.requireLongTerm()});
+  mapWriter=createMapWriter({geo:()=>mapGeoObject,dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,leaseAccount:owner=>leaseMuseAccount(owner),ensureAllowed:()=>licenseManager.requireLongTerm()});
   for(const run of Object.values(settings.mapRuns||{}))if(run.status==='writing'||run.status==='building')run.status=run.status==='writing'?'draft':'script';   // app tắt giữa chừng: cho làm tiếp
   await save();
   main = new BrowserWindow({ icon:path.join(__dirname,'assets','muse-studio.png'), width: 1450, height: 950, minWidth: 1000, minHeight: 700, backgroundColor: '#101114', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true } });

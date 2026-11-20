@@ -142,6 +142,11 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.11.1
+
+- **Viết kịch bản bản đồ không còn chờ tài khoản 1:** nếu tài khoản Muse 1 đang bận (hàng đợi đang chạy, đang phân tích truyện hay viết kịch bản khác), app tự dùng **một tài khoản Muse khác đang mở và rảnh** để viết. Hàng đợi còn việc chờ thì các tài khoản «Chạy song song» được giữ cho hàng đợi; tài khoản ngoài số đó, hoặc tài khoản đã hết việc, được dùng để viết. Dòng tiến độ ghi rõ tài khoản đang dùng. Muốn có thêm tài khoản rảnh: chọn «Phiên tài khoản» khác rồi bấm «Mở Muse / Đăng nhập».
+- Nếu mọi tài khoản đang mở đều bận, app báo rõ thay vì chỉ bảo dừng hàng đợi.
+
 ## Update 1.11.0
 
 - **Cảnh minh hoạ có người trong video bản đồ:** mỗi giai đoạn có thể bật ra một khung tranh hoạt hình vẽ tay (phong cách «Hoạt hình sáng») rồi thu lại: **tàu ra khơi, cập bến, trận đánh, vua và triều đình, chợ, xây dựng, núi lửa**. Nhân vật dễ thương, nhiều người, đồ vật, nhiều lớp nền, ánh sáng và máy quay trôi nhẹ; kèm chữ dán lớn («SET SAIL!», «CHARGE!»…) và tiếng động riêng.

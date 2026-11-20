@@ -8,7 +8,7 @@ const defaultPlan = require('./maphist-plan.js');
 
 const ATTEMPTS = 3;
 
-function createMapWriter({ plan = defaultPlan, geo, dom, openMuse, getMuse, getSettings, delay, notify = () => {}, isBusy = () => false, ensureAllowed = async () => {}, timing = {}, ask: askOverride = null }) {
+function createMapWriter({ plan = defaultPlan, geo, dom, openMuse, getMuse, getSettings, delay, notify = () => {}, isBusy = () => false, leaseAccount = null, ensureAllowed = async () => {}, timing = {}, ask: askOverride = null }) {
   const state = { busy: false, progress: '', error: '', done: 0, total: 0, phase: '' };
   let controller = null;
   const say = (progress, extra = {}) => { Object.assign(state, { progress }, extra); notify(); };
@@ -83,19 +83,28 @@ function createMapWriter({ plan = defaultPlan, geo, dom, openMuse, getMuse, getS
     if (state.busy) throw Error('Muse đang soạn kịch bản. Chờ xong hoặc bấm Dừng.');
     const config = plan.options(input), bad = plan.problems(config);
     if (bad.length) throw Error(bad[0]);
-    if (isBusy()) throw Error('Dừng hàng đợi và các thao tác trình duyệt trước khi nhờ Muse soạn kịch bản.');
-    await ensureAllowed();
+    // Có hàm leaseAccount: chọn một tài khoản Muse đang mở mà đang rảnh (tài khoản 1 bận thì dùng tài khoản khác).
+    let lease = null;
+    if (leaseAccount) {
+      await ensureAllowed();
+      lease = leaseAccount('map');
+      if (!lease) throw Error('Mọi tài khoản Muse đang mở đều bận. Chờ xong hoặc mở thêm một tài khoản Muse khác rồi bấm «Viết tiếp».');
+    } else {
+      if (isBusy()) throw Error('Dừng hàng đợi và các thao tác trình duyệt trước khi nhờ Muse soạn kịch bản.');
+      await ensureAllowed();
+    }
+    const account = lease ? lease.index : 0;
     controller = new AbortController();
     const signal = controller.signal;
-    Object.assign(state, { busy: true, error: '', progress: 'Đang mở Muse…', done: 0, total: 0, phase: 'outline' });
+    Object.assign(state, { busy: true, error: '', progress: account ? `Đang mở Muse (tài khoản ${account + 1})…` : 'Đang mở Muse…', done: 0, total: 0, phase: 'outline' });
     notify();
     try {
       let muse = null;
       if (!askOverride) {
-        await openMuse(0);
+        await openMuse(account);
         check(signal);
-        muse = getMuse(0);
-        if (!muse) throw infra('Chưa mở được Muse tài khoản 1.');
+        muse = getMuse(account);
+        if (!muse) throw infra(`Chưa mở được Muse tài khoản ${account + 1}.`);
       }
       const countryNames = getGeo().countryNames;
       let outline = resume && resume.outline && Array.isArray(resume.outline.eras) && resume.outline.eras.length ? resume.outline : null;
@@ -138,6 +147,7 @@ function createMapWriter({ plan = defaultPlan, geo, dom, openMuse, getMuse, getS
       throw error;
     } finally {
       state.busy = false; controller = null;
+      if (lease) lease.release();
       notify();
     }
   }
