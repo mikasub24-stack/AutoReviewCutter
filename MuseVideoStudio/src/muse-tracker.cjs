@@ -104,6 +104,13 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     const anchored=candidates.filter(e=>anchorMatches(e.root));
     return recoverRequireAnchor||anchored.length||echoKey?anchored:candidates;
   }
+  // Muse can answer a repeated prompt by sending the clip it already made ("same shot, not regenerated"): the clip keeps its
+  // old address but sits in a brand-new reply under the newest copy of this prompt. Only then is an old address accepted.
+  function resentClip(video) {
+    if(imageMode||!s.hadPriorSame||!s.echoRoot?.isConnected||s.baseline.has(video))return false;
+    const copies=echoCandidates(true).map(c=>c.root);
+    return copies.length>s.baselineMatches&&copies[copies.length-1]===s.echoRoot&&following(s.echoRoot,video);
+  }
   function threadRoot(root) {
     const known=root.parentElement?.closest('[role="log"],[role="feed"],[data-chat-thread],[data-testid="conversation"],[data-testid="messages"],.messages,.conversation');
     if(known && known!==document.body)return known;
@@ -132,7 +139,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
         if(next.tagName!==branch.tagName||next.hasAttribute('data-muse-studio-attempt')||next.querySelector('[data-muse-studio-attempt],textarea,input,[contenteditable="true"],[role="textbox"]'))break;
         if(recover){const text=norm(next.textContent);if(others.some(p=>text.includes(p)))break;}
         span.push(next);
-        const freshMedia=mediaNodes(next).some(v=>(recover||(!s.baseline.has(v)&&!s.baselineSources.has(source(v)))));
+        const freshMedia=mediaNodes(next).some(v=>(recover||(!s.baseline.has(v)&&(!s.baselineSources.has(source(v))||resentClip(v)))));
         const actualProgress=next.querySelector('progress,[role="progressbar"],[aria-valuenow]');
         if(!found&&(freshMedia||actualProgress))found=next;
       }
@@ -152,7 +159,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   }
   function hint(){
     const small=tinyHint();if(small)return small;
-    const fresh=(imageMode?imageNodes(document):[...document.querySelectorAll('video')]).filter(v=>s.echoRoot?.isConnected&&following(s.echoRoot,v)&&(!imageMode||!s.echoRoot.contains(v))&&(recover||(!s.baseline.has(v)&&!s.baselineSources.has(source(v))))).length;
+    const fresh=(imageMode?imageNodes(document):[...document.querySelectorAll('video')]).filter(v=>s.echoRoot?.isConnected&&following(s.echoRoot,v)&&(!imageMode||!s.echoRoot.contains(v))&&(recover||(!s.baseline.has(v)&&(!s.baselineSources.has(source(v))||resentClip(v))))).length;
     const why=Object.entries(s.reject||{}).map(([k,n])=>k+' '+n).join(', '),noun=imageMode?'ảnh':'video';
     return fresh?`thấy ${fresh} ${noun} mới nhưng chưa gắn được vào đúng prompt${why?' ('+why+')':''}`:`chưa thấy ${noun} mới trong chat`;
   }
@@ -182,7 +189,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     const ids=new Set([...s.echoAliases,s.echoRoot.id,s.echoRoot.getAttribute('data-message-id'),s.echoRoot.getAttribute('data-id')].filter(Boolean));
     for(const video of mediaNodes(bound)){
       if(!following(s.echoRoot,video)||s.echoRoot.contains(video)||composer(video))continue;
-      if(!recover&&(s.baseline.has(video)||s.baselineSources.has(source(video))))continue;
+      if(!recover&&(s.baseline.has(video)||(s.baselineSources.has(source(video))&&!resentClip(video))))continue;
       const common=lca(s.echoRoot,video);
       if(!common||!bound.contains(common)){note('ngoài vùng chat');continue;}
       let root=video,first=s.echoRoot;
@@ -265,7 +272,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       if(!following(s.echoRoot,video))continue;
       if(imageMode&&s.echoRoot.contains(video))continue;
       if(s.genericSpan&&!s.genericSpan.some(row=>row.contains(video))){note('ngoài vùng trả lời');continue;}
-      if(!recover&&(s.baseline.has(video)||s.baselineSources.has(source(video))))continue;
+      if(!recover&&(s.baseline.has(video)||(s.baselineSources.has(source(video))&&!resentClip(video))))continue;
       const root=responseRoot(video,thread);
       if(!root||root.contains(s.echo)||!following(s.echoRoot,root)){note('không rõ khối');continue;}
       if(userRoots.some(user=>following(user,video))){note('sau tin nhắn khác');continue;}

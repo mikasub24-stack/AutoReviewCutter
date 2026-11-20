@@ -174,6 +174,17 @@ const assert = require('node:assert/strict');
     const anchor=await page.evaluate(pollTracking,{id:'new-attempt'});assert.equal(anchor.echoKey,'u-new-repeat');
     await page.evaluate(beginTracking,{id:'new-attempt',prompt:'Repeated resume target',recover:true,echoKey:anchor.echoKey,echoMarker:anchor.echoMarker});
     assert.equal((await page.evaluate(pollTracking,{id:'new-attempt'})).url,'https://muse.ai/new-repeat.webm');
+    // Muse resends the clip it already made for the same prompt (same address, new reply under the new copy of the prompt): that is the result.
+    await reset();await append({id:'u-resend-old',role:'user',text:'Resent shot'});await append({id:'r-resend-old',src:'/resent.webm',ref:'u-resend-old'});await ready('r-resend-old');
+    await page.evaluate(beginTracking,{id:'resend',prompt:'Resent shot'});await append({id:'u-resend-new',role:'user',text:'Resent shot'});
+    assert.equal((await page.evaluate(pollTracking,{id:'resend'})).ready,false,'the old clip alone is not a result');
+    await append({id:'r-resend-new',src:'/resent.webm',ref:'u-resend-new'});await ready('r-resend-new');
+    const resent=await page.evaluate(pollTracking,{id:'resend'});assert.equal(resent.ready,true);assert.equal(resent.url,'https://muse.ai/resent.webm');
+    // ...but a clip that sits ABOVE the new copy of the prompt (old rows rebuilt as new nodes) is still never accepted.
+    await reset();await append({id:'u-rebuilt-old',role:'user',text:'Rebuilt shot'});await append({id:'r-rebuilt-old',src:'/rebuilt.webm',ref:'u-rebuilt-old'});await ready('r-rebuilt-old');
+    await page.evaluate(beginTracking,{id:'rebuilt',prompt:'Rebuilt shot'});await append({id:'u-rebuilt-new',role:'user',text:'Rebuilt shot'});
+    await page.evaluate(()=>{const old=document.getElementById('r-rebuilt-old'),fresh=old.cloneNode(true);old.remove();document.getElementById('u-rebuilt-new').before(fresh);});
+    assert.equal((await page.evaluate(pollTracking,{id:'rebuilt'})).ready,false,'a rebuilt old row above the new copy is not a result');
     // A React remount of the same message must rebind its stable ID, not fail
     // before the delayed video arrives.
     await reset();await page.evaluate(beginTracking,{id:'remount',prompt:'Remounted original scene'});await append({id:'u-remount',role:'user',text:'Remounted original scene'});
