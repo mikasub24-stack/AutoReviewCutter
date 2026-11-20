@@ -78,7 +78,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
           }
           if (name === 'mapSaveScript') return { issues: [] };
           if (name === 'mapRender') { s.maphist.runs[data.runId].status = 'building'; Object.assign(s.maphist, { busy: true, phase: 'build', runId: data.runId }); s.maphist.build = { busy: true, progress: 'Đang vẽ khung hình 300/900 · còn khoảng 2 phút', done: 300, total: 900, preview: 'C:\\Videos\\BanDo\\History-of-Testland\\.dang-dung\\xem-truoc-0.jpg', previewAt: 111 }; setTimeout(window.push, 0); return { runId: data.runId }; }
-          if (name === 'mapThumb') { Object.assign(s.maphist.runs[data.runId], { thumb: 'C:\\Videos\\BanDo\\History-of-Testland\\thumbnail-1.jpg', thumbAt: 5 }); setTimeout(window.push, 0); return { file: 'C:\\Videos\\BanDo\\History-of-Testland\\thumbnail-1.jpg', variant: 1, count: 3 }; }
+          if (name === 'mapThumb') { Object.assign(s.maphist.runs[data.runId], { thumb: 'C:\\Videos\\BanDo\\History-of-Testland\\thumbnail-1.jpg', thumbAt: 5 }); setTimeout(window.push, 0); return { file: 'C:\\Videos\\BanDo\\History-of-Testland\\thumbnail-1.jpg', variant: 1, count: 4 }; }
           if (name === 'mapPublish') { Object.assign(s.maphist.runs[data.runId], { publish: { title: 'Testland: The Full Story from Dust to Empire', description: 'A tale of Testland.', tags: ['history'], chapters: [], partial: true } }); setTimeout(window.push, 0); return { publish: s.maphist.runs[data.runId].publish }; }
           if (name === 'mapRemove') { delete s.maphist.runs[data.runId]; return structuredClone(s); }
           return structuredClone(s);
@@ -324,7 +324,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     await page.click('#navMap');
     assert.equal(await page.locator('#mapTopic').inputValue(), 'History of Testland');
     assert.equal(await page.locator('#mapCountry').inputValue(), 'Indonesia');
-    // 11) Ảnh bìa: ba kiểu bố cục thật sự khác nhau, màu rực; chữ duy nhất là vài từ to (hook), không nhãn nhỏ nào khác; hook trống thì không chữ.
+    // 11) Ảnh bìa: bốn kiểu bố cục thật sự khác nhau (kiểu 4 «Trước / Sau» có hai năm RẤT TO thay cho hook), màu rực; chữ duy nhất là vài từ to (hook), không nhãn nhỏ nào khác; hook trống thì không chữ.
     const thumbs = await page.evaluate(async () => {
       const raw = await window.nodeJson('world'), sample = await window.nodeJson('sample');
       const geo = maphistGeo.build(raw), n = maphistPlan.normalizeScript(sample, geo);
@@ -336,19 +336,22 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
       const out = [];
       try {
         textCalls = 0; R.drawThumbnail(1, { variant: 0, hook: '' }); const none = textCalls;
-        for (let v = 0; v < 3; v++) {
+        for (let v = 0; v < 4; v++) {
           textCalls = 0; said = new Set(); R.drawThumbnail(1, { variant: v, hook: 'AZTEC EMPIRE' });
           const d = canvas.getContext('2d').getImageData(0, 0, 1920, 1080).data; let sat = 0, cnt = 0, hash = 0;
           for (let i = 0; i < d.length; i += 4 * 97) { const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]); sat += mx ? (mx - mn) / mx : 0; cnt++; hash = (hash * 31 + d[i] + d[i + 2] * 7) % 1000003; }
-          out.push({ textCalls, said: [...said].join(' '), none, sat: sat / cnt, hash });
+          const px = canvas.getContext('2d').getImageData(970, 216, 1, 1).data;   // tâm vết nứt tia sét (kiểu 4) phải trắng
+          out.push({ textCalls, said: [...said].join(' '), none, sat: sat / cnt, hash, crack: [px[0], px[1], px[2]], years: [Math.abs(tl.eras[0].year), Math.abs(tl.eras.at(-1).year)] });
         }
       } finally { proto.fillText = f; proto.strokeText = k; }
       return out;
     });
     assert.equal(thumbs[0].none, 0, 'hook trống thì không vẽ chữ');
-    assert.deepEqual(thumbs.map(t => t.said), ['AZTEC EMPIRE', 'AZTEC EMPIRE', 'AZTEC EMPIRE'], 'chữ duy nhất trên ảnh bìa là hook (một hoặc hai dòng)');
+    assert.deepEqual(thumbs.slice(0, 3).map(t => t.said), ['AZTEC EMPIRE', 'AZTEC EMPIRE', 'AZTEC EMPIRE'], 'chữ duy nhất trên ảnh bìa là hook (một hoặc hai dòng)');
+    assert.ok(thumbs[3].said.includes(String(thumbs[3].years[0])) && thumbs[3].said.includes(String(thumbs[3].years[1])) && !thumbs[3].said.includes('AZTEC'), 'kiểu «Trước / Sau»: chữ là năm đầu và năm cuối: ' + thumbs[3].said);
+    assert.ok(thumbs[3].crack[0] > 215 && thumbs[3].crack[1] > 200 && thumbs[3].crack[2] > 120, 'vết nứt tia sét ở giữa ảnh sáng trắng / vàng nhạt: ' + thumbs[3].crack);
     assert.ok(thumbs.every(t => t.sat > .3), 'màu rực (độ bão hòa cao): ' + thumbs.map(t => t.sat.toFixed(2)));
-    assert.equal(new Set(thumbs.map(t => t.hash)).size, 3, 'ba kiểu bố cục khác nhau');
+    assert.equal(new Set(thumbs.map(t => t.hash)).size, 4, 'bốn kiểu bố cục khác nhau');
     // 12) Kiểu hoạt hình thật sự được vẽ: biển xanh phẳng, số năm hồng, cuộn giấy da, nút Subscribe ở màn kết; kiểu cổ khác hẳn và không có các thứ đó.
     const toon = await page.evaluate(async () => {
       const raw = await window.nodeJson('world'), sample = await window.nodeJson('sample'), geo = maphistGeo.build(raw);

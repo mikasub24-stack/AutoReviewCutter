@@ -991,7 +991,7 @@
       }
       return c;
     }
-    let thumbCv = null;
+    let thumbCv = null, thumbCv2 = null;
     function rays(c, x, y, rot, color, alpha, n = 18) {
       c.save(); c.translate(x, y); c.rotate(rot);
       for (let k = 0; k < n; k++) {
@@ -1018,8 +1018,8 @@
       c.restore();
     }
     // Quả cầu cờ: mặt tròn mang màu/kiểu cờ của thế lực, viền đen dày, bóng bóng loáng, mắt to, lông mày giận dữ, miệng gầm.
-    // look: hướng nhìn của đồng tử (-1 trái … 1 phải); gear: 'helmet' | 'crown' | ''.
-    function ball(c, cx, cy, r, realm, { look = 1, gear = '', tilt = 0 } = {}) {
+    // look: hướng nhìn của đồng tử (-1 trái … 1 phải); gear: 'helmet' | 'crown' | ''; mood: 'angry' (mặc định) | 'calm' (mỉm cười) | 'shock' (há miệng, đổ mồ hôi).
+    function ball(c, cx, cy, r, realm, { look = 1, gear = '', tilt = 0, mood = 'angry' } = {}) {
       const OUT = '#140b07';
       c.save(); c.translate(cx, cy); c.rotate(tilt); c.lineJoin = 'round'; c.lineCap = 'round';
       c.save(); c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = r * .22; c.shadowOffsetY = r * .1; c.fillStyle = OUT; c.beginPath(); c.arc(0, 0, r, 0, TAU); c.fill(); c.restore();
@@ -1032,21 +1032,32 @@
       c.strokeStyle = OUT; c.lineWidth = r * .06; c.beginPath(); c.arc(0, 0, r - r * .03, 0, TAU); c.stroke();
       c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.ellipse(-r * .46, -r * .62, r * .2, r * .09, -.62, 0, TAU); c.fill();   // vệt sáng
       // mắt
-      const ex = r * .31, ey = -r * .02, rx = r * .21, ry = r * .27;
+      const shock = mood === 'shock', calm = mood === 'calm';
+      const ex = r * .31, ey = -r * .02, rx = r * (shock ? .235 : .21), ry = r * (shock ? .3 : .27);
       for (const sd of [-1, 1]) {
         c.fillStyle = '#fff'; c.strokeStyle = OUT; c.lineWidth = r * .035; c.beginPath(); c.ellipse(sd * ex, ey, rx, ry, 0, 0, TAU); c.fill(); c.stroke();
         const px = sd * ex + look * rx * .36, py = ey + ry * .2;
-        c.fillStyle = OUT; c.beginPath(); c.ellipse(px, py, rx * .5, ry * .52, 0, 0, TAU); c.fill();
-        c.fillStyle = '#fff'; c.beginPath(); c.arc(px - rx * .14, py - ry * .2, rx * .15, 0, TAU); c.fill();
-        // lông mày giận: dốc xuống phía giữa mặt
-        c.strokeStyle = OUT; c.lineWidth = r * .085; c.beginPath(); c.moveTo(sd * (ex + rx * 1.25), ey - ry * 1.25); c.lineTo(sd * (ex - rx * .8), ey - ry * .62); c.stroke();
+        c.fillStyle = OUT; c.beginPath(); c.ellipse(px, py, rx * (shock ? .3 : .5), ry * (shock ? .32 : .52), 0, 0, TAU); c.fill();
+        c.fillStyle = '#fff'; c.beginPath(); c.arc(px - rx * .14, py - ry * .2, rx * (shock ? .1 : .15), 0, TAU); c.fill();
+        c.strokeStyle = OUT; c.lineWidth = r * .085; c.beginPath();
+        if (mood === 'angry') { c.moveTo(sd * (ex + rx * 1.25), ey - ry * 1.25); c.lineTo(sd * (ex - rx * .8), ey - ry * .62); }   // lông mày giận: dốc xuống phía giữa mặt
+        else { const up = shock ? 1.55 : 1.22; c.moveTo(sd * (ex + rx * 1.1), ey - ry * (up - .06)); c.quadraticCurveTo(sd * ex, ey - ry * (up + .42), sd * (ex - rx * 1.05), ey - ry * (up - .04)); }   // lông mày cong: hiền / ngạc nhiên
+        c.stroke();
       }
-      // miệng gầm có răng
       const mx = r * .34, my = r * .4;
-      c.beginPath(); c.moveTo(-mx, my - r * .03); c.quadraticCurveTo(0, my - r * .17, mx, my - r * .03); c.quadraticCurveTo(0, my + r * .3, -mx, my - r * .03); c.closePath();
-      c.fillStyle = '#4c0f10'; c.fill();
-      c.save(); c.clip(); c.fillStyle = '#fff'; c.fillRect(-mx, my - r * .12, 2 * mx, r * .11); c.restore();
-      c.strokeStyle = OUT; c.lineWidth = r * .04; c.stroke();
+      if (shock) {   // há miệng hình chữ O + giọt mồ hôi
+        c.beginPath(); c.ellipse(0, my + r * .08, r * .15, r * .2, 0, 0, TAU); c.fillStyle = '#4c0f10'; c.fill(); c.strokeStyle = OUT; c.lineWidth = r * .045; c.stroke();
+        c.beginPath(); c.moveTo(r * .62, -r * .56); c.quadraticCurveTo(r * .78, -r * .3, r * .62, -r * .22); c.quadraticCurveTo(r * .46, -r * .3, r * .62, -r * .56); c.closePath();
+        c.fillStyle = '#8fdcff'; c.fill(); c.lineWidth = r * .03; c.stroke();
+      } else if (calm) {   // mỉm cười
+        c.beginPath(); c.moveTo(-mx * .8, my - r * .06); c.quadraticCurveTo(0, my + r * .36, mx * .8, my - r * .06); c.quadraticCurveTo(0, my + r * .04, -mx * .8, my - r * .06); c.closePath();
+        c.fillStyle = '#4c0f10'; c.fill(); c.strokeStyle = OUT; c.lineWidth = r * .045; c.stroke();
+      } else {   // miệng gầm có răng
+        c.beginPath(); c.moveTo(-mx, my - r * .03); c.quadraticCurveTo(0, my - r * .17, mx, my - r * .03); c.quadraticCurveTo(0, my + r * .3, -mx, my - r * .03); c.closePath();
+        c.fillStyle = '#4c0f10'; c.fill();
+        c.save(); c.clip(); c.fillStyle = '#fff'; c.fillRect(-mx, my - r * .12, 2 * mx, r * .11); c.restore();
+        c.strokeStyle = OUT; c.lineWidth = r * .04; c.stroke();
+      }
       // mũ sắt / vương miện
       if (gear === 'helmet') {
         const g = c.createLinearGradient(0, -r * 1.2, 0, -r * .5); g.addColorStop(0, '#8a9a5a'); g.addColorStop(1, '#4d5a2c');
@@ -1090,8 +1101,78 @@
       });
       return { size, lines: lines.length, height: size * (lines.length * 1.0 + .2) };
     }
-    // i: giai đoạn; variant: 0 đối đầu (một thế lực thì nhân vật ở giữa) · 1 nhân vật lớn bên trái · 2 nhân vật lớn bên phải; hook: chữ to trên ảnh ('' = không chữ).
+    // Năm RẤT TO kiểu thumbnail (số + BC/AD nhỏ bên phải), viền đen dày; fit: bề rộng tối đa.
+    function bigYear(c, year, cx, baseY, { maxW = 700, maxSize = 250, gold = false, rot = -.03 } = {}) {
+      const S = Plan.strings(tl.lang), yr = Math.round(year), num = String(Math.abs(yr)), suf = yr < 0 ? S.bcTag : yr < 1000 ? S.adTag : '';
+      const meas = (str, size) => { c.save(); c.font = `900 ${size}px ${IMPACT}`; const w = c.measureText(str).width; c.restore(); return w; };
+      const unit = meas(num, 100) + (suf ? meas(suf, 38) + 14 : 0), size = Math.min(maxSize, maxW / unit * 100), sw = size * .2;
+      const numW = meas(num, size), sufW = suf ? meas(suf, size * .38) : 0, total = numW + (suf ? sufW + size * .14 : 0);
+      c.save(); c.translate(cx, baseY); c.rotate(rot); c.lineJoin = 'round'; c.miterLimit = 2; c.textBaseline = 'alphabetic'; c.textAlign = 'left';
+      const parts = [[num, -total / 2, size]]; if (suf) parts.push([suf, -total / 2 + numW + size * .14, size * .38]);
+      for (const [str, x, sz] of parts) {
+        c.font = `900 ${sz}px ${IMPACT}`;
+        c.save(); c.translate(0, sz * .07); c.strokeStyle = 'rgba(0,0,0,.55)'; c.lineWidth = sw * (sz / size) * 1.12; c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = sz * .12; c.strokeText(str, x, 0); c.restore();
+        c.strokeStyle = '#0b0705'; c.lineWidth = sw * (sz / size); c.strokeText(str, x, 0);
+        const g = c.createLinearGradient(0, -sz * .78, 0, 0);
+        if (gold) { g.addColorStop(0, '#fff27a'); g.addColorStop(.55, '#ffd21f'); g.addColorStop(1, '#ff9d0a'); } else { g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#d9e4f7'); }
+        c.fillStyle = g; c.fillText(str, x, 0);
+      }
+      c.restore();
+    }
+    // Kiểu 4 «Trước / Sau»: màn hình chia đôi bằng vết nứt tia sét. Trái = giai đoạn đầu (nhạt, nhân vật bình thản);
+    // phải = giai đoạn cuối (rực, nhân vật choáng ngợp, đội vương miện). Hai bên cùng tỉ lệ bản đồ nên thấy lãnh thổ lớn lên; mỗi bên một năm RẤT TO.
+    function drawBeforeAfter() {
+      const c = ctx, W2 = width, H2 = height, n = tl.eras.length, i0 = 0, i1 = n - 1, e0 = tl.eras[i0], e1 = tl.eras[i1];
+      const big = e => (e.realms || []).filter(r => r.units && r.units.length).sort((a, b) => b.units.length - a.units.length)[0] || null;
+      const A = big(e1) || big(e0), keys = A ? A.units : [];
+      const t0 = stillTime(i0), t1 = stillTime(i1), base = Plan.stateAt(tl, t1).cam;
+      const camL = keys.length ? fitCam(base, keys, W2 * .26, H2 * .5, W2 * .38, H2 * .44) : { ...base, span: base.span * .8 };
+      const camR = keys.length ? fitCam(base, keys, W2 * .74, H2 * .5, W2 * .38, H2 * .44) : { ...base, span: base.span * .8 };
+      camR.span = camL.span;   // cùng tỉ lệ hai bên
+      thumbCv = thumbCv || mkSize(W2, H2); thumbCv2 = thumbCv2 || mkSize(W2, H2);
+      drawFrame(t0, { bare: true, clean: true, cam: camL });
+      { const x = thumbCv.getContext('2d'); x.clearRect(0, 0, W2, H2); x.drawImage(canvas, 0, 0); }
+      drawFrame(t1, { bare: true, clean: true, cam: camR });
+      { const x = thumbCv2.getContext('2d'); x.clearRect(0, 0, W2, H2); x.drawImage(canvas, 0, 0); }
+      // đường nứt: các điểm tâm vết nứt (tỉ lệ khung)
+      const P = [[.548, -.03], [.505, .2], [.542, .215], [.488, .47], [.526, .485], [.468, .75], [.502, .765], [.452, 1.03]].map(([x, y]) => [x * W2, y * H2]);
+      const crack = () => { c.beginPath(); P.forEach(([x, y], k) => k ? c.lineTo(x, y) : c.moveTo(x, y)); };
+      const half = side => { c.beginPath(); c.moveTo(side < 0 ? -20 : W2 + 20, P[0][1]); P.forEach(([x, y]) => c.lineTo(x, y)); c.lineTo(side < 0 ? -20 : W2 + 20, P[P.length - 1][1]); c.closePath(); };
+      const sat = toon() ? 1.2 : 1.6;
+      c.save(); half(-1); c.clip();   // TRÁI: nhạt, hơi lạnh
+      c.filter = 'saturate(.82) contrast(1.05) brightness(.96)'; c.drawImage(thumbCv, 0, 0); c.filter = 'none';
+      c.fillStyle = 'rgba(40,86,150,.16)'; c.fillRect(0, 0, W2, H2); c.restore();
+      c.save(); half(1); c.clip();   // PHẢI: rực, vầng sáng ấm
+      c.filter = `saturate(${sat}) contrast(1.14) brightness(1.02)`; c.drawImage(thumbCv2, 0, 0); c.filter = 'none';
+      c.globalCompositeOperation = 'screen'; rays(c, W2 * .74, H2 * .52, .2, '255,222,140', .22);
+      const gl = c.createRadialGradient(W2 * .74, H2 * .52, 30, W2 * .74, H2 * .52, W2 * .42); gl.addColorStop(0, 'rgba(255,196,90,.38)'); gl.addColorStop(1, 'rgba(255,120,40,0)');
+      c.fillStyle = gl; c.fillRect(0, 0, W2, H2); c.restore();
+      // tối viền + tối đỉnh cho năm, tối đáy cho nhân vật
+      c.save();
+      const vg = c.createRadialGradient(W2 / 2, H2 * .5, H2 * .34, W2 / 2, H2 * .5, W2 * .68); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(4,8,20,.62)');
+      c.fillStyle = vg; c.fillRect(0, 0, W2, H2);
+      const tg = c.createLinearGradient(0, 0, 0, H2 * .42); tg.addColorStop(0, 'rgba(4,8,20,.55)'); tg.addColorStop(1, 'rgba(4,8,20,0)'); c.fillStyle = tg; c.fillRect(0, 0, W2, H2 * .42);
+      const bt = c.createLinearGradient(0, H2 * .62, 0, H2); bt.addColorStop(0, 'rgba(4,8,20,0)'); bt.addColorStop(1, 'rgba(4,8,20,.5)'); c.fillStyle = bt; c.fillRect(0, H2 * .62, W2, H2 * .38);
+      c.restore();
+      // vết nứt tia sét: viền đen có quầng vàng, lõi trắng
+      c.save(); c.lineJoin = 'miter'; c.miterLimit = 8; c.lineCap = 'butt';
+      crack(); c.shadowColor = 'rgba(255,214,80,.95)'; c.shadowBlur = 46; c.strokeStyle = '#0b0705'; c.lineWidth = 50; c.stroke(); c.shadowColor = 'transparent';
+      crack(); c.strokeStyle = '#ffffff'; c.lineWidth = 28; c.stroke();
+      crack(); c.strokeStyle = '#ffe9a0'; c.lineWidth = 9; c.stroke();
+      c.restore();
+      // năm RẤT TO hai bên
+      bigYear(c, e0.year, W2 * .25, 232, { maxW: W2 * .38, rot: -.035 });
+      bigYear(c, e1.year, W2 * .75, 232, { maxW: W2 * .38, gold: true, rot: .03 });
+      // nhân vật: trái bình thản, phải choáng ngợp (to hơn, vương miện)
+      if (A) {
+        const rl = 190, rr = 250;
+        ball(c, rl + 34, H2 - rl * .74, rl, A, { look: 1, gear: '', tilt: .05, mood: 'calm' });
+        ball(c, W2 - rr - 34, H2 - rr * .74, rr, A, { look: -1, gear: 'crown', tilt: -.06, mood: 'shock' });
+      }
+    }
+    // i: giai đoạn; variant: 0 đối đầu (một thế lực thì nhân vật ở giữa) · 1 nhân vật lớn bên trái · 2 nhân vật lớn bên phải · 3 «Trước / Sau» (chia đôi bằng vết nứt, năm RẤT TO); hook: chữ to trên ảnh ('' = không chữ).
     function drawThumbnail(i, { variant = 0, hook = '' } = {}) {
+      if (((Math.round(variant) % 4) + 4) % 4 === 3 && tl.eras.length > 1) return drawBeforeAfter();   // kiểu 4: «Trước / Sau» (cần ít nhất hai giai đoạn)
       const era = tl.eras[Math.max(0, Math.min(tl.eras.length - 1, i))], t0 = stillTime(i);
       const withUnits = (era.realms || []).filter(r => r.units && r.units.length).map(r => ({ r, n: r.units.length })).sort((a, b) => b.n - a.n).map(x => x.r);
       const A = withUnits[0] || null, B = withUnits[1] || null, layout = ((variant % 3) + 3) % 3;

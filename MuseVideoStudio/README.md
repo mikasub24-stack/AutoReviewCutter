@@ -142,6 +142,11 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.12.0
+
+- **Thumbnail kiểu thứ 4 «Trước / Sau»:** bấm «Tạo thumbnail khác» ở video bản đồ đã dựng xong sẽ ra thêm một kiểu: màn hình chia đôi bằng **vết nứt tia sét**, bên trái là giai đoạn **đầu** (màu nhạt, nhân vật mỉm cười), bên phải là giai đoạn **cuối** (màu rực, nhân vật choáng ngợp đội vương miện), mỗi bên một **năm RẤT TO** (có BC/AD). Hai bên cùng tỉ lệ bản đồ nên thấy rõ lãnh thổ lớn lên. Kịch bản chỉ có một giai đoạn thì kiểu này bỏ qua. Ba kiểu cũ giữ nguyên.
+- Quả cầu cờ có thêm hai nét mặt: mỉm cười và há miệng đổ mồ hôi (mặc định vẫn là mặt giận như cũ).
+
 ## Update 1.11.2
 
 - **Sửa lỗi video đã tạo xong mà app không lưu, rồi dừng lặp đi lặp lại:** khi một cảnh được gửi lại, Muse có thể trả lời «tôi gửi lại đúng clip đó, không tạo lại». Clip đó có địa chỉ cũ nên app trước đây coi là video cũ và chờ mãi. Giờ app nhận clip Muse gửi lại nếu nó nằm trong tin trả lời mới, ngay dưới bản sao mới nhất của đúng prompt đó. Clip nằm phía trên (hàng cũ bị dựng lại) vẫn không bao giờ được nhận.
