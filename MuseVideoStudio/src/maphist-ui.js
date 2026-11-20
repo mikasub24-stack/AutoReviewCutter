@@ -37,7 +37,7 @@
   const tempo = () => Math.min(1.2, Math.max(0.8, Number($('mapTempo').value) || 1));
   const musicVolume = () => Math.min(0.6, Math.max(0, Number($('mapMusicVol').value) || 0.2));
   const workers = () => Math.min(16, Math.max(0, Math.round(Number($('mapWorkers').value) || 0)));
-  const config = () => Plan.options({ topic: $('mapTopic').value, category, country: $('mapCountry').value, minutes: $('mapMinutes').value, language: lang() });
+  const config = () => Plan.options({ topic: $('mapTopic').value, category, country: $('mapCountry').value, minutes: $('mapMinutes').value, language: lang(), theme: $('mapTheme').value });
   function renderCount() {
     const c = config(), n = Plan.eraCount(c.minutes);
     $('mapCount').textContent = `Video khoảng ${c.minutes} phút = khoảng ${n} giai đoạn (mỗi giai đoạn ~${Plan.ERA_SECONDS} giây). Dựng trên máy bạn: khoảng ${Math.max(2, Math.round(c.minutes * 1.8))}–${Math.max(4, Math.round(c.minutes * 3.5))} phút tùy cấu hình máy (có card đồ họa thì nhanh hơn).`;
@@ -229,7 +229,7 @@
     if (bad.length) { toast(bad[0]); $('mapTopic').focus(); return; }
     $('mapCreate').disabled = true;
     try {
-      const fresh = await call('mapMake', { topic: c.topic, category: c.category, country: c.country, minutes: c.minutes, language: c.language, voice: $('mapVoice').value, tempo: tempo(), music, musicVolume: musicVolume(), workers: workers(), auto: $('mapAuto').checked });
+      const fresh = await call('mapMake', { topic: c.topic, category: c.category, country: c.country, minutes: c.minutes, language: c.language, theme: c.theme, voice: $('mapVoice').value, tempo: tempo(), music, musicVolume: musicVolume(), workers: workers(), auto: $('mapAuto').checked });
       if (fresh) {
         $('mapForm').open = false;
         toast(!c.topic ? 'Muse đang chọn chủ đề và soạn kịch bản. Tên video sẽ hiện ở danh sách ngay khi có dàn ý.' : $('mapAuto').checked ? 'Muse đang soạn kịch bản. Các bước sau (vẽ bản đồ, giọng đọc, nhạc) tự chạy, bạn không cần bấm gì thêm.' : 'Muse đang soạn kịch bản. Xong bạn bấm «Xem và sửa kịch bản» để kiểm tra rồi mới dựng.');
@@ -368,16 +368,18 @@
   $('mapTempo').value = String(saved.tempo || 1);
   $('mapMusicVol').value = String(saved.musicVolume == null ? 0.2 : saved.musicVolume);
   $('mapWorkers').value = String(saved.workers || 0);
+  $('mapTheme').value = saved.theme === 'classic' ? 'classic' : 'cartoon';
   $('mapAuto').checked = saved.auto !== false;
   const showTempo = () => { $('mapTempoOut').textContent = tempo().toFixed(2) + '×'; };
   showTempo(); renderMusic(); renderCount(); renderGroups(); renderTopics();
-  const remember = () => { saved = { ...saved, topic: $('mapTopic').value, category, country: $('mapCountry').value, minutes: $('mapMinutes').value, tempo: tempo(), musicVolume: musicVolume(), workers: workers(), music, language: lang(), auto: $('mapAuto').checked }; persist(); };
+  const remember = () => { saved = { ...saved, topic: $('mapTopic').value, category, country: $('mapCountry').value, minutes: $('mapMinutes').value, tempo: tempo(), musicVolume: musicVolume(), workers: workers(), music, language: lang(), theme: $('mapTheme').value, auto: $('mapAuto').checked }; persist(); };
   $('mapMinutes').onchange = () => { remember(); renderCount(); };
   $('mapTopic').oninput = () => { remember(); renderCount(); renderTopics(); };
   $('mapCountry').oninput = remember;
   $('mapTempo').oninput = () => { showTempo(); remember(); };
   $('mapMusicVol').oninput = remember;
   $('mapWorkers').onchange = remember;
+  $('mapTheme').onchange = remember;
   $('mapAuto').onchange = remember;
   // Nhớ giọng riêng cho từng ngôn ngữ; chỉ ghi khi người dùng tự đổi giọng (đổi ngôn ngữ thì ô giọng còn giữ giọng ngôn ngữ cũ, không được ghi nhầm).
   $('mapVoice').onchange = () => { saved = { ...saved, voices: { ...(saved.voices || {}), [lang()]: $('mapVoice').value } }; remember(); };

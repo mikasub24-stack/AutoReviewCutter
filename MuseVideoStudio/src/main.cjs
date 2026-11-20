@@ -880,6 +880,7 @@ async function runMapWrite(runId,{auto}){
     }});
     await mapDraftChain;
     await fs.mkdir(mapFolder(settings.output,runId),{recursive:true});
+    result.script.theme=meta.theme==='classic'?'classic':'cartoon';   // kiểu hình người dùng chọn lúc tạo video (sửa lại được trong cửa sổ kịch bản)
     await atomic(mapScriptFile(runId),result.script);
     meta.name=meta.name||result.script.title||meta.topic;
     meta.title=result.script.title||meta.topic;
@@ -1468,7 +1469,7 @@ app.whenReady().then(async () => {
         const base=(config.topic||'Tu-chon').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/gi,'d').replace(/[^A-Za-z0-9]+/g,'-').slice(0,30);
         runId=await freeStoryId(base,{output:settings.output,jobs:[],folderOf:mapFolder,fallback:'BanDo'});
         const group=mapPlan.categoryOf(config.category);
-        all[runId]={name:config.topic||(group?'Muse tự chọn: '+group.label:'Muse tự chọn chủ đề'),topic:config.topic,category:config.topic?'':config.category,minutes:config.minutes,country:config.country,language:config.language,voice,tempo:config.tempo,music:mapMusicOf(config.music),musicVolume:config.musicVolume,workers:config.workers,status:'writing',createdAt:Date.now(),error:''};
+        all[runId]={name:config.topic||(group?'Muse tự chọn: '+group.label:'Muse tự chọn chủ đề'),topic:config.topic,category:config.topic?'':config.category,minutes:config.minutes,country:config.country,language:config.language,theme:config.theme,voice,tempo:config.tempo,music:mapMusicOf(config.music),musicVolume:config.musicVolume,workers:config.workers,status:'writing',createdAt:Date.now(),error:''};
         for(const id of Object.keys(all).slice(0,Math.max(0,Object.keys(all).length-40)))delete all[id];
       }
       await fs.mkdir(mapFolder(settings.output,runId),{recursive:true});

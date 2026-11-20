@@ -215,6 +215,9 @@ test('độ dài chọn 6 / 8 / 15 phút: số giai đoạn tăng theo, không v
   assert.deepEqual(Plan.LENGTHS.map(m => Plan.eraCount(m)), [23, 30, 56]);
   assert.equal(Plan.options({ minutes: 99 }).minutes, 15, 'không vượt 15 phút');
   assert.equal(Plan.options({}).minutes, 8, 'mặc định 8 phút');
+  assert.equal(Plan.options({}).theme, 'cartoon', 'mặc định hoạt hình sáng');
+  assert.equal(Plan.options({ theme: 'classic' }).theme, 'classic');
+  assert.equal(Plan.options({ theme: 'xyz' }).theme, 'cartoon', 'giá trị lạ về mặc định');
   assert.ok(Plan.eraCount(15) <= Plan.MAX_ERAS);
 });
 
@@ -572,7 +575,7 @@ test('ngôn ngữ video: Anh, Đức, Pháp, Nga — kịch bản, nhãn năm, c
   assert.match(draw, /Plan\.strings\(tl\.lang\)\.thanks/); assert.match(draw, /Plan\.strings\(tl\.lang\)\.people\(n\)/); assert.match(draw, /Plan\.strings\(tl\.lang\)\[yearF < 0 \? 'bcTag' : 'adTag'\]/);
   assert.doesNotMatch(draw, /'Thanks for watching'|\$\{people\(n\)\} people/);
   const main = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.cjs'), 'utf8');
-  assert.match(main, /function pickMapVoice\(wanted,language\)/); assert.match(main, /language:config\.language,voice/); assert.match(main, /language:meta\.language,avoid/);
+  assert.match(main, /function pickMapVoice\(wanted,language\)/); assert.match(main, /language:config\.language,theme:config\.theme,voice/); assert.match(main, /language:meta\.language,avoid/);
 });
 
 test('chữ to trên ảnh bìa (hook): Muse viết hoặc lấy từ tiêu đề, 1–5 từ VIẾT HOA, bỏ mạo từ, theo ngôn ngữ', () => {

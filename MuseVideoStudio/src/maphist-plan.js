@@ -164,6 +164,7 @@
       musicVolume: clamp(num(input.musicVolume, .2), 0, 1),
       workers: clamp(Math.round(num(input.workers, 0)), 0, 16),   // số cửa sổ vẽ song song; 0 = tự chọn theo máy
       language: LANGUAGES.some(l => l.id === String(input.language || '')) ? String(input.language) : 'en',
+      theme: String(input.theme || '') === 'classic' ? 'classic' : 'cartoon',   // kiểu hình video: hoạt hình sáng (mặc định) hoặc atlas cổ
       aspect: '16:9'
     };
   }

@@ -197,11 +197,15 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     await page.evaluate(() => { document.querySelector('#mapAdvanced').open = true; });
     await page.fill('#mapCountry', 'Indonesia');
     await page.evaluate(() => { document.querySelector('#mapAdvanced').open = false; });
+    assert.equal(await page.locator('#mapTheme').isVisible(), true, 'form tạo video có ô «Kiểu hình video»');
+    assert.equal(await page.locator('#mapTheme').inputValue(), 'cartoon', 'mặc định hoạt hình sáng');
+    assert.deepEqual(await page.locator('#mapTheme option').evaluateAll(o => o.map(x => x.value)), ['cartoon', 'classic']);
+    await page.selectOption('#mapTheme', 'classic');
     await page.click('#mapCreate');
     await page.waitForSelector('#mapRuns .restoreRun');
     const made = await calls('mapMake');
     assert.equal(made.length, 1);
-    assert.deepEqual(made[0].data, { topic: 'History of Testland', category: '', country: 'Indonesia', minutes: 6, language: 'en', voice: 'en-US-GuyNeural', tempo: 1, music: 'C:\\Music\\epic.mp3', musicVolume: 0.2, workers: 0, auto: true });
+    assert.deepEqual(made[0].data, { topic: 'History of Testland', category: '', country: 'Indonesia', minutes: 6, language: 'en', theme: 'classic', voice: 'en-US-GuyNeural', tempo: 1, music: 'C:\\Music\\epic.mp3', musicVolume: 0.2, workers: 0, auto: true });
     assert.match(await page.locator('#mapRuns .restoreRunText').first().textContent(), /Soạn kịch bản 2\/3/);
     assert.match(await page.locator('#mapRunHint').textContent(), /Đang soạn kịch bản · 5\/12 giai đoạn/);
     assert.equal(await page.locator('#mapCreate').isDisabled(), true);

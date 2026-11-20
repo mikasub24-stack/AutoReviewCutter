@@ -142,6 +142,10 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.12.1
+
+- **Chọn «Kiểu hình video» ngay khi tạo video:** form tạo video bản đồ có thêm ô **Kiểu hình video** (cạnh «Độ dài video» và «Ngôn ngữ video»): **Hoạt hình sáng** (mặc định, có hiệu ứng âm thanh, cảnh minh hoạ có người) hoặc **Atlas cổ** (giấy da, không hiệu ứng âm thanh). Trước đây ô này chỉ nằm trong cửa sổ sửa kịch bản. Lựa chọn được nhớ cho lần sau và vẫn đổi lại được trong cửa sổ sửa kịch bản. Ảnh mẫu ở các nhóm chủ đề chỉ để minh hoạ chủ đề, không đổi theo kiểu hình.
+
 ## Update 1.12.0
 
 - **Thumbnail kiểu thứ 4 «Trước / Sau»:** bấm «Tạo thumbnail khác» ở video bản đồ đã dựng xong sẽ ra thêm một kiểu: màn hình chia đôi bằng **vết nứt tia sét**, bên trái là giai đoạn **đầu** (màu nhạt, nhân vật mỉm cười), bên phải là giai đoạn **cuối** (màu rực, nhân vật choáng ngợp đội vương miện), mỗi bên một **năm RẤT TO** (có BC/AD). Hai bên cùng tỉ lệ bản đồ nên thấy rõ lãnh thổ lớn lên. Kịch bản chỉ có một giai đoạn thì kiểu này bỏ qua. Ba kiểu cũ giữ nguyên.
