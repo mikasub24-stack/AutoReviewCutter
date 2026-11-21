@@ -356,6 +356,27 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.ok(thumbs[3].crack[0] > 215 && thumbs[3].crack[1] > 200 && thumbs[3].crack[2] > 120, 'vết nứt tia sét ở giữa ảnh sáng trắng / vàng nhạt: ' + thumbs[3].crack);
     assert.ok(thumbs.every(t => t.sat > .3), 'màu rực (độ bão hòa cao): ' + thumbs.map(t => t.sat.toFixed(2)));
     assert.equal(new Set(thumbs.map(t => t.hash)).size, 4, 'bốn kiểu bố cục khác nhau');
+    // 11b) Mặt lãnh thổ đổi theo sự kiện: mất ≥ 20% vùng -> choáng; mở rộng mạnh -> cười lớn; còn lại theo mood kịch bản; mặt choáng vẽ được (không lỗi, khác mặt cười).
+    const faces = await page.evaluate(async () => {
+      const raw = await window.nodeJson('world'), sample = await window.nodeJson('sample');
+      const s2 = JSON.parse(JSON.stringify(sample)); s2.eras[1].realms = [JSON.parse(JSON.stringify(s2.eras[0].realms[0]))];   // cùng một thế lực ở hai giai đoạn liền nhau
+      const geo = maphistGeo.build(raw), n = maphistPlan.normalizeScript(s2, geo);
+      const tl = maphistPlan.compile(n.script, geo, { durations: n.script.eras.map(() => 14), fps: 30 });
+      const canvas = Object.assign(document.createElement('canvas'), { width: 1920, height: 1080 }), R = maphistDraw.create({ canvas, geo }); R.setTimeline(tl);
+      let idx = -1, r = null, prev = null;
+      for (let i = 1; i < tl.eras.length && !r; i++) for (const x of tl.eras[i].realms) { const was = tl.eras[i - 1].realms.find(y => y.name === x.name); if (was && was.units.length >= 3) { idx = i; r = x; prev = was; break; } }
+      if (!r) return { skip: true };
+      const a = prev.units.length;
+      return { skip: false, shrink: R.moodOf({ ...r, units: prev.units.slice(0, Math.floor(a * .5)) }, idx), grow: R.moodOf({ ...r, units: prev.units.concat(prev.units) }, idx), same: R.moodOf({ ...r, units: prev.units, mood: 'calm' }, idx), first: R.moodOf({ ...r, mood: 'sad' }, 0) };
+    });
+    assert.equal(faces.skip, false, 'mẫu kịch bản có thế lực xuất hiện ở hai giai đoạn liền nhau (đủ để thử biểu cảm theo sự kiện)');
+    assert.deepEqual([faces.shrink, faces.grow, faces.same, faces.first], ['shock', 'happy', 'calm', 'sad'], 'biểu cảm theo sự kiện: ' + JSON.stringify(faces));
+    const moodPix = await page.evaluate(() => {
+      const draw = m => { const cv = Object.assign(document.createElement('canvas'), { width: 400, height: 260 }), c = cv.getContext('2d'); c.fillStyle = '#4caf6a'; c.fillRect(0, 0, 400, 260); maphistCartoon.eyes(c, 200, 120, 50, { mood: m, t: 1.3, seed: .31, k: 1, lid: '#c0392b' }); return [...c.getImageData(0, 0, 400, 260).data].reduce((h, v, i) => (h * 31 + v + i) >>> 0, 7); };
+      return ['happy', 'proud', 'calm', 'angry', 'sad', 'tired', 'shock'].map(draw);
+    });
+    assert.equal(new Set(moodPix).size, 7, 'bảy biểu cảm khác nhau, kể cả mặt choáng');
+    assert.equal(await page.evaluate(() => maphistPlan.MOODS.includes('shock')), true, 'kịch bản chấp nhận mood «shock»');
     // 12) Kiểu hoạt hình thật sự được vẽ: biển xanh phẳng, số năm hồng, cuộn giấy da, nút Subscribe ở màn kết; kiểu cổ khác hẳn và không có các thứ đó.
     const toon = await page.evaluate(async () => {
       const raw = await window.nodeJson('world'), sample = await window.nodeJson('sample'), geo = maphistGeo.build(raw);

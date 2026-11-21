@@ -108,22 +108,23 @@
   // ---------- Đôi mắt to của thế lực ----------
   // R = bán kính mỗi mắt; k = độ phóng ra (đã easeBack); lid = màu mí (lấy từ màu cờ).
   function eyes(c, x, y, R, o = {}) {
-    const { mood = 'happy', t = 0, seed = 0, k = 1, lid = '#c0392b' } = o;
+    const { mood = 'happy', t = 0, seed = 0, k = 1, lid = '#c0392b' } = o, shock = mood === 'shock';   // shock: choáng (mất đất / bị tấn công): mắt tròn xoe, đồng tử nhỏ, há miệng, đổ mồ hôi, run
     if (k <= 0.01) return;
     const iris = ['#2f78c4', '#4a2f1c', '#2a8a57', '#6a4aa8'][Math.floor(seed * 10) % 4];
     const ph = (t + seed * 1.3) % 3.9, blink = ph < .15 ? Math.sin(ph / .15 * Math.PI) : 0;
     const lx = Math.sin(t * .9 + seed) * R * .2, ly = Math.cos(t * .6 + seed) * R * .1 + (mood === 'sad' || mood === 'tired' ? R * .2 : 0);
     const lidFill = lum(lid) > .85 ? '#9aa3ad' : lid;
-    c.save(); c.translate(x, y + Math.sin(t * 2.3 + seed) * R * .04); c.scale(k, k); c.lineJoin = 'round'; c.lineCap = 'round';
+    c.save(); c.translate(x + (shock ? Math.sin(t * 41 + seed) * R * .028 : 0), y + Math.sin(t * 2.3 + seed) * R * .04); c.scale(k, k); c.lineJoin = 'round'; c.lineCap = 'round';
     const gap = R * 1.04, lw = Math.max(2.6, R * .13);
     for (const sx of [-1, 1]) {
       const ex = sx * gap, inner = -sx;      // inner = hướng về giữa hai mắt
       const ry = Math.max(R * .09, R * (1 - blink * .93));
       c.save(); c.translate(ex, 0);
-      c.beginPath(); c.ellipse(0, 0, R, ry, 0, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.save(); c.clip();
+      const RX = shock ? R * 1.1 : R;
+      c.beginPath(); c.ellipse(0, 0, RX, shock ? Math.max(ry, R * .12) * 1.08 : ry, 0, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.save(); c.clip();
       const sh = c.createLinearGradient(0, -R, 0, R); sh.addColorStop(0, 'rgba(60,80,110,.22)'); sh.addColorStop(.35, 'rgba(60,80,110,0)'); c.fillStyle = sh; c.fillRect(-R, -R, R * 2, R * 2);
-      c.fillStyle = iris; c.beginPath(); c.arc(lx, ly, R * .56, 0, TAU); c.fill();
-      c.fillStyle = '#0a0f1a'; c.beginPath(); c.arc(lx, ly, R * .32, 0, TAU); c.fill();
+      c.fillStyle = iris; c.beginPath(); c.arc(lx, ly, R * (shock ? .4 : .56), 0, TAU); c.fill();
+      c.fillStyle = '#0a0f1a'; c.beginPath(); c.arc(lx, ly, R * (shock ? .18 : .32), 0, TAU); c.fill();
       c.fillStyle = '#fff'; c.beginPath(); c.arc(lx - R * .18, ly - R * .2, R * .16, 0, TAU); c.fill(); c.beginPath(); c.arc(lx + R * .16, ly + R * .18, R * .07, 0, TAU); c.fill();
       // mí mắt theo tâm trạng: [độ cao mép mí phía trong, phía ngoài] (đơn vị R, âm = lên cao)
       const lids = { angry: [.1, -.7], tired: [-.15, .12], sad: [-.72, .02], calm: [-.5, -.5], proud: [-.62, -.62] }[mood];
@@ -132,14 +133,22 @@
         c.fillStyle = lidFill; c.fill(); c.strokeStyle = INK; c.lineWidth = lw; c.beginPath(); c.moveTo(inner * R * 1.3, lids[0] * R); c.lineTo(-inner * R * 1.3, lids[1] * R); c.stroke();
       }
       c.restore();
-      c.beginPath(); c.ellipse(0, 0, R, ry, 0, 0, TAU); c.strokeStyle = INK; c.lineWidth = lw; c.stroke();
+      c.beginPath(); c.ellipse(0, 0, RX, shock ? Math.max(ry, R * .12) * 1.08 : ry, 0, 0, TAU); c.strokeStyle = INK; c.lineWidth = lw; c.stroke();
+      if (shock) { c.beginPath(); c.moveTo(-R * 1.05, -R * 1.52); c.quadraticCurveTo(0, -R * 2.2, R * 1.05, -R * 1.52); c.lineWidth = lw * 1.1; c.stroke();   // lông mày dựng cao
+        const d = (t * 1.15 + seed + (sx > 0 ? .5 : 0)) % 1; c.fillStyle = 'rgba(150,215,255,.96)'; c.lineWidth = lw * .55; c.beginPath(); c.ellipse(sx * R * 1.18, -R * .78 + d * R * 1.9, R * .15, R * .27, 0, 0, TAU); c.fill(); c.stroke(); }   // giọt mồ hôi chảy bên thái dương
       if (mood === 'happy' || mood === 'proud') { c.beginPath(); c.moveTo(-R * .95, -R * (1.28 - (mood === 'proud' ? .1 : 0))); c.quadraticCurveTo(0, -R * 1.78, R * .95, -R * 1.3 - (sx > 0 && mood === 'proud' ? R * .16 : 0)); c.lineWidth = lw * 1.1; c.stroke(); }
       if (mood === 'sad') { const d = (t * .7 + seed) % 1; c.fillStyle = 'rgba(150,215,255,.95)'; c.lineWidth = lw * .5; c.beginPath(); c.ellipse(inner * R * .4, R + 4 + d * R * .8, R * .13, R * .22, 0, 0, TAU); c.fill(); c.stroke(); }
       c.restore();
     }
     const my = R * 1.62, mw = R * .62;
+    if (mood === 'happy' || mood === 'proud' || mood === 'calm') { c.fillStyle = 'rgba(255,130,165,.82)'; for (const sx of [-1, 1]) { c.beginPath(); c.ellipse(sx * (gap + R * .72), my - R * .3, R * .4, R * .24, 0, 0, TAU); c.fill(); } }   // má hồng
     c.strokeStyle = INK; c.lineWidth = lw; c.fillStyle = '#7a1f16';
-    if (mood === 'happy') {
+    if (shock) {
+      const open = .5 + Math.sin(t * 9 + seed) * .06;
+      c.beginPath(); c.ellipse(0, my + R * .45, mw * .62, R * (open + .1), 0, 0, TAU); c.fill(); c.save(); c.clip();
+      c.fillStyle = '#ff7a8a'; c.beginPath(); c.ellipse(0, my + R * 1.0, mw * .48, R * .34, 0, 0, TAU); c.fill(); c.restore();
+      c.beginPath(); c.ellipse(0, my + R * .45, mw * .62, R * (open + .1), 0, 0, TAU); c.stroke();
+    } else if (mood === 'happy') {
       c.beginPath(); c.moveTo(-mw, my - 2); c.quadraticCurveTo(0, my + R * .95, mw, my - 2); c.closePath(); c.fill(); c.save(); c.clip();
       c.fillStyle = '#fff'; c.fillRect(-mw, my - 4, mw * 2, R * .24); c.fillStyle = '#ff7a8a'; c.beginPath(); c.ellipse(0, my + R * .62, mw * .5, R * .28, 0, 0, TAU); c.fill(); c.restore();
       c.beginPath(); c.moveTo(-mw, my - 2); c.quadraticCurveTo(0, my + R * .95, mw, my - 2); c.closePath(); c.stroke();

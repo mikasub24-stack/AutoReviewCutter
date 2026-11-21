@@ -134,7 +134,7 @@
     }
   ];
   const categoryOf = id => CATEGORIES.find(c => c.id === id) || null;
-  const MOODS = ['happy', 'proud', 'tired', 'angry', 'sad', 'calm'];
+  const MOODS = ['happy', 'proud', 'tired', 'angry', 'sad', 'calm', 'shock'];   // shock: mặt choáng (do bản vẽ tự suy ra khi thế lực mất đất; kịch bản cũng có thể viết)
   const FLAGS = ['solid', 'h', 'v', 'disc', 'cross'];
   const MARKERS = ['city', 'capital', 'temple', 'castle', 'ship', 'battle'];
   const ICONS = ['sail', 'crown', 'swords', 'star', 'flag', 'person', 'rocket', 'scroll', 'castle'];

@@ -418,6 +418,7 @@
     // Mặt trên lá cờ: mắt chớp, đảo nhìn quanh, lông mày + miệng đổi theo tâm trạng (happy, proud, tired, angry, sad, calm).
     const seedOf = str => { let h = 7; for (const ch of String(str || '')) h = (h * 31 + ch.charCodeAt(0)) % 997; return h / 997 * 6.28; };
     function drawFace(c, b, mood, t, seed) {
+      if (mood === 'shock') mood = 'sad';   // khung cờ kiểu Atlas cổ chưa có nét choáng
       const e1 = b.x + b.w * .33, e2 = b.x + b.w * .67, ey = b.y + b.h * .43, rx = b.w * .078, ry = b.h * .155;
       const ph = (t + seed * 1.3) % 3.7, blink = ph < .16 ? Math.sin(ph / .16 * Math.PI) : 0;
       const lid = mood === 'tired' ? .5 : mood === 'calm' ? .22 : mood === 'angry' ? .18 : 0, closed = Math.max(blink, lid);
@@ -788,14 +789,24 @@
       }
       return best;
     }
-    function toonRealm(c, r, pr, spots, local, t, opts) {
+    // Biểu cảm theo sự kiện: mất ≥ 20% vùng so với giai đoạn trước -> choáng (đổ mồ hôi); mở rộng mạnh -> cười lớn; còn lại theo mood kịch bản.
+    function reaction(r, idx) {
+      const prev = idx > 0 ? tl.eras[idx - 1] : null, was = prev && (prev.realms || []).find(x => x.name === r.name);
+      if (was && was.units.length >= 3) {
+        const a = was.units.length, n = r.units.length;
+        if (n <= a * .8) return 'shock';
+        if (n >= a * 1.3 + 1) return 'happy';
+      }
+      return r.mood;
+    }
+    function toonRealm(c, r, pr, spots, local, t, opts, idx = 0) {
       if (!r.units.length || opts.clean) return;
       const key2 = bigUnit(r.units), cl = key2 && centroidOf(key2), b = boxOf(r.units, pr);
       if (!cl || !b) return;
-      const [x, y] = pr.P(cl[0], cl[1]), ub = boxOf([key2], pr) || b, R = clamp(Math.sqrt(ub.w * ub.h) * .15, 12, 58), k = (local - GROW_DELAY - GROW * .45) / .6;
+      const [x, y] = pr.P(cl[0], cl[1]), ub = boxOf([key2], pr) || b, R = clamp(Math.sqrt(ub.w * ub.h * .5 + b.w * b.h * .5) * .19, 14, 74), k = (local - GROW_DELAY - GROW * .45) / .6;
       if (k <= 0) return;
       const [ax, ay] = eyeSpot(x, y, spots, R), cols = r.colors && r.colors.length ? r.colors : [r.color];
-      if (r.face) Cart.eyes(c, ax, ay, R, { mood: r.mood, t, seed: seedOf(r.name), k: Cart.easeBack(k), lid: cols[0] });
+      if (r.face) Cart.eyes(c, ax, ay, R, { mood: reaction(r, idx), t, seed: seedOf(r.name), k: Cart.easeBack(k), lid: cols[0] });
       if (r.name && Math.min(b.w, b.h) > 60 && R >= 18 && k > .7) { c.save(); c.globalAlpha *= clamp((k - .7) / .3, 0, 1); Cart.label(c, r.name, ax, ay + R * 2.7, clamp(R * .62, 15, 28)); c.restore(); }
     }
     // Biển ngả xám xanh ở giai đoạn có trận đánh (chuyển mượt khi sang giai đoạn mới).
@@ -897,7 +908,7 @@
         st.era.markers.forEach((m, i) => drawMarker(sc, opts.clean ? { ...m, name: '' } : m, pr, local, i, t));
         const spots = st.era.markers.map(m => pr.P(m.at[0], m.at[1]));
         st.era.realms.forEach(r => {
-          if (cartoon) { toonRealm(sc, r, pr, spots, local, t, opts); return; }
+          if (cartoon) { toonRealm(sc, r, pr, spots, local, t, opts, st.index); return; }
           if (!r.units.length) return;
           const key2 = bigUnit(r.units), cl = key2 && centroidOf(key2), b = boxOf(r.units, pr);
           if (!cl || !b) return;
@@ -1219,7 +1230,7 @@
         ball(c, left ? r + 30 : W2 - r - 30, H2 - r * .78, r, A, { look: left ? 1 : -1, gear, tilt: left ? .07 : -.07 });
       }
     }
-    return { setTimeline, drawFrame, drawStill, drawThumbnail, stillTime, stats, projector, profile: p => { profile = p; }, get timeline() { return tl; } };
+    return { setTimeline, drawFrame, drawStill, drawThumbnail, stillTime, stats, projector, moodOf: (r, idx) => reaction(r, idx), profile: p => { profile = p; }, get timeline() { return tl; } };
   }
   return { create, FONT: SERIF, GROW, FINE_SPAN, pigment, titleLayout };
 });

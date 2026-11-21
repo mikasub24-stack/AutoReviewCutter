@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.13.0
+
+- **Mặt lãnh thổ to hơn, biểu cảm hơn** (video kiểu Hoạt hình sáng): mặt to hơn bản cũ (to theo cả vùng chứ không chỉ theo một tỉnh), có má hồng, và có thêm nét **choáng**: mắt tròn xoe, đồng tử nhỏ, lông mày dựng cao, há miệng, đổ mồ hôi và run nhẹ.
+- **Biểu cảm đổi theo sự kiện:** thế lực **mất từ 20% vùng** so với giai đoạn trước thì mặt **choáng**; **mở rộng mạnh** (từ 1,3 lần trở lên) thì **cười lớn**; các trường hợp còn lại giữ tâm trạng mà kịch bản đã viết (tự hào, bình thản, giận, buồn, mệt). Kịch bản cũng có thể ghi mood «shock».
+- Kiểu Atlas cổ không đổi (khung cờ ở góc dùng mặt buồn thay cho mặt choáng).
+
 ## Update 1.12.1
 
 - **Chọn «Kiểu hình video» ngay khi tạo video:** form tạo video bản đồ có thêm ô **Kiểu hình video** (cạnh «Độ dài video» và «Ngôn ngữ video»): **Hoạt hình sáng** (mặc định, có hiệu ứng âm thanh, cảnh minh hoạ có người) hoặc **Atlas cổ** (giấy da, không hiệu ứng âm thanh). Trước đây ô này chỉ nằm trong cửa sổ sửa kịch bản. Lựa chọn được nhớ cho lần sau và vẫn đổi lại được trong cửa sổ sửa kịch bản. Ảnh mẫu ở các nhóm chủ đề chỉ để minh hoạ chủ đề, không đổi theo kiểu hình.
