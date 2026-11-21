@@ -463,12 +463,14 @@ test('ảnh bìa 16:9: chọn giai đoạn nhiều lãnh thổ nhất, đổi �
   assert.equal(asked[0].hook, Plan.hookOf(sample)); assert.ok(asked[0].hook.split(' ').length <= 5 && asked[0].hook === asked[0].hook.toLocaleUpperCase('en'));
   assert.equal(asked[0].timeline.W, 1920);
   assert.equal(asked[0].timeline.H, 1080);
-  assert.equal(a.count, 4, 'bốn kiểu bố cục');
+  assert.equal(a.count, 5, 'năm kiểu bố cục');
   const b = await service.thumbnail({ dir, name: 'Thử', script: copy(sample), variant: 1 });
   assert.equal(path.basename(b.file), 'thumbnail-2.jpg');
   assert.notEqual(b.era, a.era, 'bấm lại ra giai đoạn khác'); assert.equal(asked.at(-1).variant, 1);
   const ba = await service.thumbnail({ dir, name: 'Thử', script: copy(sample), variant: 3 });
   assert.equal(path.basename(ba.file), 'thumbnail-4.jpg', 'kiểu thứ 4 «Trước / Sau» ghi ra tệp riêng'); assert.equal(asked.at(-1).variant, 3);
+  const pa = await service.thumbnail({ dir, name: 'Thử', script: copy(sample), variant: 4 });
+  assert.equal(path.basename(pa.file), 'thumbnail-5.jpg', 'kiểu thứ 5 «Hoảng loạn» ghi ra tệp riêng'); assert.equal(asked.at(-1).variant, 4);
   const wrapped = await service.thumbnail({ dir, name: 'Thử', script: copy(sample), variant: a.count });
   assert.equal(wrapped.variant, 0, 'hết vòng thì quay lại ảnh đầu');
   assert.equal(fs.readdirSync(dir).filter(f => f.endsWith('.tmp')).length, 0);

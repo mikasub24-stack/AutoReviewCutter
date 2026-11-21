@@ -142,6 +142,11 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.14.0
+
+- **Thêm kiểu ảnh bìa thứ 5 «Hoảng loạn»** (bấm đổi ảnh để ra): chữ hook **hai màu phẳng** (dòng trên trắng, dòng dưới vàng, viền đen dày + viền xanh lơ, font tròn đậm Baloo 2 giấy phép OFL nhúng kèm app) ở góc trên trái, tự thêm «?!» ở cuối; **bản đồ** bên trái với thế lực chính nổi quầng sáng và **mỗi nước láng giềng một khuôn mặt lo sợ**; **nhân vật quả cầu rất to** bên phải mặt choáng, đổ mồ hôi, có vạch nhấn vàng. Việt Nam có sao vàng trên trán quả cầu.
+- Tối đa 5 ảnh bìa mỗi video (tệp `thumbnail-5.jpg` là kiểu mới). Bốn kiểu cũ không đổi.
+
 ## Update 1.13.1
 
 - **Ảnh bìa kiểu 4 «Trước / Sau» đẹp hơn, bản đồ NỔI lên:** thế lực ở hai bên đổi sang màu **rực** (xưa **xanh dương**, nay **đỏ**, không còn màu vàng xỉn), có **quầng sáng** và viền dày quanh lãnh thổ; bản đồ **to hơn** (xưa nhỏ thì phóng gần hơn để vẫn nhìn rõ).

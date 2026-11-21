@@ -219,14 +219,14 @@ function createMapService({ getSettings = () => ({}), voice = null, ensureAllowe
     }
   }
 
-  const THUMB_STYLES = 4;
+  const THUMB_STYLES = 5;
   // Giai đoạn đáng làm ảnh bìa nhất: nhiều lãnh thổ + địa danh nhất (tối đa 3 lựa chọn, tốt nhất trước).
   function pickEras(timeline) {
     const scored = timeline.eras.map((e, i) => ({ i, score: (e.realms || []).reduce((n, r) => n + ((r.units || []).length), 0) * 10 + (e.markers || []).length * 3 + (e.routes || []).length * 2 + i * .01 }));
     return scored.sort((a, b) => b.score - a.score).slice(0, 3).map(x => x.i);
   }
   // Ảnh bìa 16:9 (1920×1080 JPEG ≤ 2 MB, đúng giới hạn YouTube) của video đã có kịch bản: vài từ RẤT TO (script.hook, hoặc lấy từ tiêu đề) + quả cầu cờ mặt giận dữ.
-  // 4 kiểu: đối đầu hai thế lực / nhân vật lớn bên trái / nhân vật lớn bên phải / «Trước / Sau» (giai đoạn đầu | giai đoạn cuối, năm RẤT TO); ba kiểu đầu mỗi kiểu lấy một giai đoạn đẹp nhất.
+  // 5 kiểu: đối đầu hai thế lực / nhân vật lớn bên trái / nhân vật lớn bên phải / «Trước / Sau» (giai đoạn đầu | giai đoạn cuối, năm RẤT TO) / «Hoảng loạn» (chữ tròn vàng, mỗi nước một mặt lo sợ); ba kiểu đầu mỗi kiểu lấy một giai đoạn đẹp nhất.
   async function thumbnail({ dir, name, script: rawScript, variant = 0 }) {
     if (state.busy) throw Error('Đang dựng một video bản đồ. Chờ dựng xong rồi tạo thumbnail.');
     await ensureAllowed();

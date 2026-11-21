@@ -326,7 +326,7 @@
     }
     // Lãnh thổ hoạt hình: tô đúng lá cờ, viền đen dày, bóng đổ xuống biển, ánh bóng nhẹ; mọc ra như vòng tròn nảy.
     // Ảnh bìa «nổi bản đồ»: thế lực chính đổi sang màu RỰC đặc (không theo màu kịch bản, tránh màu vàng xỉn), có quầng sáng trắng + quầng màu quanh lãnh thổ.
-    const popRealm = (realm, pop) => pop && realm && realm.name === pop.name ? { ...realm, colors: [pop.color], color: pop.color, flag: 'solid' } : realm;
+    const popRealm = (realm, pop) => pop && !pop.keep && realm && realm.name === pop.name ? { ...realm, colors: [pop.color], color: pop.color, flag: 'solid' } : realm;
     function popHalo(c, all, pop) {
       c.save(); c.lineJoin = 'round';
       c.shadowColor = pop.glow; c.shadowBlur = 90; c.strokeStyle = pop.glow; c.lineWidth = 46; c.stroke(all); c.stroke(all);
@@ -834,12 +834,16 @@
     }
     // Mặt to vẽ thẳng lên lãnh thổ của thế lực pop (ảnh bìa): mắt, lông mày, má hồng, miệng theo mood; đặt ở chỗ thoáng nhất của phần bản đồ nhìn thấy; không kèm tên.
     function popFace(c, r, pr, spots, t, opts) {
-      const pop = opts.pop;
-      if (!pop || r.name !== pop.name || !r.units.length) return;
-      const vis = pop.vis || [0, 0, width, height], spot = roomySpot(c, r, pr, vis, null);
-      if (!spot) return;
+      const pop = opts.pops ? opts.pops[r.name] : opts.pop && r.name === opts.pop.name ? opts.pop : null;
+      if (!pop || !r.units.length) return;
+      const vis = pop.vis || [0, 0, width, height]; let spot = roomySpot(c, r, pr, vis, null);
+      if (!spot) {   // lãnh thổ quá nhỏ để lấy điểm thoáng: đặt mặt ở trọng tâm đơn vị lớn nhất
+        const k0 = bigUnit(r.units), cl0 = k0 && centroidOf(k0); if (!cl0) return;
+        const [x0, y0] = pr.P(cl0[0], cl0[1]); if (x0 < vis[0] || x0 > vis[2] || y0 < vis[1] || y0 > vis[3]) return;
+        spot = { x: x0, y: y0, rho: 0 };
+      }
       const bx = boxOf(r.units, pr), fit = bx ? Math.min(Math.sqrt(bx.w * bx.h) * .17, Math.min(bx.w, bx.h) * .22) : 0;
-      const R = clamp(Math.max(spot.rho / 1.35, fit), 30, 110);
+      const R = clamp(Math.max(spot.rho / 1.35, fit), pop.minR || 30, pop.maxR || 110);
       spot.x = clamp(spot.x, vis[0] + R * 2.1, vis[2] - R * 2.1); spot.y = clamp(spot.y, vis[1] + R * 1.5, vis[3] - R * 2);
       if (pop.star) popStar(c, r, pr, vis, spot.x, spot.y, R);
       Cart.eyes(c, spot.x, spot.y, R, { mood: pop.mood, t: pop.t == null ? 1.3 : pop.t, seed: seedOf(r.name), k: 1, lid: pop.color });
@@ -860,7 +864,7 @@
       c.restore();
     }
     function toonRealm(c, r, pr, spots, local, t, opts, idx = 0) {
-      if (opts.pop && opts.clean) { popFace(c, r, pr, spots, t, opts); return; }
+      if ((opts.pop || opts.pops) && opts.clean) { popFace(c, r, pr, spots, t, opts); return; }
       if (!r.units.length || opts.clean) return;
       const key2 = bigUnit(r.units), cl = key2 && centroidOf(key2), b = boxOf(r.units, pr);
       if (!cl || !b) return;
@@ -970,7 +974,7 @@
         const spots = st.era.markers.map(m => pr.P(m.at[0], m.at[1]));
         st.era.realms.forEach(r => {
           if (cartoon) { toonRealm(sc, r, pr, spots, local, t, opts, st.index); return; }
-          if (opts.pop && opts.clean) { popFace(sc, r, pr, spots, t, opts); return; }
+          if ((opts.pop || opts.pops) && opts.clean) { popFace(sc, r, pr, spots, t, opts); return; }
           if (!r.units.length) return;
           const key2 = bigUnit(r.units), cl = key2 && centroidOf(key2), b = boxOf(r.units, pr);
           if (!cl || !b) return;
@@ -1254,7 +1258,96 @@
       // mặt nhân vật nằm TRÊN lãnh thổ (popFace): trái bình thản, phải choáng ngợp
     }
     // i: giai đoạn; variant: 0 đối đầu (một thế lực thì nhân vật ở giữa) · 1 nhân vật lớn bên trái · 2 nhân vật lớn bên phải · 3 «Trước / Sau» (chia đôi bằng vết nứt, năm RẤT TO); hook: chữ to trên ảnh ('' = không chữ).
+    // Chữ hook kiểu 5, theo đúng kiểu ảnh mẫu: font tròn đậm (Baloo 2), HAI MÀU PHẲNG (dòng trên TRẮNG, dòng dưới VÀNG), viền đen dày + viền xanh lơ mỏng ngoài cùng; mỗi dòng tự co cho vừa bề ngang nên dòng ngắn thì to hơn.
+    const ROUND = '"MapRound", "Arial Rounded MT Bold", "Arial Black", "Segoe UI Black", sans-serif';
+    function hookSoft(c, hook, { maxW, maxH, x, top }) {
+      const words = String(hook || '').trim().split(/\s+/).filter(Boolean);
+      if (!words.length) return null;
+      const font = size => `800 ${size}px ${ROUND}`, meas = (str, size) => { c.save(); c.font = font(size); const w = c.measureText(str).width; c.restore(); return w; };
+      let lines = [words.join(' ')];
+      if (words.length > 1) {
+        let best = null;
+        for (let k = 1; k < words.length; k++) { const l = [words.slice(0, k).join(' '), words.slice(k).join(' ')], w = Math.max(meas(l[0], 100), meas(l[1], 100)); if (!best || w < best.w) best = { lines: l, w }; }
+        const one = meas(lines[0], 100), two = best.w;
+        if (maxW / (two + 30) >= maxW / (one + 30) * .8) lines = best.lines;
+      }
+      let sizes = lines.map(l => Math.min(260, maxW / (meas(l, 100) + 30) * 100));
+      const total = sizes.reduce((t, z) => t + z * 1.02, 0); if (total > maxH) sizes = sizes.map(z => z * maxH / total);
+      let y = top;
+      lines.forEach((ln, k) => {
+        const size = sizes[k]; y += size * .86;
+        c.save(); c.translate(x + size * .12, y); c.rotate(k ? -.035 : -.02); c.transform(1, 0, -.06, 1, 0, 0);
+        c.font = font(size); c.textAlign = 'left'; c.textBaseline = 'alphabetic'; c.lineJoin = 'round'; c.lineCap = 'round';
+        c.strokeStyle = '#3fcfff'; c.lineWidth = size * .38; c.strokeText(ln, 0, 0);   // viền xanh lơ mỏng ngoài cùng
+        c.strokeStyle = '#05060a'; c.lineWidth = size * .26; c.strokeText(ln, 0, 0);    // viền đen dày
+        c.fillStyle = lines.length > 1 && k === 0 ? '#ffffff' : '#ffe500'; c.fillText(ln, 0, 0);
+        c.restore();
+        y += size * .16;
+      });
+      return { size: sizes[0], lines: lines.length };
+    }
+    // Vạch nhấn màu vàng viền đen quanh nhân vật (dấu hiệu «hoảng hốt»).
+    function ticks(c, cx, cy, r, list) {
+      c.save(); c.lineCap = 'round';
+      for (const [deg, a, b, w] of list) {
+        const rad = deg * Math.PI / 180, x0 = cx + Math.cos(rad) * r * a, y0 = cy + Math.sin(rad) * r * a, x1 = cx + Math.cos(rad) * r * b, y1 = cy + Math.sin(rad) * r * b;
+        c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.strokeStyle = '#142046'; c.lineWidth = w + 18; c.stroke();
+        c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.strokeStyle = '#ffd21f'; c.lineWidth = w; c.stroke();
+      }
+      c.restore();
+    }
+    // Kiểu 5 «Hoảng loạn»: chữ hook vàng to ở góc trên trái, bản đồ bên trái mỗi thế lực MỘT khuôn mặt lo sợ (thế lực chính nổi quầng sáng), nhân vật quả cầu rất to bên phải mặt choáng.
+    function drawPanic(i, hook) {
+      const c = ctx, W2 = width, H2 = height, era = tl.eras[Math.max(0, Math.min(tl.eras.length - 1, i))], t0 = stillTime(i);
+      const realms = (era.realms || []).filter(r => r.units && r.units.length).sort((a, b) => b.units.length - a.units.length);
+      const A = realms[0] || null, base = Plan.stateAt(tl, t0).cam, keys = [...new Set(realms.flatMap(r => r.units))];
+      const hasText = Boolean(String(hook || '').trim());
+      const target = [W2 * .32, H2 * (hasText ? .7 : .55), W2 * .6, H2 * (hasText ? .5 : .8)];
+      const cam = keys.length ? fitCam(base, coreKeys(keys), ...target, 0, 4) : { ...base, span: base.span * .8 };
+      const vis = [W2 * .02, H2 * (hasText ? .42 : .1), W2 * .63, H2 * .95], pops = {};
+      realms.forEach((r, k) => { if (r !== A) pops[r.name] = { name: r.name, mood: k % 2 ? 'sad' : 'shock', t: 1.3 + k * .37, vis, minR: 20, maxR: 64 }; });
+      drawFrame(t0, { bare: true, clean: true, cam, pop: A ? { name: A.name, keep: true, color: '#fff', glow: '#fff29a' } : null, pops });
+      // Các nước láng giềng (không thuộc thế lực nào) cũng mang mặt lo sợ: chọn vài nước lớn nhất đang hiện trên bản đồ, cách nhau đủ xa.
+      {
+        const pr = projector(cam), used = new Set(realms.flatMap(r => r.units).map(k => { const u = geo.units.get(k); return u && u.a3; }));
+        const cand = [];
+        for (const u of geo.countries) {
+          if (used.has(u.a3)) continue;
+          const b = boxOf([u.key], pr); if (!b || b.w < 120 || b.h < 120 || b.cx < vis[0] || b.cx > vis[2] || b.cy < vis[1] || b.cy > vis[3]) continue;
+          cand.push({ u, area: b.w * b.h });
+        }
+        cand.sort((x, y) => y.area - x.area);
+        const placed = [], paint = ['#f4a63c', '#8f73e0', '#2fb9a6', '#f0709c', '#5aaef2']; let n = 0;
+        for (const { u } of cand) {
+          if (placed.length >= 4) break;
+          const spot = roomySpot(c, { units: [u.key] }, pr, vis, null);
+          if (!spot || spot.rho < 26 || placed.some(q => Math.hypot(q.x - spot.x, q.y - spot.y) < 240)) continue;
+          const R = clamp(spot.rho / 1.5, 22, 44); placed.push(spot);
+          spot.x = clamp(spot.x, vis[0] + R * 2.1, vis[2] - R * 2.1); spot.y = clamp(spot.y, vis[1] + R * 1.5, vis[3] - R * 2.2);
+          toonGroup(c, [u.key], { name: u.name, colors: [paint[n % paint.length]], flag: 'solid' }, pr);   // nước láng giềng có màu riêng (như các nước khác trên bản đồ)
+          Cart.eyes(c, spot.x, spot.y, R, { mood: ['sad', 'shock', 'sad', 'angry'][n % 4], t: 1.1 + n * .43, seed: seedOf(u.name), k: 1, lid: paint[n % paint.length] });
+          n++;
+        }
+      }
+      thumbCv = thumbCv || mkSize(W2, H2);
+      const tc = thumbCv.getContext('2d'); tc.clearRect(0, 0, W2, H2); tc.drawImage(canvas, 0, 0);
+      c.save(); c.filter = toon() ? 'saturate(1.2) contrast(1.08)' : 'saturate(1.65) contrast(1.18) brightness(1.02)'; c.drawImage(thumbCv, 0, 0); c.filter = 'none'; c.restore();
+      const r = 300, bx = W2 - r - 30, by = H2 - r * .74;
+      c.save(); c.globalCompositeOperation = 'screen'; rays(c, bx, by, .1, '255,255,255', .12);
+      const gl = c.createRadialGradient(bx, by, 30, bx, by, W2 * .42); gl.addColorStop(0, 'rgba(255,255,255,.3)'); gl.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gl; c.fillRect(0, 0, W2, H2); c.restore();
+      c.save();
+      const vg = c.createRadialGradient(W2 / 2, H2 * .5, H2 * .36, W2 / 2, H2 * .5, W2 * .68); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(4,8,20,.5)'); c.fillStyle = vg; c.fillRect(0, 0, W2, H2);
+      if (hasText) { const tg = c.createLinearGradient(0, 0, 0, H2 * .42); tg.addColorStop(0, 'rgba(4,8,20,.5)'); tg.addColorStop(1, 'rgba(4,8,20,0)'); c.fillStyle = tg; c.fillRect(0, 0, W2, H2 * .42); }
+      c.restore();
+      if (hasText) { const t = String(hook).trim(); hookSoft(c, /[?!]$/.test(t) ? t : t + '?!', { maxW: W2 * .62, maxH: H2 * .36, x: W2 * .02, top: 14 }); }
+      if (A) {
+        ticks(c, bx, by, r, [[-122, 1.1, 1.3, 20], [-98, 1.08, 1.36, 24], [-74, 1.1, 1.3, 20], [-158, 1.1, 1.26, 18]]);
+        ball(c, bx, by, r, A, { look: -1, gear: '', tilt: -.07, mood: 'shock' });
+        if (isVietnam(A.name)) drawStar(c, { x: bx - r * .04, y: by - r * .66, R: r * .2 });   // sao vàng trên trán quả cầu
+      }
+    }
     function drawThumbnail(i, { variant = 0, hook = '' } = {}) {
+      if (Math.round(variant) === 4) return drawPanic(i, hook);   // kiểu 5: «Hoảng loạn»
       if (((Math.round(variant) % 4) + 4) % 4 === 3 && tl.eras.length > 1) return drawBeforeAfter();   // kiểu 4: «Trước / Sau» (cần ít nhất hai giai đoạn)
       const era = tl.eras[Math.max(0, Math.min(tl.eras.length - 1, i))], t0 = stillTime(i);
       const withUnits = (era.realms || []).filter(r => r.units && r.units.length).map(r => ({ r, n: r.units.length })).sort((a, b) => b.n - a.n).map(x => x.r);

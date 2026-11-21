@@ -340,7 +340,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
       const out = [];
       try {
         textCalls = 0; R.drawThumbnail(1, { variant: 0, hook: '' }); const none = textCalls;
-        for (let v = 0; v < 4; v++) {
+        for (let v = 0; v < 5; v++) {
           textCalls = 0; said = new Set(); R.drawThumbnail(1, { variant: v, hook: 'AZTEC EMPIRE' });
           const d = canvas.getContext('2d').getImageData(0, 0, 1920, 1080).data; let sat = 0, cnt = 0, hash = 0;
           for (let i = 0; i < d.length; i += 4 * 97) { const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]); sat += mx ? (mx - mn) / mx : 0; cnt++; hash = (hash * 31 + d[i] + d[i + 2] * 7) % 1000003; }
@@ -362,7 +362,8 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.ok(thumbs[3].crack[0] > 215 && thumbs[3].crack[1] > 200 && thumbs[3].crack[2] > 120, 'vết nứt tia sét ở giữa ảnh sáng trắng / vàng nhạt: ' + thumbs[3].crack);
     assert.ok(thumbs[3].blueL > .004 && thumbs[3].redR > .004, 'kiểu «Trước / Sau»: bản đồ xanh (trái) và đỏ (phải) rực, đủ to: ' + thumbs[3].blueL.toFixed(3) + ' / ' + thumbs[3].redR.toFixed(3));
     assert.ok(thumbs.every(t => t.sat > .3), 'màu rực (độ bão hòa cao): ' + thumbs.map(t => t.sat.toFixed(2)));
-    assert.equal(new Set(thumbs.map(t => t.hash)).size, 4, 'bốn kiểu bố cục khác nhau');
+    assert.equal(thumbs[4].said.replace(/\s+/g, ''), 'AZTECEMPIRE?!', 'kiểu «Hoảng loạn»: chỉ chữ hook, thêm ?! ở cuối: ' + thumbs[4].said);
+    assert.equal(new Set(thumbs.map(t => t.hash)).size, 5, 'năm kiểu bố cục khác nhau');
     // 11b) Mặt lãnh thổ đổi theo sự kiện: mất ≥ 20% vùng -> choáng; mở rộng mạnh -> cười lớn; còn lại theo mood kịch bản; mặt choáng vẽ được (không lỗi, khác mặt cười).
     const faces = await page.evaluate(async () => {
       const raw = await window.nodeJson('world'), sample = await window.nodeJson('sample');

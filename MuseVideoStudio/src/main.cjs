@@ -1550,7 +1550,7 @@ app.whenReady().then(async () => {
       else if(settings.output&&meta){await fs.mkdir(mapFolder(settings.output,id),{recursive:true});await shell.openPath(mapFolder(settings.output,id));}
       return true;
     },
-    // Ảnh bìa (thumbnail) 16:9 của video đã dựng xong; mỗi lần bấm đổi sang một giai đoạn đẹp khác (tối đa 4 ảnh, ảnh thứ 4 kiểu «Trước / Sau»).
+    // Ảnh bìa (thumbnail) 16:9 của video đã dựng xong; mỗi lần bấm đổi sang một giai đoạn đẹp khác (tối đa 5 ảnh, ảnh thứ 4 kiểu «Trước / Sau», ảnh thứ 5 kiểu «Hoảng loạn»).
     mapThumb: async data => {
       const id=String(data?.runId||''),meta=mapRuns()[id];
       if(!meta)throw Error('Không thấy video này.');
