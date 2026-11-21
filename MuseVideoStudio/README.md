@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.13.1
+
+- **Ảnh bìa kiểu 4 «Trước / Sau» đẹp hơn, bản đồ NỔI lên:** thế lực ở hai bên đổi sang màu **rực** (xưa **xanh dương**, nay **đỏ**, không còn màu vàng xỉn), có **quầng sáng** và viền dày quanh lãnh thổ; bản đồ **to hơn** (xưa nhỏ thì phóng gần hơn để vẫn nhìn rõ).
+- **Mặt nằm ngay trên bản đồ** (bỏ hai quả bóng ở góc dưới): bên trái bình thản, bên phải **choáng**; mặt đặt ở chỗ thoáng nhất của phần bản đồ nhìn thấy nên không bị tràn khỏi khung, kể cả với đế chế rất lớn.
+- **Việt Nam có sao vàng** của quốc kỳ trên lãnh thổ đỏ (nhận ra qua tên thế lực: Vietnam / Việt Nam / Đại Việt / Đại Nam ở giai đoạn cuối).
+- Ba kiểu ảnh bìa còn lại không đổi.
+
 ## Update 1.13.0
 
 - **Mặt lãnh thổ to hơn, biểu cảm hơn** (video kiểu Hoạt hình sáng): mặt to hơn bản cũ (to theo cả vùng chứ không chỉ theo một tỉnh), có má hồng, và có thêm nét **choáng**: mắt tròn xoe, đồng tử nhỏ, lông mày dựng cao, há miệng, đổ mồ hôi và run nhẹ.

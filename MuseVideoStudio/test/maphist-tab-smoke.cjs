@@ -344,8 +344,14 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
           textCalls = 0; said = new Set(); R.drawThumbnail(1, { variant: v, hook: 'AZTEC EMPIRE' });
           const d = canvas.getContext('2d').getImageData(0, 0, 1920, 1080).data; let sat = 0, cnt = 0, hash = 0;
           for (let i = 0; i < d.length; i += 4 * 97) { const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]); sat += mx ? (mx - mn) / mx : 0; cnt++; hash = (hash * 31 + d[i] + d[i + 2] * 7) % 1000003; }
+          let blueL = 0, redR = 0, tot = 0;   // kiểu 4: thế lực xưa XANH rực ở nửa trái, thế lực nay ĐỎ rực ở nửa phải (không phải màu vàng xỉn)
+          for (let y = 0; y < 1080; y += 5) for (let x = 0; x < 1920; x += 5) {
+            const i = (y * 1920 + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2]; tot++;
+            if (x < 900 && b > 190 && r < 100 && g < 140) blueL++;
+            if (x > 1020 && r > 210 && g < 100 && b < 110) redR++;
+          }
           const px = canvas.getContext('2d').getImageData(970, 216, 1, 1).data;   // tâm vết nứt tia sét (kiểu 4) phải trắng
-          out.push({ textCalls, said: [...said].join(' '), none, sat: sat / cnt, hash, crack: [px[0], px[1], px[2]], years: [Math.abs(tl.eras[0].year), Math.abs(tl.eras.at(-1).year)] });
+          out.push({ textCalls, said: [...said].join(' '), none, sat: sat / cnt, hash, blueL: blueL / tot, redR: redR / tot, crack: [px[0], px[1], px[2]], years: [Math.abs(tl.eras[0].year), Math.abs(tl.eras.at(-1).year)] });
         }
       } finally { proto.fillText = f; proto.strokeText = k; }
       return out;
@@ -354,6 +360,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.deepEqual(thumbs.slice(0, 3).map(t => t.said), ['AZTEC EMPIRE', 'AZTEC EMPIRE', 'AZTEC EMPIRE'], 'chữ duy nhất trên ảnh bìa là hook (một hoặc hai dòng)');
     assert.ok(thumbs[3].said.includes(String(thumbs[3].years[0])) && thumbs[3].said.includes(String(thumbs[3].years[1])) && !thumbs[3].said.includes('AZTEC'), 'kiểu «Trước / Sau»: chữ là năm đầu và năm cuối: ' + thumbs[3].said);
     assert.ok(thumbs[3].crack[0] > 215 && thumbs[3].crack[1] > 200 && thumbs[3].crack[2] > 120, 'vết nứt tia sét ở giữa ảnh sáng trắng / vàng nhạt: ' + thumbs[3].crack);
+    assert.ok(thumbs[3].blueL > .004 && thumbs[3].redR > .004, 'kiểu «Trước / Sau»: bản đồ xanh (trái) và đỏ (phải) rực, đủ to: ' + thumbs[3].blueL.toFixed(3) + ' / ' + thumbs[3].redR.toFixed(3));
     assert.ok(thumbs.every(t => t.sat > .3), 'màu rực (độ bão hòa cao): ' + thumbs.map(t => t.sat.toFixed(2)));
     assert.equal(new Set(thumbs.map(t => t.hash)).size, 4, 'bốn kiểu bố cục khác nhau');
     // 11b) Mặt lãnh thổ đổi theo sự kiện: mất ≥ 20% vùng -> choáng; mở rộng mạnh -> cười lớn; còn lại theo mood kịch bản; mặt choáng vẽ được (không lỗi, khác mặt cười).
