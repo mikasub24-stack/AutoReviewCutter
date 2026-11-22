@@ -28,6 +28,10 @@ Sao chép hashtag|Copy hashtags
 Đã sao chép hashtag.|Hashtags copied.
 Sao chép thẻ tag|Copy tags
 Đã sao chép thẻ tag.|Tags copied.
+Lưu tiêu đề|Save title
+Đã đổi tiêu đề. Bấm «Dựng lại video» để thẻ mở đầu trong video cũng đổi tên.|Title changed. Press “Rebuild video” so the opening card in the video changes too.
+Thẻ mở đầu trong video vẫn hiện tên cũ. Bấm «Dựng lại video» để đổi.|The opening card in the video still shows the old title. Press “Rebuild video” to change it.
+Sửa tiêu đề rồi bấm «Lưu tiêu đề»: mô tả và file ghi chú đổi theo.|Edit the title, then press “Save title”: the description and notes file follow.
 Đang lập tiêu đề, mô tả, hashtag và thẻ tag từ kịch bản…|Preparing the title, description, hashtags and tags from the script…
 Tiêu đề hơi dài: YouTube thường chỉ hiện khoảng 60–70 ký tự.|Long title: YouTube usually shows only about 60–70 characters.
 Video này dựng bằng bản cũ hoặc quá ngắn nên chưa có chương theo giờ. Bấm «Dựng lại video» để mô tả có chương đúng giờ.|This video was built with an older version or is too short, so it has no timed chapters yet. Press “Rebuild video” to get a description with correct chapter times.

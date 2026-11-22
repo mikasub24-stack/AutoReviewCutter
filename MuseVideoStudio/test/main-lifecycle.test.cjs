@@ -1129,7 +1129,7 @@ const pngPixel = (() => {
 const jpegPixel = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAgAAAQABAAD//gAQTGF2YzYwLjMxLjEwMgD/2wBDAAgKCgsKCw0NDQ0NDRAPEBAQEBAQEBAQEBASEhIVFRUSEhIQEBISFBQVFRcXFxUVFRUXFxkZGR4eHBwjIyQrKzP/xACZAAACAwEBAAAAAAAAAAAAAAAHBgUAAQQCAQAABwEBAAAAAAAAAAAAAAAABQYHBAgDAgEQAAECBAQEAgsBAAAAAAAAAAECEQUEAwAhEsIGEzFDg2FRQnMjoXFjMjSyUjNBEQACAQIEAgcFBQkBAAAAAAABAgMEERIAIQUTBkSDQ4LBwyJhMVFBFHEHMjNSI7K0FjR1gWRzNf/AABEIABIAIAMBEgACEgADEgD/2gAMAwEAAhEDEQA/AB5s6TTOzVZC/oSELWHIJAzBgw/0kPywdi9uGyoFNStSYmFrolK6QACVLzYKfF0Ae++FpVq6mJG/Cod2F7EgYRYfaSL+7S+uSb+YqOhqAZI6g+hk9CodSVPzkGnpOZE++y8v7LuFRBpUSyU1PAxUOsbuJmLsGYD0xo5XRhjw4lK3zhzPsVUdselxwY/qoJ74nw4YoqhCL8O97yrbS1gdcq0cJJoE4/002yRLb05NLppRUlwUZnzKWObcmpnyuwe2osasiKEVQiqqgBVABAAA0AA9wGUNtPOu2VDMqw1gLYbXSL2/Cc5U/NcaRJQRxqqIiyqqqAqqoEQCqBoABoANBlG8yc37dVvCqRVYMPExYkiAOLBa1pj+k3vbJUjfQ7mm1uP7glKdSkgorukqBZKGxb5nhdZ9v7Tu+OXK237vd3ZXYT0FjY/mT/K/+v7cp7m7ofX+XnKvkHMf030t48HEvxvT+PBa2DifA3zP7Inqk3QmkVCVLpGiMx9JKs+Vy+KgxctybmXtR2tGpaComlTCKyxX4OXhBJbJxHzZ1o/YMz2cwVb1MKrISzRkjF8VNrXN9Tobn7Pnmc+zVO1K7TPCwNvyyx91/wBSLlxN25dptk3GaekRYoK1UbgqdI5Yy/EwLhASIh0KqGNmxABVAGVxutJJvaUzU5VAnEvxSVPqwWtgD/DXIegSik1lJJBBpEEFiCMzEHzvzBOv29VklcSpiIJBBYgjQgi2oz5X9n3vDJfytHHNHXxyIsiOsSOjgMrqwlBVlNwQRoQdCM6co9M6jzMzsb6Hc03Y30O5pt/6DtO745FB2nd8clXN3Q+v8vI5u6H1/l5PMb6Hc03Y30O5pule39p3fHI2/tO745anm7ofX+Xkc3dD6/y89+1EhMkAAB7GXOAbEpUSfiTifG92r9mn1Mt+Bt82AWko7AD9kDppqVUk/wCTqc9Sf0tH/wAl/dXM+CSSXmDmNpHZyK50BYliFSWZEW5+SqAqj3BQANM50n/vcx/3Cb+IqM//2Q==';
 const fakeHudFactory = log => () => ({
   thumb: async o => { log.push(['thumb', o.variant, o.title, o.leftImage.slice(0, 23), o.rightImage.slice(0, 23), o.leftScore, o.rightScore, o.lang]); return jpegPixel; },
-  init: async o => { log.push(['init', o.layout, o.lang]); }, base: async () => pngPixel, tag: async () => pngPixel, caption: async () => pngPixel,
+  init: async o => { log.push(['init', o.layout, o.lang]); log.push(['title', o.title]); }, base: async () => pngPixel, tag: async () => pngPixel, caption: async () => pngPixel,
   meterSeq: async (side, from, to) => from === to ? [pngPixel] : Array.from({ length: 24 }, () => pngPixel), intro: async () => pngPixel, outro: async lessons => [pngPixel, ...lessons.map(() => pngPixel)], close: () => { log.push(['close']); }
 });
 
@@ -1245,6 +1245,8 @@ test('tab So sánh song song: Muse tự chọn chủ đề → kịch bản → 
     assert.ok(Math.abs(Number(info.format.duration) - meta.seconds) < 0.5);
     assert.ok(Math.abs(meta.seconds - (4.5 + 8 + 7 * 2)) < 1, 'mở đầu + 7 mốc (mỗi mốc ≥ 2 giây) + kết: ' + meta.seconds);
     assert.deepEqual(hudLog.filter(x => x[0] === 'init'), [['init', 'side', 'en']]);
+    assert.deepEqual(hudLog.filter(x => x[0] === 'title').map(x => x[1]), [draft.script.title], 'thẻ mở đầu in đúng tiêu đề kịch bản');
+    assert.equal(meta.videoTitle, draft.script.title, 'nhớ tên đang in trong video');
     assert.ok(hudLog.some(x => x[0] === 'close'), 'đóng cửa sổ vẽ chữ sau khi dựng');
     const notes = await fs.readFile(path.join(folder, 'ghi-chu-dang-video.txt'), 'utf8');
     assert.match(notes, /LỜI ĐỌC:/);
@@ -1271,12 +1273,32 @@ test('tab So sánh song song: Muse tự chọn chủ đề → kịch bản → 
     const publishSaved = (await app.invoke('state')).pair.stories['SS-phim'].publish;
     assert.equal(publishSaved.title, draft.script.title);
 
+    // Đổi tiêu đề: cập nhật kịch bản đã lưu, tên video, gói đăng và file ghi chú; thẻ mở đầu trong video đổi khi dựng lại.
+    const oldTitle = draft.script.title, newTitle = '  From the First Cry   to Forgiveness: Yelling vs Listening (Age 0–30)  ';
+    await assert.rejects(app.invoke('pairRetitle', { storyId: 'SS-phim', title: '   ' }), /không được để trống|cannot be empty/);
+    await assert.rejects(app.invoke('pairRetitle', { storyId: 'SS-phim', title: 'x'.repeat(101) }), /tối đa 100|at most 100/);
+    await assert.rejects(app.invoke('pairRetitle', { storyId: 'khong-co', title: 'abc' }), /Không thấy video này|This video was not found/);
+    const re = await app.invoke('pairRetitle', { storyId: 'SS-phim', title: newTitle });
+    const wantTitle = 'From the First Cry to Forgiveness: Yelling vs Listening (Age 0–30)';
+    assert.equal(re.title, wantTitle);
+    const m2 = (await app.invoke('state')).pair.stories['SS-phim'];
+    assert.deepEqual([m2.name, m2.title, m2.publish.title], [wantTitle, wantTitle, wantTitle]);
+    assert.ok(m2.publish.description.startsWith(wantTitle + '\n'), 'mô tả đổi theo tiêu đề');
+    assert.equal(m2.videoTitle, oldTitle, 'video vẫn in tên cũ cho tới khi dựng lại');
+    assert.equal(m2.output, meta.output, 'đổi tiêu đề không đụng video đã dựng');
+    assert.equal(JSON.parse(await fs.readFile(path.join(folder, 'kich-ban.json'), 'utf8')).script.title, wantTitle);
+    assert.match(await fs.readFile(path.join(folder, 'tieu-de-youtube.txt'), 'utf8'), new RegExp('^TITLE\\n' + wantTitle.replace(/[()]/g, '\\$&') + '\\n'));
+    assert.match(await fs.readFile(path.join(folder, 'ghi-chu-dang-video.txt'), 'utf8'), /From the First Cry to Forgiveness/);
+
     // Dựng lại (ví dụ đổi nhạc): vẫn ra video mới, không đè video cũ.
     const first = meta.output;
     await app.invoke('pairBuild', { storyId: 'SS-phim', voice: { voice: '' } });
     await until(() => { const m = app.invoke('state').pair.stories['SS-phim']; return m.status === 'built' && m.output !== first; }, 180000);
     const latest = app.invoke('state').pair.stories['SS-phim'];
     assert.ok(latest.publish.title && latest.timeline.length === 7, 'dựng lại thì lập lại gói đăng');
+    assert.equal(latest.publish.title, wantTitle, 'gói đăng giữ tiêu đề mới sau khi dựng lại');
+    assert.equal(latest.videoTitle, wantTitle, 'dựng lại thì thẻ mở đầu in tiêu đề mới');
+    assert.deepEqual(hudLog.filter(x => x[0] === 'title').map(x => x[1]), [oldTitle, wantTitle]);
 
     // Thẻ video không được biến mất: mất thông tin video (pairStories) nhưng còn việc trong hàng đợi + kịch bản + video trong thư mục → khôi phục khi mở lại.
     await app.stop();
@@ -1288,12 +1310,12 @@ test('tab So sánh song song: Muse tự chọn chủ đề → kịch bản → 
     state = await app.invoke('state');
     const back = state.pair.stories['SS-phim'];
     assert.ok(back, 'thẻ video trở lại');
-    assert.deepEqual([back.status, back.lang, back.layout, back.name], ['built', 'en', 'side', draft.script.title]);
+    assert.deepEqual([back.status, back.lang, back.layout, back.name], ['built', 'en', 'side', wantTitle], 'khôi phục đúng tiêu đề đã đổi');
     assert.equal(back.output, latest.output, 'lấy lại đúng video dựng mới nhất, không nhầm clip 001.mp4');
     assert.ok(back.cover && (await fs.stat(back.cover)).size > 500, 'lấy lại ảnh bìa');
     assert.equal(state.jobs.filter(j => j.kind === 'pair' && j.storyId === 'SS-phim').length, 21);
     const pubBack = await app.invoke('pairPublish', { storyId: 'SS-phim' });
-    assert.equal(pubBack.publish.title, draft.script.title);
+    assert.equal(pubBack.publish.title, wantTitle);
     assert.equal(pubBack.publish.partial, true, 'chưa biết mốc giờ nên chưa có chương');
     assert.equal(typeof (await app.invoke('pairThumb', { storyId: 'SS-phim' })).file, 'string', 'thẻ khôi phục vẫn tạo thumbnail được');
 

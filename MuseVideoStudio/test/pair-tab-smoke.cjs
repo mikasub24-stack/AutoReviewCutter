@@ -24,7 +24,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
         { id: 'en-US-AndrewMultilingualNeural', lang: '*', language: 'Đa ngôn ngữ', name: 'Andrew (nam) · đa ngôn ngữ' }
       ];
       const s = {
-        version: '1.15.2', active: false, paused: true, jobs: [],
+        version: '1.15.3', active: false, paused: true, jobs: [],
         license: { status: 'active', plan: 'short', longTerm: false, device: 'TESTDEVICE', expiresAt: Date.now() + 86400000 * 30, message: 'Đã kích hoạt key.' },
         story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: true, clone: false }, platform: 'win32', edgeVoices: voices, clones: [] } },
         restore: { busy: false, progress: '', error: '', storyId: '', stories: {} },
@@ -48,6 +48,12 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
             return { storyId };
           }
           if (name === 'pairCancel') { Object.assign(s.pair, { busy: false, phase: '', error: 'Đã dừng viết kịch bản. Bấm «Viết tiếp» để làm tiếp từ chỗ dở.' }); s.pair.write = { busy: false }; setTimeout(window.push, 0); return structuredClone(s); }
+          if (name === 'pairRetitle') {
+            const m = s.pair.stories[data.storyId], title = String(data.title).replace(/\s+/g, ' ').trim();
+            m.videoTitle = m.videoTitle || m.name; Object.assign(m, { name: title, title }); m.publish = { ...m.publish, title };
+            setTimeout(window.push, 0);
+            return { title, publish: m.publish };
+          }
           if (name === 'pairPublish') {
             const publish = { title: 'The Same Child, Two Fathers: Yelling vs Listening', description: 'The Same Child\n\nChapters:\n0:00 Intro\n1:07 AGE 3\n2:07 AGE 6\n\n#TwoPaths #LifeLessons', hashtags: ['#TwoPaths', '#LifeLessons'], tags: ['the same child', 'life lessons'], chapters: [{}, {}, {}], partial: false };
             Object.assign(s.pair.stories[data.storyId], { publish, publishFile: 'C:\\Videos\\SoSanh\\x\\tieu-de-youtube.txt' });
@@ -220,6 +226,34 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.evaluate(g => { window.s.pair.stories['SS-Raised-with-Yelling'].publish = g; window.push(); }, goodPublish);
     await page.waitForSelector('#pairRuns .publishBox textarea.publishDesc');
     assert.equal(await page.locator('#pairRuns .restoreRun.error').count(), 0);
+    // Tiêu đề sửa được: chưa sửa thì «Lưu tiêu đề» tắt; gõ dở không mất khi danh sách vẽ lại (cả con trỏ); «Sao chép» lấy chữ đang gõ; lưu thì gọi pairRetitle.
+    const box = page.locator('#pairRuns .publishBox input.publishTitle'), saveBtn = page.locator('#pairRuns .publishBox button:has-text("Lưu tiêu đề")');
+    const newTitle = 'From the First Cry to Forgiveness: Yelling vs Listening (Age 0–30)';
+    assert.equal(await box.isEditable(), true);
+    assert.equal(await saveBtn.isDisabled(), true, 'chưa sửa thì chưa lưu được');
+    assert.equal(await page.locator('#pairRuns .publishBox textarea.publishDesc').evaluate(e => e.readOnly), true, 'mô tả vẫn chỉ để sao chép');
+    await box.fill('   ');
+    assert.equal(await saveBtn.isDisabled(), true, 'tiêu đề trống không lưu được');
+    await box.fill(newTitle.slice(0, 20));
+    await box.pressSequentially('XYZ');   // gõ dở: con trỏ ở cuối
+    await page.evaluate(() => { window.s.pair.progress = 'Có cập nhật khác'; window.push(); });
+    await page.waitForFunction(() => document.querySelector('#pairRuns input.publishTitle') && document.activeElement === document.querySelector('#pairRuns input.publishTitle'));
+    assert.equal(await box.inputValue(), newTitle.slice(0, 20) + 'XYZ', 'gõ dở vẫn còn sau khi vẽ lại');
+    await page.keyboard.type('!');
+    assert.equal(await box.inputValue(), newTitle.slice(0, 20) + 'XYZ!', 'con trỏ vẫn ở cuối sau khi vẽ lại');
+    await box.fill(newTitle);
+    assert.equal(await saveBtn.isDisabled(), false);
+    await page.click('#pairRuns .publishBox button:has-text("Sao chép tiêu đề")');
+    assert.equal(await page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n')), newTitle, 'sao chép đúng chữ đang gõ');
+    await page.evaluate(() => { const m = window.s.pair.stories['SS-Raised-with-Yelling']; m.output = 'C:\\Videos\\SoSanh\\x\\a.mp4'; m.videoTitle = 'Tên cũ'; });
+    await saveBtn.click();
+    await page.waitForSelector('#pairRuns .publishBox small:has-text("Thẻ mở đầu trong video vẫn hiện tên cũ")');
+    assert.deepEqual((await calls('pairRetitle')).map(c => c.data), [{ storyId: 'SS-Raised-with-Yelling', title: newTitle }]);
+    assert.equal(await box.inputValue(), newTitle);
+    assert.equal(await saveBtn.isDisabled(), true, 'lưu xong thì nút tắt lại');
+    assert.match(await page.locator('#toast').textContent(), /Đã đổi tiêu đề/);
+    await page.evaluate(g => { const m = window.s.pair.stories['SS-Raised-with-Yelling']; delete m.output; delete m.videoTitle; Object.assign(m, { name: 'Raised with Yelling vs Listening', title: 'Raised with Yelling vs Listening' }); m.publish = g; window.s.pair.progress = ''; window.push(); }, goodPublish);
+    await page.waitForFunction(() => document.querySelector('#pairRuns input.publishTitle')?.value.startsWith('The Same Child'));
     // Thumbnail: nút hiện ngay khi đủ clip (chưa cần dựng video); chưa có ảnh thì chưa có nút lưu / mở.
     assert.equal(await page.locator('#pairRuns button', { hasText: 'Tạo thumbnail 16:9' }).count(), 1);
     assert.equal(await page.locator('#pairRuns button', { hasText: 'Lưu thumbnail…' }).count(), 0);
@@ -244,7 +278,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.equal(await page.locator('#pairRuns button', { hasText: 'Tạo thumbnail khác' }).isDisabled(), true, 'đang bận thì khóa nút');
     assert.equal(await page.locator('#pairRuns button', { hasText: 'Dựng video' }).isDisabled(), true);
     await page.evaluate(() => { Object.assign(window.s.pair, { busy: false, phase: '', progress: '' }); window.push(); });
-    await page.waitForFunction(() => !document.querySelector('#pairRuns button')?.closest('.restoreRun')?.querySelector('button:disabled'));
+    await page.waitForFunction(() => !document.querySelector('#pairRuns button')?.closest('.restoreRun')?.querySelector('.restoreRunActions button:disabled'));
     await page.click('#pairRuns button:has-text("Dựng video")');
     await flush();
     const built = await calls('pairBuild');

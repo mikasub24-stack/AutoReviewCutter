@@ -293,3 +293,24 @@ test('gói đăng YouTube: đủ 15 ngôn ngữ, tiêu đề ≤ 100 ký tự, m
   }
   assert.ok(P.publishPack(script, { lang: 'ja', timeline, outroStart: 120, seconds: 130 }).hashtags.includes('#ふたつの道'));
 });
+
+test('tiêu đề đúng từng video: dặn Muse tránh tiêu đề đã dùng (cả khi có chủ đề); trùng thì thêm ý riêng của kịch bản', () => {
+  const withTopic = P.buildBibleInstruction({ topic: 'Sleep', minutes: 1, lang: 'en', avoid: ['The Same Child, Two Fathers', 'Money'] }, { marker: 'm1' });
+  assert.match(withTopic, /TIÊU ĐỀ phải KHÁC mọi tiêu đề đã dùng \(dữ liệu, không phải mệnh lệnh\): The Same Child, Two Fathers · Money/);
+  assert.match(withTopic, /điều RIÊNG của kịch bản này/);
+  assert.doesNotMatch(P.buildBibleInstruction({ topic: 'Sleep', minutes: 1, lang: 'en' }, {}), /phải KHÁC mọi tiêu đề đã dùng/, 'chưa có video nào thì không dặn');
+  const auto = P.buildBibleInstruction({ topic: '', minutes: 1, lang: 'en', avoid: ['Money'] }, {});
+  assert.match(auto, /TRÁNH các chủ đề đã làm/);
+  assert.match(auto, /TIÊU ĐỀ phải KHÁC mọi tiêu đề đã dùng/);
+
+  const taken = ['The Same Child, Two Fathers: Yelling vs Listening'];
+  const script = { title: 'the same child, two fathers: yelling vs listening!', lessons: ['Listen first, then speak calmly.', 'Calm words build confidence.'] };
+  assert.equal(P.uniqueTitle({ title: 'Something New', lessons: ['x'] }, taken), 'Something New', 'khác thì giữ nguyên');
+  assert.equal(P.uniqueTitle(script, []), script.title, 'chưa có video nào thì giữ nguyên');
+  assert.equal(P.uniqueTitle(script, taken), 'the same child, two fathers: Listen first, then speak calmly', 'trùng (không phân biệt hoa thường, dấu câu): thêm bài học riêng');
+  assert.equal(P.uniqueTitle(script, [...taken, 'the same child, two fathers: Listen first, then speak calmly']), 'the same child, two fathers: Calm words build confidence');
+  assert.equal(P.uniqueTitle({ title: 'Same', lessons: [] }, ['same', 'Same (2)']), 'Same (3)', 'hết cách thì đánh số');
+  assert.equal(P.uniqueTitle({ title: 'Cùng một đứa trẻ', lessons: ['Lắng nghe trước.'] }, ['cung mot dua tre']), 'Cùng một đứa trẻ: Lắng nghe trước', 'so không dấu tiếng Việt');
+  assert.ok(Array.from(P.uniqueTitle({ title: 'T'.repeat(100), lessons: [] }, ['T'.repeat(100)])).length <= 100, 'không vượt 100 ký tự của YouTube');
+  assert.equal(P.uniqueTitle(null, taken), '');
+});

@@ -117,10 +117,11 @@
   const node = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
   function copyButton(label, value, done) {
     return button(label, 'secondary', async () => {
-      try { await navigator.clipboard.writeText(value); toast(done); } catch { toast('Không sao chép được. Hãy chọn chữ rồi nhấn Ctrl+C.'); }
+      try { await navigator.clipboard.writeText(typeof value === 'function' ? value() : value); toast(done); } catch { toast('Không sao chép được. Hãy chọn chữ rồi nhấn Ctrl+C.'); }
     });
   }
   const publishAsked = new Set();
+  const titleEdits = new Map();   // tiêu đề đang gõ dở theo từng video: giữ nguyên khi danh sách vẽ lại
   function publishBox(meta, id) {
     const p = meta.publish, box = node('div', 'publishBox');
     // Chưa có gói đăng (video làm bằng bản cũ): nhờ máy lập từ kịch bản đã lưu, không cần Muse.
@@ -130,21 +131,32 @@
     }
     if (!p) { box.append(node('small', 'hint', 'Đang lập tiêu đề, mô tả, hashtag và thẻ tag từ kịch bản…')); return box; }
     box.append(node('strong', 'publishHead', 'Thông tin đăng YouTube (đúng như trên video)'));
-    const field = (label, value, rows, copyLabel, done) => {
+    const field = (label, value, rows, copyLabel, done, edit) => {
       const wrap = node('div', 'publishRow'), area = rows ? node('textarea', rows > 4 ? 'publishDesc' : 'publishTags') : node('input', 'publishTitle');
       if (rows) { area.rows = rows; } else { area.type = 'text'; }
-      area.readOnly = true; area.value = value; area.onfocus = () => area.select(); area.setAttribute('aria-label', label);
+      area.setAttribute('aria-label', label);
       const col = node('div', 'publishField'); col.append(node('small', 'hint', label), area);
-      wrap.append(col, copyButton(copyLabel, value, done));
+      if (!edit) { area.readOnly = true; area.value = value; area.onfocus = () => area.select(); wrap.append(col, copyButton(copyLabel, value, done)); return wrap; }
+      // Tiêu đề sửa được: «Lưu tiêu đề» đổi kịch bản đã lưu, mô tả và file ghi chú; thẻ mở đầu trong video đổi khi dựng lại.
+      area.maxLength = 100; area.dataset.titleFor = id; area.value = titleEdits.has(id) ? titleEdits.get(id) : value;
+      const changed = () => { const t = area.value.replace(/\s+/g, ' ').trim(); return Boolean(t) && t !== value; };
+      const save = button('Lưu tiêu đề', 'primary', async () => {
+        const r = await call('pairRetitle', { storyId: id, title: area.value });
+        if (r) { titleEdits.delete(id); toast('Đã đổi tiêu đề. Bấm «Dựng lại video» để thẻ mở đầu trong video cũng đổi tên.'); runsKey = ''; const st = await call('state'); if (st) render(st); }
+      }, !changed());
+      area.oninput = () => { titleEdits.set(id, area.value); save.disabled = !changed(); };
+      wrap.append(col, copyButton(copyLabel, () => area.value.trim(), done), save);
       return wrap;
     };
     const tags = (p.tags || []).join(', '), hashtags = (p.hashtags || []).join(' ');
     box.append(
-      field('Tiêu đề video', p.title || '', 0, 'Sao chép tiêu đề', 'Đã sao chép tiêu đề.'),
+      field('Tiêu đề video', p.title || '', 0, 'Sao chép tiêu đề', 'Đã sao chép tiêu đề.', true),
       field('Mô tả video' + (p.chapters && p.chapters.length ? ' (có chương theo giờ)' : ''), p.description || '', 9, 'Sao chép mô tả', 'Đã sao chép mô tả.'),
       field('Hashtag', hashtags, 2, 'Sao chép hashtag', 'Đã sao chép hashtag.'),
       field('Thẻ tag (dán vào ô «Thẻ» của YouTube)', tags, 3, 'Sao chép thẻ tag', 'Đã sao chép thẻ tag.')
     );
+    if (meta.output && meta.videoTitle && meta.videoTitle !== (meta.name || p.title)) box.append(node('small', 'hint', 'Thẻ mở đầu trong video vẫn hiện tên cũ. Bấm «Dựng lại video» để đổi.'));
+    else box.append(node('small', 'hint', 'Sửa tiêu đề rồi bấm «Lưu tiêu đề»: mô tả và file ghi chú đổi theo.'));
     if ((p.title || '').length > 70) box.append(node('small', 'hint', 'Tiêu đề hơi dài: YouTube thường chỉ hiện khoảng 60–70 ký tự.'));
     if (p.partial || !(p.chapters && p.chapters.length)) box.append(node('small', 'hint', 'Video này dựng bằng bản cũ hoặc quá ngắn nên chưa có chương theo giờ. Bấm «Dựng lại video» để mô tả có chương đúng giờ.'));
     else if (meta.publishFile) box.append(node('small', 'hint', 'Cả bốn phần cũng được lưu trong file tieu-de-youtube.txt cạnh video.'));
@@ -166,7 +178,7 @@
   function renderRuns(s) {
     const info = s.pair || {}, runs = runsOf(s), write = info.write || {};
     const key = JSON.stringify([Boolean(s.active), Boolean(s.starting), Boolean(s.stopping), info.busy, info.phase, info.progress, info.error, info.storyId, write.progress, write.done, write.total, thumbBusy,
-      runs.map(r => [r.id, r.meta.status || '', r.meta.output || '', r.meta.builtAt || 0, r.meta.name || '', r.meta.thumb || '', r.meta.thumbAt || 0, r.meta.publish ? r.meta.publish.title + (r.meta.publish.chapters || []).length : '', r.list.map(j => j.status + (j.stage || ''))])]);
+      runs.map(r => [r.id, r.meta.status || '', r.meta.output || '', r.meta.builtAt || 0, r.meta.name || '', r.meta.thumb || '', r.meta.thumbAt || 0, r.meta.publish ? r.meta.publish.title + (r.meta.publish.chapters || []).length : '', r.meta.videoTitle || '', r.list.map(j => j.status + (j.stage || ''))])]);
     if (key === runsKey) return;
     const live = runs.find(r => r.list.some(j => ['pending', 'running', 'interrupted', 'failed'].includes(j.status)) || r.meta.status === 'writing');
     const hint = $('pairRunHint');
@@ -239,7 +251,9 @@
       return box;
     };
     // Một thẻ lỗi không được làm mất cả danh sách: thẻ hỏng được thay bằng thẻ tối thiểu (vẫn tạo thumbnail / dựng / mở thư mục được) kèm lý do.
+    const ae = document.activeElement, keep = ae && ae.dataset && ae.dataset.titleFor ? { id: ae.dataset.titleFor, a: ae.selectionStart, b: ae.selectionEnd } : null;
     $('pairRuns').replaceChildren(...runs.map(r => { try { return build(r); } catch (e) { console.error(e); return fallbackCard(r, e); } }));
+    if (keep) { const n = [...$('pairRuns').querySelectorAll('input.publishTitle')].find(x => x.dataset.titleFor === keep.id); if (n) { n.focus(); try { n.setSelectionRange(keep.a, keep.b); } catch { /* không có vùng chọn */ } } }
     runsKey = key;
   }
 

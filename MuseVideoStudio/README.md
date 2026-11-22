@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.15.3
+
+- **Tiêu đề đúng từng video.** Khi viết kịch bản, Muse được dặn đặt tiêu đề KHÁC mọi video đã làm (cả khi bạn tự gõ chủ đề) và nêu điều riêng của kịch bản đó, không chỉ lặp lại chủ đề. Nếu tiêu đề vẫn trùng một video đã có (không phân biệt hoa thường, dấu câu, dấu tiếng Việt), app tự thêm ý riêng lấy từ bài học của chính video («Tên chung: bài học»); hết cách mới đánh số (2), (3).
+- **Đổi tiêu đề video đã làm:** ô «Tiêu đề video» trong mục «Thông tin đăng YouTube» giờ gõ sửa được (≤ 100 ký tự). Bấm «Lưu tiêu đề» để cập nhật kịch bản đã lưu, tên video, mô tả, `tieu-de-youtube.txt` và `ghi-chu-dang-video.txt`. «Sao chép tiêu đề» lấy đúng chữ đang gõ; chữ gõ dở và con trỏ được giữ khi danh sách tự cập nhật. Thẻ mở đầu in trong video chỉ đổi khi bấm «Dựng lại video» (dùng lại clip đã có, không gọi Muse); trước đó app nhắc video vẫn đang hiện tên cũ.
+- Test mới: `pair-plan` (dặn tránh tiêu đề, `uniqueTitle`), `main-lifecycle` (đổi tiêu đề, kịch bản / gói đăng / file ghi chú, dựng lại in tên mới, khôi phục thẻ giữ tên mới), `pair-tab-smoke` (sửa, lưu, sao chép chữ đang gõ, gõ dở không mất khi vẽ lại).
+- Chưa kiểm được trên Windows và Electron thật.
+
 ## Update 1.15.2
 
 - **Video hoàn thành không còn «mất tích» khỏi tab «So sánh song song».** Mỗi video luôn có một thẻ: nếu thông tin video bị mất hoặc hỏng nhưng vẫn còn việc trong hàng đợi, kịch bản đã lưu và video dựng sẵn trong thư mục `SoSanh`, Muse tự khôi phục thẻ khi mở ứng dụng (và trước khi tạo thumbnail / dựng / lấy thông tin đăng), lấy lại đúng video dựng mới nhất và ảnh bìa. Danh sách vẽ từng bước riêng: một thẻ lỗi chỉ thành thẻ tối thiểu kèm lý do và nút «Tạo thumbnail 16:9», «Mở thư mục» thay vì làm trống cả danh sách.

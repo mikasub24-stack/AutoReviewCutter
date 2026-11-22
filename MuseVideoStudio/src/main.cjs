@@ -999,7 +999,7 @@ function prunePairStories(){
   for(const [id,meta] of Object.entries(all))if(!ids.has(id)&&meta.status!=='writing')delete all[id];
 }
 const pairInput=meta=>({topic:meta.topic,left:meta.left,right:meta.right,minutes:meta.minutes,lang:meta.lang,layout:meta.layout,
-  avoid:Object.values(settings.pairStories||{}).filter(m=>m!==meta).map(m=>m.title||m.topic).filter(Boolean).slice(-12)});
+  avoid:Object.values(settings.pairStories||{}).filter(m=>m!==meta).map(m=>m.name||m.title||m.topic).filter(Boolean).slice(-12)});
 async function writePairNotes(storyId,meta,draft){
   if(!draft?.script)return;
   const text=pairPlan.notesText(pairInput(meta),draft.script,{builtAt:new Date().toLocaleString('vi-VN')});
@@ -1057,7 +1057,7 @@ async function buildPairStory(storyId){
       clips:pairBeatClips(clips),hud:pairHud,voice:voiceService,dir:pairFolder(settings.output,storyId),name:meta.name||storyId,ffmpeg:settings.ffmpeg||'ffmpeg',signal:pairController.signal,
       onProgress:text=>{pairState.progress=text;notify();}
     });
-    Object.assign(meta,{output:result.output,cover:result.cover,seconds:result.seconds,builtAt:Date.now(),clipSig:clips.map(j=>j.output).join('|'),timeline:result.timeline,outroStart:result.outroStart});
+    Object.assign(meta,{output:result.output,cover:result.cover,seconds:result.seconds,builtAt:Date.now(),clipSig:clips.map(j=>j.output).join('|'),timeline:result.timeline,outroStart:result.outroStart,videoTitle:draft.script.title});
     await writePairNotes(storyId,meta,draft);
     await makePairPublish(storyId,meta,draft.script,{force:true});
     meta.status='built';
@@ -1086,6 +1086,8 @@ async function runPair(storyId){
   try{
     const draft=await readPairDraft(storyId);
     const result=await pairWriter.write({options:pairInput(meta),resume:draft&&!draft.final?draft:null,onDraft:d=>{void savePairDraft(storyId,d);}});
+    // Tiêu đề phải đúng từng video: trùng video đã làm thì thêm ý riêng của chính kịch bản này.
+    result.script.title=pairPlan.uniqueTitle(result.script,Object.entries(settings.pairStories||{}).filter(([id])=>id!==storyId).map(([,m])=>m.name||m.title).filter(Boolean))||result.script.title;
     const jobs=pairPlan.buildJobs(result.config,result.script,{storyId});
     await savePairDraft(storyId,{bible:result.bible,beats:result.script.beats,script:result.script,final:true,config:{lang:result.config.lang,layout:result.config.layout,minutes:result.config.minutes}});
     if(!queue.jobs.some(j=>j.kind==='pair'&&j.storyId===storyId))await queue.add(jobs);
@@ -1851,6 +1853,28 @@ app.whenReady().then(async () => {
       const publish=await makePairPublish(storyId,meta,draft.script,{force:true});
       await save();notify();
       return {publish};
+    },
+    // Đổi tiêu đề video đã làm: cập nhật kịch bản đã lưu, tên video, gói đăng YouTube. Thẻ mở đầu trong video chỉ đổi khi «Dựng lại video» (meta.videoTitle nhớ tên đang in trong video).
+    pairRetitle: async data => {
+      const storyId=String(data?.storyId||'');
+      await recoverPairStories().catch(()=>{});
+      const meta=settings.pairStories?.[storyId];
+      if(!meta)throw Error(ui('Không thấy video này.','This video was not found.'));
+      if(pairState.busy&&pairState.storyId===storyId)throw Error(ui('Chờ video này viết hoặc dựng xong rồi hãy đổi tiêu đề.','Wait until this video finishes writing or building, then change the title.'));
+      const title=String(data?.title??'').replace(/\s+/g,' ').trim();
+      if(!title)throw Error(ui('Tiêu đề không được để trống.','The title cannot be empty.'));
+      if(Array.from(title).length>100)throw Error(ui('Tiêu đề tối đa 100 ký tự (giới hạn của YouTube).','The title can be at most 100 characters (YouTube limit).'));
+      const draft=await readPairDraft(storyId);
+      if(!draft?.script)throw Error(ui('Không thấy kịch bản đã lưu của video này.','The saved script of this video was not found.'));
+      const old=draft.script.title;
+      if(meta.output&&!meta.videoTitle)meta.videoTitle=old;
+      draft.script.title=title;
+      await savePairDraft(storyId,draft);
+      Object.assign(meta,{name:title,title});
+      await makePairPublish(storyId,meta,draft.script,{force:true});
+      await writePairNotes(storyId,meta,draft);
+      await save();notify();
+      return {title,publish:meta.publish};
     },
     pairSave: async data => {
       const meta=settings.pairStories?.[String(data?.storyId||'')],thumb=Boolean(data?.thumb),out=thumb?meta?.thumb:meta?.output;
