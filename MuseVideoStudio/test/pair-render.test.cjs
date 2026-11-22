@@ -163,3 +163,75 @@ test('dựng thật có nhạc nền và dừng giữa chừng không để lạ
     assert.ok(!(await fs.readdir(out)).some(f => f.startsWith('Bị dừng')), 'không để lại video dở');
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
+
+// ---- Thumbnail 16:9
+const jpegUrl = dir => { const f = path.join(dir, 'px.jpg'); ff('-f', 'lavfi', '-i', 'testsrc=size=64x36:rate=1:duration=1', '-frames:v', '1', '-q:v', '5', f); return require('node:fs').promises.readFile(f).then(b => 'data:image/jpeg;base64,' + b.toString('base64')); };
+const thumbScript = {
+  ...script,
+  beats: [{ number: 1, leftScore: 100, rightScore: 100 }, { number: 2, leftScore: 70, rightScore: 95 }, { number: 3, leftScore: 20, rightScore: 90 }, { number: 4, leftScore: 55, rightScore: 60 }, { number: 5, leftScore: 30, rightScore: 92 }]
+    .map(b => ({ ...b, label: `AGE ${b.number}`, caption: 'c', narration: 'n' }))
+};
+
+test('thumbnail: mốc được chọn theo kiểu (chênh điểm nhiều nhất / nhiều nhì / nhiều ba; kiểu «Điểm cuối» lấy mốc cuối)', () => {
+  const pick = style => R.thumbBeat(thumbScript.beats, style).number;
+  assert.equal(pick(0), 3, 'chênh 70');
+  assert.equal(pick(1), 5, 'mốc cuối');
+  assert.equal(pick(2), 5, 'chênh 62');
+  assert.equal(pick(3), 2, 'chênh 25');
+  assert.equal(R.thumbBeat([thumbScript.beats[0]], 3).number, 1, 'chỉ một mốc vẫn chọn được');
+  assert.equal(R.thumbBeat([{ number: 1 }, { number: 2 }], 0).number, 2, 'thiếu điểm: mốc sau cùng');
+});
+
+test('thumbnail: lấy khung hình thật từ clip trái / phải, gọi bộ vẽ đúng kiểu, ghi thumbnail-N.jpg, xoay vòng và dọn tệp tạm', opts, async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'pair-thumb-'));
+  try {
+    const sample = path.join(dir, 'mau.mp4');
+    ff('-f', 'lavfi', '-i', 'testsrc=size=320x180:rate=30:duration=2', '-pix_fmt', 'yuv420p', sample);
+    const clips = thumbScript.beats.map(b => ({ number: b.number, left: sample, right: sample }));
+    const jpeg = await jpegUrl(dir), seen = [];
+    const hud = { thumb: async o => { seen.push(o); return jpeg; } };
+    const out = path.join(dir, 'out');
+    const a = await R.makePairThumbnail({ script: thumbScript, config: { lang: 'vi' }, clips, hud, dir: out, variant: 0 });
+    assert.deepEqual([a.variant, a.count, a.beat], [0, 4, 3]);
+    assert.equal(path.basename(a.file), 'thumbnail-1.jpg');
+    assert.equal(a.bytes, (await fs.stat(a.file)).size);
+    const o = seen[0];
+    assert.match(o.leftImage, /^data:image\/jpeg;base64,\/9j\//);
+    assert.match(o.rightImage, /^data:image\/jpeg;base64,\/9j\//);
+    assert.deepEqual([o.variant, o.title, o.left, o.right, o.meter, o.lang, o.leftScore, o.rightScore], [0, 'One child, two paths', 'RAISED WITH YELLING', 'RAISED WITH LISTENING', 'CONFIDENCE', 'vi', 20, 90]);
+    const b = await R.makePairThumbnail({ script: thumbScript, config: { lang: 'en' }, clips, hud, dir: out, variant: 1 });
+    assert.equal(path.basename(b.file), 'thumbnail-2.jpg');
+    assert.deepEqual([seen[1].leftScore, seen[1].rightScore], [30, 92], 'kiểu «Điểm cuối»: điểm của mốc cuối');
+    const c = await R.makePairThumbnail({ script: thumbScript, config: {}, clips, hud, dir: out, variant: 6 });
+    assert.deepEqual([c.variant, path.basename(c.file)], [2, 'thumbnail-3.jpg'], 'vòng lại sau 4 kiểu');
+    const d = await R.makePairThumbnail({ script: thumbScript, config: {}, clips, hud, dir: out, variant: -1 });
+    assert.equal(d.variant, 3, 'số âm cũng không lỗi');
+    assert.deepEqual((await fs.readdir(out)).sort(), ['thumbnail-1.jpg', 'thumbnail-2.jpg', 'thumbnail-3.jpg', 'thumbnail-4.jpg'], 'không để lại thư mục tạm');
+    const body = await fs.readFile(a.file);
+    assert.deepEqual([body[0], body[1]], [0xff, 0xd8]);
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});
+
+test('thumbnail: báo lỗi rõ khi thiếu kịch bản / clip, khi bộ vẽ trả ảnh sai hay quá nặng, và không để lại tệp tạm', opts, async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'pair-thumb-bad-'));
+  try {
+    const sample = path.join(dir, 'mau.mp4');
+    ff('-f', 'lavfi', '-i', 'testsrc=size=320x180:rate=30:duration=1', '-pix_fmt', 'yuv420p', sample);
+    const clips = thumbScript.beats.map(b => ({ number: b.number, left: sample, right: sample }));
+    const jpeg = await jpegUrl(dir), out = path.join(dir, 'out');
+    const make = (extra = {}) => R.makePairThumbnail({ script: thumbScript, config: {}, clips, hud: { thumb: async () => jpeg }, dir: out, variant: 0, ...extra });
+    await assert.rejects(make({ script: null }), /Chưa có kịch bản/);
+    await assert.rejects(make({ script: { beats: [] } }), /Chưa có kịch bản/);
+    await assert.rejects(make({ clips: clips.filter(c => c.number !== 3) }), /Mốc 3 chưa có đủ hai clip/);
+    await assert.rejects(make({ clips: clips.map(c => c.number === 3 ? { ...c, right: '' } : c) }), /Mốc 3 chưa có đủ hai clip/);
+    await assert.rejects(make({ clips: clips.map(c => ({ ...c, left: path.join(dir, 'khong-co.mp4') })) }), /./);
+    await assert.rejects(make({ hud: { thumb: async () => 'data:image/png;base64,AAAA' } }), /ảnh không hợp lệ/);
+    await assert.rejects(make({ hud: { thumb: async () => 'data:image/jpeg;base64,AAAA' } }), /ảnh không hợp lệ/);
+    await assert.rejects(make({ hud: { thumb: async () => undefined } }), /ảnh không hợp lệ/);
+    await assert.rejects(make({ hud: { thumb: async () => { throw Error('Không đọc được khung hình để làm thumbnail.'); } } }), /Không đọc được khung hình/);
+    const big = 'data:image/jpeg;base64,' + Buffer.concat([Buffer.from([0xff, 0xd8]), Buffer.alloc(2.1e6, 7)]).toString('base64');
+    await assert.rejects(make({ hud: { thumb: async () => big } }), /quá nặng/);
+    assert.deepEqual(await fs.readdir(out), [], 'lỗi thì không để lại tệp nào');
+    await assert.rejects(make({ ffmpeg: path.join(dir, 'khong-co-ffmpeg') }), /./);
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});

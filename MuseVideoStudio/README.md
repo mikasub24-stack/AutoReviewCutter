@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.15.1
+
+- **Tab «So sánh song song» có nút «Tạo thumbnail 16:9»** (ảnh bìa 1920×1080, JPEG ≤ 1,9 MB, đúng giới hạn YouTube): ghép khung hình thật của clip bên trái và clip bên phải rồi vẽ chữ RẤT TO bằng canvas. Làm được ngay khi mọi clip đã xong, **không cần chờ dựng video**; dùng cho cả video ngang và video dọc (Shorts), cả 15 ngôn ngữ.
+- **4 kiểu, bấm «Tạo thumbnail khác» để đổi** (ảnh `thumbnail-1.jpg` … `thumbnail-4.jpg` nằm cạnh video): ① «Đối đầu» (hai nửa, tiêu đề lớn dưới, huy hiệu VS, mũi tên % của hai bên) ② «Điểm cuối» (số % pin của hai bên thật to, lấy ở mốc cuối) ③ «Tiêu đề to» (chữ khổng lồ chạy ngang hai nửa) ④ «Chéo» (đường chia nghiêng, VS ở giữa). Bên điểm thấp hơn hẳn được làm ảm đạm (bớt màu, sắc đỏ sẫm), bên cao hơn rực lên; thêm ánh sáng lan, viền sáng hai mép và chữ có viền đen dày.
+- «Lưu thumbnail…» và «Mở thumbnail» nằm cạnh ảnh xem trước; tiêu đề dài được rút về vế đầu (trước dấu «:») cho gọn.
+- Test mới: `pair-render` (chọn mốc theo kiểu, lấy khung hình thật bằng FFmpeg, ghi tệp, dọn tạm, báo lỗi), `pair-hud-smoke` (canvas thật: 4 kiểu, khung hình nhiễu nặng vẫn ≤ 1,9 MB, 8 ngôn ngữ, dữ liệu lạ, ảnh hỏng), `pair-hud-window`, `pair-tab-smoke` và luồng đầy đủ trong `main-lifecycle`.
+
 ## Update 1.15.0
 
 - **Tab mới «So sánh song song»** (gói Năm / Vĩnh viễn): kiểu video chia đôi màn hình «cùng một nhân vật người que 3D, hai con đường» (ví dụ lớn lên trong tiếng la mắng và lớn lên được lắng nghe). Chọn chủ đề trong 14 gợi ý, tự gõ, hoặc **để trống để Muse tự chọn chủ đề**, chọn độ dài 8–10 phút (có 1 / 3 / 5 phút để chạy thử), rồi mọi bước sau tự chạy: Muse viết kịch bản (hồ sơ + từng phần ≤ 8 mốc, có thể «Viết tiếp» khi dừng giữa chừng), tạo **một ảnh nền chung cho mỗi mốc** rồi **hai clip 8 giây (trái và phải) cùng xuất phát từ ảnh đó** (video 9 phút = 66 ảnh + 132 clip), lồng tiếng, vẽ chữ, thanh pin % tụt dần và âm thanh rồi dựng thành MP4 (thư mục `SoSanh`, kèm ảnh bìa và file ghi chú đăng video).

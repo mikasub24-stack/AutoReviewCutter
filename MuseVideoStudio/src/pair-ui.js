@@ -22,7 +22,7 @@
     ar: 'الغرفة نفسها والطفل نفسه، لكن طريقان مختلفان تمامًا.', th: 'ห้องเดียวกัน เด็กคนเดียวกัน แต่เป็นสองเส้นทางที่ต่างกันมาก',
     ja: '同じ部屋、同じ子ども。でも、まったく違う二つの道。', ko: '같은 방, 같은 아이, 하지만 전혀 다른 두 갈래 길.', zh: '同一个房间，同一个孩子，却走上两条截然不同的路。'
   };
-  let shownVoiceKey = '', runsKey = '', listening = false, audio = null, lastState = null, music = saved.music || '';
+  let thumbBusy = '', shownVoiceKey = '', runsKey = '', listening = false, audio = null, lastState = null, music = saved.music || '';
 
   const lang = () => ($('pairLang') && P.LANGUAGES.some(l => l.id === $('pairLang').value)) ? $('pairLang').value : 'en';
   const tempo = () => Math.min(1.3, Math.max(0.8, Number($('pairTempo').value) || 1));
@@ -115,14 +115,15 @@
 
   function renderRuns(s) {
     const info = s.pair || {}, runs = runsOf(s), write = info.write || {};
-    const key = JSON.stringify([Boolean(s.active), Boolean(s.starting), Boolean(s.stopping), info.busy, info.phase, info.progress, info.error, info.storyId, write.progress, write.done, write.total,
-      runs.map(r => [r.id, r.meta.status || '', r.meta.output || '', r.meta.builtAt || 0, r.meta.name || '', r.list.map(j => j.status + (j.stage || ''))])]);
+    const key = JSON.stringify([Boolean(s.active), Boolean(s.starting), Boolean(s.stopping), info.busy, info.phase, info.progress, info.error, info.storyId, write.progress, write.done, write.total, thumbBusy,
+      runs.map(r => [r.id, r.meta.status || '', r.meta.output || '', r.meta.builtAt || 0, r.meta.name || '', r.meta.thumb || '', r.meta.thumbAt || 0, r.list.map(j => j.status + (j.stage || ''))])]);
     if (key === runsKey) return;
     runsKey = key;
     const live = runs.find(r => r.list.some(j => ['pending', 'running', 'interrupted', 'failed'].includes(j.status)) || r.meta.status === 'writing');
     const hint = $('pairRunHint');
     if (info.busy && info.phase === 'write') hint.textContent = `Đang viết kịch bản · ${write.done || 0}/${write.total || '?'} mốc`;
     else if (info.busy && info.phase === 'build') hint.textContent = 'Đang lồng tiếng và dựng video';
+    else if (info.busy && info.phase === 'thumb') hint.textContent = 'Đang tạo thumbnail';
     else if (live && live.list.length) { const clips = live.list.filter(j => j.phase === 'clip'), done = clips.filter(j => j.status === 'completed').length; hint.textContent = `${s.active || s.starting ? 'Đang chạy' : 'Tạm dừng'} · ${done}/${clips.length} clip`; }
     hint.hidden = !(live || info.busy); $('pairIdleHint').hidden = Boolean(live || info.busy);
     $('pairRuns').replaceChildren(...runs.map(({ id, list, meta }) => {
@@ -157,6 +158,10 @@
         if (meta.cover) video.poster = localFileUrl(meta.cover);
         video.src = localFileUrl(meta.output); extra.push(video);
       }
+      if (meta.thumb && !building) {
+        const img = document.createElement('img'); img.className = 'restoreThumb'; img.alt = 'Thumbnail 16:9';
+        img.src = localFileUrl(meta.thumb) + '?v=' + (meta.thumbAt || 0); img.onerror = () => { img.hidden = true; }; extra.push(img);
+      }
       const actions = document.createElement('div'); actions.className = 'restoreRunActions';
       const queueBusy = Boolean(s.active || s.starting), anyBusy = queueBusy || Boolean(info.busy) || Boolean(s.merging || s.packaging);
       if (writing) actions.append(button('Dừng viết', 'secondary', async () => { const r = await call('pairCancel'); if (r) { runsKey = ''; render(r); } }));
@@ -171,6 +176,12 @@
         const r = await call('pairBuild', { storyId: id, voice: { voice: $('pairVoice').value || (meta.voice && meta.voice.voice) || '', tempo: tempo() }, music });
         if (r) { runsKey = ''; render(r); }
       }, anyBusy));
+      if (allClips && !building) actions.append(button(thumbBusy === id ? 'Đang tạo thumbnail…' : meta.thumb ? 'Tạo thumbnail khác' : 'Tạo thumbnail 16:9', 'secondary', async () => {
+        thumbBusy = id; runsKey = ''; render(lastState);
+        try { const r = await call('pairThumb', { storyId: id }); if (r) toast(`Đã tạo thumbnail 1920×1080 (ảnh ${r.variant}/${r.count}). Bấm lại để đổi sang kiểu khác.`); }
+        finally { thumbBusy = ''; runsKey = ''; const st = await call('state'); if (st) render(st); }
+      }, anyBusy || Boolean(thumbBusy)));
+      if (meta.thumb) actions.append(button('Lưu thumbnail…', 'primary', async () => { const r = await call('pairSave', { storyId: id, thumb: true }); if (r && r.file) toast('Đã lưu thumbnail: ' + r.file); }), button('Mở thumbnail', 'secondary', () => call('pairReveal', { storyId: id, thumb: true })));
       if (meta.output) actions.append(button('Lưu video…', 'primary', async () => { const r = await call('pairSave', { storyId: id }); if (r && r.file) toast('Đã lưu video: ' + r.file); }));
       if (meta.output) actions.append(button('Mở video', 'secondary', () => call('pairReveal', { storyId: id })));
       actions.append(button('Mở thư mục', 'secondary', () => call('openOutput', { kind: 'pair' })));

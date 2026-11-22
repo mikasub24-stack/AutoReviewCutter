@@ -37,7 +37,7 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
   const app = new EventEmitter();
   app.requestSingleInstanceLock = () => ownsLock;
   app.whenReady = () => Promise.resolve();
-  app.getPath = name => { assert.equal(name, 'userData'); return userData; };
+  app.getPath = name => { assert.ok(['userData', 'downloads'].includes(name), name); return name === 'downloads' ? path.join(userData, 'Downloads') : userData; };
   app.quit = () => { lifecycle.push('quit'); quit(); };
 
   function accountSession(partition) {
@@ -1126,7 +1126,9 @@ const pngPixel = (() => {
   const header = Buffer.alloc(13); header.writeUInt32BE(1, 0); header.writeUInt32BE(1, 4); header.set([8, 6, 0, 0, 0], 8);
   return 'data:image/png;base64,' + Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', header), chunk('IDAT', zlib.deflateSync(Buffer.from([0, 255, 80, 40, 128]))), chunk('IEND', Buffer.alloc(0))]).toString('base64');
 })();
+const jpegPixel = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAgAAAQABAAD//gAQTGF2YzYwLjMxLjEwMgD/2wBDAAgKCgsKCw0NDQ0NDRAPEBAQEBAQEBAQEBASEhIVFRUSEhIQEBISFBQVFRcXFxUVFRUXFxkZGR4eHBwjIyQrKzP/xACZAAACAwEBAAAAAAAAAAAAAAAHBgUAAQQCAQAABwEBAAAAAAAAAAAAAAAABQYHBAgDAgEQAAECBAQEAgsBAAAAAAAAAAECEQUEAwAhEsIGEzFDg2FRQnMjoXFjMjSyUjNBEQACAQIEAgcFBQkBAAAAAAABAgMEERIAIQUTBkSDQ4LBwyJhMVFBFHEHMjNSI7K0FjR1gWRzNf/AABEIABIAIAMBEgACEgADEgD/2gAMAwEAAhEDEQA/AB5s6TTOzVZC/oSELWHIJAzBgw/0kPywdi9uGyoFNStSYmFrolK6QACVLzYKfF0Ae++FpVq6mJG/Cod2F7EgYRYfaSL+7S+uSb+YqOhqAZI6g+hk9CodSVPzkGnpOZE++y8v7LuFRBpUSyU1PAxUOsbuJmLsGYD0xo5XRhjw4lK3zhzPsVUdselxwY/qoJ74nw4YoqhCL8O97yrbS1gdcq0cJJoE4/002yRLb05NLppRUlwUZnzKWObcmpnyuwe2osasiKEVQiqqgBVABAAA0AA9wGUNtPOu2VDMqw1gLYbXSL2/Cc5U/NcaRJQRxqqIiyqqqAqqoEQCqBoABoANBlG8yc37dVvCqRVYMPExYkiAOLBa1pj+k3vbJUjfQ7mm1uP7glKdSkgorukqBZKGxb5nhdZ9v7Tu+OXK237vd3ZXYT0FjY/mT/K/+v7cp7m7ofX+XnKvkHMf030t48HEvxvT+PBa2DifA3zP7Inqk3QmkVCVLpGiMx9JKs+Vy+KgxctybmXtR2tGpaComlTCKyxX4OXhBJbJxHzZ1o/YMz2cwVb1MKrISzRkjF8VNrXN9Tobn7Pnmc+zVO1K7TPCwNvyyx91/wBSLlxN25dptk3GaekRYoK1UbgqdI5Yy/EwLhASIh0KqGNmxABVAGVxutJJvaUzU5VAnEvxSVPqwWtgD/DXIegSik1lJJBBpEEFiCMzEHzvzBOv29VklcSpiIJBBYgjQgi2oz5X9n3vDJfytHHNHXxyIsiOsSOjgMrqwlBVlNwQRoQdCM6co9M6jzMzsb6Hc03Y30O5pt/6DtO745FB2nd8clXN3Q+v8vI5u6H1/l5PMb6Hc03Y30O5pule39p3fHI2/tO745anm7ofX+Xkc3dD6/y89+1EhMkAAB7GXOAbEpUSfiTifG92r9mn1Mt+Bt82AWko7AD9kDppqVUk/wCTqc9Sf0tH/wAl/dXM+CSSXmDmNpHZyK50BYliFSWZEW5+SqAqj3BQANM50n/vcx/3Cb+IqM//2Q==';
 const fakeHudFactory = log => () => ({
+  thumb: async o => { log.push(['thumb', o.variant, o.title, o.leftImage.slice(0, 23), o.rightImage.slice(0, 23), o.leftScore, o.rightScore, o.lang]); return jpegPixel; },
   init: async o => { log.push(['init', o.layout, o.lang]); }, base: async () => pngPixel, tag: async () => pngPixel, caption: async () => pngPixel,
   meterSeq: async (side, from, to) => from === to ? [pngPixel] : Array.from({ length: 24 }, () => pngPixel), intro: async () => pngPixel, outro: async lessons => [pngPixel, ...lessons.map(() => pngPixel)], close: () => { log.push(['close']); }
 });
@@ -1196,6 +1198,8 @@ test('tab So sánh song song: Muse tự chọn chủ đề → kịch bản → 
     assert.equal(draft.script.beats.length, 7);
     assert.match(fake.log.instructions[0], /TỰ CHỌN một chủ đề/);
     await assert.rejects(app.invoke('pairBuild', { storyId: 'SS-phim' }), /Chờ xử lý|clip đã xong/, 'chưa đủ clip thì chưa dựng');
+    await assert.rejects(app.invoke('pairThumb', { storyId: 'SS-phim' }), /Chỉ tạo thumbnail khi mọi clip đã xong|Create the thumbnail once every clip is done/, 'chưa đủ clip thì chưa làm thumbnail');
+    await assert.rejects(app.invoke('pairThumb', { storyId: 'khong-co' }), /Không thấy video này|This video was not found/);
 
     // Clip làm tay: mỗi clip một file 1 giây rồi báo đã xong; dựng video thật (chữ canvas giả).
     await fs.mkdir(folder, { recursive: true });
@@ -1203,6 +1207,30 @@ test('tab So sánh song song: Muse tự chọn chủ đề → kịch bản → 
     await require('../src/merge.cjs').command('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=320x180:rate=30:duration=1', '-pix_fmt', 'yuv420p', sample], 60000);
     for (const job of clips) { const file = path.join(folder, String(job.number).padStart(3, '0') + '.mp4'); await fs.copyFile(sample, file); Object.assign(job, { status: 'completed', output: file }); }
     for (const job of images) Object.assign(job, { status: 'completed', output: sample });
+    // Thumbnail 16:9: làm được ngay khi đủ clip (chưa cần dựng video); mỗi lần bấm một kiểu khác, vòng lại sau 4 kiểu.
+    const jpegBytes = Buffer.from(jpegPixel.split(',')[1], 'base64');
+    const t1 = await app.invoke('pairThumb', { storyId: 'SS-phim' });
+    assert.deepEqual([t1.variant, t1.count], [1, 4]);
+    assert.ok(t1.file.startsWith(folder) && /thumbnail-1\.jpg$/.test(t1.file), t1.file);
+    assert.deepEqual(await fs.readFile(t1.file), jpegBytes);
+    const t2 = await app.invoke('pairThumb', { storyId: 'SS-phim' });
+    assert.deepEqual([t2.variant, t2.count], [2, 4]);
+    assert.notEqual(t2.file, t1.file);
+    const thumbCalls = hudLog.filter(x => x[0] === 'thumb');
+    assert.deepEqual(thumbCalls.map(x => x[1]), [0, 1], 'kiểu 1 rồi kiểu 2');
+    assert.ok(thumbCalls.every(x => x[3] === 'data:image/jpeg;base64,' && x[4] === 'data:image/jpeg;base64,' && x[7] === 'en'), 'khung hình thật lấy từ clip trái / phải');
+    assert.equal(thumbCalls[1][5], draft.script.beats.at(-1).leftScore, 'kiểu «Điểm cuối» dùng điểm của mốc cuối');
+    assert.ok(thumbCalls[0][2] && thumbCalls[0][2] === draft.script.title);
+    const afterThumb = (await app.invoke('state')).pair;
+    assert.equal(afterThumb.busy, false);
+    assert.equal(afterThumb.stories['SS-phim'].thumb, t2.file);
+    assert.ok(hudLog.filter(x => x[0] === 'close').length >= 2, 'đóng cửa sổ vẽ sau mỗi thumbnail');
+    const savedThumb = await app.invoke('pairSave', { storyId: 'SS-phim', thumb: true });
+    assert.ok(/\.jpg$/.test(savedThumb.file));
+    assert.deepEqual(await fs.readFile(savedThumb.file), jpegBytes);
+    assert.equal(await app.invoke('pairReveal', { storyId: 'SS-phim', thumb: true }), true);
+    for (let i = 0; i < 2; i++) await app.invoke('pairThumb', { storyId: 'SS-phim' });
+    assert.equal((await app.invoke('pairThumb', { storyId: 'SS-phim' })).variant, 1, 'xoay vòng sau 4 kiểu');
     assert.ok(await app.invoke('pairBuild', { storyId: 'SS-phim', voice: { voice: '' } }));
     await until(() => app.invoke('state').pair.stories['SS-phim']?.status === 'built', 180000);
     const done = (await app.invoke('state')).pair;

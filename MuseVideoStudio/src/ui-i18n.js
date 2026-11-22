@@ -1026,6 +1026,7 @@ Muse đang viết kịch bản. Các bước sau tự chạy, bạn không cần
 Muse đang chọn chủ đề và viết kịch bản. Các bước sau tự chạy, bạn không cần bấm gì thêm.|Muse is picking a topic and writing the script. The next steps run by themselves, you do not need to click anything else.
 Đang lồng tiếng và dựng video|Narrating and building the video
 Đang lồng tiếng và dựng video…|Narrating and building the video…
+Đang tạo thumbnail|Creating the thumbnail
 Muse đang chọn chủ đề…|Muse is picking a topic…
 Đang lập kịch bản|Writing the script
 Muse đang viết kịch bản…|Muse is writing the script…
@@ -1132,6 +1133,7 @@ Video ghép chưa hợp lệ.|The joined video is not valid.
       [/^Đã gắn khóa vào (\d+) cảnh\.$/,m=>'Added the lock to '+m[1]+' scene(s).'],
       [/^Đã lưu video: (.+)$/,m=>'Video saved: '+m[1]],
       [/^Đã lưu thumbnail: (.+)$/,m=>'Thumbnail saved: '+m[1]],
+      [/^Đã tạo thumbnail 1920×1080 \(ảnh (\d+)\/(\d+)\)\. Bấm lại để đổi sang kiểu khác\.$/,m=>'Created the 1920×1080 thumbnail (style '+m[1]+'/'+m[2]+'). Press again to switch to another style.'],
       [/^(✓ .+) · đang bỏ khỏi video$/,m=>m[1]+' · left out of the video'],
       [/^· đang bỏ khỏi video$/,()=>'· left out of the video'],
       [/^Đã thấy tin nhắn · chờ Muse phản hồi \((.+)\)$/,m=>'Message found · Waiting for Muse response ('+t(m[1])+')'],

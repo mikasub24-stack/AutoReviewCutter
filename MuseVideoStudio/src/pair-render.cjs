@@ -3,7 +3,7 @@
 //              + giọng đọc + tiếng nền của hai clip (trái ở loa trái, phải ở loa phải, tự nhỏ khi có giọng) + hiệu ứng âm thanh tự tổng hợp.
 //   Thêm thẻ mở đầu (tiêu đề) và thẻ kết (bài học + câu cuối), rồi nối các đoạn: hình giữ nguyên, tiếng nối liền và mã hóa AAC một lần (kèm nhạc nền nếu có).
 // Độ dài mỗi đoạn làm tròn đúng số khung hình nên hình và tiếng luôn bằng nhau; không lệch dần ở chỗ nối.
-// `hud` là bộ vẽ lớp chữ (cửa sổ Electron ẩn khi chạy thật, Chromium khi kiểm thử): init/base/tag/caption/meterSeq/intro/outro trả về PNG dạng data URL.
+// `hud` là bộ vẽ lớp chữ (cửa sổ Electron ẩn khi chạy thật, Chromium khi kiểm thử): init/base/tag/caption/meterSeq/intro/outro trả về PNG dạng data URL; thumb trả về JPEG (thumbnail 16:9).
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
@@ -286,4 +286,61 @@ async function assemblePair({ script, config = {}, clips, hud, voice = null, dir
   }
 }
 
-module.exports = { LEAD, TAIL, MUSIC_EXT, beatLength, introLength, outroLength, cuesFor, beatVideoArgs, introVideoArgs, outroVideoArgs, audioArgs, finalArgs, assemblePair, decode };
+// ---------- Thumbnail 16:9 ----------
+// Mốc làm ảnh bìa theo kiểu: kiểu 1 «Điểm cuối» lấy mốc cuối (điểm cuối cùng của hai bên); các kiểu còn lại lấy mốc chênh điểm nhiều nhất,
+// rồi nhiều nhì, nhiều ba (hai nửa khác nhau rõ nhất nên thumbnail «kể» được câu chuyện).
+function thumbBeat(beats, style) {
+  if (style === 1) return beats[beats.length - 1];
+  const gap = b => Math.abs(Number(b.leftScore) - Number(b.rightScore)) || 0;
+  const ranked = beats.map((b, i) => ({ b, i, g: gap(b) })).sort((x, y) => y.g - x.g || y.i - x.i);
+  const rank = style === 0 ? 0 : style === 2 ? 1 : 2;
+  return ranked[Math.min(rank, ranked.length - 1)].b;
+}
+const decodeJpeg = data => {
+  const text = String(data || ''), i = text.indexOf(',');
+  if (!text.startsWith('data:image/jpeg') || i < 0) throw Error('Bộ vẽ thumbnail trả ảnh không hợp lệ.');
+  const buffer = Buffer.from(text.slice(i + 1), 'base64');
+  if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) throw Error('Bộ vẽ thumbnail trả ảnh không hợp lệ.');
+  return buffer;
+};
+// Lấy một khung hình giữa clip (đủ nét, tránh khung đầu còn mờ) thành JPEG ≤ 1280 px.
+async function grabFrame({ ffmpeg, ffprobe, clip, out, signal }) {
+  const { duration } = await probe(ffprobe, clip);
+  const at = duration > 0 ? Math.min(3, duration * 0.45) : 0;
+  await run(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y', '-ss', num(at), '-i', clip, '-frames:v', '1', '-vf', "scale='min(1280,iw)':-2", '-q:v', '2', out], { signal });
+  const buffer = await fs.readFile(out).catch(() => null);
+  if (!buffer || !buffer.length) throw Error(`Không lấy được khung hình từ clip ${path.basename(clip)}.`);
+  return `data:image/jpeg;base64,${buffer.toString('base64')}`;
+}
+// Ảnh bìa 16:9 (1920×1080 JPEG ≤ 1,9 MB) của video đã có kịch bản + đủ clip. `variant` chọn kiểu (xoay vòng qua Hud.THUMB.STYLES kiểu).
+// clips: [{ number, left, right }] theo số mốc (như assemblePair). Không cần video đã dựng xong.
+async function makePairThumbnail({ script, config = {}, clips, hud, dir, variant = 0, ffmpeg = 'ffmpeg', signal }) {
+  if (!script || !Array.isArray(script.beats) || !script.beats.length) throw Error('Chưa có kịch bản để làm thumbnail.');
+  const count = Hud.THUMB.STYLES, k = ((Math.round(Number(variant)) || 0) % count + count) % count;
+  const byNumber = new Map((clips || []).map(c => [c.number, c]));
+  const beat = thumbBeat(script.beats, k), c = byNumber.get(beat.number);
+  if (!c || !c.left || !c.right) throw Error(`Mốc ${beat.number} chưa có đủ hai clip để làm thumbnail.`);
+  const t = await checkTools(ffmpeg);
+  await fs.mkdir(dir, { recursive: true });
+  const temp = await fs.mkdtemp(path.join(dir, '.thumb-'));
+  try {
+    const [leftImage, rightImage] = await Promise.all([
+      grabFrame({ ffmpeg: t.ffmpeg, ffprobe: t.ffprobe, clip: c.left, out: path.join(temp, 'l.jpg'), signal }),
+      grabFrame({ ffmpeg: t.ffmpeg, ffprobe: t.ffprobe, clip: c.right, out: path.join(temp, 'r.jpg'), signal })
+    ]);
+    const last = script.beats[script.beats.length - 1], shown = k === 1 ? last : beat;
+    const jpeg = decodeJpeg(await hud.thumb({
+      variant: k, leftImage, rightImage, title: script.title, left: script.left, right: script.right, meter: script.meter,
+      leftScore: shown.leftScore, rightScore: shown.rightScore, lang: Plan.langOf(config.lang).id
+    }));
+    if (jpeg.length > Hud.THUMB.MAX_BYTES + 5e4) throw Error('Ảnh thumbnail quá nặng (hơn 2 MB). Bấm tạo lại để thử kiểu khác.');
+    const file = path.join(dir, `thumbnail-${k + 1}.jpg`), part = path.join(temp, 'out.jpg');
+    await fs.writeFile(part, jpeg);
+    await fs.rename(part, file);
+    return { file, variant: k, count, beat: beat.number, bytes: jpeg.length };
+  } finally {
+    await fs.rm(temp, { recursive: true, force: true });
+  }
+}
+
+module.exports = { makePairThumbnail, thumbBeat, LEAD, TAIL, MUSIC_EXT, beatLength, introLength, outroLength, cuesFor, beatVideoArgs, introVideoArgs, outroVideoArgs, audioArgs, finalArgs, assemblePair, decode };

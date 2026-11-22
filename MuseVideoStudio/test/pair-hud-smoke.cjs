@@ -53,6 +53,75 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     for (const text of ['', '<b>x</b>'.repeat(50), 'A'.repeat(600), '\u0000‮\n\t' + 'مرحبا']) assert.deepEqual(size(await page.evaluate(t => PairHud.caption(t), text)), rect(require('../src/pair-hud.js').geometry('side').caption));
     await page.evaluate(() => PairHud.intro());
     assert.equal(await page.evaluate(() => window.pwned), undefined, 'không chạy mã trong dữ liệu');
+    // ---- Thumbnail 16:9: 4 kiểu, JPEG 1920×1080 ≤ 1,9 MB (kể cả khung hình nhiễu nặng), nhiều ngôn ngữ, dữ liệu lạ, ảnh hỏng
+    const Hud = require('../src/pair-hud.js');
+    const jpegSize = url => {
+      assert.match(url, /^data:image\/jpeg;base64,/);
+      const b = Buffer.from(url.split(',')[1], 'base64');
+      assert.deepEqual([b[0], b[1]], [0xff, 0xd8]);
+      for (let i = 2; i < b.length - 9;) {
+        if (b[i] !== 0xff) { i++; continue; }
+        const m = b[i + 1];
+        if (m >= 0xc0 && m <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(m)) return { w: b.readUInt16BE(i + 7), h: b.readUInt16BE(i + 5), bytes: b.length };
+        i += 2 + b.readUInt16BE(i + 2);
+      }
+      throw Error('không thấy SOF');
+    };
+    const frames = await page.evaluate(() => {
+      const make = (w, h, hue, noise) => {
+        const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+        const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, `hsl(${hue},70%,55%)`); g.addColorStop(1, `hsl(${hue + 60},60%,25%)`); x.fillStyle = g; x.fillRect(0, 0, w, h);
+        x.fillStyle = '#fff'; x.beginPath(); x.arc(w * .5, h * .45, h * .18, 0, 7); x.fill();
+        if (noise) { const d = x.getImageData(0, 0, w, h); for (let i = 0; i < d.data.length; i += 4) { d.data[i] = Math.random() * 255; d.data[i + 1] = Math.random() * 255; d.data[i + 2] = Math.random() * 255; } x.putImageData(d, 0, 0); }
+        return c.toDataURL('image/jpeg', .95);
+      };
+      return { l: make(1280, 1280, 20, false), r: make(1280, 720, 190, false), noisyL: make(1280, 1280, 0, true), noisyR: make(1280, 1280, 0, true) };
+    });
+    const thumbOpts = (extra = {}) => ({ variant: 0, leftImage: frames.l, rightImage: frames.r, title: 'The Same Child, Two Fathers: Yelling vs Listening', left: 'RAISED WITH YELLING', right: 'RAISED WITH LISTENING', meter: 'CONFIDENCE', leftScore: 22, rightScore: 90, lang: 'en', ...extra });
+    const thumb = o => page.evaluate(o => PairHud.thumb(o), o);
+    assert.deepEqual([Hud.THUMB.W, Hud.THUMB.H, Hud.THUMB.STYLES], [1920, 1080, 4]);
+    const styleHashes = new Set();
+    for (let v = 0; v < Hud.THUMB.STYLES; v++) {
+      const url = await thumb(thumbOpts({ variant: v }));
+      const info = jpegSize(url);
+      assert.deepEqual([info.w, info.h], [1920, 1080], `kiểu ${v}`);
+      assert.ok(info.bytes <= Hud.THUMB.MAX_BYTES, `kiểu ${v} nặng ${info.bytes}`);
+      styleHashes.add(hash(url));
+      if (process.env.THUMB_OUT) await fs.writeFile(path.join(process.env.THUMB_OUT, `thumb-${v}.jpg`), Buffer.from(url.split(',')[1], 'base64'));
+    }
+    assert.equal(styleHashes.size, 4, '4 kiểu cho 4 hình khác nhau');
+    assert.equal(hash(await thumb(thumbOpts({ variant: 0 }))), hash(await thumb(thumbOpts({ variant: 4 }))), 'kiểu 5 vòng lại kiểu 1');
+    assert.equal(hash(await thumb(thumbOpts({ variant: 1 }))), hash(await thumb(thumbOpts({ variant: -3 }))), 'số âm vẫn về đúng kiểu');
+    for (let v = 0; v < 4; v++) {
+      const info = jpegSize(await thumb(thumbOpts({ variant: v, leftImage: frames.noisyL, rightImage: frames.noisyR })));
+      assert.ok(info.bytes <= Hud.THUMB.MAX_BYTES, `nhiễu nặng kiểu ${v}: ${info.bytes} byte`);
+      assert.deepEqual([info.w, info.h], [1920, 1080]);
+    }
+    const langs = { ar: 'من الطفل نفسه إلى أبوين مختلفين', zh: '同一个孩子，两种父亲', th: 'เด็กคนเดียวกัน พ่อสองแบบ', ja: '同じ子ども、二人の父親', ru: 'Один ребёнок, два отца', hi: 'एक ही बच्चा, दो पिता', ko: '같은 아이, 두 아버지', vi: 'Cùng một đứa trẻ, hai người cha' };
+    const langHashes = new Set();
+    for (const [lang, text] of Object.entries(langs)) for (let v = 0; v < 4; v++) {
+      const url = await thumb(thumbOpts({ variant: v, lang, title: text, left: text.slice(0, 10), right: text.slice(-9) }));
+      assert.deepEqual([jpegSize(url).w, jpegSize(url).h], [1920, 1080], `${lang}/${v}`);
+      if (v === 0) langHashes.add(hash(url));
+    }
+    assert.equal(langHashes.size, Object.keys(langs).length, 'mỗi ngôn ngữ ra hình khác nhau');
+    for (let v = 0; v < 4; v++) for (const extra of [
+      { title: 'A'.repeat(300), left: 'x'.repeat(300), right: '' },
+      { title: '', left: '', right: '' },
+      { title: '<img src=x onerror="window.pwned=2">'.repeat(10), left: '<b>x</b>', right: '\u0000‮\n\t' },
+      { leftScore: NaN, rightScore: undefined },
+      { leftScore: 250, rightScore: -40 },
+      { meter: '' }
+    ]) assert.deepEqual([jpegSize(await thumb(thumbOpts({ variant: v, ...extra }))).w], [1920], `dữ liệu lạ kiểu ${v}`);
+    assert.equal(await page.evaluate(() => window.pwned), undefined, 'thumbnail không chạy mã trong dữ liệu');
+    await assert.rejects(thumb(thumbOpts({ leftImage: 'data:image/jpeg;base64,AAAA' })), /Không đọc được khung hình/);
+    await assert.rejects(thumb(thumbOpts({ rightImage: '' })), /Không đọc được khung hình/);
+    assert.equal(Hud.hookOf('The Same Child, Two Fathers: Yelling vs Listening'), 'The Same Child, Two Fathers');
+    assert.equal(Hud.hookOf('Short'), 'Short');
+    assert.equal(Hud.hookOf('A: B'), 'A: B', 'vế đầu quá ngắn: giữ nguyên');
+    assert.equal(Hud.hookOf('Why one calm word beats ten loud ones in every home'), 'Why one calm word beats ten loud ones in every home', 'không có dấu tách: giữ nguyên');
+    assert.equal(Hud.hookOf('x'.repeat(60) + ': y'), 'x'.repeat(60) + ': y', 'vế đầu quá dài: giữ nguyên');
+    assert.equal(Hud.hookOf(null), '');
     assert.equal(errors.length, 0, errors.join('\n'));
     console.log('pair hud smoke ok');
   } finally { await browser.close(); server.close(); }

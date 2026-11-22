@@ -44,8 +44,10 @@ test('dữ liệu có dấu nháy, xuống dòng, ${} hay mã lệnh chỉ là d
   const nasty = '"); globalThis.hacked = 1; (\'`${process.exit()}\n </script>\\';
   await hud.caption(nasty);
   await hud.init({ title: nasty, lessons: [nasty] });
+  await hud.thumb({ variant: 2, title: nasty, left: nasty, leftImage: 'data:image/jpeg;base64,' + nasty });
   assert.deepEqual(e.calls[0], ['caption', nasty]);
   assert.equal(e.calls[1][1].title, nasty);
+  assert.deepEqual(e.calls[2], ['thumb', { variant: 2, title: nasty, left: nasty, leftImage: 'data:image/jpeg;base64,' + nasty }]);
   assert.equal(globalThis.hacked, undefined);
 });
 

@@ -24,7 +24,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
         { id: 'en-US-AndrewMultilingualNeural', lang: '*', language: 'Đa ngôn ngữ', name: 'Andrew (nam) · đa ngôn ngữ' }
       ];
       const s = {
-        version: '1.15.0', active: false, paused: true, jobs: [],
+        version: '1.15.1', active: false, paused: true, jobs: [],
         license: { status: 'active', plan: 'short', longTerm: false, device: 'TESTDEVICE', expiresAt: Date.now() + 86400000 * 30, message: 'Đã kích hoạt key.' },
         story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: true, clone: false }, platform: 'win32', edgeVoices: voices, clones: [] } },
         restore: { busy: false, progress: '', error: '', storyId: '', stories: {} },
@@ -48,6 +48,13 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
             return { storyId };
           }
           if (name === 'pairCancel') { Object.assign(s.pair, { busy: false, phase: '', error: 'Đã dừng viết kịch bản. Bấm «Viết tiếp» để làm tiếp từ chỗ dở.' }); s.pair.write = { busy: false }; setTimeout(window.push, 0); return structuredClone(s); }
+          if (name === 'pairThumb') {
+            window.thumbN = (window.thumbN || 0) + 1;
+            const file = 'C:\\Videos\\SoSanh\\' + data.storyId + '\\thumbnail-' + window.thumbN + '.jpg';
+            Object.assign(s.pair.stories[data.storyId], { thumb: file, thumbAt: window.thumbN });
+            setTimeout(window.push, 0);
+            return { file, variant: window.thumbN, count: 4 };
+          }
           if (name === 'storyListen') return 'C:\\Temp\\nghe-thu.mp3';
           return structuredClone(s);
         }
@@ -182,6 +189,31 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     // 9) Đủ clip: nút Dựng video gửi đúng mã, giọng, nhạc; dựng xong có video, ảnh bìa và nút lưu / mở.
     await page.evaluate(() => { window.s.jobs.forEach(j => { j.status = 'completed'; j.stage = 'completed'; }); window.push(); });
     await page.waitForSelector('#pairRuns button:has-text("Dựng video")');
+    // Thumbnail: nút hiện ngay khi đủ clip (chưa cần dựng video); chưa có ảnh thì chưa có nút lưu / mở.
+    assert.equal(await page.locator('#pairRuns button', { hasText: 'Tạo thumbnail 16:9' }).count(), 1);
+    assert.equal(await page.locator('#pairRuns button', { hasText: 'Lưu thumbnail…' }).count(), 0);
+    assert.equal(await page.locator('#pairRuns img.restoreThumb').count(), 0);
+    await page.click('#pairRuns button:has-text("Tạo thumbnail 16:9")');
+    await page.waitForSelector('#pairRuns img.restoreThumb', { state: 'attached' });
+    assert.deepEqual((await calls('pairThumb')).map(c => c.data), [{ storyId: 'SS-Raised-with-Yelling' }]);
+    assert.match(await page.locator('#toast').textContent(), /Đã tạo thumbnail 1920×1080 \(ảnh 1\/4\)\. Bấm lại để đổi sang kiểu khác\./);
+    assert.match(await page.locator('#pairRuns img.restoreThumb').getAttribute('src'), /thumbnail-1\.jpg\?v=1$/);
+    assert.equal(await page.locator('#pairRuns button', { hasText: 'Tạo thumbnail khác' }).count(), 1, 'đã có ảnh thì nút đổi thành «Tạo thumbnail khác»');
+    await page.click('#pairRuns button:has-text("Tạo thumbnail khác")');
+    await page.waitForFunction(() => /thumbnail-2\.jpg/.test(document.querySelector('#pairRuns img.restoreThumb')?.getAttribute('src') || ''));
+    assert.equal((await calls('pairThumb')).length, 2);
+    await page.click('#pairRuns button:has-text("Lưu thumbnail…")');
+    await flush();
+    assert.deepEqual((await calls('pairSave')).at(-1).data, { storyId: 'SS-Raised-with-Yelling', thumb: true });
+    await page.click('#pairRuns button:has-text("Mở thumbnail")');
+    await flush();
+    assert.deepEqual((await calls('pairReveal')).at(-1).data, { storyId: 'SS-Raised-with-Yelling', thumb: true });
+    await page.evaluate(() => { Object.assign(window.s.pair, { busy: true, phase: 'thumb', storyId: 'SS-Raised-with-Yelling', progress: 'Đang tạo thumbnail…' }); window.push(); });
+    await page.waitForFunction(() => document.querySelector('#pairRunHint')?.textContent === 'Đang tạo thumbnail');
+    assert.equal(await page.locator('#pairRuns button', { hasText: 'Tạo thumbnail khác' }).isDisabled(), true, 'đang bận thì khóa nút');
+    assert.equal(await page.locator('#pairRuns button', { hasText: 'Dựng video' }).isDisabled(), true);
+    await page.evaluate(() => { Object.assign(window.s.pair, { busy: false, phase: '', progress: '' }); window.push(); });
+    await page.waitForFunction(() => !document.querySelector('#pairRuns button')?.closest('.restoreRun')?.querySelector('button:disabled'));
     await page.click('#pairRuns button:has-text("Dựng video")');
     await flush();
     const built = await calls('pairBuild');
@@ -199,10 +231,10 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.match(await page.locator('#pairRuns .restoreRunText').first().textContent(), /Video hoàn chỉnh \(9 phút 3 giây\): Raised with Yelling\.mp4.*ghi-chu-dang-video\.txt/);
     await page.click('#pairRuns button:has-text("Lưu video…")');
     await flush();
-    assert.deepEqual((await calls('pairSave'))[0].data, { storyId: 'SS-Raised-with-Yelling' });
+    assert.deepEqual((await calls('pairSave')).find(c => !c.data.thumb).data, { storyId: 'SS-Raised-with-Yelling' });
     await page.click('#pairRuns button:has-text("Mở video")');
     await flush();
-    assert.deepEqual((await calls('pairReveal'))[0].data, { storyId: 'SS-Raised-with-Yelling' });
+    assert.deepEqual((await calls('pairReveal')).find(c => !c.data.thumb).data, { storyId: 'SS-Raised-with-Yelling' });
     await page.click('#pairRuns button:has-text("Mở thư mục")');
     await flush();
     assert.deepEqual((await calls('openOutput')).at(-1).data, { kind: 'pair' });

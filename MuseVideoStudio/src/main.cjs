@@ -26,7 +26,7 @@ const {createWildWriter}=require('./wild-write.cjs');
 const wildFolder=(output,id)=>path.join(output,'DongVat',String(id||'Phim').replace(/[^\w-]/g,'')||'Phim');
 const pairPlan=require('./pair-plan.js');
 const {createPairWriter}=require('./pair-write.cjs');
-const {assemblePair}=require('./pair-render.cjs');
+const {assemblePair,makePairThumbnail}=require('./pair-render.cjs');
 const {createWindowHud}=require('./pair-hud-window.cjs');
 // Tab «So sánh song song»: mỗi video một thư mục SoSanh/<mã>.
 const pairFolder=(output,id)=>path.join(output,'SoSanh',String(id||'Phim').replace(/[^\w-]/g,'')||'Phim');
@@ -1783,17 +1783,38 @@ app.whenReady().then(async () => {
       void buildPairStory(storyId).catch(e=>{pairState={busy:false,phase:'',progress:'',error:e.message,storyId};notify();});
       return snapshot();
     },
+    // «Tạo thumbnail 16:9»: ghép khung hình clip trái / phải + chữ canvas (1920×1080 JPEG ≤ 2 MB). Làm được ngay khi mọi clip xong, không cần chờ dựng video; mỗi lần bấm đổi sang kiểu khác (4 kiểu).
+    pairThumb: async data => {
+      if(pairState.busy||pairWriter?.busy)throw Error(ui('Đang làm video, chờ xong hoặc bấm Dừng.','A video is being made. Wait for it or press Stop.'));
+      const storyId=String(data?.storyId||''),meta=settings.pairStories?.[storyId];
+      if(!meta)throw Error(ui('Không thấy video này.','This video was not found.'));
+      if(!settings.output)throw Error(ui('Chọn thư mục lưu video trước.','Choose the video folder first.'));
+      const clips=pairClips(storyId);
+      if(!pairDone(clips))throw Error(ui('Chỉ tạo thumbnail khi mọi clip đã xong.','Create the thumbnail once every clip is done.'));
+      const draft=await readPairDraft(storyId);
+      if(!draft?.script)throw Error(ui('Không thấy kịch bản đã lưu của video này.','The saved script of this video was not found.'));
+      await licenseManager.requireLongTerm();
+      pairState={busy:true,phase:'thumb',progress:ui('Đang tạo thumbnail…','Creating the thumbnail…'),error:'',storyId};notify();
+      try{
+        const r=await makePairThumbnail({script:draft.script,config:{lang:meta.lang},clips:pairBeatClips(clips),hud:pairHud,dir:pairFolder(settings.output,storyId),variant:Number(meta.thumbVariant)||0,ffmpeg:settings.ffmpeg||'ffmpeg'});
+        meta.thumb=r.file;meta.thumbAt=Date.now();meta.thumbVariant=(r.variant+1)%r.count;
+        await save();
+        return {file:r.file,variant:r.variant+1,count:r.count};
+      }finally{pairState={busy:false,phase:'',progress:'',error:'',storyId};pairHud?.close();notify();}
+    },
     pairSave: async data => {
-      const out=settings.pairStories?.[String(data?.storyId||'')]?.output;
-      if(!out||!await fs.stat(out).then(s=>s.isFile(),()=>false))throw Error(ui('Chưa có video hoàn chỉnh để lưu.','There is no finished video to save yet.'));
-      const picked=await dialog.showSaveDialog(main,{title:ui('Lưu video về','Save video'),defaultPath:path.join(app.getPath('downloads'),path.basename(out)),filters:[{name:'MP4',extensions:['mp4']}]});
+      const meta=settings.pairStories?.[String(data?.storyId||'')],thumb=Boolean(data?.thumb),out=thumb?meta?.thumb:meta?.output;
+      if(!out||!await fs.stat(out).then(s=>s.isFile(),()=>false))throw Error(thumb?ui('Chưa có thumbnail để lưu. Bấm «Tạo thumbnail 16:9» trước.','There is no thumbnail to save yet. Press “Create 16:9 thumbnail” first.'):ui('Chưa có video hoàn chỉnh để lưu.','There is no finished video to save yet.'));
+      const base=thumb?(String(meta.name||'video').replace(/[\\/:*?"<>|\x00-\x1f]+/g,' ').trim().slice(0,60)||'video')+' - thumbnail.jpg':path.basename(out);
+      const picked=await dialog.showSaveDialog(main,{title:thumb?ui('Lưu thumbnail về','Save thumbnail'):ui('Lưu video về','Save video'),defaultPath:path.join(app.getPath('downloads'),base),filters:[{name:thumb?'JPEG':'MP4',extensions:thumb?['jpg','jpeg']:['mp4']}]});
       if(picked.canceled||!picked.filePath)return false;
-      const dest=/\.mp4$/i.test(picked.filePath)?picked.filePath:picked.filePath+'.mp4';
+      const dest=(thumb?/\.jpe?g$/i:/\.mp4$/i).test(picked.filePath)?picked.filePath:picked.filePath+(thumb?'.jpg':'.mp4');
       if(path.resolve(dest).toLowerCase()!==path.resolve(out).toLowerCase())await fs.copyFile(out,dest);
       shell.showItemInFolder(dest);return{file:dest};
     },
     pairReveal: async data => {
       const id=String(data?.storyId||''),meta=settings.pairStories?.[id];
+      if(data?.thumb&&meta?.thumb&&await fs.stat(meta.thumb).then(x=>x.isFile(),()=>false)){shell.showItemInFolder(meta.thumb);return true;}
       if(meta?.output)shell.showItemInFolder(meta.output);
       else if(settings.output&&meta){await fs.mkdir(pairFolder(settings.output,id),{recursive:true});await shell.openPath(pairFolder(settings.output,id));}
       return true;
