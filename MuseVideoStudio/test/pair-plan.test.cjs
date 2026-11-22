@@ -226,3 +226,70 @@ test('mã phim, dữ liệu vẽ chữ gọn và ghi chú đăng video', () => {
   assert.match(notes, /nội dung bị thay đổi hoặc tổng hợp/);
   assert.match(notes, /Dựng lúc: 2026-01-01 10:00/);
 });
+
+test('gói đăng YouTube: tiêu đề, mô tả có chương theo giờ, hashtag, thẻ tag ≤ 450 ký tự; chương đầu 0:00, chương cuối là bài học', () => {
+  const config = P.options({ minutes: 1 });
+  const script = P.assemble(P.parseBible(bibleReply(7), config), P.parseBeats(['BEATS:', ...[1, 2, 3, 4, 5, 6, 7].map(n => beatLine(n))].join('\n'), config), config);
+  const timeline = script.beats.map((b, i) => ({ number: b.number, start: 8 + i * 16 }));
+  const pack = P.publishPack(script, { lang: 'en', layout: 'side', timeline, outroStart: 8 + 7 * 16, seconds: 130 });
+  assert.equal(pack.title, script.title);
+  assert.equal(pack.partial, false);
+  assert.ok(pack.chapters.length >= 3 && pack.chapters.length <= 13);
+  assert.deepEqual([pack.chapters[0].t, pack.chapters[0].clock], [0, '0:00']);
+  assert.equal(pack.chapters[pack.chapters.length - 1].t, 120, 'chương cuối trùng thẻ bài học');
+  assert.equal(pack.chapters[pack.chapters.length - 1].clock, '2:00');
+  for (let i = 1; i < pack.chapters.length; i++) assert.ok(pack.chapters[i].t - pack.chapters[i - 1].t >= 10, 'các chương cách nhau ≥ 10 giây');
+  assert.match(pack.description, /\nChapters:\n0:00 /);
+  assert.match(pack.description, /\n2:00 What to take away\n/);
+  assert.match(pack.description, /AI-generated/);
+  for (const l of script.lessons) assert.ok(pack.description.includes('• ' + l), 'bài học nằm trong mô tả');
+  assert.ok(pack.description.endsWith(pack.hashtags.join(' ')), 'hashtag nằm cuối mô tả');
+  assert.ok(pack.hashtags.length >= 3 && pack.hashtags.every(h => /^#[^\s#]+$/u.test(h)), 'hashtag không có dấu cách');
+  assert.ok(!pack.hashtags.includes('#Shorts'), 'chia ngang không gắn #Shorts');
+  assert.ok(pack.tags.join(', ').length <= 450);
+  assert.ok(pack.tags.includes('life lessons'));
+  assert.equal(new Set(pack.tags).size, pack.tags.length, 'thẻ tag không trùng');
+  assert.match(pack.text, /^TITLE\n.+\n\nDESCRIPTION\n/);
+  assert.match(pack.text, /\nTAGS\n.+\n$/);
+});
+
+test('gói đăng YouTube: video dựng bằng bản cũ (không có mốc giờ) vẫn có tiêu đề / mô tả / hashtag / thẻ tag nhưng chưa có chương; xếp dọc gắn #Shorts', () => {
+  const config = P.options({ minutes: 1 });
+  const script = P.assemble(P.parseBible(bibleReply(7), config), P.parseBeats(['BEATS:', ...[1, 2, 3, 4, 5, 6, 7].map(n => beatLine(n))].join('\n'), config), config);
+  const old = P.publishPack(script, { lang: 'vi', layout: 'stack' });
+  assert.equal(old.partial, true);
+  assert.deepEqual(old.chapters, []);
+  assert.doesNotMatch(old.description, /Các chương:/, 'không in mục chương rỗng');
+  assert.match(old.description, /Hình ảnh trong video do AI tạo ra/);
+  assert.ok(old.hashtags.includes('#Shorts') && old.hashtags.includes('#HaiConDuong'));
+  assert.ok(old.tags.length >= 5 && old.tags.includes('bài học cuộc sống'));
+  // quá ít chương (video rất ngắn) cũng không in mục chương
+  const short = P.publishPack(script, { lang: 'en', timeline: [{ number: 1, start: 8 }, { number: 2, start: 12 }], outroStart: 20, seconds: 30 });
+  assert.equal(short.partial, true);
+  assert.doesNotMatch(short.description, /Chapters:/);
+  // dữ liệu thiếu không làm hỏng
+  const empty = P.publishPack(null, {});
+  assert.equal(empty.title, 'English');
+  assert.deepEqual(empty.chapters, []);
+  assert.equal(P.clockOf(0), '0:00');
+  assert.equal(P.clockOf(65.4), '1:05');
+  assert.equal(P.clockOf(3725), '1:02:05');
+});
+
+test('gói đăng YouTube: đủ 15 ngôn ngữ, tiêu đề ≤ 100 ký tự, mô tả ≤ 5000, hashtag giữ chữ của ngôn ngữ đó', () => {
+  const config = P.options({ minutes: 1 });
+  const script = P.assemble(P.parseBible(bibleReply(7), config), P.parseBeats(['BEATS:', ...[1, 2, 3, 4, 5, 6, 7].map(n => beatLine(n))].join('\n'), config), config);
+  script.title = 'T'.repeat(160);
+  const timeline = script.beats.map((b, i) => ({ number: b.number, start: 8 + i * 16 }));
+  const ids = Object.keys(P.LANGS);
+  assert.equal(ids.length, 15);
+  for (const lang of ids) {
+    const pack = P.publishPack(script, { lang, layout: 'side', timeline, outroStart: 120, seconds: 130 });
+    assert.ok(pack.title.length <= 100, lang);
+    assert.ok(pack.description.length <= 5000, lang);
+    assert.ok(pack.hashtags.length >= 3 && pack.hashtags.every(h => /^#[^\s#]+$/u.test(h)), lang);
+    assert.ok(pack.tags.join(', ').length <= 450, lang);
+    assert.equal(pack.chapters.length >= 3, true, lang);
+  }
+  assert.ok(P.publishPack(script, { lang: 'ja', timeline, outroStart: 120, seconds: 130 }).hashtags.includes('#ふたつの道'));
+});

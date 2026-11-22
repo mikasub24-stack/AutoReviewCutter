@@ -107,18 +107,67 @@
   // ---- danh sách video
   function runsOf(s) {
     const ids = new Set(Object.keys((s.pair && s.pair.stories) || {}));
-    for (const j of s.jobs || []) if (j.kind === 'pair' && j.storyId) ids.add(j.storyId);
-    return [...ids].map(id => ({ id, list: (s.jobs || []).filter(j => j.kind === 'pair' && j.storyId === id), meta: ((s.pair && s.pair.stories) || {})[id] || {} }))
+    for (const j of s.jobs || []) if (j && j.kind === 'pair' && j.storyId) ids.add(j.storyId);
+    return [...ids].map(id => ({ id, list: (s.jobs || []).filter(j => j && j.kind === 'pair' && j.storyId === id), meta: ((s.pair && s.pair.stories) || {})[id] || {} }))
       .sort((a, b) => (b.meta.createdAt || 0) - (a.meta.createdAt || 0));
   }
   const button = (text, cls, onclick, disabled) => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = text; b.disabled = Boolean(disabled); if (onclick) b.onclick = onclick; return b; };
 
+  // ---- thông tin đăng YouTube: tiêu đề, mô tả (có chương), hashtag, thẻ tag; mỗi phần có nút sao chép
+  const node = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  function copyButton(label, value, done) {
+    return button(label, 'secondary', async () => {
+      try { await navigator.clipboard.writeText(value); toast(done); } catch { toast('Không sao chép được. Hãy chọn chữ rồi nhấn Ctrl+C.'); }
+    });
+  }
+  const publishAsked = new Set();
+  function publishBox(meta, id) {
+    const p = meta.publish, box = node('div', 'publishBox');
+    // Chưa có gói đăng (video làm bằng bản cũ): nhờ máy lập từ kịch bản đã lưu, không cần Muse.
+    if (!p && !publishAsked.has(id)) {
+      publishAsked.add(id);
+      Promise.resolve().then(() => window.studio.invoke('pairPublish', { storyId: id })).then(() => { runsKey = ''; return window.studio.invoke('state'); }).then(st => { if (st) render(st); }).catch(() => {});
+    }
+    if (!p) { box.append(node('small', 'hint', 'Đang lập tiêu đề, mô tả, hashtag và thẻ tag từ kịch bản…')); return box; }
+    box.append(node('strong', 'publishHead', 'Thông tin đăng YouTube (đúng như trên video)'));
+    const field = (label, value, rows, copyLabel, done) => {
+      const wrap = node('div', 'publishRow'), area = rows ? node('textarea', rows > 4 ? 'publishDesc' : 'publishTags') : node('input', 'publishTitle');
+      if (rows) { area.rows = rows; } else { area.type = 'text'; }
+      area.readOnly = true; area.value = value; area.onfocus = () => area.select(); area.setAttribute('aria-label', label);
+      const col = node('div', 'publishField'); col.append(node('small', 'hint', label), area);
+      wrap.append(col, copyButton(copyLabel, value, done));
+      return wrap;
+    };
+    const tags = (p.tags || []).join(', '), hashtags = (p.hashtags || []).join(' ');
+    box.append(
+      field('Tiêu đề video', p.title || '', 0, 'Sao chép tiêu đề', 'Đã sao chép tiêu đề.'),
+      field('Mô tả video' + (p.chapters && p.chapters.length ? ' (có chương theo giờ)' : ''), p.description || '', 9, 'Sao chép mô tả', 'Đã sao chép mô tả.'),
+      field('Hashtag', hashtags, 2, 'Sao chép hashtag', 'Đã sao chép hashtag.'),
+      field('Thẻ tag (dán vào ô «Thẻ» của YouTube)', tags, 3, 'Sao chép thẻ tag', 'Đã sao chép thẻ tag.')
+    );
+    if ((p.title || '').length > 70) box.append(node('small', 'hint', 'Tiêu đề hơi dài: YouTube thường chỉ hiện khoảng 60–70 ký tự.'));
+    if (p.partial || !(p.chapters && p.chapters.length)) box.append(node('small', 'hint', 'Video này dựng bằng bản cũ hoặc quá ngắn nên chưa có chương theo giờ. Bấm «Dựng lại video» để mô tả có chương đúng giờ.'));
+    else if (meta.publishFile) box.append(node('small', 'hint', 'Cả bốn phần cũng được lưu trong file tieu-de-youtube.txt cạnh video.'));
+    box.append(node('small', 'hint', 'Hình ảnh do AI tạo: khi đăng hãy bật mục «nội dung bị thay đổi hoặc tổng hợp».'));
+    return box;
+  }
+  function fallbackCard({ id, list, meta }, error) {
+    const box = node('div', 'restoreRun error'), top = node('div', 'restoreRunTop');
+    top.append(node('strong', '', (meta && (meta.name || meta.title)) || id), node('span', '', `${(list || []).filter(j => j.phase === 'clip' && j.status === 'completed').length}/${(list || []).filter(j => j.phase === 'clip').length} clip`));
+    const text = node('p', 'restoreRunText warn', 'Không hiển thị đầy đủ được thẻ video này' + (error && error.message ? ` (${error.message})` : '') + '. Các nút bên dưới vẫn dùng được.');
+    const actions = node('div', 'restoreRunActions');
+    actions.append(
+      button('Tạo thumbnail 16:9', 'secondary', async () => { const r = await call('pairThumb', { storyId: id }); if (r) toast(`Đã tạo thumbnail 1920×1080 (ảnh ${r.variant}/${r.count}). Bấm lại để đổi sang kiểu khác.`); }),
+      button('Mở thư mục', 'secondary', () => call('openOutput', { kind: 'pair' }))
+    );
+    box.append(top, text, actions);
+    return box;
+  }
   function renderRuns(s) {
     const info = s.pair || {}, runs = runsOf(s), write = info.write || {};
     const key = JSON.stringify([Boolean(s.active), Boolean(s.starting), Boolean(s.stopping), info.busy, info.phase, info.progress, info.error, info.storyId, write.progress, write.done, write.total, thumbBusy,
-      runs.map(r => [r.id, r.meta.status || '', r.meta.output || '', r.meta.builtAt || 0, r.meta.name || '', r.meta.thumb || '', r.meta.thumbAt || 0, r.list.map(j => j.status + (j.stage || ''))])]);
+      runs.map(r => [r.id, r.meta.status || '', r.meta.output || '', r.meta.builtAt || 0, r.meta.name || '', r.meta.thumb || '', r.meta.thumbAt || 0, r.meta.publish ? r.meta.publish.title + (r.meta.publish.chapters || []).length : '', r.list.map(j => j.status + (j.stage || ''))])]);
     if (key === runsKey) return;
-    runsKey = key;
     const live = runs.find(r => r.list.some(j => ['pending', 'running', 'interrupted', 'failed'].includes(j.status)) || r.meta.status === 'writing');
     const hint = $('pairRunHint');
     if (info.busy && info.phase === 'write') hint.textContent = `Đang viết kịch bản · ${write.done || 0}/${write.total || '?'} mốc`;
@@ -126,7 +175,7 @@
     else if (info.busy && info.phase === 'thumb') hint.textContent = 'Đang tạo thumbnail';
     else if (live && live.list.length) { const clips = live.list.filter(j => j.phase === 'clip'), done = clips.filter(j => j.status === 'completed').length; hint.textContent = `${s.active || s.starting ? 'Đang chạy' : 'Tạm dừng'} · ${done}/${clips.length} clip`; }
     hint.hidden = !(live || info.busy); $('pairIdleHint').hidden = Boolean(live || info.busy);
-    $('pairRuns').replaceChildren(...runs.map(({ id, list, meta }) => {
+    const build = ({ id, list, meta }) => {
       const clips = list.filter(j => j.phase === 'clip'), doneClips = clips.filter(j => j.status === 'completed').length, doneAll = list.filter(j => j.status === 'completed').length;
       const failed = list.some(j => ['failed', 'interrupted'].includes(j.status)), running = list.some(j => j.status === 'running');
       const allClips = clips.length > 0 && clips.every(j => j.status === 'completed');
@@ -185,9 +234,13 @@
       if (meta.output) actions.append(button('Lưu video…', 'primary', async () => { const r = await call('pairSave', { storyId: id }); if (r && r.file) toast('Đã lưu video: ' + r.file); }));
       if (meta.output) actions.append(button('Mở video', 'secondary', () => call('pairReveal', { storyId: id })));
       actions.append(button('Mở thư mục', 'secondary', () => call('openOutput', { kind: 'pair' })));
+      if (!building && !writing && (meta.output || allClips) && list.length) extra.push(publishBox(meta, id));
       box.append(top, bar, text, ...extra, actions);
       return box;
-    }));
+    };
+    // Một thẻ lỗi không được làm mất cả danh sách: thẻ hỏng được thay bằng thẻ tối thiểu (vẫn tạo thumbnail / dựng / mở thư mục được) kèm lý do.
+    $('pairRuns').replaceChildren(...runs.map(r => { try { return build(r); } catch (e) { console.error(e); return fallbackCard(r, e); } }));
+    runsKey = key;
   }
 
   // ---- khóa theo gói
@@ -200,9 +253,10 @@
   function render(s) {
     if (!s) return;
     lastState = s;
-    renderLock(s); renderVoice(s); renderCount();
-    $('pairCreate').disabled = createBlocked(s);
-    renderRuns(s);
+    // Mỗi phần chạy riêng: một phần lỗi (ví dụ danh sách giọng) không được làm mất danh sách video bên dưới.
+    for (const step of [() => renderLock(s), () => renderVoice(s), renderCount, () => { $('pairCreate').disabled = createBlocked(s); }, () => renderRuns(s)]) {
+      try { step(); } catch (e) { console.error(e); }
+    }
   }
 
   // ---- khởi tạo

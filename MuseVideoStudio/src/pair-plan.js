@@ -375,9 +375,77 @@
     return lines.join('\n');
   }
 
+  // ---------- Thông tin đăng YouTube ----------
+  // Chữ cố định theo ngôn ngữ video (phần còn lại — tiêu đề, bài học, câu cuối, nhãn mốc, phụ đề — đã nằm sẵn trong kịch bản bằng đúng ngôn ngữ đó).
+  //   chapters: tiêu đề mục chương · note: lời nhắc nội dung do AI tạo · hash: 3 hashtag chung · kw: từ khóa chung cho thẻ tag.
+  const pub = (chapters, note, hash, kw) => ({ chapters, note, hash, kw });
+  const PUB = {
+    en: pub('Chapters', 'The images in this video are AI-generated. The percentages are a storytelling illustration, not research data.', ['TwoPaths', 'LifeLessons', 'SelfImprovement'], ['life lessons', 'self improvement', 'storytelling', 'animation']),
+    vi: pub('Các chương', 'Hình ảnh trong video do AI tạo ra. Các chỉ số % chỉ để minh họa câu chuyện, không phải số liệu nghiên cứu.', ['HaiConDuong', 'BaiHocCuocSong', 'PhatTrienBanThan'], ['bài học cuộc sống', 'phát triển bản thân', 'kể chuyện', 'hoạt hình']),
+    es: pub('Capítulos', 'Las imágenes de este video fueron generadas con IA. Los porcentajes son una ilustración narrativa, no datos de investigación.', ['DosCaminos', 'LeccionesDeVida', 'Superacion'], ['lecciones de vida', 'superación personal', 'historias', 'animación']),
+    pt: pub('Capítulos', 'As imagens deste vídeo foram geradas por IA. As porcentagens são apenas uma ilustração narrativa, não dados de pesquisa.', ['DoisCaminhos', 'LicoesDeVida', 'Superacao'], ['lições de vida', 'superação', 'histórias', 'animação']),
+    fr: pub('Chapitres', 'Les images de cette vidéo sont générées par IA. Les pourcentages sont une illustration narrative, pas des données de recherche.', ['DeuxChemins', 'LeconsDeVie', 'DeveloppementPersonnel'], ['leçons de vie', 'développement personnel', 'histoire', 'animation']),
+    de: pub('Kapitel', 'Die Bilder in diesem Video wurden mit KI erzeugt. Die Prozentwerte dienen nur der Veranschaulichung der Geschichte und sind keine Forschungsdaten.', ['ZweiWege', 'Lebenslektionen', 'Selbstentwicklung'], ['lebenslektionen', 'selbstentwicklung', 'geschichte', 'animation']),
+    id: pub('Bab', 'Gambar dalam video ini dibuat dengan AI. Persentase hanyalah ilustrasi cerita, bukan data penelitian.', ['DuaJalan', 'PelajaranHidup', 'PengembanganDiri'], ['pelajaran hidup', 'pengembangan diri', 'cerita', 'animasi']),
+    ru: pub('Главы', 'Изображения в этом видео созданы с помощью ИИ. Проценты — лишь иллюстрация истории, а не данные исследований.', ['ДваПути', 'УрокиЖизни', 'Саморазвитие'], ['уроки жизни', 'саморазвитие', 'история', 'анимация']),
+    tr: pub('Bölümler', 'Bu videodaki görüntüler yapay zekâ ile üretilmiştir. Yüzdeler yalnızca hikâyeyi anlatmak içindir, araştırma verisi değildir.', ['İkiYol', 'HayatDersleri', 'KişiselGelişim'], ['hayat dersleri', 'kişisel gelişim', 'hikaye', 'animasyon']),
+    hi: pub('अध्याय', 'इस वीडियो की तस्वीरें AI से बनाई गई हैं। प्रतिशत केवल कहानी को समझाने के लिए हैं, शोध के आँकड़े नहीं।', ['दोरास्ते', 'जीवनकेसबक', 'आत्मविकास'], ['जीवन के सबक', 'आत्मविकास', 'कहानी', 'एनिमेशन']),
+    ar: pub('الفصول', 'الصور في هذا الفيديو مُنشأة بالذكاء الاصطناعي. النسب المئوية مجرد توضيح للقصة وليست بيانات بحثية.', ['طريقان', 'دروس_الحياة', 'تطوير_الذات'], ['دروس الحياة', 'تطوير الذات', 'قصة', 'رسوم متحركة']),
+    th: pub('บท', 'ภาพในวิดีโอนี้สร้างด้วย AI ตัวเลขเปอร์เซ็นต์ใช้เล่าเรื่องเท่านั้น ไม่ใช่ข้อมูลวิจัย', ['สองเส้นทาง', 'บทเรียนชีวิต', 'พัฒนาตัวเอง'], ['บทเรียนชีวิต', 'พัฒนาตัวเอง', 'เล่าเรื่อง', 'แอนิเมชัน']),
+    ja: pub('チャプター', 'この動画の映像はAIで生成されています。パーセンテージは物語を伝えるためのイメージで、研究データではありません。', ['ふたつの道', '人生の教訓', '自己成長'], ['人生の教訓', '自己成長', 'ストーリー', 'アニメーション']),
+    ko: pub('챕터', '이 영상의 이미지는 AI로 생성되었습니다. 퍼센트는 이야기를 위한 연출이며 연구 데이터가 아닙니다.', ['두갈래길', '인생교훈', '자기계발'], ['인생 교훈', '자기계발', '이야기', '애니메이션']),
+    zh: pub('章节', '本视频的画面由 AI 生成。百分比仅用于讲故事的示意，并非研究数据。', ['两条路', '人生感悟', '自我成长'], ['人生感悟', '自我成长', '故事', '动画'])
+  };
+  const clockOf = sec => {
+    const t = Math.max(0, Math.round(Number(sec) || 0)), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), pad = n => String(n).padStart(2, '0');
+    return h ? `${h}:${pad(m)}:${pad(t % 60)}` : `${m}:${pad(t % 60)}`;
+  };
+  const firstClause = title => {
+    const full = flat(title), first = full.split(/\s*[:|–—]\s*/)[0].trim();
+    return first.length >= 10 && first.length < full.length ? first : full;
+  };
+  // Hashtag không dấu cách: chữ + số + gạch dưới (mọi ngôn ngữ), mỗi từ viết hoa chữ đầu.
+  const hashOf = text => {
+    const words = flat(text).split(/[^\p{L}\p{N}\p{M}_]+/u).filter(Boolean);
+    return words.map(w => w.charAt(0).toLocaleUpperCase() + w.slice(1)).join('');
+  };
+  // Gói đăng YouTube: tiêu đề (≤ 100), mô tả (chương theo giờ nếu biết, bài học, câu cuối, lời nhắc nội dung AI, hashtag) và thẻ tag (≤ 450 ký tự).
+  // opts: { lang, layout, timeline: [{ number, start }], outroStart, seconds }; không có timeline (video dựng bằng bản cũ) thì chưa có chương.
+  function publishPack(script, opts = {}) {
+    const L = langOf(opts.lang), X = PUB[L.id] || PUB.en, lc = t => { try { return String(t).toLocaleLowerCase(L.id); } catch { return String(t).toLowerCase(); } };
+    const title = cut(script && script.title, 100) || L.label, hook = firstClause(title);
+    const beats = (script && script.beats) || [], lessons = ((script && script.lessons) || []).map(flat).filter(Boolean), closing = flat(script && script.closing);
+    // Chương: mở đầu đúng 0:00, mỗi chương cách nhau ≥ 10 giây (và thưa dần để không quá ~12 chương), chương cuối là thẻ bài học.
+    const chapters = [];
+    const timeline = Array.isArray(opts.timeline) ? opts.timeline.filter(x => x && Number.isFinite(Number(x.start))) : [];
+    if (timeline.length && Number(opts.outroStart) > 0) {
+      const total = Number(opts.seconds) > 0 ? Number(opts.seconds) : Number(opts.outroStart) + 10, gap = Math.max(25, total / 12);
+      chapters.push({ t: 0, clock: '0:00', label: cut(hook, 70) });
+      for (const x of timeline) {
+        const b = beats.find(y => y.number === x.number), last = chapters[chapters.length - 1];
+        if (!b || x.start - last.t < gap || Number(opts.outroStart) - x.start < 15) continue;
+        chapters.push({ t: Math.round(x.start), clock: clockOf(x.start), label: cut([flat(b.label), flat(b.caption)].filter(Boolean).join(' · '), 70) });
+      }
+      const end = L.lessons.charAt(0) + L.lessons.slice(1).toLocaleLowerCase(L.id);
+      if (Number(opts.outroStart) - chapters[chapters.length - 1].t >= 10) chapters.push({ t: Math.round(opts.outroStart), clock: clockOf(opts.outroStart), label: end });
+    }
+    const hashtags = [...new Set([hashOf(hook).slice(0, 40), ...X.hash, opts.layout === 'stack' ? 'Shorts' : ''].filter(Boolean))].map(h => '#' + h);
+    const body = [title];
+    if (closing) body.push('', closing);
+    if (lessons.length) body.push('', L.lessons.charAt(0) + L.lessons.slice(1).toLocaleLowerCase(L.id) + ':', ...lessons.map(x => '• ' + x));
+    if (chapters.length >= 3) body.push('', X.chapters + ':', ...chapters.map(c => `${c.clock} ${c.label}`));
+    body.push('', X.note, '', hashtags.join(' '));
+    const description = body.join('\n').slice(0, 4900);
+    const words = [title, hook, flat(script && script.left), flat(script && script.right), ...flat(L.tagline).split('·'), flat(script && script.meter), ...X.kw].map(x => lc(flat(x))).filter(x => x.length > 1);
+    const tags = []; let size = 0;
+    for (const t of [...new Set(words)]) { if (size + t.length + 2 > 450) break; tags.push(t); size += t.length + 2; }
+    const text = ['TITLE', title, '', 'DESCRIPTION', description, '', 'HASHTAGS', hashtags.join(' '), '', 'TAGS', tags.join(', ')].join('\n') + '\n';
+    return { lang: L.id, title, description, hashtags, tags, chapters: chapters.length >= 3 ? chapters : [], partial: chapters.length < 3, text };
+  }
+
   return {
     KIND, LAYOUTS, MINUTES, SECONDS, PART_BEATS, LANGS, LANGUAGES, langOf, limits, RATES, TOPICS, topicPreset, budgetChars, beatsFor, MAX_CAPTION, MAX_LABEL, MAX_TAG, MAX_LESSONS,
     options, problems, slug, storyIdBase, buildBibleInstruction, parseBible, buildPartInstruction, parseBeats, checkBeats, fixText, assemble,
-    anchorPrompt, clipPrompt, isPolicyError, safeRetryPrompt, buildJobs, hudScript, notesText
+    anchorPrompt, clipPrompt, isPolicyError, safeRetryPrompt, buildJobs, hudScript, notesText, publishPack, clockOf
   };
 });

@@ -20,6 +20,19 @@ Lời đọc và chữ trên video bằng tiếng Nga (làm cho khán giả nói
 Tạo thumbnail 16:9|Create 16:9 thumbnail
 Tạo thumbnail khác|Create another thumbnail
 Đang tạo thumbnail…|Creating thumbnail…
+Thông tin đăng YouTube (đúng như trên video)|YouTube publishing info (exactly as on the video)
+Mô tả video (có chương theo giờ)|Video description (with timed chapters)
+Mô tả video|Video description
+Thẻ tag (dán vào ô «Thẻ» của YouTube)|Tags (paste into the YouTube “Tags” box)
+Sao chép hashtag|Copy hashtags
+Đã sao chép hashtag.|Hashtags copied.
+Sao chép thẻ tag|Copy tags
+Đã sao chép thẻ tag.|Tags copied.
+Đang lập tiêu đề, mô tả, hashtag và thẻ tag từ kịch bản…|Preparing the title, description, hashtags and tags from the script…
+Tiêu đề hơi dài: YouTube thường chỉ hiện khoảng 60–70 ký tự.|Long title: YouTube usually shows only about 60–70 characters.
+Video này dựng bằng bản cũ hoặc quá ngắn nên chưa có chương theo giờ. Bấm «Dựng lại video» để mô tả có chương đúng giờ.|This video was built with an older version or is too short, so it has no timed chapters yet. Press “Rebuild video” to get a description with correct chapter times.
+Cả bốn phần cũng được lưu trong file tieu-de-youtube.txt cạnh video.|All four parts are also saved in tieu-de-youtube.txt next to the video.
+Hình ảnh do AI tạo: khi đăng hãy bật mục «nội dung bị thay đổi hoặc tổng hợp».|AI-generated images: when you upload, turn on the “altered or synthetic content” setting.
 Tiêu đề đăng YouTube (đúng như trên video)|YouTube title (exactly as on the video)
 Sao chép tiêu đề|Copy title
 Đã sao chép tiêu đề.|Title copied.
@@ -1133,6 +1146,7 @@ Video ghép chưa hợp lệ.|The joined video is not valid.
       [/^Đã gắn khóa vào (\d+) cảnh\.$/,m=>'Added the lock to '+m[1]+' scene(s).'],
       [/^Đã lưu video: (.+)$/,m=>'Video saved: '+m[1]],
       [/^Đã lưu thumbnail: (.+)$/,m=>'Thumbnail saved: '+m[1]],
+      [/^Không hiển thị đầy đủ được thẻ video này(?: \((.+)\))?\. Các nút bên dưới vẫn dùng được\.$/,m=>'This video card could not be shown in full'+(m[1]?' ('+m[1]+')':'')+'. The buttons below still work.'],
       [/^Đã tạo thumbnail 1920×1080 \(ảnh (\d+)\/(\d+)\)\. Bấm lại để đổi sang kiểu khác\.$/,m=>'Created the 1920×1080 thumbnail (style '+m[1]+'/'+m[2]+'). Press again to switch to another style.'],
       [/^(✓ .+) · đang bỏ khỏi video$/,m=>m[1]+' · left out of the video'],
       [/^· đang bỏ khỏi video$/,()=>'· left out of the video'],

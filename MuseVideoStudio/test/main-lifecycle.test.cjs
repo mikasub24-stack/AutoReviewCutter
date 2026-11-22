@@ -1155,7 +1155,8 @@ test('tab So sánh song song: Muse tự chọn chủ đề → kịch bản → 
     await fs.writeFile(path.join(dir, 'studio.json'), JSON.stringify({ configVersion: 2, settings: { output: dir, accountCount: 1, cooldownSeconds: 0 } }));
     let failing = true;
     const fake = fakeMuse({ total: 7, topic: 'Sleeping on time and staying up late', bad: n => failing && n === 3 ? 'short' : '' });
-    app = await boot(dir, { longTerm: true, domTimeoutMs: 300, pairWriterFactory: options => createPairWriter({ ...options, ask: fake.ask, delay: async () => {} }), pairHudFactory: fakeHudFactory(hudLog) });
+    const bootOpts = { longTerm: true, domTimeoutMs: 300, pairWriterFactory: options => createPairWriter({ ...options, ask: fake.ask, delay: async () => {} }), pairHudFactory: fakeHudFactory(hudLog) };
+    app = await boot(dir, bootOpts);
     await assert.rejects(app.invoke('pairMake', { topic: '', minutes: 1, voice: { voice: 'en-US-GuyNeural' } }), /Chưa cài giọng Microsoft/);
     assert.equal(fake.log.bible, 0, 'lỗi đầu vào thì chưa gửi gì cho Muse');
     await assert.rejects(app.invoke('pairMake', { topic: '', minutes: 1, music: path.join(dir, 'x.txt'), voice: { voice: '' } }), /Nhạc nền phải là/);
@@ -1251,10 +1252,50 @@ test('tab So sánh song song: Muse tự chọn chủ đề → kịch bản → 
     await assert.rejects(fs.access(path.join(dir, 'KeChuyen')));
     await assert.rejects(fs.access(path.join(dir, 'DongVat')));
 
+    // Thông tin đăng YouTube: lập ngay khi dựng xong từ kịch bản và mốc giờ thật của video; có file tieu-de-youtube.txt cạnh video.
+    assert.deepEqual(meta.timeline.map(x => x.number), [1, 2, 3, 4, 5, 6, 7]);
+    assert.ok(meta.timeline.every((x, i) => i === 0 || x.start > meta.timeline[i - 1].start), 'mốc giờ tăng dần');
+    assert.ok(meta.outroStart > meta.timeline.at(-1).start && meta.outroStart < meta.seconds);
+    assert.equal(meta.publish.title, draft.script.title);
+    assert.ok(meta.publish.description.startsWith(draft.script.title) && meta.publish.description.includes(draft.script.closing));
+    assert.ok(meta.publish.hashtags.length >= 3 && meta.publish.hashtags.every(h => /^#\S+$/u.test(h)));
+    assert.ok(meta.publish.tags.length >= 5 && meta.publish.tags.join(', ').length <= 450);
+    assert.ok(Array.isArray(meta.publish.chapters));
+    assert.equal(meta.publishFile, path.join(folder, 'tieu-de-youtube.txt'));
+    assert.equal(await fs.readFile(meta.publishFile, 'utf8'), meta.publish.text);
+    const pub1 = await app.invoke('pairPublish', { storyId: 'SS-phim' });
+    assert.deepEqual(pub1.publish, meta.publish, 'có sẵn thì trả lại, không lập lại');
+    assert.equal((await app.invoke('pairPublish', { storyId: 'SS-phim', force: true })).publish.title, draft.script.title);
+    await assert.rejects(app.invoke('pairPublish', { storyId: 'khong-co' }), /Không thấy video này|This video was not found/);
+    // Gói đăng đã nằm trong thông tin video mà giao diện đọc.
+    const publishSaved = (await app.invoke('state')).pair.stories['SS-phim'].publish;
+    assert.equal(publishSaved.title, draft.script.title);
+
     // Dựng lại (ví dụ đổi nhạc): vẫn ra video mới, không đè video cũ.
     const first = meta.output;
     await app.invoke('pairBuild', { storyId: 'SS-phim', voice: { voice: '' } });
     await until(() => { const m = app.invoke('state').pair.stories['SS-phim']; return m.status === 'built' && m.output !== first; }, 180000);
+    const latest = app.invoke('state').pair.stories['SS-phim'];
+    assert.ok(latest.publish.title && latest.timeline.length === 7, 'dựng lại thì lập lại gói đăng');
+
+    // Thẻ video không được biến mất: mất thông tin video (pairStories) nhưng còn việc trong hàng đợi + kịch bản + video trong thư mục → khôi phục khi mở lại.
+    await app.stop();
+    const saved = JSON.parse(await fs.readFile(path.join(dir, 'studio.json'), 'utf8'));
+    assert.ok(saved.settings.pairStories['SS-phim'], 'đã lưu thông tin video');
+    delete saved.settings.pairStories;
+    await fs.writeFile(path.join(dir, 'studio.json'), JSON.stringify(saved));
+    app = await boot(dir, bootOpts);
+    state = await app.invoke('state');
+    const back = state.pair.stories['SS-phim'];
+    assert.ok(back, 'thẻ video trở lại');
+    assert.deepEqual([back.status, back.lang, back.layout, back.name], ['built', 'en', 'side', draft.script.title]);
+    assert.equal(back.output, latest.output, 'lấy lại đúng video dựng mới nhất, không nhầm clip 001.mp4');
+    assert.ok(back.cover && (await fs.stat(back.cover)).size > 500, 'lấy lại ảnh bìa');
+    assert.equal(state.jobs.filter(j => j.kind === 'pair' && j.storyId === 'SS-phim').length, 21);
+    const pubBack = await app.invoke('pairPublish', { storyId: 'SS-phim' });
+    assert.equal(pubBack.publish.title, draft.script.title);
+    assert.equal(pubBack.publish.partial, true, 'chưa biết mốc giờ nên chưa có chương');
+    assert.equal(typeof (await app.invoke('pairThumb', { storyId: 'SS-phim' })).file, 'string', 'thẻ khôi phục vẫn tạo thumbnail được');
 
     // Xóa danh sách tab này: việc và video bị gỡ, tab khác không bị đụng.
     await app.invoke('clearList', { kind: 'pair', deleteFiles: false });

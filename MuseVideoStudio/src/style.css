@@ -486,6 +486,10 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .publishHead { font-size: 13px; }
 .publishRow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .publishRow input.publishTitle { flex: 1 1 320px; min-width: 0; font-size: 15px; font-weight: 600; }
+.publishField { flex: 1 1 320px; min-width: 0; display: grid; gap: 4px; }
+.publishField input, .publishField textarea { width: 100%; box-sizing: border-box; }
+.publishField textarea { font-size: 13px; line-height: 1.45; resize: vertical; }
+.publishField + button { align-self: flex-end; }
 .publishMore { display: grid; gap: 8px; }
 .publishMore summary { cursor: pointer; font-size: 13px; }
 .publishMore textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; line-height: 1.45; resize: vertical; }

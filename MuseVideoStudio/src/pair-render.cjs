@@ -264,6 +264,11 @@ async function assemblePair({ script, config = {}, clips, hud, voice = null, dir
     // 5. Nối.
     const order = [{ video: introVideo, audio: introAudio, total: introTotal }, ...pieces, { video: outroVideo, audio: outroAudio, total: outroTotal }];
     const total = order.reduce((s, p) => s + p.total, 0);
+    // Mốc giờ của từng mốc trong video cuối (dùng cho chương YouTube): mở đầu rồi lần lượt từng mốc, cuối cùng là thẻ kết.
+    const timeline = [];
+    let at = introTotal;
+    beats.forEach((b, i) => { timeline.push({ number: b.number, start: Math.round(at * 1000) / 1000 }); at += pieces[i].total; });
+    const outroStart = Math.round(at * 1000) / 1000;
     await fs.writeFile(path.join(temp, 'video.txt'), order.map(p => `file '${path.basename(p.video)}'`).join('\n'));
     await fs.writeFile(path.join(temp, 'audio.txt'), order.map(p => `file '${path.basename(p.audio)}'`).join('\n'));
     onProgress('Đang nối các mốc thành video…');
@@ -280,7 +285,7 @@ async function assemblePair({ script, config = {}, clips, hud, voice = null, dir
       cover = output.replace(/\.mp4$/i, '.jpg');
       await run(t.ffmpeg, ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y', '-ss', num(Math.min(1.6, introTotal - 0.7)), '-i', output, '-frames:v', '1', '-q:v', '3', cover], { signal });
     } catch (e) { if (signal?.aborted) throw e; cover = ''; }
-    return { output, cover, seconds: result.duration, expected: total, beats: beats.length, intro: introTotal, outro: outroTotal };
+    return { output, cover, seconds: result.duration, expected: total, beats: beats.length, intro: introTotal, outro: outroTotal, timeline, outroStart };
   } finally {
     await fs.rm(temp, { recursive: true, force: true });
   }

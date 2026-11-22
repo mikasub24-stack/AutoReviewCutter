@@ -128,6 +128,13 @@ for (const layout of ['side', 'stack']) {
       assert.ok(Math.abs(Number(info.format.duration) - result.expected) < 0.25, `dài ${info.format.duration}s, mong đợi ${result.expected}s`);
       assert.ok(Math.abs(result.expected - (result.intro + result.outro + 2 * R.beatLength(2, 1.5))) < 0.01, 'tổng = mở đầu + các mốc + kết');
       assert.ok((await fs.stat(result.cover)).size > 1000, 'ảnh bìa');
+      // mốc giờ từng mốc trong video thành phẩm (để lập chương YouTube)
+      const per = R.beatLength(2, 1.5);
+      assert.deepEqual(result.timeline.map(x => x.number), [1, 2]);
+      assert.ok(Math.abs(result.timeline[0].start - result.intro) < 0.01, 'mốc 1 bắt đầu ngay sau phần mở đầu');
+      assert.ok(Math.abs(result.timeline[1].start - (result.intro + per)) < 0.01, 'mốc 2 bắt đầu sau mốc 1');
+      assert.ok(Math.abs(result.outroStart - (result.intro + 2 * per)) < 0.01, 'thẻ bài học bắt đầu sau mốc cuối');
+      assert.ok(Math.abs(result.outroStart + result.outro - result.expected) < 0.01, 'thẻ bài học kéo dài tới hết video');
       // giọng: tiêu đề, từng mốc, bài học + câu cuối được gửi đi đọc, đúng giọng đã chọn
       assert.deepEqual(voice.calls[0].items.map(i => i.id), ['intro', 'b1', 'b2', 'outro']);
       assert.equal(voice.calls[0].voice, 'en-US-GuyNeural');

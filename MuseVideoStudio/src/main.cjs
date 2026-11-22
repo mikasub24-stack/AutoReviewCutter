@@ -1005,6 +1005,39 @@ async function writePairNotes(storyId,meta,draft){
   const text=pairPlan.notesText(pairInput(meta),draft.script,{builtAt:new Date().toLocaleString('vi-VN')});
   await fs.writeFile(path.join(pairFolder(settings.output,storyId),'ghi-chu-dang-video.txt'),text,'utf8').catch(()=>{});
 }
+// Gói đăng YouTube (tiêu đề, mô tả có chương, hashtag, thẻ tag) lập từ kịch bản đã lưu; ghi thêm file tieu-de-youtube.txt cạnh video. Không cần Muse, không cần mạng.
+async function makePairPublish(storyId,meta,script,{force=false}={}){
+  if(meta.publish?.title&&!force)return meta.publish;
+  meta.publish=pairPlan.publishPack(script,{lang:meta.lang,layout:meta.layout,timeline:meta.timeline,outroStart:meta.outroStart,seconds:meta.seconds});
+  meta.publishFile=path.join(pairFolder(settings.output,storyId),'tieu-de-youtube.txt');
+  await fs.mkdir(path.dirname(meta.publishFile),{recursive:true}).then(()=>fs.writeFile(meta.publishFile,meta.publish.text,'utf8')).catch(()=>{meta.publishFile='';});
+  return meta.publish;
+}
+// Mỗi video có một thẻ trong tab: thiếu thông tin (dữ liệu cũ hỏng / bị xóa) thì lập lại từ kịch bản đã lưu và video đã dựng nằm trong thư mục, để thẻ video không bao giờ biến mất khi còn việc trong hàng đợi.
+async function recoverPairStories(){
+  if(!settings.output)return false;
+  const all=settings.pairStories||(settings.pairStories={});
+  let changed=false;
+  for(const storyId of new Set(queue.jobs.filter(j=>j.kind==='pair'&&j.storyId).map(j=>j.storyId))){
+    if(all[storyId])continue;
+    const draft=await readPairDraft(storyId),script=draft?.script;
+    if(!script||!Array.isArray(script.beats))continue;
+    const folder=pairFolder(settings.output,storyId);
+    let output='',cover='';
+    try{
+      const found=[];
+      for(const n of await fs.readdir(folder))if(/\.mp4$/i.test(n)&&!/^\d+\.mp4$/.test(n))found.push({file:path.join(folder,n),t:(await fs.stat(path.join(folder,n))).mtimeMs});
+      found.sort((a,b)=>b.t-a.t);
+      if(found[0]){output=found[0].file;const jpg=output.replace(/\.mp4$/i,'.jpg');if(await fs.stat(jpg).then(x=>x.isFile(),()=>false))cover=jpg;}
+    }catch{}
+    const cfg=draft.config||{};
+    all[storyId]={topic:'',left:script.left,right:script.right,minutes:Number(cfg.minutes)||Math.max(1,Math.round(script.beats.length*8/60)),lang:cfg.lang||'en',layout:cfg.layout==='stack'?'stack':'side',voice:{engine:'none',voice:'',tempo:1,volume:1},music:'',musicVolume:.14,ambience:.45,auto:false,status:output?'built':'queued',
+      name:script.title,title:script.title,meter:script.meter,beatCount:script.beats.length,createdAt:Date.now(),...(output?{output,cover,builtAt:Date.now()}:{})};
+    changed=true;
+  }
+  if(changed)await save();
+  return changed;
+}
 // Giọng đọc + chữ canvas + âm thanh + ghép MP4 (pair-render.cjs). Cửa sổ vẽ chữ chỉ mở trong lúc dựng.
 async function buildPairStory(storyId){
   const meta=settings.pairStories?.[storyId];
@@ -1024,8 +1057,9 @@ async function buildPairStory(storyId){
       clips:pairBeatClips(clips),hud:pairHud,voice:voiceService,dir:pairFolder(settings.output,storyId),name:meta.name||storyId,ffmpeg:settings.ffmpeg||'ffmpeg',signal:pairController.signal,
       onProgress:text=>{pairState.progress=text;notify();}
     });
-    Object.assign(meta,{output:result.output,cover:result.cover,seconds:result.seconds,builtAt:Date.now(),clipSig:clips.map(j=>j.output).join('|')});
+    Object.assign(meta,{output:result.output,cover:result.cover,seconds:result.seconds,builtAt:Date.now(),clipSig:clips.map(j=>j.output).join('|'),timeline:result.timeline,outroStart:result.outroStart});
     await writePairNotes(storyId,meta,draft);
+    await makePairPublish(storyId,meta,draft.script,{force:true});
     meta.status='built';
     pairState={busy:false,phase:'done',progress:'Video đã dựng xong',error:'',storyId};
   }catch(e){
@@ -1053,7 +1087,7 @@ async function runPair(storyId){
     const draft=await readPairDraft(storyId);
     const result=await pairWriter.write({options:pairInput(meta),resume:draft&&!draft.final?draft:null,onDraft:d=>{void savePairDraft(storyId,d);}});
     const jobs=pairPlan.buildJobs(result.config,result.script,{storyId});
-    await savePairDraft(storyId,{bible:result.bible,beats:result.script.beats,script:result.script,final:true});
+    await savePairDraft(storyId,{bible:result.bible,beats:result.script.beats,script:result.script,final:true,config:{lang:result.config.lang,layout:result.config.layout,minutes:result.config.minutes}});
     if(!queue.jobs.some(j=>j.kind==='pair'&&j.storyId===storyId))await queue.add(jobs);
     Object.assign(meta,{name:result.script.title,title:result.script.title,left:result.script.left,right:result.script.right,meter:result.script.meter,status:'queued',beatCount:result.script.beats.length});
     await save();
@@ -1105,6 +1139,7 @@ app.whenReady().then(async () => {
   pairWriter=createPairWriter({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.requireLongTerm()});
   mapService=createMapService({getSettings:()=>settings,voice:voiceService,ensureAllowed:()=>licenseManager.requireLongTerm(),notify,...(()=>{const f=createWindowFrames({BrowserWindow,ipcMain});return{renderFrames:f.renderFrames,renderStill:f.renderStill};})(),userDataDir:app.getPath('userData')});
   mapWriter=createMapWriter({geo:()=>mapGeoObject,dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,leaseAccount:owner=>leaseMuseAccount(owner),ensureAllowed:()=>licenseManager.requireLongTerm()});
+  await recoverPairStories().catch(()=>{});
   for(const m of Object.values(settings.pairStories||{}))if(m.status==='building')m.status='queued';   // app tắt giữa lúc dựng: dựng lại được
   for(const run of Object.values(settings.mapRuns||{}))if(run.status==='writing'||run.status==='building')run.status=run.status==='writing'?'draft':'script';   // app tắt giữa chừng: cho làm tiếp
   await save();
@@ -1767,6 +1802,7 @@ app.whenReady().then(async () => {
     // Dựng (lại) video từ các clip đã xong, ví dụ sau khi «Tạo lại» một clip hoặc đổi giọng / nhạc.
     pairBuild: async data => {
       if(queue.active||starting||merging||packaging||pairState.busy)throw Error('Chờ xử lý hiện tại hoàn tất.');
+      await recoverPairStories().catch(()=>{});
       const meta=settings.pairStories?.[String(data?.storyId||'')];
       if(!meta)throw Error('Không thấy video này.');
       const storyId=String(data.storyId);
@@ -1786,6 +1822,7 @@ app.whenReady().then(async () => {
     // «Tạo thumbnail 16:9»: ghép khung hình clip trái / phải + chữ canvas (1920×1080 JPEG ≤ 2 MB). Làm được ngay khi mọi clip xong, không cần chờ dựng video; mỗi lần bấm đổi sang kiểu khác (4 kiểu).
     pairThumb: async data => {
       if(pairState.busy||pairWriter?.busy)throw Error(ui('Đang làm video, chờ xong hoặc bấm Dừng.','A video is being made. Wait for it or press Stop.'));
+      await recoverPairStories().catch(()=>{});
       const storyId=String(data?.storyId||''),meta=settings.pairStories?.[storyId];
       if(!meta)throw Error(ui('Không thấy video này.','This video was not found.'));
       if(!settings.output)throw Error(ui('Chọn thư mục lưu video trước.','Choose the video folder first.'));
@@ -1801,6 +1838,19 @@ app.whenReady().then(async () => {
         await save();
         return {file:r.file,variant:r.variant+1,count:r.count};
       }finally{pairState={busy:false,phase:'',progress:'',error:'',storyId};pairHud?.close();notify();}
+    },
+    // Gói đăng YouTube của video: tiêu đề, mô tả (có chương nếu video dựng bằng bản mới), hashtag, thẻ tag. Video dựng bằng bản cũ: lập từ kịch bản, chưa có chương (dựng lại để có chương đúng giờ).
+    pairPublish: async data => {
+      const storyId=String(data?.storyId||'');
+      await recoverPairStories().catch(()=>{});
+      const meta=settings.pairStories?.[storyId];
+      if(!meta)throw Error(ui('Không thấy video này.','This video was not found.'));
+      if(meta.publish?.title&&!data?.force)return {publish:meta.publish};
+      const draft=await readPairDraft(storyId);
+      if(!draft?.script)throw Error(ui('Không thấy kịch bản đã lưu của video này.','The saved script of this video was not found.'));
+      const publish=await makePairPublish(storyId,meta,draft.script,{force:true});
+      await save();notify();
+      return {publish};
     },
     pairSave: async data => {
       const meta=settings.pairStories?.[String(data?.storyId||'')],thumb=Boolean(data?.thumb),out=thumb?meta?.thumb:meta?.output;

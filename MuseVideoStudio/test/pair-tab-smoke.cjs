@@ -24,7 +24,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
         { id: 'en-US-AndrewMultilingualNeural', lang: '*', language: 'Đa ngôn ngữ', name: 'Andrew (nam) · đa ngôn ngữ' }
       ];
       const s = {
-        version: '1.15.1', active: false, paused: true, jobs: [],
+        version: '1.15.2', active: false, paused: true, jobs: [],
         license: { status: 'active', plan: 'short', longTerm: false, device: 'TESTDEVICE', expiresAt: Date.now() + 86400000 * 30, message: 'Đã kích hoạt key.' },
         story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: true, clone: false }, platform: 'win32', edgeVoices: voices, clones: [] } },
         restore: { busy: false, progress: '', error: '', storyId: '', stories: {} },
@@ -48,6 +48,12 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
             return { storyId };
           }
           if (name === 'pairCancel') { Object.assign(s.pair, { busy: false, phase: '', error: 'Đã dừng viết kịch bản. Bấm «Viết tiếp» để làm tiếp từ chỗ dở.' }); s.pair.write = { busy: false }; setTimeout(window.push, 0); return structuredClone(s); }
+          if (name === 'pairPublish') {
+            const publish = { title: 'The Same Child, Two Fathers: Yelling vs Listening', description: 'The Same Child\n\nChapters:\n0:00 Intro\n1:07 AGE 3\n2:07 AGE 6\n\n#TwoPaths #LifeLessons', hashtags: ['#TwoPaths', '#LifeLessons'], tags: ['the same child', 'life lessons'], chapters: [{}, {}, {}], partial: false };
+            Object.assign(s.pair.stories[data.storyId], { publish, publishFile: 'C:\\Videos\\SoSanh\\x\\tieu-de-youtube.txt' });
+            setTimeout(window.push, 0);
+            return { publish };
+          }
           if (name === 'pairThumb') {
             window.thumbN = (window.thumbN || 0) + 1;
             const file = 'C:\\Videos\\SoSanh\\' + data.storyId + '\\thumbnail-' + window.thumbN + '.jpg';
@@ -189,6 +195,31 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     // 9) Đủ clip: nút Dựng video gửi đúng mã, giọng, nhạc; dựng xong có video, ảnh bìa và nút lưu / mở.
     await page.evaluate(() => { window.s.jobs.forEach(j => { j.status = 'completed'; j.stage = 'completed'; }); window.push(); });
     await page.waitForSelector('#pairRuns button:has-text("Dựng video")');
+    // Thông tin đăng YouTube: tự lập khi đủ clip; tiêu đề, mô tả, hashtag, thẻ tag đều hiện sẵn kèm nút sao chép.
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'http://127.0.0.1:' + server.address().port });
+    await page.waitForSelector('#pairRuns .publishBox textarea.publishDesc');
+    assert.equal((await calls('pairPublish')).length, 1, 'tự nhờ máy lập gói đăng đúng một lần');
+    assert.deepEqual((await calls('pairPublish'))[0].data, { storyId: 'SS-Raised-with-Yelling' });
+    assert.equal(await page.locator('#pairRuns .publishBox input.publishTitle').inputValue(), 'The Same Child, Two Fathers: Yelling vs Listening');
+    assert.match(await page.locator('#pairRuns .publishBox textarea.publishDesc').inputValue(), /Chapters:\n0:00 Intro/);
+    assert.equal(await page.locator('#pairRuns .publishBox textarea[aria-label="Hashtag"]').inputValue(), '#TwoPaths #LifeLessons');
+    assert.equal(await page.locator('#pairRuns .publishBox textarea[aria-label^="Thẻ tag"]').inputValue(), 'the same child, life lessons');
+    for (const [btn, want] of [['Sao chép tiêu đề', 'The Same Child, Two Fathers: Yelling vs Listening'], ['Sao chép hashtag', '#TwoPaths #LifeLessons'], ['Sao chép thẻ tag', 'the same child, life lessons']]) {
+      await page.click(`#pairRuns .publishBox button:has-text("${btn}")`);
+      assert.equal(await page.evaluate(() => navigator.clipboard.readText()), want, btn);
+    }
+    await page.click('#pairRuns .publishBox button:has-text("Sao chép mô tả")');
+    assert.match(await page.evaluate(() => navigator.clipboard.readText()), /^The Same Child\n\nChapters:/);
+    assert.match(await page.locator('#toast').textContent(), /Đã sao chép mô tả/);
+    // Dữ liệu lạ làm hỏng một thẻ: thẻ đó thành thẻ tối thiểu kèm lý do, không làm mất danh sách; sửa dữ liệu thì thẻ đầy đủ trở lại.
+    const goodPublish = await page.evaluate(() => window.s.pair.stories['SS-Raised-with-Yelling'].publish);
+    await page.evaluate(() => { window.s.pair.stories['SS-Raised-with-Yelling'].publish = { title: 'x', tags: 'không phải mảng' }; window.push(); });
+    await page.waitForSelector('#pairRuns .restoreRun.error .restoreRunText.warn:has-text("Không hiển thị đầy đủ được thẻ video này")');
+    assert.equal(await page.locator('#pairRuns .restoreRun').count(), 1);
+    assert.equal(await page.locator('#pairRuns button', { hasText: 'Tạo thumbnail 16:9' }).count(), 1, 'thẻ tối thiểu vẫn tạo thumbnail được');
+    await page.evaluate(g => { window.s.pair.stories['SS-Raised-with-Yelling'].publish = g; window.push(); }, goodPublish);
+    await page.waitForSelector('#pairRuns .publishBox textarea.publishDesc');
+    assert.equal(await page.locator('#pairRuns .restoreRun.error').count(), 0);
     // Thumbnail: nút hiện ngay khi đủ clip (chưa cần dựng video); chưa có ảnh thì chưa có nút lưu / mở.
     assert.equal(await page.locator('#pairRuns button', { hasText: 'Tạo thumbnail 16:9' }).count(), 1);
     assert.equal(await page.locator('#pairRuns button', { hasText: 'Lưu thumbnail…' }).count(), 0);

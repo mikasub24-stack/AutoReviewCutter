@@ -142,6 +142,14 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.15.2
+
+- **Video hoàn thành không còn «mất tích» khỏi tab «So sánh song song».** Mỗi video luôn có một thẻ: nếu thông tin video bị mất hoặc hỏng nhưng vẫn còn việc trong hàng đợi, kịch bản đã lưu và video dựng sẵn trong thư mục `SoSanh`, Muse tự khôi phục thẻ khi mở ứng dụng (và trước khi tạo thumbnail / dựng / lấy thông tin đăng), lấy lại đúng video dựng mới nhất và ảnh bìa. Danh sách vẽ từng bước riêng: một thẻ lỗi chỉ thành thẻ tối thiểu kèm lý do và nút «Tạo thumbnail 16:9», «Mở thư mục» thay vì làm trống cả danh sách.
+- **Mục «Thông tin đăng YouTube» ngay trong thẻ video:** **tiêu đề, mô tả, hashtag, thẻ tag**, mỗi phần có nút sao chép (thẻ tag ≤ 450 ký tự, tiêu đề ≤ 100). Mô tả có bài học, câu kết, **chương theo giờ** (lấy từ mốc giờ thật của từng mốc trong video đã dựng; mở đầu đúng 0:00, các chương cách nhau ≥ 10 giây) và lời nhắc hình ảnh do AI tạo; video xếp dọc tự thêm #Shorts. Chữ cố định (chương, lời nhắc, hashtag, từ khóa) có sẵn cho cả 15 ngôn ngữ. Cả bốn phần cũng được ghi vào `tieu-de-youtube.txt` cạnh video.
+- Lập hoàn toàn trên máy từ kịch bản đã lưu, không cần Muse và không cần mạng. Video dựng bằng bản cũ có sẵn tiêu đề / mô tả / hashtag / thẻ tag ngay; muốn có chương theo giờ thì bấm «Dựng lại video» một lần.
+- Test mới: `pair-plan` (gói đăng: chương, độ dài, 15 ngôn ngữ, video cũ), `pair-render` (mốc giờ thật bằng FFmpeg), `main-lifecycle` (lưu gói đăng khi dựng, `tieu-de-youtube.txt`, khôi phục thẻ sau khi mất thông tin video) và `pair-tab-smoke` (ô tiêu đề / mô tả / hashtag / thẻ tag, nút sao chép với clipboard thật, thẻ tối thiểu khi dữ liệu lỗi).
+- Chưa kiểm được trên Windows và Electron thật; nguyên nhân gốc khiến thẻ biến mất trên máy bạn chưa tái hiện được, nên bản này sửa theo hướng phòng thủ (khôi phục + không để một lỗi làm trống danh sách).
+
 ## Update 1.15.1
 
 - **Tab «So sánh song song» có nút «Tạo thumbnail 16:9»** (ảnh bìa 1920×1080, JPEG ≤ 1,9 MB, đúng giới hạn YouTube): ghép khung hình thật của clip bên trái và clip bên phải rồi vẽ chữ RẤT TO bằng canvas. Làm được ngay khi mọi clip đã xong, **không cần chờ dựng video**; dùng cho cả video ngang và video dọc (Shorts), cả 15 ngôn ngữ.
