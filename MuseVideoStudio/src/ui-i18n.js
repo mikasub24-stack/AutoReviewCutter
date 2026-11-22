@@ -998,6 +998,79 @@ Chưa có file hoặc thư mục để mở.|There is no file or folder to open 
 Dừng hàng đợi hoặc chờ ghép xong rồi mới xóa được.|Stop the queue or wait for the assembly to finish before removing.
 Clip còn nguyên, không phải tạo lại. Giọng đã đọc xong được dùng lại, chỉ đọc lại cảnh lỗi.|The clips are safe, nothing needs to be regenerated. Voices already read are reused; only failed scenes are read again.
 
+So sánh song song|Side-by-side
+Một nhân vật, hai con đường → tự viết kịch bản, quay, lồng tiếng và dựng video 8–10 phút|One character, two paths → writes the script, shoots, narrates and edits an 8–10 minute video
+Làm video mới|Make a new video
+Màn hình chia đôi: cùng một nhân vật người que 3D, hai cách sống khác nhau (ví dụ lớn lên trong tiếng la mắng và lớn lên được lắng nghe). Muse tự viết kịch bản, tạo một ảnh nền chung cho mỗi mốc rồi hai clip chuyển động (trái và phải) xuất phát từ ảnh đó; tool tự thêm chữ, thanh pin tụt dần, giọng đọc và âm thanh rồi dựng thành video hoàn chỉnh. Để trống chủ đề thì Muse tự chọn.|Split screen: the same 3D stick-figure character living two different ways (for example growing up with yelling versus growing up being listened to). Muse writes the script, makes one shared background image for each moment, then two motion clips (left and right) that start from that image; the tool adds the text, the draining battery meters, the narration and the sound, then builds the finished video. Leave the topic empty and Muse picks one.
+Chủ đề (để trống: Muse tự chọn; chọn gợi ý bên dưới hoặc tự gõ)|Topic (leave empty: Muse picks; choose a suggestion below or type your own)
+Để trống: Muse tự chọn. Hoặc gõ, hoặc bấm một chủ đề gợi ý bên dưới|Leave empty: Muse picks. Or type one, or click a suggested topic below
+Gợi ý chủ đề|Topic suggestions
+Chủ đề gợi ý (bấm để chọn). Nhãn hai bên điền sẵn nếu có; để trống thì Muse tự viết đúng ngôn ngữ video:|Suggested topics (click to choose). The two labels are filled in when the topic has them; leave them empty and Muse writes them in the video language:
+🎲 Để Muse tự chọn|🎲 Let Muse choose
+Nhãn bên trái (không bắt buộc)|Left label (optional)
+Nhãn bên phải (không bắt buộc)|Right label (optional)
+Ví dụ: RAISED WITH YELLING|For example: RAISED WITH YELLING
+Ví dụ: RAISED WITH LISTENING|For example: RAISED WITH LISTENING
+Ngôn ngữ video (lời đọc, chữ, giọng)|Video language (narration, text, voice)
+Tiếng Việt|Vietnamese
+Khung hình|Frame layout
+Ngang 16:9, trái – phải|Horizontal 16:9, left – right (YouTube)
+Dọc 9:16, trên – dưới (Shorts)|Vertical 9:16, top – bottom (Shorts, TikTok, Reels)
+Chưa có giọng cho ngôn ngữ này|No voice for this language yet
+Cài lại giọng miễn phí|Reinstall free voices
+Giọng Microsoft miễn phí (✓ = đúng ngôn ngữ video). Cần có mạng lúc đọc. Mỗi mốc có một đoạn lời dẫn kể điều xảy ra ở bên trái rồi bên phải.|Free Microsoft voices (✓ = matches the video language). An internet connection is needed while narrating. Each moment has one narration passage telling what happens on the left, then on the right.
+Không nhạc nền (chỉ có giọng đọc và âm thanh tự tạo).|No background music (only the narration and the generated sound effects).
+Hình ảnh do AI tạo ra: khi đăng lên YouTube hãy bật mục «nội dung bị thay đổi hoặc tổng hợp». Thanh pin % chỉ là minh họa kể chuyện, không phải số liệu nghiên cứu. Sau khi dựng xong, tool ghi sẵn file ghi chú đăng video trong cùng thư mục.|The images are AI-generated: when you upload to YouTube, turn on the “altered or synthetic content” option. The battery % meters are only a storytelling illustration, not research data. After the build the tool writes a posting-notes file in the same folder.
+Làm video tự động|Make the video automatically
+Muse đang viết kịch bản. Các bước sau tự chạy, bạn không cần bấm gì thêm.|Muse is writing the script. The next steps run by themselves, you do not need to click anything else.
+Muse đang chọn chủ đề và viết kịch bản. Các bước sau tự chạy, bạn không cần bấm gì thêm.|Muse is picking a topic and writing the script. The next steps run by themselves, you do not need to click anything else.
+Đang lồng tiếng và dựng video|Narrating and building the video
+Đang lồng tiếng và dựng video…|Narrating and building the video…
+Muse đang chọn chủ đề…|Muse is picking a topic…
+Đang lập kịch bản|Writing the script
+Muse đang viết kịch bản…|Muse is writing the script…
+Muse đang lập kịch bản…|Muse is outlining the script…
+Muse đang chọn chủ đề và lập kịch bản…|Muse is picking a topic and outlining the script…
+Kịch bản chưa viết xong. Bấm «Viết tiếp» để Muse làm tiếp từ chỗ dở (phần đã viết được giữ lại).|The script is not finished. Click “Continue writing” so Muse carries on from where it stopped (what was already written is kept).
+Có clip dở hoặc lỗi. Tool tự thử lại vài lần; nếu vẫn lỗi hãy bấm «Tạo tiếp». Clip chỉ chạy khi ảnh nền của mốc đó đã xong.|Some clips are unfinished or failed. The tool retries a few times by itself; if they still fail, click “Continue making”. A clip only runs once the background image of its moment is done.
+Đang tạo ảnh nền chung và hai clip của từng mốc trên Muse…|Making the shared background image and the two clips of each moment on Muse…
+Đã đủ clip. Bấm «Dựng video» để lồng tiếng, thêm chữ và âm thanh rồi dựng.|All clips are ready. Click “Build video” to add the narration, text and sound, then build.
+Chờ chạy. Bấm «Chạy» để bắt đầu tạo ảnh nền và clip.|Waiting to run. Click “Run” to start making the background images and clips.
+Đang tạm dừng. Bấm «Tạo tiếp» để chạy nốt các clip còn lại.|Paused. Click “Continue making” to run the remaining clips.
+Dừng viết|Stop writing
+Tạo tiếp|Continue making
+Chạy|Run
+Dựng lại video|Rebuild video
+Danh sách clip video so sánh song song|Side-by-side video clip list
+Sẵn sàng cho video so sánh song song mới|Ready for a new side-by-side video
+Ảnh nền và clip lưu trong thư mục «SoSanh» theo từng video; video hoàn chỉnh được lồng tiếng, thêm chữ và âm thanh rồi dựng tự động ở cuối.|Background images and clips are saved in the “SoSanh” folder, one per video; the finished video is narrated, given text and sound, and built automatically at the end.
+Dừng và xóa toàn bộ danh sách video So sánh song song?|Stop and clear the whole list of side-by-side videos?
+Xóa luôn thư mục SoSanh của các video này (ảnh nền, clip, kịch bản, video đã dựng) vào Thùng rác|Also move the SoSanh folders of these videos (background images, clips, scripts, built video) to the Recycle Bin
+Đã dừng viết kịch bản. Bấm «Viết tiếp» để làm tiếp từ chỗ dở.|Script writing stopped. Click “Continue writing” to carry on from where it stopped.
+Đã dừng viết kịch bản.|Script writing stopped.
+Chỉ dựng video khi mọi clip đã xong.|Build the video only when every clip is done.
+Không thấy kịch bản đã lưu của video này.|Cannot find the saved script of this video.
+Không thấy video này.|Cannot find this video.
+Video đã dựng xong|The video is built
+Đã dừng dựng video. Bấm «Dựng video» để làm lại.|Building stopped. Click “Build video” to do it again.
+Đang làm video, chờ xong hoặc bấm Dừng.|A video is being made; wait for it to finish or click Stop.
+Chờ xử lý đầu ra xong trước khi làm video mới.|Wait for the current output to finish before making a new video.
+Hàng đợi đang chạy. Dừng hàng đợi trước khi làm video mới.|The queue is running. Stop the queue before making a new video.
+Tab «So sánh song song» cần FFmpeg để ghép video. Chọn ffmpeg.exe (cùng thư mục ffprobe.exe) ở «Kết nối & cài đặt».|The “Side-by-side” tab needs FFmpeg to assemble the video. Choose ffmpeg.exe (in the same folder as ffprobe.exe) under “Connection & settings”.
+Chưa cài giọng Microsoft (miễn phí). Bấm «Cài giọng miễn phí» ở mục Giọng đọc, đợi cài xong rồi làm video.|Microsoft voices (free) are not installed. Click “Install free voices” in the Narration voice section, wait for the install to finish, then make the video.
+Không mở được file nhạc nền. Chọn lại file nhạc.|Cannot open the music file. Choose the music file again.
+Chờ xử lý hiện tại hoàn tất.|Wait for the current task to finish.
+Muse chọn chủ đề và lập hồ sơ phim…|Muse is picking a topic and drawing up the outline…
+Lập hồ sơ phim · chuẩn bị yêu cầu…|Drawing up the outline · preparing the request…
+Muse chưa lập được hồ sơ phim. Bấm «Viết tiếp» để thử lại.|Muse could not draw up the outline. Click “Continue writing” to try again.
+Muse đang viết kịch bản. Chờ xong hoặc bấm Dừng.|Muse is writing a script. Wait for it to finish or click Stop.
+Dừng hàng đợi và các thao tác trình duyệt trước khi nhờ Muse viết kịch bản.|Stop the queue and browser actions before asking Muse to write the script.
+Bộ vẽ chữ trả ảnh không hợp lệ.|The text renderer returned an invalid image.
+Chưa có kịch bản để dựng.|There is no script to build yet.
+Đang đo độ dài các clip…|Measuring the clip lengths…
+Đang dựng thẻ mở đầu và thẻ kết…|Building the opening and closing cards…
+Đang nối các mốc thành video…|Joining the moments into the video…
+Video ghép chưa hợp lệ.|The joined video is not valid.
 `.trim().split('\n').map(line=>line.split('|')));
   const norm=s=>String(s).replace(/\s+/g,' ').trim();
   let language='en';try{language=localStorage.getItem('museStudio.language')==='vi'?'vi':'en';}catch{}
@@ -1012,12 +1085,30 @@ Clip còn nguyên, không phải tạo lại. Giọng đã đọc xong được 
   function translate(value){
     const raw=String(value??'');if(language==='vi')return raw;
     const key=norm(raw);if(dictionary[key])return raw.replace(key,dictionary[key]);
-    const decorated=key.match(/^([▶■▱▦▧✎⌂☘↗⚙✓＋+\s]*)(.*?)([＋▾\s]*)$/u);
+    const decorated=key.match(/^([▶■▱▦▧✎⌂☘⇋◍↗⚙✓＋+\s]*)(.*?)([＋▾\s]*)$/u);
     if(decorated&&dictionary[decorated[2]])return decorated[1]+dictionary[decorated[2]]+decorated[3];
     const photoRetry=key.match(/^Chưa lưu được ảnh · giữ đúng kết quả và thử lại: (.+)$/);if(photoRetry)return 'Image not saved yet · Retrying the same result: '+t(photoRetry[1]);
     const retry=key.match(/^Chưa lưu được video · giữ đúng kết quả và thử tải lại: (.+)$/);if(retry)return 'Video not saved yet · Retrying the same result: '+t(retry[1]);
     const expiry=key.match(/^(.*?) Hạn: (.+)$/);if(expiry)return t(expiry[1])+' Expires: '+expiry[2];
     const patterns=[
+      [/^(\d+) phút \(chạy thử, ít clip\)$/,m=>m[1]+(m[1]==='1'?' minute':' minutes')+' (trial run, fewer clips)'],
+      [/^Video khoảng (\d+) phút = (\d+) mốc → (\d+) ảnh nền chung \+ (\d+) clip \(mỗi clip (\d+) giây, hai clip mỗi mốc\)\. Tạo ảnh và clip trên Muse mất nhiều giờ: cứ để máy chạy, tool tự thử lại clip lỗi và tự dựng video khi đủ clip\.$/,m=>'About '+m[1]+(m[1]==='1'?' minute':' minutes')+' = '+m[2]+' moments → '+m[3]+' shared background images + '+m[4]+' clips (each clip '+m[5]+' seconds, two clips per moment). Making the images and clips on Muse takes many hours: just leave the computer running; the tool retries failed clips by itself and builds the video once every clip is ready.'],
+      [/^Nhạc nền: (.+)$/,m=>'Background music: '+m[1]],
+      [/^Nhạc nền phải là (.+)\.$/,m=>'Background music must be '+m[1]+'.'],
+      [/^Đang viết kịch bản · (\d+)\/(\d+|\?) mốc$/,m=>'Writing the script · '+m[1]+'/'+m[2]+' moments'],
+      [/^(Đang chạy|Tạm dừng) · (\d+)\/(\d+) clip$/,m=>(m[1]==='Đang chạy'?'Running':'Paused')+' · '+m[2]+'/'+m[3]+' clips'],
+      [/^(\d+)\/(\d+) clip$/,m=>m[1]+'/'+m[2]+' clips'],
+      [/^(\d+) \/ (\d+) clip đã lưu$/,m=>m[1]+' / '+m[2]+' clips saved'],
+      [/^Video hoàn chỉnh(?: \((\d+) phút (\d+) giây\))?: (.+)\. Xem file ghi chú đăng video \(ghi-chu-dang-video\.txt\) trong cùng thư mục\.$/,m=>'Finished video'+(m[1]?' ('+m[1]+' min '+m[2]+' s)':'')+': '+m[3]+'. See the posting-notes file (ghi-chu-dang-video.txt) in the same folder.'],
+      [/^Đã viết (\d+) mốc, bắt đầu tạo ảnh nền và clip…$/,m=>'Wrote '+m[1]+' moments, starting the background images and clips…'],
+      [/^Đã viết (\d+)\/(\d+) mốc$/,m=>'Written '+m[1]+'/'+m[2]+' moments'],
+      [/^Muse đã viết xong kịch bản \((\d+) mốc\)$/,m=>'Muse finished the script ('+m[1]+' moments)'],
+      [/^Kịch bản mới có (\d+)\/(\d+) mốc\. Bấm «Viết tiếp»\.$/,m=>'The script only has '+m[1]+'/'+m[2]+' moments. Click “Continue writing”.'],
+      [/^Muse viết thiếu hoặc sai khuôn mốc (.+)\. Bấm «Viết tiếp» để Muse làm tiếp từ chỗ này\.$/,m=>'Muse left out or malformed moments '+m[1]+'. Click “Continue writing” so Muse carries on from here.'],
+      [/^(Lập hồ sơ phim|Viết kịch bản (\d+)\/(\d+) \(mốc (\d+)–(\d+)\)) · (.+)$/,m=>{const head=m[2]?'Writing the script '+m[2]+'/'+m[3]+' (moments '+m[4]+'–'+m[5]+')':'Drawing up the outline';const tail=m[6].replace(/^chuẩn bị yêu cầu…$/,'preparing the request…').replace(/^đang gửi cho Muse…$/,'sending to Muse…').replace(/^chờ ô chat Muse \(đăng nhập nếu cần\)…$/,'waiting for the Muse chat box (sign in if needed)…').replace(/^Muse còn đang xử lý việc trước, chờ rảnh rồi mới gửi…$/,'Muse is still busy with the previous task, waiting until it is free…').replace(/^Muse đang viết(?: \(đã (\d+) cảnh\))?…$/,(x,n)=>'Muse is writing'+(n?' ('+n+' scenes so far)':'')+'…');return head+' · '+tail;}],
+      [/^Còn mốc chưa có đủ hai clip \((.+)\)\. Chạy hàng đợi cho xong rồi dựng\.$/,m=>'Some moments do not have both clips yet ('+m[1]+'). Let the queue finish, then build.'],
+      [/^Đang dựng (\d+)\/(\d+) mốc…$/,m=>'Building moment '+m[1]+'/'+m[2]+'…'],
+      [/^Mốc (\d+) thiếu luồng video\.$/,m=>'Moment '+m[1]+' has no video stream.'],
       [/^Phiên bản (.+)$/,m=>'Version '+m[1]],
       [/^Giọng Microsoft miễn phí: (\d+) giọng, nhiều ngôn ngữ \(✓ = hợp ngôn ngữ kịch bản\), cần có mạng khi đọc\.(?: (.+))?$/,m=>'Free Microsoft voices: '+m[1]+' voices, many languages (✓ = matches the script language), internet needed when reading.'+(m[2]?' '+t(m[2]):'')],
       [/^Chưa tải được danh sách giọng Microsoft \((.+)\)\. Đang dùng danh sách có sẵn\.$/,m=>'Could not load the Microsoft voice list ('+m[1]+'). Using the built-in list.'],

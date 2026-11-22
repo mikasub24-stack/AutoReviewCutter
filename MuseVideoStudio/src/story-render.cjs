@@ -276,4 +276,4 @@ async function measureScenes({ scenes, ffmpeg = 'ffmpeg' }) {
   });
 }
 
-module.exports = { SIZES, SFX, SFX_BELOW, loudness, sfxGain, TAIL, MIN_SCENE, FPS, dimensions, sceneLength, videoArgs, audioArgs, parallelism, voicePauses, assembleStory, measureScenes, probe };
+module.exports = { SIZES, SFX, SFX_BELOW, loudness, sfxGain, TAIL, MIN_SCENE, FPS, dimensions, sceneLength, videoArgs, audioArgs, parallelism, voicePauses, assembleStory, measureScenes, probe, run, pool, freeName };

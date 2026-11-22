@@ -90,9 +90,9 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     const calls = name => page.evaluate(n => window.calls.filter(c => c.name === n), name);
     const flush = () => page.evaluate(() => new Promise(r => setTimeout(r, 150)));
 
-    // 1) Nút tab nằm ngay dưới «Động vật hoang dã»; gói 30 ngày thấy khóa.
+    // 1) Nút tab nằm ngay dưới «So sánh song song» (sau «Động vật hoang dã»); gói 30 ngày thấy khóa.
     const order = await page.evaluate(() => [...document.querySelectorAll('aside nav button')].map(b => b.id));
-    assert.ok(order.indexOf('navMap') === order.indexOf('navWild') + 1, 'tab Bản đồ nằm ngay dưới Động vật: ' + order.join(','));
+    assert.ok(order.indexOf('navMap') === order.indexOf('navPair') + 1 && order.indexOf('navPair') === order.indexOf('navWild') + 1, 'tab Bản đồ nằm ngay dưới So sánh song song, sau Động vật: ' + order.join(','));
     await page.click('#navMap');
     assert.equal(await page.locator('#mapPanel').isVisible(), true);
     for (const id of ['wildPanel', 'restorePanel', 'storyPanel', 'editorPanel', 'queueWorkspace']) assert.equal(await page.locator('#' + id).isVisible(), false, id + ' phải ẩn');

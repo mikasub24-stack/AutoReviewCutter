@@ -24,8 +24,14 @@ const wildPlan=require('./wild-plan.js');
 const {createWildWriter}=require('./wild-write.cjs');
 // Tab «Động vật hoang dã»: mỗi phim một thư mục DongVat/<mã phim>; hai tab chuỗi cảnh (Dọn nhà, Động vật) dùng chung luật nối khung cuối.
 const wildFolder=(output,id)=>path.join(output,'DongVat',String(id||'Phim').replace(/[^\w-]/g,'')||'Phim');
-const isChained=job=>job.kind==='restore'||job.kind==='wild';
-const chainFolder=job=>job.kind==='wild'?wildFolder(settings.output,job.storyId):restoreFolder(settings.output,job.storyId);
+const pairPlan=require('./pair-plan.js');
+const {createPairWriter}=require('./pair-write.cjs');
+const {assemblePair}=require('./pair-render.cjs');
+const {createWindowHud}=require('./pair-hud-window.cjs');
+// Tab «So sánh song song»: mỗi video một thư mục SoSanh/<mã>.
+const pairFolder=(output,id)=>path.join(output,'SoSanh',String(id||'Phim').replace(/[^\w-]/g,'')||'Phim');
+const isChained=job=>job.kind==='restore'||job.kind==='wild'||job.kind==='pair';
+const chainFolder=job=>job.kind==='wild'?wildFolder(settings.output,job.storyId):job.kind==='pair'?pairFolder(settings.output,job.storyId):restoreFolder(settings.output,job.storyId);
 const {createStoryAnalyzer}=require('./story-analyze.cjs');
 const mapPlan=require('./maphist-plan.js');
 const {createMapWriter}=require('./maphist-write.cjs');
@@ -34,7 +40,7 @@ const {createMapService}=require('./maphist-service.cjs');
 const {createWindowFrames}=require('./maphist-frames.cjs');
 // Tab «Bản đồ lịch sử»: mỗi video một thư mục BanDo/<mã>.
 const mapFolder=(output,id)=>path.join(output,'BanDo',String(id||'BanDo').replace(/[^\w-]/g,'')||'BanDo');
-let licenseManager,paymentDetails,voiceService,storyService,storyAnalyzer,wildBuilder,wildWriter,mapWriter,mapService;
+let licenseManager,paymentDetails,voiceService,storyService,storyAnalyzer,wildBuilder,wildWriter,mapWriter,mapService,pairWriter,pairHud;
 let handlers;   // các lệnh IPC; khai báo ngoài hàm khởi tạo để các hàm chạy nền (tự chạy lại sau hết hạn mức, tab Động vật) gọi được handlers.start
 const { mergeVideos, checkTools } = require('./merge.cjs');
 const { exportEditPackage } = require('./edit-package.cjs');
@@ -66,7 +72,7 @@ const defaults = { language:'en', accountSessionIds:{}, dispatchMode:'parallel',
 function ui(vi,en){return settings?.language==='vi'?vi:en;}
 async function atomic(file, data) { await fs.writeFile(file + '.tmp', JSON.stringify(data, null, 2)); await fs.rename(file + '.tmp', file); }
 function snapshot() {
-  return {version:app.getVersion?.()||require('../package.json').version,jobs:queue.jobs,resting:queue.exhaustedAccounts().sort((a,b)=>a-b),restingUntil:queue.exhausted.size?queue.nextExhaustedAt():0,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,restore:{...restoreState,stories:settings.restoreStories||{}},wild:{...wildState,stories:settings.wildStories||{},write:wildWriter?.status()||{},build:wildBuilder?.status()||{}},maphist:{...mapState,runs:settings.mapRuns||{},write:mapWriter?.status()||{},build:mapService?.status()||{}},story:{...(storyService?.status()||{}),analyze:storyAnalyzer?.status()||{},voice:voiceService?.status()||{}},
+  return {version:app.getVersion?.()||require('../package.json').version,jobs:queue.jobs,resting:queue.exhaustedAccounts().sort((a,b)=>a-b),restingUntil:queue.exhausted.size?queue.nextExhaustedAt():0,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,restore:{...restoreState,stories:settings.restoreStories||{}},wild:{...wildState,stories:settings.wildStories||{},write:wildWriter?.status()||{},build:wildBuilder?.status()||{}},pair:{...pairState,stories:settings.pairStories||{},write:pairWriter?.status()||{}},maphist:{...mapState,runs:settings.mapRuns||{},write:mapWriter?.status()||{},build:mapService?.status()||{}},story:{...(storyService?.status()||{}),analyze:storyAnalyzer?.status()||{},voice:voiceService?.status()||{}},
     flow:{open:Boolean(flowBrowser&&!flowBrowser.isClosed()),opening:Boolean(flowLaunch)},
     accounts:Array.from({length:Math.max(settings.accountCount,MAX_ACCOUNTS)},(_,index)=>{
       const browser=browsers.get(index),external=settings.browserChoice !== 'builtin';
@@ -165,13 +171,13 @@ async function openMuse(index = 0) {
 }
 
 function accountOperationBusy() {
-  return testing || queue.active || starting || stopping || merging || packaging || opening.size || externalLaunches.size || Boolean(storyAnalyzer?.busy) || Boolean(wildWriter?.busy) || Boolean(mapWriter?.busy);
+  return testing || queue.active || starting || stopping || merging || packaging || opening.size || externalLaunches.size || Boolean(storyAnalyzer?.busy) || Boolean(wildWriter?.busy) || Boolean(pairWriter?.busy) || Boolean(mapWriter?.busy);
 }
 // Tài khoản Muse đang mở mà rảnh để viết kịch bản bản đồ: tài khoản 1 bận (hàng đợi, phân tích truyện…) thì dùng tài khoản khác (xem account-pick.cjs).
 const museLeases = new Map();
 function leaseMuseAccount(owner) {
   if (testing || starting || stopping || externalLaunches.size || resettingAccounts.size || opening.size) return null;
-  const taken = takenAccounts({ leases: [...museLeases.keys()], accountOneBusy: Boolean(storyAnalyzer?.busy || wildWriter?.busy), queueActive: queue.active, jobs: queue.jobs, accountCount: settings.accountCount });
+  const taken = takenAccounts({ leases: [...museLeases.keys()], accountOneBusy: Boolean(storyAnalyzer?.busy || wildWriter?.busy || pairWriter?.busy), queueActive: queue.active, jobs: queue.jobs, accountCount: settings.accountCount });
   const pick = pickAccount({ taken, max: MAX_ACCOUNTS, isOpen: i => { const browser = browsers.get(i); return Boolean(browser && !browser.isDestroyed() && browser.museStarted); } });
   if (pick < 0) return null;
   museLeases.set(pick, owner); notify();
@@ -349,7 +355,7 @@ async function finishVideoFile(job,temporary,outputDir,signal){
   const target=await saveOrderedOutput(temporary,outputDir,job,format.extension);
   job.downloadCompletedAt=new Date().toISOString();
   if(isChained(job)&&job.phase==='clip')await restoreFrameGuard(job,target);
-  if(isChained(job))job.lastFrame=await saveLastFrame(job,target);
+  if(isChained(job)&&job.kind!=='pair')job.lastFrame=await saveLastFrame(job,target);
   return target;
 }
 const imageDirectory=()=>path.join(settings.output,'Anh');
@@ -626,7 +632,7 @@ async function remoteStopJob(job){
 }
 async function stopAll(){
   if(stopping){while(stopping)await delay(50);return snapshot();}
-  storyAnalyzer?.cancel();wildWriter?.cancel();wildBuilder?.cancel();
+  storyAnalyzer?.cancel();wildWriter?.cancel();wildBuilder?.cancel();pairWriter?.cancel();pairController?.abort();
   stopping=true;lastStopAt=Date.now();clearTimeout(quotaTimer);quotaTimer=null;clearTimeout(rebalanceTimer);rebalanceTimer=null;rebalanceEpoch++;runEpoch++;starting=false;probeController?.abort();queue.pause();
   const probes=[...browserTests.values()].filter(t=>testing&&t.mayHaveSubmitted&&t.status!=='ready').map(t=>({id:t.id,trackerId:t.id,account:t.index+1,mayHaveSubmitted:true}));
   const jobs=[...queue.jobs.filter(j=>!probes.some(t=>t.account===j.account)&&(j.status==='running'||(['failed','interrupted'].includes(j.status)&&j.mayHaveSubmitted&&!['confirmed','ui-stopped'].includes(j.remoteStop?.state)))),...probes];notify();
@@ -791,7 +797,7 @@ function restoreQuotaResume(kind='restore'){
   notify();
 }
 async function restoreAutoRetry({retry,start,kind='restore'}){
-  const planFor=kind==='wild'?wildPlan:restorePlan;
+  const planFor=kind==='wild'?wildPlan:kind==='pair'?pairPlan:restorePlan;
   if(restoreRetrying||stopping||flushingQuit||queue.active||starting||merging||packaging)return;
   const job=queue.jobs.find(j=>j.kind===kind&&j.status==='failed'&&(j.autoRetries||0)<RESTORE_RETRIES&&!/gói Năm|Vĩnh viễn|FFmpeg|ffprobe|key/i.test(j.error||''));
   if(!job||lastStopAt>=(Date.parse(job.finishedAt||'')||0))return;       // người dùng đã bấm Dừng sau khi cảnh lỗi: để yên
@@ -972,6 +978,91 @@ async function runWild(storyId){
     wildState={busy:false,phase:'',progress:'',error:e.name==='AbortError'?'Đã dừng viết kịch bản. Bấm «Viết tiếp» để làm tiếp từ chỗ dở.':e.message,storyId};
   }finally{await wildDraftChain;await save();notify();}
 }
+// ---- Tab «So sánh song song»: chủ đề (có thể để trống: Muse tự chọn) → Muse viết kịch bản (hồ sơ + từng phần 8 mốc) → mỗi mốc một ảnh nền chung → hai clip trái / phải xuất phát từ ảnh đó → giọng đọc + chữ canvas + âm thanh → MP4.
+// Toàn bộ chạy ở tiến trình chính; kịch bản lưu nháp sau mỗi lượt để «Viết tiếp» khi Muse lỗi giữa chừng.
+let pairState={busy:false,phase:'',progress:'',error:'',storyId:''};
+let pairDraftChain=Promise.resolve(),pairController=null;
+// Clip số 2n-1 là bên TRÁI của mốc n, clip số 2n là bên PHẢI (hàng đợi không giữ trường beat/side nên suy ra từ số thứ tự).
+const pairClips=storyId=>queue.jobs.filter(j=>j.kind==='pair'&&j.phase==='clip'&&j.storyId===storyId).sort((a,b)=>(a.number||0)-(b.number||0));
+const pairDone=clips=>clips.length>0&&clips.every(j=>j.status==='completed'&&j.output);
+const pairBeatClips=clips=>{const by=new Map();for(const j of clips){const n=Math.ceil((j.number||0)/2);const e=by.get(n)||{number:n};e[(j.number||0)%2?'left':'right']=j.output;by.set(n,e);}return [...by.values()].sort((a,b)=>a.number-b.number);};
+const pairDraftFile=storyId=>path.join(pairFolder(settings.output,storyId),'kich-ban.json');
+async function readPairDraft(storyId){try{return JSON.parse(await fs.readFile(pairDraftFile(storyId),'utf8'));}catch{return null;}}
+function savePairDraft(storyId,draft){
+  const file=pairDraftFile(storyId);
+  pairDraftChain=pairDraftChain.then(async()=>{await fs.mkdir(path.dirname(file),{recursive:true});await atomic(file,draft);}).catch(()=>{});
+  return pairDraftChain;
+}
+function prunePairStories(){
+  const ids=new Set(queue.jobs.filter(j=>j.kind==='pair').map(j=>j.storyId));
+  const all=settings.pairStories||(settings.pairStories={});
+  for(const [id,meta] of Object.entries(all))if(!ids.has(id)&&meta.status!=='writing')delete all[id];
+}
+const pairInput=meta=>({topic:meta.topic,left:meta.left,right:meta.right,minutes:meta.minutes,lang:meta.lang,layout:meta.layout,
+  avoid:Object.values(settings.pairStories||{}).filter(m=>m!==meta).map(m=>m.title||m.topic).filter(Boolean).slice(-12)});
+async function writePairNotes(storyId,meta,draft){
+  if(!draft?.script)return;
+  const text=pairPlan.notesText(pairInput(meta),draft.script,{builtAt:new Date().toLocaleString('vi-VN')});
+  await fs.writeFile(path.join(pairFolder(settings.output,storyId),'ghi-chu-dang-video.txt'),text,'utf8').catch(()=>{});
+}
+// Giọng đọc + chữ canvas + âm thanh + ghép MP4 (pair-render.cjs). Cửa sổ vẽ chữ chỉ mở trong lúc dựng.
+async function buildPairStory(storyId){
+  const meta=settings.pairStories?.[storyId];
+  if(!meta)throw Error('Không thấy thông tin video này.');
+  const clips=pairClips(storyId);
+  if(!pairDone(clips))throw Error('Chỉ dựng video khi mọi clip đã xong.');
+  const draft=await readPairDraft(storyId);
+  if(!draft?.script)throw Error('Không thấy kịch bản đã lưu của video này.');
+  pairState={busy:true,phase:'build',progress:'Đang đóng trình duyệt để nhường RAM…',error:'',storyId};meta.status='building';notify();
+  pairController=new AbortController();
+  try{
+    await licenseManager.requireLongTerm();
+    await closeAllBrowsers().catch(()=>{});
+    const v=meta.voice||{};
+    const result=await assemblePair({
+      script:draft.script,config:{voice:v.engine==='edge'?v.voice:'',tempo:v.tempo||1,music:meta.music||'',musicVolume:meta.musicVolume,ambience:meta.ambience,layout:meta.layout,lang:meta.lang},
+      clips:pairBeatClips(clips),hud:pairHud,voice:voiceService,dir:pairFolder(settings.output,storyId),name:meta.name||storyId,ffmpeg:settings.ffmpeg||'ffmpeg',signal:pairController.signal,
+      onProgress:text=>{pairState.progress=text;notify();}
+    });
+    Object.assign(meta,{output:result.output,cover:result.cover,seconds:result.seconds,builtAt:Date.now(),clipSig:clips.map(j=>j.output).join('|')});
+    await writePairNotes(storyId,meta,draft);
+    meta.status='built';
+    pairState={busy:false,phase:'done',progress:'Video đã dựng xong',error:'',storyId};
+  }catch(e){
+    meta.status='queued';
+    pairState={busy:false,phase:'',progress:'',error:e.name==='AbortError'||/Đã dừng/.test(e.message)?'Đã dừng dựng video. Bấm «Dựng video» để làm lại.':e.message,storyId};
+  }
+  finally{pairController=null;pairHud?.close();await save();notify();}
+}
+// Sau khi hàng đợi chạy xong: video nào đủ clip và chưa dựng đúng bản clip này thì dựng.
+async function buildPairStories({auto=false}={}){
+  if(pairState.busy||merging||packaging)return;
+  for(const [storyId,meta] of Object.entries(settings.pairStories||{})){
+    const clips=pairClips(storyId);
+    if(!pairDone(clips))continue;
+    if(auto&&(!meta.auto||meta.clipSig===clips.map(j=>j.output).join('|')))continue;
+    try{await buildPairStory(storyId);}catch(e){pairState={busy:false,phase:'',progress:'',error:e.message,storyId};notify();}   // thiếu bản nháp...: báo lỗi trên tab, không làm hỏng việc đang chạy
+  }
+}
+// Viết kịch bản bằng Muse, thêm việc vào hàng đợi rồi tự chạy. Lỗi hoặc bấm Dừng giữa chừng: giữ bản nháp, «Viết tiếp» làm tiếp từ chỗ dở.
+async function runPair(storyId){
+  const meta=settings.pairStories?.[storyId];
+  if(!meta)return;
+  pairState={busy:true,phase:'write',progress:meta.topic?'Muse đang lập kịch bản…':'Muse đang chọn chủ đề và lập kịch bản…',error:'',storyId};notify();
+  try{
+    const draft=await readPairDraft(storyId);
+    const result=await pairWriter.write({options:pairInput(meta),resume:draft&&!draft.final?draft:null,onDraft:d=>{void savePairDraft(storyId,d);}});
+    const jobs=pairPlan.buildJobs(result.config,result.script,{storyId});
+    await savePairDraft(storyId,{bible:result.bible,beats:result.script.beats,script:result.script,final:true});
+    if(!queue.jobs.some(j=>j.kind==='pair'&&j.storyId===storyId))await queue.add(jobs);
+    Object.assign(meta,{name:result.script.title,title:result.script.title,left:result.script.left,right:result.script.right,meter:result.script.meter,status:'queued',beatCount:result.script.beats.length});
+    await save();
+    pairState={busy:false,phase:'queued',progress:`Đã viết ${result.script.beats.length} mốc, bắt đầu tạo ảnh nền và clip…`,error:'',storyId};notify();
+    if(!queue.active&&!starting){try{await handlers.start({kind:'pair'});}catch(e){pairState={...pairState,error:e.message};}}
+  }catch(e){
+    pairState={busy:false,phase:'',progress:'',error:e.name==='AbortError'?'Đã dừng viết kịch bản. Bấm «Viết tiếp» để làm tiếp từ chỗ dở.':e.message,storyId};
+  }finally{await pairDraftChain;await save();notify();}
+}
 function invalidateOutputs() {
   mergedOutput='';mergeProgress='';mergeError='';editPackageDir='';packageProgress='';packageError='';
 }
@@ -1010,8 +1101,11 @@ app.whenReady().then(async () => {
   storyAnalyzer=createStoryAnalyzer({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.ensureAllowed()});
   wildBuilder=createStoryService({getSettings:()=>settings,getJobs:()=>queue.jobs,voice:voiceService,ensureAllowed:()=>licenseManager.requireLongTerm(),notify,userDataDir:app.getPath('userData'),kind:'wild',folderOf:wildFolder,runName:'wild-run'});
   wildWriter=createWildWriter({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.requireLongTerm()});
+  pairHud=createWindowHud({BrowserWindow});
+  pairWriter=createPairWriter({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.requireLongTerm()});
   mapService=createMapService({getSettings:()=>settings,voice:voiceService,ensureAllowed:()=>licenseManager.requireLongTerm(),notify,...(()=>{const f=createWindowFrames({BrowserWindow,ipcMain});return{renderFrames:f.renderFrames,renderStill:f.renderStill};})(),userDataDir:app.getPath('userData')});
   mapWriter=createMapWriter({geo:()=>mapGeoObject,dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,leaseAccount:owner=>leaseMuseAccount(owner),ensureAllowed:()=>licenseManager.requireLongTerm()});
+  for(const m of Object.values(settings.pairStories||{}))if(m.status==='building')m.status='queued';   // app tắt giữa lúc dựng: dựng lại được
   for(const run of Object.values(settings.mapRuns||{}))if(run.status==='writing'||run.status==='building')run.status=run.status==='writing'?'draft':'script';   // app tắt giữa chừng: cho làm tiếp
   await save();
   main = new BrowserWindow({ icon:path.join(__dirname,'assets','muse-studio.png'), width: 1450, height: 950, minWidth: 1000, minHeight: 700, backgroundColor: '#101114', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true } });
@@ -1105,7 +1199,7 @@ app.whenReady().then(async () => {
     },
     language:async value=>{if(!['vi','en'].includes(value))throw Error('Unsupported language');settings.language=value;await save();notify();return snapshot();},
     testBrowsers,
-    openOutput:async data=>{if(!settings.output)throw Error('Chọn thư mục lưu video trước.');const folder=data?.kind==='image'?imageDirectory():data?.kind==='story'?path.join(settings.output,'KeChuyen'):data?.kind==='restore'?path.join(settings.output,'DonNha'):data?.kind==='wild'?path.join(settings.output,'DongVat'):data?.kind==='maphist'?path.join(settings.output,'BanDo'):settings.output;await fs.mkdir(folder,{recursive:true});const error=await shell.openPath(folder);if(error)throw Error(error);},
+    openOutput:async data=>{if(!settings.output)throw Error('Chọn thư mục lưu video trước.');const folder=data?.kind==='image'?imageDirectory():data?.kind==='story'?path.join(settings.output,'KeChuyen'):data?.kind==='restore'?path.join(settings.output,'DonNha'):data?.kind==='wild'?path.join(settings.output,'DongVat'):data?.kind==='pair'?path.join(settings.output,'SoSanh'):data?.kind==='maphist'?path.join(settings.output,'BanDo'):settings.output;await fs.mkdir(folder,{recursive:true});const error=await shell.openPath(folder);if(error)throw Error(error);},
     activateKey:async token=>{await licenseManager.activate(token);notify();return snapshot();},
     add: async data => { if (merging || packaging) throw Error('Chờ xử lý đầu ra xong trước khi thêm prompt.'); if(Array.isArray(data)&&data.some(j=>j?.kind==='restore'))await licenseManager.requireLongTerm(); if(!(Array.isArray(data)&&data.length&&data.every(j=>j?.kind==='image'||j?.kind==='story'||j?.kind==='restore')))invalidateOutputs(); await queue.add(data); return snapshot(); },
     retryDownload: async id=>{
@@ -1195,7 +1289,7 @@ app.whenReady().then(async () => {
           browsers.get(Number(job.account)-1)?.releasePage?.(id);
         }
         invalidateOutputs();
-        const lastFrame=isChained(job)?await saveLastFrame(job,target):'';
+        const lastFrame=isChained(job)&&job.kind!=='pair'?await saveLastFrame(job,target):'';
         await queue.attachManual(id,target);
         if(lastFrame){const done=queue.jobs.find(j=>j.id===id);if(done)done.lastFrame=lastFrame;}
       }catch(error){
@@ -1269,17 +1363,17 @@ app.whenReady().then(async () => {
     },
     logoutAccount: async index => {await logoutAccount(Number(index??0));return snapshot();},
     start: async data => {
-      const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':data?.kind==='restore'?'restore':data?.kind==='wild'?'wild':'video';
+      const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':data?.kind==='restore'?'restore':data?.kind==='wild'?'wild':data?.kind==='pair'?'pair':'video';
       if(merging || packaging) throw Error('Đang xử lý đầu ra video.');
       if(storyAnalyzer?.busy) throw Error('Muse đang phân tích câu chuyện. Chờ xong hoặc bấm Dừng phân tích.');
-      if(wildWriter?.busy) throw Error('Muse đang viết kịch bản phim. Chờ xong hoặc bấm Dừng.');
+      if(wildWriter?.busy||pairWriter?.busy) throw Error('Muse đang viết kịch bản phim. Chờ xong hoặc bấm Dừng.');
       if(resettingAccounts.size) throw Error('Chờ đăng xuất tài khoản hoàn tất trước khi chạy.');
             if(queue.active || starting || stopping) return snapshot();
       const epoch=runEpoch;starting=true;startError='';notify();
       try {
         if(testing){probeController?.abort();await Promise.allSettled([...probeMutations]);await probeSettled;}
         if(epoch!==runEpoch || flushingQuit)return snapshot();
-        if(kind==='restore'||kind==='wild'){await licenseManager.requireLongTerm();await checkTools(settings.ffmpeg).catch(()=>{throw Error((kind==='wild'?'Tab «Động vật hoang dã»':'Tab «Dọn nhà · Sinh tồn»')+' cần FFmpeg để nối cảnh và dựng video. Chọn ffmpeg.exe (cùng thư mục ffprobe.exe) ở «Kết nối & cài đặt».');});}
+        if(kind==='restore'||kind==='wild'||kind==='pair'){await licenseManager.requireLongTerm();await checkTools(settings.ffmpeg).catch(()=>{throw Error((kind==='wild'?'Tab «Động vật hoang dã»':kind==='pair'?'Tab «So sánh song song»':'Tab «Dọn nhà · Sinh tồn»')+' cần FFmpeg để nối cảnh và dựng video. Chọn ffmpeg.exe (cùng thư mục ffprobe.exe) ở «Kết nối & cài đặt».');});}
         else await licenseManager.ensureAllowed();
         if(epoch!==runEpoch || flushingQuit)return snapshot();
         const pendingRestore=kind==='restore'?queue.jobs.filter(j=>j.kind==='restore'&&j.status!=='completed'):[];
@@ -1327,6 +1421,8 @@ app.whenReady().then(async () => {
           if(kind==='restore' && queue.paused && !flushingQuit){ void restoreAutoRetry({retry:id=>handlers.retry(id),start:()=>handlers.start({kind:'restore',auto:true})}); restoreQuotaResume(); }
           if(kind==='wild' && !queue.paused && !flushingQuit) await buildWildStories({auto:true});
           if(kind==='wild' && queue.paused && !flushingQuit){ void restoreAutoRetry({kind:'wild',retry:id=>handlers.retry(id),start:()=>handlers.start({kind:'wild',auto:true})}); restoreQuotaResume('wild'); }
+          if(kind==='pair' && !queue.paused && !flushingQuit) await buildPairStories({auto:true});
+          if(kind==='pair' && queue.paused && !flushingQuit){ void restoreAutoRetry({kind:'pair',retry:id=>handlers.retry(id),start:()=>handlers.start({kind:'pair',auto:true})}); restoreQuotaResume('pair'); }
         }).catch(e=>dialog.showErrorBox(ui('Lỗi xử lý hàng đợi','Queue processing error'),e.message)).finally(notify);
         return snapshot();
       } catch(e){startError=e.message;throw e;} finally {if(epoch===runEpoch)starting=false;notify();}
@@ -1633,6 +1729,75 @@ app.whenReady().then(async () => {
       else if(settings.output&&meta){await fs.mkdir(wildFolder(settings.output,id),{recursive:true});await shell.openPath(wildFolder(settings.output,id));}
       return true;
     },
+    // Tab «So sánh song song»: chủ đề có thể để trống (Muse tự chọn); mọi bước sau tự chạy ở nền (trả về ngay, theo dõi tiến độ qua state.pair).
+    pairMake: async data => {
+      if(merging||packaging)throw Error('Chờ xử lý đầu ra xong trước khi làm video mới.');
+      if(pairState.busy||pairWriter?.busy)throw Error('Đang làm video, chờ xong hoặc bấm Dừng.');
+      if(queue.active||starting)throw Error('Hàng đợi đang chạy. Dừng hàng đợi trước khi làm video mới.');
+      await licenseManager.requireLongTerm();
+      if(!settings.output)throw Error('Chọn thư mục lưu video trước.');
+      await checkTools(settings.ffmpeg).catch(()=>{throw Error('Tab «So sánh song song» cần FFmpeg để ghép video. Chọn ffmpeg.exe (cùng thư mục ffprobe.exe) ở «Kết nối & cài đặt».');});
+      const all=settings.pairStories||(settings.pairStories={});
+      const resumeId=String(data?.resumeId||'');
+      let storyId,meta;
+      if(resumeId&&all[resumeId]?.status==='writing'){storyId=resumeId;meta=all[resumeId];}
+      else{
+        const config=pairPlan.options(data);
+        const bad=pairPlan.problems(config);
+        if(bad.length)throw Error(bad[0]);
+        const pick=String(data?.voice?.voice||'');
+        const voice={engine:pick?'edge':'none',voice:pick,tempo:Math.min(1.5,Math.max(0.7,Number(data?.voice?.tempo)||1)),volume:1};
+        const ready=voiceService?.status()?.ready||{};
+        if(voice.engine==='edge'&&!ready.edge)throw Error('Chưa cài giọng Microsoft (miễn phí). Bấm «Cài giọng miễn phí» ở mục Giọng đọc, đợi cài xong rồi làm video.');
+        const music=String(data?.music||'');
+        if(music){
+          if(!MUSIC_EXT.has(path.extname(music).toLowerCase()))throw Error('Nhạc nền phải là '+[...MUSIC_EXT].join(', ')+'.');
+          if(!await fs.stat(music).then(x=>x.isFile(),()=>false))throw Error('Không mở được file nhạc nền. Chọn lại file nhạc.');
+        }
+        storyId=await freeStoryId(pairPlan.storyIdBase(config),{output:settings.output,jobs:queue.jobs,folderOf:pairFolder,fallback:'SS-phim'});
+        meta=all[storyId]={topic:config.topic,left:config.left,right:config.right,minutes:config.minutes,lang:config.lang,layout:config.layout,voice,music,musicVolume:Math.min(.6,Math.max(0,Number(data?.musicVolume)||.14)),ambience:.45,auto:true,status:'writing',name:config.topic||'',createdAt:Date.now()};
+        for(const id of Object.keys(all).slice(0,Math.max(0,Object.keys(all).length-40)))delete all[id];
+      }
+      await fs.mkdir(pairFolder(settings.output,storyId),{recursive:true});
+      await save();notify();
+      void runPair(storyId);
+      return {storyId};
+    },
+    pairCancel: async()=>{pairWriter?.cancel();pairController?.abort();return snapshot();},
+    // Dựng (lại) video từ các clip đã xong, ví dụ sau khi «Tạo lại» một clip hoặc đổi giọng / nhạc.
+    pairBuild: async data => {
+      if(queue.active||starting||merging||packaging||pairState.busy)throw Error('Chờ xử lý hiện tại hoàn tất.');
+      const meta=settings.pairStories?.[String(data?.storyId||'')];
+      if(!meta)throw Error('Không thấy video này.');
+      const storyId=String(data.storyId);
+      if(!pairDone(pairClips(storyId)))throw Error('Chỉ dựng video khi mọi clip đã xong.');
+      if(!(await readPairDraft(storyId))?.script)throw Error('Không thấy kịch bản đã lưu của video này.');
+      if(data?.voice&&typeof data.voice==='object'&&'voice' in data.voice){
+        const pick=String(data.voice.voice||'');
+        meta.voice={engine:pick?'edge':'none',voice:pick,tempo:Math.min(1.5,Math.max(0.7,Number(data.voice.tempo)||1)),volume:1};
+      }
+      if(typeof data?.music==='string'){
+        if(data.music&&!MUSIC_EXT.has(path.extname(data.music).toLowerCase()))throw Error('Nhạc nền phải là '+[...MUSIC_EXT].join(', ')+'.');
+        meta.music=data.music;
+      }
+      void buildPairStory(storyId).catch(e=>{pairState={busy:false,phase:'',progress:'',error:e.message,storyId};notify();});
+      return snapshot();
+    },
+    pairSave: async data => {
+      const out=settings.pairStories?.[String(data?.storyId||'')]?.output;
+      if(!out||!await fs.stat(out).then(s=>s.isFile(),()=>false))throw Error(ui('Chưa có video hoàn chỉnh để lưu.','There is no finished video to save yet.'));
+      const picked=await dialog.showSaveDialog(main,{title:ui('Lưu video về','Save video'),defaultPath:path.join(app.getPath('downloads'),path.basename(out)),filters:[{name:'MP4',extensions:['mp4']}]});
+      if(picked.canceled||!picked.filePath)return false;
+      const dest=/\.mp4$/i.test(picked.filePath)?picked.filePath:picked.filePath+'.mp4';
+      if(path.resolve(dest).toLowerCase()!==path.resolve(out).toLowerCase())await fs.copyFile(out,dest);
+      shell.showItemInFolder(dest);return{file:dest};
+    },
+    pairReveal: async data => {
+      const id=String(data?.storyId||''),meta=settings.pairStories?.[id];
+      if(meta?.output)shell.showItemInFolder(meta.output);
+      else if(settings.output&&meta){await fs.mkdir(pairFolder(settings.output,id),{recursive:true});await shell.openPath(pairFolder(settings.output,id));}
+      return true;
+    },
     restoreReveal: async data => { const out=settings.restoreStories?.[String(data?.storyId||'')]?.output;if(out)shell.showItemInFolder(out);return true; },
     chooseMusic: async () => { const r=await dialog.showOpenDialog(main,{properties:['openFile'],filters:[{name:ui('Nhạc nền','Background music'),extensions:['mp3','wav','m4a','aac','ogg','flac']}]});return r.canceled?'':r.filePaths[0]; },
     merge: async () => { await mergeProject(); return snapshot(); },
@@ -1650,10 +1815,10 @@ app.whenReady().then(async () => {
     },
     pause: stopAll,
     stop: stopAll,
-    clearPending: async data=>{if(merging||packaging)throw Error('Chờ xử lý đầu ra hoàn tất.');const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':data?.kind==='restore'?'restore':data?.kind==='wild'?'wild':data?.kind==='video'?'video':'';if(kind==='video'||kind==='')invalidateOutputs();await queue.clearPending(kind);return snapshot();},
+    clearPending: async data=>{if(merging||packaging)throw Error('Chờ xử lý đầu ra hoàn tất.');const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':data?.kind==='restore'?'restore':data?.kind==='wild'?'wild':data?.kind==='pair'?'pair':data?.kind==='video'?'video':'';if(kind==='video'||kind==='')invalidateOutputs();await queue.clearPending(kind);return snapshot();},
     clearList: async data=>{   // deleteFiles: Kể chuyện mặc định chuyển thư mục KeChuyen vào Thùng rác (false để giữ); tab khác chỉ khi deleteFiles:true (file đã tự lưu vào Thùng rác).
       if(stopping||merging||packaging)throw Error('Chờ xử lý đầu ra hoàn tất.');
-      const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':data?.kind==='restore'?'restore':data?.kind==='wild'?'wild':data?.kind==='video'?'video':'';
+      const kind=data?.kind==='image'?'image':data?.kind==='story'?'story':data?.kind==='restore'?'restore':data?.kind==='wild'?'wild':data?.kind==='pair'?'pair':data?.kind==='video'?'video':'';
       await stopAll();
       const mine=queue.jobs.filter(j=>!kind||j.kind===kind);
       for(const job of mine){browsers.get(Number(job.account)-1)?.releasePage?.(job.id);if(job.trackerId)void dom(browsers.get(Number(job.account)-1),endTracking,{id:job.trackerId}).catch(()=>{});}
@@ -1664,7 +1829,7 @@ app.whenReady().then(async () => {
       let trashed=0;
       if(storyIds.length&&data?.deleteFiles!==false)trashed+=await trashStoryFiles({ids:storyIds});
       if(saved)trashed+=await trashSaved(saved);
-      if(kind==='video'||kind==='')invalidateOutputs();if(kind==='restore'||kind==='')pruneRestoreStories();if(kind==='wild'||kind==='')pruneWildStories();
+      if(kind==='video'||kind==='')invalidateOutputs();if(kind==='restore'||kind==='')pruneRestoreStories();if(kind==='wild'||kind==='')pruneWildStories();if(kind==='pair'||kind==='')prunePairStories();
       await save();notify();return {...snapshot(),removed:{trashed}};
     },
     applyReferences: async data=>{

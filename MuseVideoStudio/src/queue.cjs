@@ -9,9 +9,9 @@ function abortable(promise,signal){
     Promise.resolve(promise).then(v=>{cleanup();resolve(v);},e=>{cleanup();reject(e);});
   });
 }
-const kindOf=k=>k==='image'?'image':k==='story'?'story':k==='restore'?'restore':k==='wild'?'wild':'video';
-// Hai tab chạy chuỗi cảnh nối khung cuối (Dọn nhà · Sinh tồn, Động vật hoang dã) dùng chung luật hết hạn mức / chạy song song theo chuỗi.
-const chained=j=>j.kind==='restore'||j.kind==='wild';
+const kindOf=k=>k==='image'?'image':k==='story'?'story':k==='restore'?'restore':k==='wild'?'wild':k==='pair'?'pair':'video';
+// Ba tab chạy việc phụ thuộc nhau (Dọn nhà · Sinh tồn và Động vật hoang dã nối khung cuối; So sánh song song: ảnh nền chung → hai clip) dùng chung luật hết hạn mức / chạy song song.
+const chained=j=>j.kind==='restore'||j.kind==='wild'||j.kind==='pair';
 // Tab «Dọn nhà · Sinh tồn» (kind 'restore'): cảnh k chỉ chạy sau cảnh k-1, và ảnh đầu của nó là KHUNG CUỐI THẬT của cảnh k-1.
 //   needs   = [{phase,number}]            những việc cùng truyện phải xong trước
 //   refList = [{file}|{phase,number,part}] ảnh đính kèm: tệp có sẵn, ảnh đã lưu của việc đó, hoặc khung cuối (part:'lastFrame') của clip đó
@@ -257,7 +257,7 @@ class Queue {
   }
   start(kind){
     if(this.active)return Promise.resolve();
-    this.kind=kind==='image'||kind==='video'||kind==='story'||kind==='restore'||kind==='wild'?kind:null;
+    this.kind=kind==='image'||kind==='video'||kind==='story'||kind==='restore'||kind==='wild'||kind==='pair'?kind:null;
     if(!Number.isInteger(this.concurrency)||this.concurrency<1)throw Error('Số tác vụ chạy đồng thời phải là số nguyên dương.');
     this.paused=false;this.active=true;
     this.runningPromise=(async()=>{

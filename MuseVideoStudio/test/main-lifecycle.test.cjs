@@ -28,7 +28,7 @@ const safeStorage = {
   }
 };
 
-async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, longTerm, wildWriterFactory, domTimeoutMs=20000, logoutResponse=1,closeResponse=1,closeGate } = {}) {
+async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, longTerm, wildWriterFactory, pairWriterFactory, pairHudFactory, domTimeoutMs=20000, logoutResponse=1,closeResponse=1,closeGate } = {}) {
   const handlers = new Map(), sessions = new Map(), windows = [], errors = [], notices = [], trashed = [];
   const lifecycle = [],updates=[];
   let loaded, quit;
@@ -103,6 +103,8 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
       if(name==='./license.cjs' && licenseGate){const real=localRequire(name);return{...real,createLicense:async options=>{const manager=await real.createLicense(options),ensure=manager.ensureAllowed;manager.ensureAllowed=async()=>{licenseGate.entered();await licenseGate.wait;return ensure();};return manager;}};}
       if(name==='./license.cjs' && longTerm){const real=localRequire(name);return{...real,createLicense:async options=>{const manager=await real.createLicense(options);manager.requireLongTerm=async()=>manager.ensureAllowed();return manager;}};}
       if(name==='./wild-write.cjs' && wildWriterFactory)return{createWildWriter:wildWriterFactory};
+      if(name==='./pair-write.cjs' && pairWriterFactory)return{createPairWriter:pairWriterFactory};
+      if(name==='./pair-hud-window.cjs' && pairHudFactory)return{createWindowHud:pairHudFactory};
       if(name === './electron-network-check.cjs') return {checkElectronNetwork:networkProbe || (async()=>({ip:'203.0.113.9',countryCode:'US',countryName:'United States',observedAt:new Date().toISOString()}))};
       if(name === './external-browser.cjs' && externalLauncher) return {launchExternalBrowser:externalLauncher};
       if(name === './browser-discovery.cjs' && browserResolver) return {resolveBrowser:browserResolver};
@@ -1112,6 +1114,125 @@ test('tab Động vật hoang dã: viết kịch bản → 130 cảnh + ảnh v�
     assert.match(notes, /nội dung bị thay đổi hoặc tổng hợp/);
     // tab Kể chuyện không bị đụng tới
     await assert.rejects(fs.access(path.join(dir, 'KeChuyen')));
+    await app.stop();
+  } finally { if (app && !app.lifecycle.includes('quit')) await app.stop(); await fs.rm(dir, { recursive: true, force: true }); }
+});
+
+// ---- Tab «So sánh song song»
+const pairPlanModule = require('../src/pair-plan.js');
+const pngPixel = (() => {
+  const zlib = require('node:zlib');
+  const chunk = (type, data) => { const body = Buffer.concat([Buffer.from(type), data]), out = Buffer.alloc(12 + data.length); out.writeUInt32BE(data.length, 0); body.copy(out, 4); out.writeUInt32BE(zlib.crc32(body) >>> 0, 8 + data.length); return out; };
+  const header = Buffer.alloc(13); header.writeUInt32BE(1, 0); header.writeUInt32BE(1, 4); header.set([8, 6, 0, 0, 0], 8);
+  return 'data:image/png;base64,' + Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', header), chunk('IDAT', zlib.deflateSync(Buffer.from([0, 255, 80, 40, 128]))), chunk('IEND', Buffer.alloc(0))]).toString('base64');
+})();
+const fakeHudFactory = log => () => ({
+  init: async o => { log.push(['init', o.layout, o.lang]); }, base: async () => pngPixel, tag: async () => pngPixel, caption: async () => pngPixel,
+  meterSeq: async (side, from, to) => from === to ? [pngPixel] : Array.from({ length: 24 }, () => pngPixel), intro: async () => pngPixel, outro: async lessons => [pngPixel, ...lessons.map(() => pngPixel)], close: () => { log.push(['close']); }
+});
+
+test('tab So sánh song song: chỉ gói Năm / Vĩnh viễn; không lưu gì khi bị khóa', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'muse-pair-guard-'));
+  let app;
+  try {
+    await fs.writeFile(path.join(dir, 'studio.json'), JSON.stringify({ configVersion: 2, settings: { output: dir, accountCount: 1 } }));
+    app = await boot(dir);
+    await assert.rejects(app.invoke('pairMake', { topic: 'Sleep', minutes: 1 }), /gói Năm|Vĩnh viễn/i);
+    assert.equal(Object.keys((await app.invoke('state')).pair.stories).length, 0);
+    await app.stop();
+  } finally { if (app && !app.lifecycle.includes('quit')) await app.stop(); await fs.rm(dir, { recursive: true, force: true }); }
+});
+
+test('tab So sánh song song: Muse tự chọn chủ đề → kịch bản → ảnh nền + 2 clip mỗi mốc vào hàng đợi riêng → dựng video, ghi chú, dọn danh sách', { skip: !wildFfmpeg && 'cần ffmpeg + ffprobe', timeout: 240000 }, async () => {
+  const { fakeMuse } = require('./fixtures/pair-fake-muse.cjs');
+  const { createPairWriter } = require('../src/pair-write.cjs');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'muse-pair-run-'));
+  let app;
+  const hudLog = [];
+  try {
+    await fs.writeFile(path.join(dir, 'studio.json'), JSON.stringify({ configVersion: 2, settings: { output: dir, accountCount: 1, cooldownSeconds: 0 } }));
+    let failing = true;
+    const fake = fakeMuse({ total: 7, topic: 'Sleeping on time and staying up late', bad: n => failing && n === 3 ? 'short' : '' });
+    app = await boot(dir, { longTerm: true, domTimeoutMs: 300, pairWriterFactory: options => createPairWriter({ ...options, ask: fake.ask, delay: async () => {} }), pairHudFactory: fakeHudFactory(hudLog) });
+    await assert.rejects(app.invoke('pairMake', { topic: '', minutes: 1, voice: { voice: 'en-US-GuyNeural' } }), /Chưa cài giọng Microsoft/);
+    assert.equal(fake.log.bible, 0, 'lỗi đầu vào thì chưa gửi gì cho Muse');
+    await assert.rejects(app.invoke('pairMake', { topic: '', minutes: 1, music: path.join(dir, 'x.txt'), voice: { voice: '' } }), /Nhạc nền phải là/);
+    assert.equal(Object.keys((await app.invoke('state')).pair.stories).length, 0, 'lỗi đầu vào thì không lưu video dở');
+
+    // Lần 1: Muse viết sai mốc 3 → dừng đúng chỗ, giữ nháp, hỏi «Viết tiếp».
+    const made = await app.invoke('pairMake', { topic: '', minutes: 1, lang: 'en', layout: 'side', voice: { voice: '' } });
+    assert.equal(made.storyId, 'SS-phim');
+    await until(() => { const p = app.invoke('state').pair; return !p.busy && p.error; }, 30000);
+    let state = await app.invoke('state');
+    assert.match(state.pair.error, /Viết tiếp/);
+    assert.equal(state.pair.stories['SS-phim'].status, 'writing');
+    assert.equal(state.jobs.filter(j => j.kind === 'pair').length, 0, 'chưa có việc khi kịch bản chưa đủ');
+    let draft1;
+    for (let i = 0; i < 50; i++) { draft1 = await fs.readFile(path.join(dir, 'SoSanh', 'SS-phim', 'kich-ban.json'), 'utf8').then(JSON.parse, () => null); if (draft1 && draft1.beats.length) break; await new Promise(r => setTimeout(r, 100)); }
+    assert.ok(!draft1.final && draft1.beats.length >= 2, 'giữ các mốc đã viết');
+    const askedBefore = fake.log.bible;
+
+    // Lần 2: «Viết tiếp» không hỏi lại hồ sơ, đủ 7 mốc → 7 ảnh + 14 clip, tự chạy hàng đợi.
+    failing = false;
+    await app.invoke('pairMake', { resumeId: 'SS-phim' });
+    await until(() => app.invoke('state').pair.stories['SS-phim']?.status === 'queued', 30000);
+    assert.equal(fake.log.bible, askedBefore, 'không hỏi lại hồ sơ');
+    await until(() => { const s = app.invoke('state'); return !s.starting && !s.active; }, 90000);
+    await new Promise(r => setTimeout(r, 150));
+    state = await app.invoke('state');
+    const mine = state.jobs.filter(j => j.kind === 'pair');
+    assert.equal(state.jobs.length, mine.length, 'không có việc của tab khác');
+    const clips = mine.filter(j => j.phase === 'clip'), images = mine.filter(j => j.phase === 'image');
+    assert.equal(images.length, 7);
+    assert.equal(clips.length, 14);
+    assert.ok(mine.every(j => j.storyId === 'SS-phim'));
+    assert.equal(JSON.stringify(clips.slice(0, 2).map(j => j.number)), '[1,2]');
+    assert.equal(JSON.stringify(clips[0].needs), JSON.stringify([{ phase: 'image', number: 1 }]), 'clip chờ ảnh nền của mốc');
+    assert.equal(state.pair.stories['SS-phim'].name, 'Sleeping on time and staying up late');
+    assert.equal(state.pair.stories['SS-phim'].beatCount, 7);
+    const folder = path.join(dir, 'SoSanh', 'SS-phim');
+    const draft = JSON.parse(await fs.readFile(path.join(folder, 'kich-ban.json'), 'utf8'));
+    assert.equal(draft.final, true);
+    assert.equal(draft.script.beats.length, 7);
+    assert.match(fake.log.instructions[0], /TỰ CHỌN một chủ đề/);
+    await assert.rejects(app.invoke('pairBuild', { storyId: 'SS-phim' }), /Chờ xử lý|clip đã xong/, 'chưa đủ clip thì chưa dựng');
+
+    // Clip làm tay: mỗi clip một file 1 giây rồi báo đã xong; dựng video thật (chữ canvas giả).
+    await fs.mkdir(folder, { recursive: true });
+    const sample = path.join(dir, 'mau.mp4');
+    await require('../src/merge.cjs').command('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=320x180:rate=30:duration=1', '-pix_fmt', 'yuv420p', sample], 60000);
+    for (const job of clips) { const file = path.join(folder, String(job.number).padStart(3, '0') + '.mp4'); await fs.copyFile(sample, file); Object.assign(job, { status: 'completed', output: file }); }
+    for (const job of images) Object.assign(job, { status: 'completed', output: sample });
+    assert.ok(await app.invoke('pairBuild', { storyId: 'SS-phim', voice: { voice: '' } }));
+    await until(() => app.invoke('state').pair.stories['SS-phim']?.status === 'built', 180000);
+    const done = (await app.invoke('state')).pair;
+    assert.equal(done.error, '');
+    const meta = done.stories['SS-phim'];
+    assert.ok(meta.output.startsWith(folder), 'video nằm trong thư mục SoSanh của video');
+    assert.ok((await fs.stat(meta.cover)).size > 500, 'có ảnh bìa');
+    const probe = require('node:child_process').spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration:stream=width,height', '-of', 'json', meta.output]);
+    const info = JSON.parse(String(probe.stdout));
+    assert.deepEqual([info.streams[0].width, info.streams[0].height], [1920, 1080]);
+    assert.ok(Math.abs(Number(info.format.duration) - meta.seconds) < 0.5);
+    assert.ok(Math.abs(meta.seconds - (4.5 + 8 + 7 * 2)) < 1, 'mở đầu + 7 mốc (mỗi mốc ≥ 2 giây) + kết: ' + meta.seconds);
+    assert.deepEqual(hudLog.filter(x => x[0] === 'init'), [['init', 'side', 'en']]);
+    assert.ok(hudLog.some(x => x[0] === 'close'), 'đóng cửa sổ vẽ chữ sau khi dựng');
+    const notes = await fs.readFile(path.join(folder, 'ghi-chu-dang-video.txt'), 'utf8');
+    assert.match(notes, /LỜI ĐỌC:/);
+    assert.match(notes, /nội dung bị thay đổi hoặc tổng hợp/);
+    await assert.rejects(fs.access(path.join(dir, 'KeChuyen')));
+    await assert.rejects(fs.access(path.join(dir, 'DongVat')));
+
+    // Dựng lại (ví dụ đổi nhạc): vẫn ra video mới, không đè video cũ.
+    const first = meta.output;
+    await app.invoke('pairBuild', { storyId: 'SS-phim', voice: { voice: '' } });
+    await until(() => { const m = app.invoke('state').pair.stories['SS-phim']; return m.status === 'built' && m.output !== first; }, 180000);
+
+    // Xóa danh sách tab này: việc và video bị gỡ, tab khác không bị đụng.
+    await app.invoke('clearList', { kind: 'pair', deleteFiles: false });
+    state = await app.invoke('state');
+    assert.equal(state.jobs.filter(j => j.kind === 'pair').length, 0);
+    assert.equal(Object.keys(state.pair.stories).length, 0);
     await app.stop();
   } finally { if (app && !app.lifecycle.includes('quit')) await app.stop(); await fs.rm(dir, { recursive: true, force: true }); }
 });

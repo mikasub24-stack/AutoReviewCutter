@@ -142,6 +142,15 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.15.0
+
+- **Tab mới «So sánh song song»** (gói Năm / Vĩnh viễn): kiểu video chia đôi màn hình «cùng một nhân vật người que 3D, hai con đường» (ví dụ lớn lên trong tiếng la mắng và lớn lên được lắng nghe). Chọn chủ đề trong 14 gợi ý, tự gõ, hoặc **để trống để Muse tự chọn chủ đề**, chọn độ dài 8–10 phút (có 1 / 3 / 5 phút để chạy thử), rồi mọi bước sau tự chạy: Muse viết kịch bản (hồ sơ + từng phần ≤ 8 mốc, có thể «Viết tiếp» khi dừng giữa chừng), tạo **một ảnh nền chung cho mỗi mốc** rồi **hai clip 8 giây (trái và phải) cùng xuất phát từ ảnh đó** (video 9 phút = 66 ảnh + 132 clip), lồng tiếng, vẽ chữ, thanh pin % tụt dần và âm thanh rồi dựng thành MP4 (thư mục `SoSanh`, kèm ảnh bìa và file ghi chú đăng video).
+- **Mặc định tiếng Anh, 15 ngôn ngữ**: Anh, Việt, Tây Ban Nha, Bồ Đào Nha, Pháp, Đức, Indonesia, Nga, Thổ Nhĩ Kỳ, Hindi, Ả Rập, Thái, Nhật, Hàn, Trung. Lời đọc, chữ trên video và giọng Microsoft (Edge TTS) đổi theo ngôn ngữ; chủ đề gợi ý có bản tiếng Anh và tiếng Việt.
+- **Chữ, thanh pin và khung vẽ bằng canvas** (font Baloo 2 nhúng sẵn, các chữ ngoài Latin dùng font hệ thống): nhãn hai bên, thẻ mốc, phụ đề trượt vào, hai thanh pin chạy từ % cũ sang % mới, thẻ mở đầu và thẻ bài học cuối video. Có hai khung hình: ngang 16:9 (trái | phải) và dọc 9:16 (trên / dưới) cho Shorts, TikTok, Reels.
+- **Âm thanh**: giọng đọc, tiếng clip, nhạc nền tùy chọn (tự hạ khi có giọng) và hiệu ứng tự tạo (vút khi sang mốc, pop khi phụ đề hiện, tích tắc khi pin tụt, «bam» khi tụt mạnh, «ding» khi bên phải tăng).
+- Clip bị Muse chặn được làm dịu lời lẽ và thử lại; clip dùng khung đầu sai ảnh nền bị tạo lại; dừng, tạo tiếp, tạo lại và dựng lại (đổi giọng / nhạc) dùng chung hàng đợi với các tab khác.
+- Test mới: `pair-plan`, `pair-write`, `pair-render` (dựng thật bằng FFmpeg cả hai khung hình), `pair-hud-window`, `node test/pair-tab-smoke.cjs` (giao diện thật, IPC giả) và `node test/pair-hud-smoke.cjs` (canvas thật, nhiều ngôn ngữ). Chưa chạy thử với Muse thật, cửa sổ Electron ẩn và Windows thật: chất lượng chuyển động của clip Muse, font chữ ngoài Latin trên Windows và giọng Edge TTS cần kiểm thêm bằng một video thử ngắn (1 phút).
+
 ## Update 1.14.0
 
 - **Thêm kiểu ảnh bìa thứ 5 «Hoảng loạn»** (bấm đổi ảnh để ra): chữ hook **hai màu phẳng** (dòng trên trắng, dòng dưới vàng, viền đen dày + viền xanh lơ, font tròn đậm Baloo 2 giấy phép OFL nhúng kèm app) ở góc trên trái, tự thêm «?!» ở cuối; **bản đồ** bên trái với thế lực chính nổi quầng sáng và **mỗi nước láng giềng một khuôn mặt lo sợ**; **nhân vật quả cầu rất to** bên phải mặt choáng, đổ mồ hôi, có vạch nhấn vàng. Việt Nam có sao vàng trên trán quả cầu.
