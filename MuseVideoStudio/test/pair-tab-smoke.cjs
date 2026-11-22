@@ -206,10 +206,10 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.equal(await page.locator('#pairRuns .publishBox textarea[aria-label^="Thẻ tag"]').inputValue(), 'the same child, life lessons');
     for (const [btn, want] of [['Sao chép tiêu đề', 'The Same Child, Two Fathers: Yelling vs Listening'], ['Sao chép hashtag', '#TwoPaths #LifeLessons'], ['Sao chép thẻ tag', 'the same child, life lessons']]) {
       await page.click(`#pairRuns .publishBox button:has-text("${btn}")`);
-      assert.equal(await page.evaluate(() => navigator.clipboard.readText()), want, btn);
+      assert.equal(await page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n')), want, btn);
     }
     await page.click('#pairRuns .publishBox button:has-text("Sao chép mô tả")');
-    assert.match(await page.evaluate(() => navigator.clipboard.readText()), /^The Same Child\n\nChapters:/);
+    assert.match(await page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n')), /^The Same Child\n\nChapters:/);
     assert.match(await page.locator('#toast').textContent(), /Đã sao chép mô tả/);
     // Dữ liệu lạ làm hỏng một thẻ: thẻ đó thành thẻ tối thiểu kèm lý do, không làm mất danh sách; sửa dữ liệu thì thẻ đầy đủ trở lại.
     const goodPublish = await page.evaluate(() => window.s.pair.stories['SS-Raised-with-Yelling'].publish);
