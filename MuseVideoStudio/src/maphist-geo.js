@@ -107,5 +107,19 @@
     return a > c ? unit.bb : [a, b, c, d];
   }
 
-  return { build, norm, blobKey, parseBlob, coreBox, ALIASES, SCALE };
+  // Như coreBox nhưng cho CẢ NHÓM đơn vị (một thế lực gồm nhiều tỉnh): gom mọi vòng của cả nhóm, vòng lớn nhất trước, lấy đến khi phủ ≥ share TỔNG diện tích.
+  // (Tính từng tỉnh riêng thì đảo xa của một tỉnh lớn hơn 4% diện tích tỉnh đó — như quần đảo Amami của Kagoshima — vẫn kéo hộp bao xuống tận Okinawa.)
+  function coreBoxOf(units, share = .96) {
+    const rings = []; let total = 0;
+    for (const u of units) for (const r of u.rings) { rings.push(r); total += r.area; }
+    rings.sort((p, q) => q.area - p.area);
+    let a = 1e9, b = 1e9, c = -1e9, d = -1e9, acc = 0;
+    for (const r of rings) {
+      a = Math.min(a, r.bb[0]); b = Math.min(b, r.bb[1]); c = Math.max(c, r.bb[2]); d = Math.max(d, r.bb[3]); acc += r.area;
+      if (acc >= total * share) break;
+    }
+    return a > c ? null : [a, b, c, d];
+  }
+
+  return { build, norm, blobKey, parseBlob, coreBox, coreBoxOf, ALIASES, SCALE };
 });

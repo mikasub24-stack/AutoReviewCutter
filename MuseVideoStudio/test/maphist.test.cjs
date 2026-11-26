@@ -46,6 +46,11 @@ test('ảnh bìa phóng vào phần lãnh thổ chính: coreBox bỏ đảo xa n
   assert.ok(core[0] < 131.5 && core[3] > 45 && core[2] > 144, 'vẫn đủ Kyushu, Hokkaido và Honshu: ' + core);
   const area = b => (b[2] - b[0]) * (b[3] - b[1]);
   assert.ok(area(core) < area(jp.bb) * .55, 'phần chính nhỏ hơn hẳn: ' + area(core).toFixed(0) + ' / ' + area(jp.bb).toFixed(0));
+  // Cả nhóm tỉnh (thế lực gồm nhiều tỉnh): đảo xa của MỘT tỉnh lớn (Amami của Kagoshima, Ryukyu của Okinawa) không được kéo hộp bao xuống tận 24°N.
+  const prefs = geo.provinceIndex.get('JPN'), groupCore = Geo.coreBoxOf(prefs), perUnit = prefs.map(u => Geo.coreBox(u)).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])]);
+  assert.ok(groupCore[1] > 30 && groupCore[2] < 147, 'nhóm 47 tỉnh: hộp bao phần chính bỏ Amami / Ryukyu: ' + groupCore);
+  assert.ok(perUnit[1] < 28, 'tính từng tỉnh riêng thì Amami vẫn kéo xuống: ' + perUnit[1] + ' (đây là lý do phải gom cả nhóm)');
+  assert.ok(groupCore[0] < 131.5 && groupCore[3] > 45 && groupCore[2] > 144, 'vẫn đủ Kyushu, Hokkaido và Honshu: ' + groupCore);
   const tiny = geo.byA3.get('VAT') || geo.countries.slice().sort((a, b) => a.area - b.area)[0];
   assert.deepEqual(Geo.coreBox(tiny).length, 4);
   for (const u of geo.countries) { const c = Geo.coreBox(u); assert.ok(c[0] >= u.bb[0] - 1e-9 && c[2] <= u.bb[2] + 1e-9 && c[1] >= u.bb[1] - 1e-9 && c[3] <= u.bb[3] + 1e-9 && c[2] >= c[0] && c[3] >= c[1], u.a3 + ' hộp bao phần chính nằm trong hộp bao đủ'); }

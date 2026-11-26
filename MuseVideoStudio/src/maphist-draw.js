@@ -137,15 +137,23 @@
       cache.paths.set(key, path);
       return path;
     }
-    const coreBB = unit => unit._core || (unit._core = Geo.coreBox(unit));   // hộp bao phần chính (bỏ đảo xa nhỏ), nhớ lại cho lần sau
+    // Hộp bao của cả nhóm khóa. core = true: chỉ PHẦN CHÍNH (vòng lớn phủ 96% diện tích CẢ NHÓM, bỏ đảo xa nhỏ); vùng tròn (B:…) luôn tính nguyên.
     function boxOf(keys, pr, core = false) {
       let a = 1e9, b = 1e9, c = -1e9, d = -1e9;
-      for (const key of keys) {
-        const blob = Geo.parseBlob(key), unit = blob ? null : geo.units.get(key);
-        const box = blob ? blobBox(blob) : unit ? (core ? coreBB(unit) : unit.bb) : null;
-        if (!box) continue;
+      const add = box => {
+        if (!box) return;
         const [x0, y0] = pr.P(box[0], box[3]), [x1, y1] = pr.P(box[2], box[1]);
         a = Math.min(a, x0, x1); c = Math.max(c, x0, x1); b = Math.min(b, y0, y1); d = Math.max(d, y0, y1);
+      };
+      const units = [];
+      for (const key of keys) {
+        const blob = Geo.parseBlob(key), unit = blob ? null : geo.units.get(key);
+        if (blob) add(blobBox(blob)); else if (unit) { if (core) units.push(unit); else add(unit.bb); }
+      }
+      if (units.length) {
+        const sig = units.map(u => u.key).join('|'), memo = (boxOf.memo = boxOf.memo || new Map());
+        if (!memo.has(sig)) memo.set(sig, Geo.coreBoxOf(units));
+        add(memo.get(sig));
       }
       return a > c ? null : { x: a, y: b, w: c - a, h: d - b, cx: (a + c) / 2, cy: (b + d) / 2 };
     }
@@ -1113,12 +1121,12 @@
       const A = big(e1) || big(e0), keys = A ? A.units : [];
       // Thế lực "diễn viên": bên phải là thế lực lớn nhất hiện tại, bên trái là CHÍNH thế lực đó thời xưa (nếu chưa có thì thế lực lớn nhất thời đó).
       const L = A ? (e0.realms || []).find(r => r.name === A.name && r.units && r.units.length) || big(e0) : null;
-      const popL = L ? { name: L.name, color: '#2e6bff', glow: '#a8dcff', mood: 'calm', t: 1.3, maxR: 92, vis: [W2 * .03, H2 * .27, W2 * .47, H2 * .97] } : null;
-      const popR = A ? { name: A.name, color: '#ff2f3c', glow: '#ffc24a', mood: 'shock', t: 1.3, maxR: 92, vis: [W2 * .53, H2 * .27, W2 * .97, H2 * .97], star: isVietnam(A.name) } : null;   // Việt Nam: có sao vàng của quốc kỳ
+      const popL = L ? { name: L.name, color: '#2e6bff', glow: '#a8dcff', mood: 'calm', t: 1.3, maxR: 80, vis: [W2 * .03, H2 * .27, W2 * .47, H2 * .97] } : null;
+      const popR = A ? { name: A.name, color: '#ff2f3c', glow: '#ffc24a', mood: 'shock', t: 1.3, maxR: 80, vis: [W2 * .53, H2 * .27, W2 * .97, H2 * .97], star: isVietnam(A.name) } : null;   // Việt Nam: có sao vàng của quốc kỳ
       const t0 = stillTime(i0), t1 = stillTime(i1), base = Plan.stateAt(tl, t1).cam;
       // Bên phải: PHÓNG TO vừa khít thế lực hiện tại (phần lãnh thổ chính chiếm ~90% bề rộng nửa ảnh / ~70% chiều cao, như thumbnail «so sánh» của các kênh bản đồ). Bên trái: vừa khít thế lực thời xưa nhưng không nhỏ hơn 27% khung bên phải (xưa nhỏ thì phóng gần hơn, để bản đồ vẫn TO và đọc được).
-      const camR = keys.length ? fitCam(base, coreKeys(keys), W2 * .74, H2 * .585, W2 * .45, H2 * .68, 0, 4) : { ...base, span: base.span * .8 };
-      const camL = L ? fitCam(base, coreKeys(L.units), W2 * .26, H2 * .585, W2 * .45, H2 * .68, camR.span * .27, 4) : keys.length ? fitCam(base, coreKeys(keys), W2 * .26, H2 * .585, W2 * .45, H2 * .68, 0, 4) : { ...camR };   // chưa có thế lực xưa: cùng vùng đất đó ở nửa trái (đất trống), không phải một vùng khác
+      const camR = keys.length ? fitCam(base, coreKeys(keys), W2 * .74, H2 * .59, W2 * .46, H2 * .72, 0, 4) : { ...base, span: base.span * .8 };
+      const camL = L ? fitCam(base, coreKeys(L.units), W2 * .26, H2 * .59, W2 * .46, H2 * .72, camR.span * .27, 4) : keys.length ? fitCam(base, coreKeys(keys), W2 * .26, H2 * .59, W2 * .46, H2 * .72, 0, 4) : { ...camR };   // chưa có thế lực xưa: cùng vùng đất đó ở nửa trái (đất trống), không phải một vùng khác
       thumbCv = thumbCv || mkSize(W2, H2); thumbCv2 = thumbCv2 || mkSize(W2, H2);
       drawFrame(t0, { bare: true, clean: true, cam: camL, pop: popL });
       { const x = thumbCv.getContext('2d'); x.clearRect(0, 0, W2, H2); x.drawImage(canvas, 0, 0); }

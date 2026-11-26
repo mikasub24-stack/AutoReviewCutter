@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.15.6
+
+- **Thumbnail «Trước / Sau» của tab Bản đồ: phóng bản đồ to thật sự.** Bản 1.15.5 gần như không khác bản cũ khi thế lực gồm nhiều tỉnh (vd Nhật chia 47 tỉnh): đảo xa của MỘT tỉnh (quần đảo Amami của Kagoshima, Ryukyu của Okinawa) vẫn kéo khung xuống tận 24°N nên nước chính nhỏ. Giờ khung gom vòng lớn của CẢ NHÓM tỉnh rồi mới lấy phần phủ 96% diện tích, và khung mỗi nửa ảnh tăng lên ~92% bề rộng / 72% chiều cao nửa ảnh; mặt nhân vật nhỏ lại thêm để không che bản đồ. Đo trên thumbnail Nhật 47 tỉnh: nước nửa phải phủ gấp ~1,5 lần bản 1.15.5.
+- Test mới: `maphist.test` (hộp bao phần chính của cả nhóm 47 tỉnh, bỏ Amami / Ryukyu), `maphist-tab-smoke` (vẽ thật: cả thế lực một nước lẫn 47 tỉnh đều phủ > 1,4% ảnh và cao > 62% khung; bản 1.15.5 chỉ ~0,45% ở trường hợp 47 tỉnh nên test này bắt được).
+- **Chưa kiểm được trên Windows, Electron và Muse thật.** Ảnh kiểm tra dựng bằng Chromium trên máy chủ, với kịch bản Nhật tự viết giống ảnh bạn gửi; kịch bản thật của bạn có thể chia vùng khác nên nước có thể to hơn hoặc nhỏ hơn một chút.
+
 ## Update 1.15.5
 
 - **Tab «Bản đồ lịch sử»: chỉ còn MỘT kiểu thumbnail «Trước / Sau», bản đồ phóng to hẳn lên.** Đã xóa 4 kiểu cũ (đối đầu, nhân vật lớn bên trái / phải, hoảng loạn) và nút đổi kiểu: nút giờ là «Tạo thumbnail 16:9» rồi «Tạo lại thumbnail» (ghi đè tệp `thumbnail.jpg`). Trước đây khung zoom đo cả đảo xa nhỏ xíu (Nhật bị kéo ra tận Ogasawara) nên nước chính nhỏ và lệch, còn nửa trái bị lấy sai vùng khi thế lực xưa chưa có vùng. Giờ khung đo phần lãnh thổ CHÍNH (các vòng lớn phủ 96% diện tích), mỗi nửa ảnh phóng vừa khít khoảng 90% bề rộng / 68% chiều cao, mặt nhân vật nhỏ lại để không che bản đồ; chưa có thế lực xưa thì nửa trái hiện đúng vùng đất đó (đất trống) chứ không phải vùng khác. Ô «chữ TO trên thumbnail» trong màn hình sửa kịch bản không còn tác dụng với thumbnail (kiểu này dùng hai năm đầu / cuối).

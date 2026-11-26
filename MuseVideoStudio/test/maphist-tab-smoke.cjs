@@ -364,27 +364,32 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.ok(thumbs[0].blueL > .004 && thumbs[0].redR > .004, 'bản đồ xanh (trái) và đỏ (phải) rực, đủ to: ' + thumbs[0].blueL.toFixed(3) + ' / ' + thumbs[0].redR.toFixed(3));
     assert.ok(thumbs.every(t => t.sat > .3), 'màu rực (độ bão hòa cao): ' + thumbs.map(t => t.sat.toFixed(2)));
     assert.equal(new Set(thumbs.map(t => t.hash)).size, 1, 'chỉ còn một kiểu: tham số kiểu / hook cũ không đổi ảnh: ' + thumbs.map(t => t.hash));
-    // 11a) Kiểu «Trước / Sau»: bản đồ PHÓNG TO vào phần lãnh thổ chính (đảo xa không kéo ra xa, không làm lệch tâm): nước hiện tại phủ to nửa phải ảnh, như thumbnail «so sánh» của các kênh bản đồ.
+    // 11a) «Trước / Sau»: bản đồ PHÓNG TO vào phần lãnh thổ chính (đảo xa không kéo ra xa, không làm lệch tâm), cả khi thế lực gồm 47 tỉnh (đảo của Kagoshima / Okinawa không được kéo khung xuống): nước hiện tại phủ to nửa phải ảnh.
     const zoom = await page.evaluate(async () => {
-      const raw = await window.nodeJson('world'), geo = maphistGeo.build(raw);
+      const raw = await window.nodeJson('world'), geo = maphistGeo.build(raw), out = {};
       const era = (year, realms) => ({ year, title: 'T' + year, caption: 'C' + year, narration: 'Narration for ' + year + '.', population: 0, icon: 'crown', realms, markers: [], routes: [] });
-      const script = { title: 'History of Japan', subtitle: 'x', country: 'Japan', eras: [
-        era(-10000, [{ name: 'Jomon', regions: ['Hokkaidō', 'Aomori', 'Iwate', 'Akita', 'Miyagi', 'Yamagata', 'Fukushima'], colors: ['#2e6bff', '#ffffff'], flag: 'h', mood: 'calm', face: true }]),
-        era(2024, [{ name: 'Japan', regions: ['Japan'], colors: ['#d62839', '#ffffff'], flag: 'h', mood: 'shock', face: true }])] };
-      const n = maphistPlan.normalizeScript(script, geo);
-      const tl = maphistPlan.compile(n.script, geo, { durations: n.script.eras.map(() => 14), fps: 30 });
-      const canvas = Object.assign(document.createElement('canvas'), { width: 1920, height: 1080 }), R = maphistDraw.create({ canvas, geo }); R.setTimeline(tl);
-      R.drawThumbnail(1, { variant: 3, hook: '' });
-      const d = canvas.getContext('2d').getImageData(0, 0, 1920, 1080).data; let cnt = 0, y0 = 1e9, y1 = -1, x0 = 1e9, x1 = -1;
-      for (let y = 260; y < 1080; y++) for (let x = 1020; x < 1920; x++) {
-        const i = (y * 1920 + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2];
-        if (r > 150 && r - g > 90 && r - b > 80) { cnt++; if (y < y0) y0 = y; if (y > y1) y1 = y; if (x < x0) x0 = x; if (x > x1) x1 = x; }
+      for (const [name, regions] of [['country', ['Japan']], ['provinces', geo.provinceNames.get('JPN')]]) {
+        const script = { title: 'History of Japan', subtitle: 'x', country: 'Japan', eras: [
+          era(-10000, [{ name: 'Jomon', regions: ['Hokkaidō', 'Aomori', 'Iwate', 'Akita', 'Miyagi', 'Yamagata', 'Fukushima'], colors: ['#2e6bff', '#ffffff'], flag: 'h', mood: 'calm', face: true }]),
+          era(2024, [{ name: 'Japan', regions, colors: ['#d62839', '#ffffff'], flag: 'h', mood: 'shock', face: true }])] };
+        const n = maphistPlan.normalizeScript(script, geo);
+        const tl = maphistPlan.compile(n.script, geo, { durations: n.script.eras.map(() => 14), fps: 30 });
+        const canvas = Object.assign(document.createElement('canvas'), { width: 1920, height: 1080 }), R = maphistDraw.create({ canvas, geo }); R.setTimeline(tl);
+        R.drawThumbnail();
+        const d = canvas.getContext('2d').getImageData(0, 0, 1920, 1080).data; let cnt = 0, y0 = 1e9, y1 = -1, x0 = 1e9, x1 = -1;
+        for (let y = 260; y < 1080; y++) for (let x = 1020; x < 1920; x++) {
+          const i = (y * 1920 + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2];
+          if (r > 150 && r - g > 90 && r - b > 80) { cnt++; if (y < y0) y0 = y; if (y > y1) y1 = y; if (x < x0) x0 = x; if (x > x1) x1 = x; }
+        }
+        out[name] = { frac: cnt / (1920 * 1080), h: (y1 - y0) / 1080, w: (x1 - x0) / 1920, cx: (x0 + x1) / 2 / 1920 };
       }
-      return { frac: cnt / (1920 * 1080), h: (y1 - y0) / 1080, w: (x1 - x0) / 1920, cx: (x0 + x1) / 2 / 1920 };
+      return out;
     });
-    assert.ok(zoom.frac > .011, 'kiểu «Trước / Sau»: nước hiện tại phóng to, phủ > 1,1% ảnh (bản cũ chỉ ~0,3%): ' + zoom.frac.toFixed(4));
-    assert.ok(zoom.h > .58, 'lãnh thổ chính cao > 58% khung ảnh (bản cũ ~52%): ' + zoom.h.toFixed(2));
-    assert.ok(zoom.cx > .6 && zoom.cx < .85, 'nằm giữa nửa phải, không bị đảo xa kéo lệch: ' + zoom.cx.toFixed(2));
+    for (const [name, z] of Object.entries(zoom)) {
+      assert.ok(z.frac > .014, name + ': nước hiện tại phóng to, phủ > 1,4% ảnh (bản cũ chỉ ~0,3%): ' + z.frac.toFixed(4));
+      assert.ok(z.h > .62, name + ': lãnh thổ chính cao > 62% khung ảnh (bản cũ ~52%): ' + z.h.toFixed(2));
+      assert.ok(z.cx > .6 && z.cx < .85, name + ': nằm giữa nửa phải, không bị đảo xa kéo lệch: ' + z.cx.toFixed(2));
+    }
     // 11b) Mặt lãnh thổ đổi theo sự kiện: mất ≥ 20% vùng -> choáng; mở rộng mạnh -> cười lớn; còn lại theo mood kịch bản; mặt choáng vẽ được (không lỗi, khác mặt cười).
     const faces = await page.evaluate(async () => {
       const raw = await window.nodeJson('world'), sample = await window.nodeJson('sample');
