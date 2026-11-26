@@ -131,31 +131,36 @@
     });
   }
   const publishAsked = new Set();
+  const foldOpen = new Map();   // khung đăng YouTube đang mở hay thu gọn theo từng video: giữ nguyên khi danh sách vẽ lại
   function publishBox(meta, id) {
     const p = meta.publish, title = (p && p.title) || meta.title || meta.name || '', box = node('div', 'publishBox');
     // Video cũ chưa có gói đăng: nhờ máy lập từ kịch bản (tiêu đề đúng như trên video, không phải tên dự án).
     if ((!p || !p.titles) && id && !publishAsked.has(id)) { publishAsked.add(id); call('mapPublish', { runId: id }).then(r => { if (r) refresh(); }); }
     const input = node('input', 'publishTitle'); input.type = 'text'; input.readOnly = true; input.value = title; input.onfocus = () => input.select();
     const row = node('div', 'publishRow'); row.append(input, copyButton('Sao chép tiêu đề', title, 'Đã sao chép tiêu đề.'));
-    box.append(node('strong', 'publishHead', 'Tiêu đề đăng YouTube (đúng như trên video)'), row);
+    const whole = node('details', 'publishWhole'), head = node('summary', 'publishHead', 'Thông tin đăng YouTube (đúng như trên video)'), body = node('div', 'publishBody');
+    whole.open = foldOpen.has(id) ? foldOpen.get(id) : true;
+    whole.addEventListener('toggle', () => foldOpen.set(id, whole.open));
+    whole.append(head, body); box.append(whole);
+    body.append(row);
     // Tiêu đề gợi ý khác (kiểu các kênh bản đồ hay được xem): chọn một cái rồi dán lúc đăng, không cần dựng lại video.
     if (p && p.titles && p.titles.length) {
       const ideas = node('div', 'publishIdeas');
       ideas.append(node('small', 'hint', 'Tiêu đề gợi ý khác để đăng (chọn cái bạn thích, bấm Sao chép):'));
       for (const t of p.titles) { const inp = node('input', 'publishIdea'); inp.type = 'text'; inp.readOnly = true; inp.value = t; inp.onfocus = () => inp.select(); const r = node('div', 'publishRow'); r.append(inp, copyButton('Sao chép', t, 'Đã sao chép tiêu đề gợi ý.')); ideas.append(r); }
-      box.append(ideas);
+      body.append(ideas);
     }
     if (p) {
-      const more = node('details', 'publishMore'), desc = node('textarea', 'publishDesc'), tags = node('textarea', 'publishTags'), hashes = node('textarea', 'publishHashtags');
-      desc.readOnly = true; desc.rows = 9; desc.value = p.description || ''; tags.readOnly = true; tags.rows = 2; tags.value = (p.tags || []).join(', '); hashes.readOnly = true; hashes.rows = 2; hashes.value = (p.hashtags || []).join(' ');
-      more.append(node('summary', '', 'Mô tả (có chương), hashtag và thẻ'), desc, copyButton('Sao chép mô tả', desc.value, 'Đã sao chép mô tả.'));
-      if (hashes.value) more.append(node('small', 'hint', `Hashtag đề xuất (${(p.hashtags || []).length}): đã nằm cuối mô tả; 3 cái đầu hiện ngay trên tiêu đề video.`), hashes, copyButton('Sao chép hashtag', hashes.value, 'Đã sao chép hashtag.'));
+      const more = node('details', 'publishMore'), desc = node('textarea', 'publishDesc'), tags = node('textarea', 'publishTags');
+      desc.readOnly = true; desc.rows = 9; desc.value = p.description || ''; tags.readOnly = true; tags.rows = 2; tags.value = (p.tags || []).join(', ');
+      more.append(node('summary', '', 'Mô tả (có chương, đã gồm hashtag) và thẻ'), desc, copyButton('Sao chép mô tả', desc.value, 'Đã sao chép mô tả.'));
+      if ((p.hashtags || []).length) more.append(node('small', 'hint', `${p.hashtags.length} hashtag đã nằm cuối mô tả; 3 cái đầu hiện ngay trên tiêu đề video.`));
       more.append(tags, copyButton('Sao chép thẻ', tags.value, 'Đã sao chép thẻ.'));
-      box.append(more);
-      if (p.partial) box.append(node('small', 'hint', 'Video này dựng bằng bản cũ nên chưa có chương (mô tả và thẻ lập từ kịch bản). Bấm «Dựng lại» để có chương đúng giờ.'));
-      else if (meta.publishFile) box.append(node('small', 'hint', 'Cả ba đã được lưu trong file tieu-de-youtube.txt cạnh video (bấm «Mở video» để tới thư mục).'));
-    } else box.append(node('small', 'hint', 'Đang lập mô tả và thẻ từ kịch bản…'));
-    if (title.length > 70) box.append(node('small', 'hint', 'Tiêu đề hơi dài: YouTube thường chỉ hiện khoảng 60–70 ký tự. Muốn gọn hơn, bấm «Xem và sửa kịch bản», sửa tiêu đề rồi «Dựng lại» (tiêu đề trên video và tiêu đề đăng luôn khớp nhau).'));
+      body.append(more);
+      if (p.partial) body.append(node('small', 'hint', 'Video này dựng bằng bản cũ nên chưa có chương (mô tả và thẻ lập từ kịch bản). Bấm «Dựng lại» để có chương đúng giờ.'));
+      else if (meta.publishFile) body.append(node('small', 'hint', 'Cả ba đã được lưu trong file tieu-de-youtube.txt cạnh video (bấm «Mở video» để tới thư mục).'));
+    } else body.append(node('small', 'hint', 'Đang lập mô tả và thẻ từ kịch bản…'));
+    if (title.length > 70) body.append(node('small', 'hint', 'Tiêu đề hơi dài: YouTube thường chỉ hiện khoảng 60–70 ký tự. Muốn gọn hơn, bấm «Xem và sửa kịch bản», sửa tiêu đề rồi «Dựng lại» (tiêu đề trên video và tiêu đề đăng luôn khớp nhau).'));
     return box;
   }
   function renderRuns(s) {

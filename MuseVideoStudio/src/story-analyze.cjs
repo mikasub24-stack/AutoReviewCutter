@@ -3,11 +3,12 @@
 // lời đọc luôn lấy nguyên văn từ truyện nên không thể bị Muse sửa.
 const { randomBytes } = require('node:crypto');
 const { createMuseAsk, infra } = require('./muse-ask.cjs');
+const { acquireAccount } = require('./account-pick.cjs');
 const defaultPlan = require('./story-plan.js');
 
 const CHUNK_SCENES = 8;           // số cảnh dự kiến mỗi lượt hỏi Muse (trả lời đủ ngắn, ít sai)
 
-function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSettings, delay, notify = () => {}, isBusy = () => false, ensureAllowed = async () => {}, timing = {} }) {
+function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSettings, delay, notify = () => {}, isBusy = () => false, leaseAccount = null, ensureAllowed = async () => {}, timing = {} }) {
   const state = { busy: false, kind: '', progress: '', error: '', part: 0, parts: 0 };
   let controller = null;
 
@@ -76,18 +77,18 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
       const u = resume.understanding;
       if (u && typeof u === 'object' && String(u.summary || '').trim()) startUnderstanding = { summary: String(u.summary).slice(0, 4000), approach: String(u.approach || '').slice(0, 3000), setting: String(u.setting || '').slice(0, 1500) };
     }
-    if (isBusy()) throw Error('Dừng hàng đợi và các thao tác trình duyệt trước khi nhờ Muse phân tích.');
-    await ensureAllowed();
+    const lease = await acquireAccount({ leaseAccount, isBusy, ensureAllowed, owner: 'story', busyMessage: 'Dừng hàng đợi và các thao tác trình duyệt trước khi nhờ Muse phân tích.' });
+    const account = lease ? lease.index : 0;   // tài khoản 1 bận thì dùng tài khoản Muse khác đang rảnh
     controller = new AbortController();
     const signal = controller.signal;
-    Object.assign(state, { busy: true, kind: 'analyze', error: '', progress: 'Đang mở Muse…', part: 0, parts: ranges.length });
+    Object.assign(state, { busy: true, kind: 'analyze', error: '', progress: account ? `Đang mở Muse (tài khoản ${account + 1})…` : 'Đang mở Muse…', part: 0, parts: ranges.length });
     notify();
     const notes = [];
     try {
-      await openMuse(0);
+      await openMuse(account);
       check(signal);
-      const muse = getMuse(0);
-      if (!muse) throw infra('Chưa mở được Muse tài khoản 1.');
+      const muse = getMuse(account);
+      if (!muse) throw infra(`Chưa mở được Muse tài khoản ${account + 1}.`);
       let cast = startCast, understanding = startUnderstanding, stop = null;
       // Truyện (không phải quảng cáo): Muse đọc hiểu cả bài trước, rồi mới chia cảnh theo hiểu biết đó.
       // Mẹo vặt ngắn và rõ ràng từng bước nên bỏ lượt đọc hiểu riêng (đỡ tốn lượt Muse); lượt chia bước đã tự đọc cả mẹo.
@@ -223,6 +224,7 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
       throw error;
     } finally {
       state.busy = false; controller = null;
+      if (lease) lease.release();
       notify();
     }
   }
@@ -233,19 +235,19 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
     const config = plan.options(input);
     const tip = Boolean(config.tip);
     if (tip) plan.buildTipScriptInstruction(config); else plan.buildAdScriptInstruction(config);   // báo lỗi thiếu tiêu đề / tên sản phẩm trước khi mở Muse
-    if (isBusy()) throw Error(`Dừng hàng đợi và các thao tác trình duyệt trước khi nhờ Muse viết ${tip ? 'mẹo' : 'lời quảng cáo'}.`);
-    await ensureAllowed();
+    const lease = await acquireAccount({ leaseAccount, isBusy, ensureAllowed, owner: 'story', busyMessage: `Dừng hàng đợi và các thao tác trình duyệt trước khi nhờ Muse viết ${tip ? 'mẹo' : 'lời quảng cáo'}.` });
+    const account = lease ? lease.index : 0;   // tài khoản 1 bận thì dùng tài khoản Muse khác đang rảnh
     controller = new AbortController();
     const signal = controller.signal;
     const plant = tip && config.tipKind === 'plant', history = tip && config.tipKind === 'history';
     const label = history ? 'Viết bài lịch sử' : plant ? 'Viết bài trồng cây' : tip ? 'Viết mẹo vặt' : 'Viết lời quảng cáo';
-    Object.assign(state, { busy: true, kind: 'write', error: '', progress: 'Đang mở Muse…', part: 0, parts: 1 });
+    Object.assign(state, { busy: true, kind: 'write', error: '', progress: account ? `Đang mở Muse (tài khoản ${account + 1})…` : 'Đang mở Muse…', part: 0, parts: 1 });
     notify();
     try {
-      await openMuse(0);
+      await openMuse(account);
       check(signal);
-      const muse = getMuse(0);
-      if (!muse) throw infra('Chưa mở được Muse tài khoản 1.');
+      const muse = getMuse(account);
+      if (!muse) throw infra(`Chưa mở được Muse tài khoản ${account + 1}.`);
       if (tip) {
         const result = await writeTip(muse, config, signal, label);
         if (!result.stopped) say(history ? `Muse đã viết xong bài lịch sử (${result.steps} đoạn)` : `Muse đã viết xong ${plant ? 'bài trồng cây' : 'mẹo vặt'} (${result.steps} bước)`);
@@ -270,6 +272,7 @@ function createStoryAnalyzer({ plan = defaultPlan, dom, openMuse, getMuse, getSe
       throw error;
     } finally {
       state.busy = false; controller = null;
+      if (lease) lease.release();
       notify();
     }
   }

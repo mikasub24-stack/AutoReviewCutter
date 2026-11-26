@@ -227,7 +227,7 @@ async function assemblePair({ script, config = {}, clips, hud, voice = null, dir
     const introVoice = await voiceSeconds('intro'), outroVoice = await voiceSeconds('outro');
     // 3. Dựng từng mốc (nhiều mốc cùng lúc): vẽ lớp chữ, ghép hình, trộn tiếng.
     const language = Plan.langOf(config.lang);
-    await hud.init({ layout: geo.layout, title: script.title, left: script.left, right: script.right, meter: script.meter, total: beats.length, lang: language.id, tagline: language.tagline, lessonsTitle: language.lessons });
+    await hud.init({ layout: geo.layout, title: script.title, left: script.left, right: script.right, meter: script.meter, verdict: Plan.verdictOf(beats), total: beats.length, lang: language.id, tagline: language.tagline, lessonsTitle: language.lessons });
     const base = path.join(temp, 'base.png');
     await fs.writeFile(base, decode(await hud.base()));
     const pieces = [];
@@ -324,7 +324,10 @@ async function assemblePair({ script, config = {}, clips, hud, voice = null, dir
 function thumbBeat(beats, style) {
   if (style === 1) return beats[beats.length - 1];
   const gap = b => Math.abs(Number(b.leftScore) - Number(b.rightScore)) || 0;
-  const ranked = beats.map((b, i) => ({ b, i, g: gap(b) })).sort((x, y) => y.g - x.g || y.i - x.i);
+  // Ưu tiên mốc mà bên dẫn điểm là bên được ✓ ở cuối video, để số % trên ảnh không mâu thuẫn với dấu ✗ / ✓.
+  const verdict = Plan.verdictOf(beats), leads = b => Number(b.rightScore) > Number(b.leftScore) ? 'R' : Number(b.leftScore) > Number(b.rightScore) ? 'L' : '';
+  const same = verdict ? beats.filter(b => leads(b) === verdict) : [];
+  const ranked = (same.length ? same : beats).map(b => ({ b, i: beats.indexOf(b), g: gap(b) })).sort((x, y) => y.g - x.g || y.i - x.i);
   const rank = style === 0 ? 0 : style === 2 ? 1 : 2;
   return ranked[Math.min(rank, ranked.length - 1)].b;
 }
@@ -363,7 +366,7 @@ async function makePairThumbnail({ script, config = {}, clips, hud, dir, variant
     const last = script.beats[script.beats.length - 1], shown = k === 1 ? last : beat;
     const jpeg = decodeJpeg(await hud.thumb({
       variant: k, leftImage, rightImage, title: script.title, left: script.left, right: script.right, meter: script.meter,
-      leftScore: shown.leftScore, rightScore: shown.rightScore, lang: Plan.langOf(config.lang).id
+      leftScore: shown.leftScore, rightScore: shown.rightScore, verdict: Plan.verdictOf(script.beats), lang: Plan.langOf(config.lang).id
     }));
     if (jpeg.length > Hud.THUMB.MAX_BYTES + 5e4) throw Error('Ảnh thumbnail quá nặng (hơn 2 MB). Bấm tạo lại để thử kiểu khác.');
     const file = path.join(dir, `thumbnail-${k + 1}.jpg`), part = path.join(temp, 'out.jpg');

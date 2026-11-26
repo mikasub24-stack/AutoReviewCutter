@@ -11,8 +11,24 @@ function takenAccounts({ leases = [], accountOneBusy = false, queueActive = fals
   }
   return taken;
 }
-function pickAccount({ taken, isOpen, max = 10 }) {
+// Thứ tự chọn: tài khoản đang mở và rảnh → tài khoản rảnh đã đăng nhập sẵn (canOpen) để app tự mở thêm cửa sổ → tài khoản 1 nếu rảnh.
+function pickAccount({ taken, isOpen, canOpen = () => false, max = 10 }) {
   for (let i = 0; i < max; i++) if (!taken.has(i) && isOpen(i)) return i;
+  for (let i = 0; i < max; i++) if (!taken.has(i) && canOpen(i)) return i;
   return taken.has(0) ? -1 : 0;
 }
-module.exports = { takenAccounts, pickAccount };
+const NONE_FREE = 'Mọi tài khoản Muse đang mở đều bận. Chờ xong hoặc đăng nhập thêm một tài khoản Muse khác rồi thử lại.';
+// Lấy tài khoản Muse cho một lượt việc: có leaseAccount thì thuê tài khoản rảnh (tài khoản 1 bận thì dùng tài khoản khác);
+// không có thì dùng tài khoản 1 và từ chối khi hàng đợi hay thao tác khác đang chạy. Trả về {index, release()} hoặc null.
+async function acquireAccount({ leaseAccount = null, isBusy = () => false, ensureAllowed = async () => {}, owner, busyMessage }) {
+  if (leaseAccount) {
+    await ensureAllowed();
+    const lease = leaseAccount(owner);
+    if (!lease) throw Error(NONE_FREE);
+    return lease;
+  }
+  if (isBusy()) throw Error(busyMessage);
+  await ensureAllowed();
+  return null;
+}
+module.exports = { takenAccounts, pickAccount, acquireAccount, NONE_FREE };

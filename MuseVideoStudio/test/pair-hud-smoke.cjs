@@ -116,6 +116,28 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.equal(await page.evaluate(() => window.pwned), undefined, 'thumbnail không chạy mã trong dữ liệu');
     await assert.rejects(thumb(thumbOpts({ leftImage: 'data:image/jpeg;base64,AAAA' })), /Không đọc được khung hình/);
     await assert.rejects(thumb(thumbOpts({ rightImage: '' })), /Không đọc được khung hình/);
+    // Dấu ✓ xanh (bên đúng) / ✗ đỏ (bên sai): có trên thumbnail mọi kiểu và trên lớp nền video; đo màu thật dưới dấu gạch trong huy hiệu ở hai góc.
+    const pixel = (url, x, y) => page.evaluate(async ({ url, x, y }) => { const img = new Image(); img.src = url; await img.decode(); const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); g.drawImage(img, 0, 0); return Array.from(g.getImageData(x, y, 1, 1).data); }, { url, x, y });
+    const isRed = ([r, g, b]) => r > 150 && r > g + 70 && r > b + 60, isGreen = ([r, g, b]) => g > 110 && g > r + 60 && g > b + 20;
+    for (let v = 0; v < Hud.THUMB.STYLES; v++) {
+      const right = await thumb(thumbOpts({ variant: v, verdict: 'R' })), left = await thumb(thumbOpts({ variant: v, verdict: 'L' })), none = await thumb(thumbOpts({ variant: v })), junk = await thumb(thumbOpts({ variant: v, verdict: 'X' }));
+      assert.equal(new Set([hash(right), hash(left), hash(none)]).size, 3, `kiểu ${v}: có dấu, đổi bên, không dấu đều khác nhau`);
+      assert.equal(hash(junk), hash(none), `kiểu ${v}: kết luận lạ bị bỏ qua`);
+      assert.ok(isRed(await pixel(right, 118, 194)) && isGreen(await pixel(right, 1920 - 118, 194)), `kiểu ${v}: bên phải đúng thì ✗ đỏ ở góc trái, ✓ xanh ở góc phải`);
+      assert.ok(isGreen(await pixel(left, 118, 194)) && isRed(await pixel(left, 1920 - 118, 194)), `kiểu ${v}: bên trái đúng thì ✓ xanh ở góc trái, ✗ đỏ ở góc phải`);
+    }
+    for (const layout of ['side', 'stack']) {
+      await init({ ...base, layout });
+      const plain = await page.evaluate(() => PairHud.base());
+      await init({ ...base, layout, verdict: 'R' });
+      const marked = await page.evaluate(() => PairHud.base());
+      assert.deepEqual(size(marked), size(plain), `${layout}: kích thước lớp nền không đổi`);
+      assert.notEqual(hash(marked), hash(plain), `${layout}: lớp nền có thêm dấu ✓ ✗`);
+      await init({ ...base, layout, verdict: 'L' });
+      assert.notEqual(hash(await page.evaluate(() => PairHud.base())), hash(marked), `${layout}: đổi bên thì dấu đổi`);
+      await init({ ...base, layout, verdict: 'X' });
+      assert.equal(hash(await page.evaluate(() => PairHud.base())), hash(plain), `${layout}: kết luận lạ bị bỏ qua`);
+    }
     assert.equal(Hud.hookOf('The Same Child, Two Fathers: Yelling vs Listening'), 'The Same Child, Two Fathers');
     assert.equal(Hud.hookOf('Short'), 'Short');
     assert.equal(Hud.hookOf('A: B'), 'A: B', 'vế đầu quá ngắn: giữ nguyên');

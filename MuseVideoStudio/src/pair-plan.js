@@ -488,9 +488,17 @@
     return { lang: L.id, title, description, hashtags, tags, titles, chapters: chapters.length >= 3 ? chapters : [], partial: chapters.length < 3, text };
   }
 
+  // Bên «đúng / nên» (✓) và bên «sai / không nên» (✗) theo điểm cuối cùng của hai bên; chênh dưới 5 điểm hoặc thiếu điểm thì không kết luận.
+  function verdictOf(beats) {
+    const last = Array.isArray(beats) && beats.length ? beats[beats.length - 1] : null;
+    const l = Number(last && last.leftScore), r = Number(last && last.rightScore);
+    if (!Number.isFinite(l) || !Number.isFinite(r) || Math.abs(l - r) < 5) return '';
+    return r > l ? 'R' : 'L';
+  }
+
   return {
     KIND, LAYOUTS, MINUTES, SECONDS, PART_BEATS, LANGS, LANGUAGES, langOf, limits, RATES, TOPICS, topicPreset, budgetChars, beatsFor, MAX_CAPTION, MAX_LABEL, MAX_TAG, MAX_LESSONS,
     options, problems, slug, storyIdBase, buildBibleInstruction, parseBible, buildPartInstruction, parseBeats, checkBeats, fixText, assemble,
-    anchorPrompt, clipPrompt, isPolicyError, safeRetryPrompt, buildJobs, hudScript, notesText, publishPack, clockOf, uniqueTitle
+    anchorPrompt, clipPrompt, isPolicyError, safeRetryPrompt, buildJobs, hudScript, notesText, publishPack, clockOf, uniqueTitle, verdictOf
   };
 });

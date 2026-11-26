@@ -494,6 +494,11 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .publishIdeas .publishRow { gap: 6px; }
 .publishIdeas input.publishIdea { flex: 1 1 320px; min-width: 0; font-size: 14px; font-weight: 500; }
 .publishIdeas .publishField input.publishIdea { width: 100%; box-sizing: border-box; }
+.publishWhole > summary { cursor: pointer; font-size: 13px; font-weight: 700; }
+.publishBody { display: grid; gap: 8px; margin-top: 8px; }
+.publishSec { border-top: 1px solid rgba(255,255,255,.1); padding-top: 6px; }
+.publishSec > summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+.publishSec > :not(summary) { margin-top: 6px; }
 .publishMore { display: grid; gap: 8px; }
 .publishMore summary { cursor: pointer; font-size: 13px; }
 .publishMore textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; line-height: 1.45; resize: vertical; }

@@ -122,6 +122,15 @@
   }
   const publishAsked = new Set();
   const titleEdits = new Map();   // tiêu đề đang gõ dở theo từng video: giữ nguyên khi danh sách vẽ lại
+  const foldState = new Map();    // phần nào đang mở / thu gọn theo từng video: giữ nguyên khi danh sách vẽ lại
+  // Một phần có thể mở / đóng (thẻ details); nhớ lựa chọn theo video + tên phần.
+  function fold(id, key, label, cls, open = true) {
+    const d = node('details', cls), k = id + '|' + key;
+    d.open = foldState.has(k) ? foldState.get(k) : open;
+    d.addEventListener('toggle', () => foldState.set(k, d.open));
+    d.append(node('summary', '', label));
+    return d;
+  }
   function publishBox(meta, id) {
     const p = meta.publish, box = node('div', 'publishBox');
     // Chưa có gói đăng (video làm bằng bản cũ): nhờ máy lập từ kịch bản đã lưu, không cần Muse.
@@ -130,7 +139,8 @@
       Promise.resolve().then(() => window.studio.invoke('pairPublish', { storyId: id })).then(() => { runsKey = ''; return window.studio.invoke('state'); }).then(st => { if (st) render(st); }).catch(() => {});
     }
     if (!p) { box.append(node('small', 'hint', 'Đang lập tiêu đề, mô tả, hashtag và thẻ tag từ kịch bản…')); return box; }
-    box.append(node('strong', 'publishHead', 'Thông tin đăng YouTube (đúng như trên video)'));
+    const whole = fold(id, 'all', 'Thông tin đăng YouTube (đúng như trên video)', 'publishWhole'), body = node('div', 'publishBody');
+    whole.querySelector('summary').className = 'publishHead';
     const field = (label, value, rows, copyLabel, done, edit) => {
       const wrap = node('div', 'publishRow'), area = rows ? node('textarea', rows > 4 ? 'publishDesc' : 'publishTags') : node('input', 'publishTitle');
       if (rows) { area.rows = rows; } else { area.type = 'text'; }
@@ -148,8 +158,9 @@
       wrap.append(col, copyButton(copyLabel, () => area.value.trim(), done), save);
       return wrap;
     };
-    const tags = (p.tags || []).join(', '), hashtags = (p.hashtags || []).join(' ');   // hashtag: tối đa 14, 3 cái đầu hiện ngay trên tiêu đề video
-    box.append(
+    const tags = (p.tags || []).join(', ');   // hashtag (tối đa 14, 3 cái đầu hiện ngay trên tiêu đề video) đã nằm cuối mô tả nên không có ô riêng
+    const titleSec = fold(id, 'title', 'Tiêu đề', 'publishSec');
+    titleSec.append(
       field('Tiêu đề video', p.title || '', 0, 'Sao chép tiêu đề', 'Đã sao chép tiêu đề.', true),
       ...(p.titles && p.titles.length ? [(() => {
         // Tiêu đề gợi ý khác (khung đúng / sai, nên / không nên): chọn một cái để dán lúc đăng; muốn đổi cả tiêu đề trên video thì dán vào ô trên rồi «Lưu tiêu đề».
@@ -157,17 +168,23 @@
         ideas.append(node('small', 'hint', 'Tiêu đề gợi ý khác (hút view, khung đúng / sai): sao chép để đăng, hoặc dán vào ô trên rồi «Lưu tiêu đề».'));
         p.titles.forEach((t, k) => { const row = field('Gợi ý ' + (k + 1), t, 0, 'Sao chép', 'Đã sao chép tiêu đề gợi ý.'), inp = row.querySelector('input'); if (inp) inp.className = 'publishIdea'; ideas.append(row); });
         return ideas;
-      })()] : []),
-      field('Mô tả video' + (p.chapters && p.chapters.length ? ' (có chương theo giờ)' : ''), p.description || '', 9, 'Sao chép mô tả', 'Đã sao chép mô tả.'),
-      field('Hashtag đề xuất (' + (p.hashtags || []).length + ', đã nằm cuối mô tả)', hashtags, 3, 'Sao chép hashtag', 'Đã sao chép hashtag.'),
-      field('Thẻ tag (dán vào ô «Thẻ» của YouTube)', tags, 3, 'Sao chép thẻ tag', 'Đã sao chép thẻ tag.')
+      })()] : [])
     );
-    if (meta.output && meta.videoTitle && meta.videoTitle !== (meta.name || p.title)) box.append(node('small', 'hint', 'Thẻ mở đầu trong video vẫn hiện tên cũ. Bấm «Dựng lại video» để đổi.'));
-    else box.append(node('small', 'hint', 'Sửa tiêu đề rồi bấm «Lưu tiêu đề»: mô tả và file ghi chú đổi theo.'));
-    if ((p.title || '').length > 70) box.append(node('small', 'hint', 'Tiêu đề hơi dài: YouTube thường chỉ hiện khoảng 60–70 ký tự.'));
-    if (p.partial || !(p.chapters && p.chapters.length)) box.append(node('small', 'hint', 'Video này dựng bằng bản cũ hoặc quá ngắn nên chưa có chương theo giờ. Bấm «Dựng lại video» để mô tả có chương đúng giờ.'));
-    else if (meta.publishFile) box.append(node('small', 'hint', 'Cả bốn phần cũng được lưu trong file tieu-de-youtube.txt cạnh video.'));
-    box.append(node('small', 'hint', 'Hình ảnh do AI tạo: khi đăng hãy bật mục «nội dung bị thay đổi hoặc tổng hợp».'));
+    const descSec = fold(id, 'desc', 'Mô tả (đã gồm hashtag)', 'publishSec');
+    descSec.append(
+      field('Mô tả video' + (p.chapters && p.chapters.length ? ' (có chương theo giờ)' : ''), p.description || '', 9, 'Sao chép mô tả', 'Đã sao chép mô tả.'),
+      node('small', 'hint', `${(p.hashtags || []).length} hashtag đã nằm cuối mô tả; 3 cái đầu hiện ngay trên tiêu đề video.`)
+    );
+    const tagSec = fold(id, 'tags', 'Thẻ tag', 'publishSec');
+    tagSec.append(field('Thẻ tag (dán vào ô «Thẻ» của YouTube)', tags, 3, 'Sao chép thẻ tag', 'Đã sao chép thẻ tag.'));
+    body.append(titleSec, descSec, tagSec);
+    if (meta.output && meta.videoTitle && meta.videoTitle !== (meta.name || p.title)) body.append(node('small', 'hint', 'Thẻ mở đầu trong video vẫn hiện tên cũ. Bấm «Dựng lại video» để đổi.'));
+    else body.append(node('small', 'hint', 'Sửa tiêu đề rồi bấm «Lưu tiêu đề»: mô tả và file ghi chú đổi theo.'));
+    if ((p.title || '').length > 70) body.append(node('small', 'hint', 'Tiêu đề hơi dài: YouTube thường chỉ hiện khoảng 60–70 ký tự.'));
+    if (p.partial || !(p.chapters && p.chapters.length)) body.append(node('small', 'hint', 'Video này dựng bằng bản cũ hoặc quá ngắn nên chưa có chương theo giờ. Bấm «Dựng lại video» để mô tả có chương đúng giờ.'));
+    else if (meta.publishFile) body.append(node('small', 'hint', 'Tiêu đề, mô tả (đã gồm hashtag) và thẻ tag cũng được lưu trong file tieu-de-youtube.txt cạnh video.'));
+    body.append(node('small', 'hint', 'Hình ảnh do AI tạo: khi đăng hãy bật mục «nội dung bị thay đổi hoặc tổng hợp».'));
+    whole.append(body); box.append(whole);
     return box;
   }
   function fallbackCard({ id, list, meta }, error) {

@@ -21,6 +21,12 @@ Tạo thumbnail 16:9|Create 16:9 thumbnail
 Tạo lại thumbnail|Recreate thumbnail
 Đang tạo thumbnail…|Creating thumbnail…
 Thông tin đăng YouTube (đúng như trên video)|YouTube publishing info (exactly as on the video)
+Tiêu đề|Title
+Mô tả (đã gồm hashtag)|Description (hashtags included)
+Thẻ tag|Tags
+Mô tả (có chương, đã gồm hashtag) và thẻ|Description (with chapters, hashtags included) and tags
+Tiêu đề, mô tả (đã gồm hashtag) và thẻ tag cũng được lưu trong file tieu-de-youtube.txt cạnh video.|The title, description (hashtags included) and tags are also saved in tieu-de-youtube.txt next to the video.
+Mọi tài khoản Muse đang mở đều bận. Chờ xong hoặc đăng nhập thêm một tài khoản Muse khác rồi thử lại.|Every open Muse account is busy. Wait, or sign in to another Muse account and try again.
 Mô tả video (có chương theo giờ)|Video description (with timed chapters)
 Mô tả video|Video description
 Thẻ tag (dán vào ô «Thẻ» của YouTube)|Tags (paste into the YouTube “Tags” box)
@@ -1116,6 +1122,7 @@ Video ghép chưa hợp lệ.|The joined video is not valid.
       [/^Video khoảng (\d+) phút = (\d+) mốc → (\d+) ảnh nền chung \+ (\d+) clip \(mỗi clip (\d+) giây, hai clip mỗi mốc\)\. Tạo ảnh và clip trên Muse mất nhiều giờ: cứ để máy chạy, tool tự thử lại clip lỗi và tự dựng video khi đủ clip\.$/,m=>'About '+m[1]+(m[1]==='1'?' minute':' minutes')+' = '+m[2]+' moments → '+m[3]+' shared background images + '+m[4]+' clips (each clip '+m[5]+' seconds, two clips per moment). Making the images and clips on Muse takes many hours: just leave the computer running; the tool retries failed clips by itself and builds the video once every clip is ready.'],
       [/^Nhạc nền: (.+)$/,m=>'Background music: '+m[1]],
       [/^Nhạc nền phải là (.+)\.$/,m=>'Background music must be '+m[1]+'.'],
+      [/^(\d+) hashtag đã nằm cuối mô tả; 3 cái đầu hiện ngay trên tiêu đề video\.$/,m=>m[1]+' hashtags are already at the end of the description; the first 3 show right above the video title.'],
       [/^Đang viết kịch bản · (\d+)\/(\d+|\?) mốc$/,m=>'Writing the script · '+m[1]+'/'+m[2]+' moments'],
       [/^(Đang chạy|Tạm dừng) · (\d+)\/(\d+) clip$/,m=>(m[1]==='Đang chạy'?'Running':'Paused')+' · '+m[2]+'/'+m[3]+' clips'],
       [/^(\d+)\/(\d+) clip$/,m=>m[1]+'/'+m[2]+' clips'],

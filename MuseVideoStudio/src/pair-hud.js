@@ -39,7 +39,7 @@
   }
 
   // ---------- Công cụ vẽ ----------
-  let geo = geometry('side'), spec = { title: '', left: '', right: '', meter: '', total: 1, lang: 'en', tagline: 'ONE PERSON · TWO PATHS', lessonsTitle: 'WHAT TO TAKE AWAY' };
+  let geo = geometry('side'), spec = { title: '', left: '', right: '', meter: '', verdict: '', total: 1, lang: 'en', tagline: 'ONE PERSON · TWO PATHS', lessonsTitle: 'WHAT TO TAKE AWAY' };
   function canvas(w, h) {
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
@@ -141,6 +141,23 @@
     return { x, y, w, h: height };
   }
 
+  // Dấu ✓ xanh (bên đúng / nên) hoặc ✗ đỏ (bên sai / không nên): vòng tròn viền trắng, dấu vẽ bằng nét nên không phụ thuộc font.
+  function verdictBadge(ctx, cx, cy, r, good) {
+    const c1 = good ? '#5cf7b4' : '#ff6b7d', c2 = good ? '#0f9d62' : '#c9102c', glow = good ? 'rgba(40,230,150,.85)' : 'rgba(255,50,80,.85)';
+    ctx.save();
+    ctx.shadowColor = glow; ctx.shadowBlur = r * .55;
+    const g = ctx.createLinearGradient(cx, cy - r, cx, cy + r); g.addColorStop(0, c1); g.addColorStop(1, c2);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0; ctx.lineWidth = Math.max(3, r * .09); ctx.strokeStyle = '#fff'; ctx.stroke();
+    ctx.lineWidth = r * .24; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = r * .1; ctx.shadowOffsetY = r * .04;
+    ctx.beginPath();
+    if (good) { ctx.moveTo(cx - r * .42, cy + r * .02); ctx.lineTo(cx - r * .1, cy + r * .34); ctx.lineTo(cx + r * .46, cy - r * .3); }
+    else { const d = r * .34; ctx.moveTo(cx - d, cy - d); ctx.lineTo(cx + d, cy + d); ctx.moveTo(cx + d, cy - d); ctx.lineTo(cx - d, cy + d); }
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // ---------- Nền chung ----------
   function drawBase() {
     const { W, H } = geo, { c, ctx } = canvas(W, H);
@@ -163,8 +180,16 @@
     if (geo.layout === 'stack') { ctx.moveTo(0, 960); ctx.lineTo(W, 960); } else { ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); }
     ctx.stroke();
     ctx.restore();
-    capsule(ctx, spec.left, { ...geo.label.L, side: 'L' });
-    capsule(ctx, spec.right, { ...geo.label.R, side: 'R' });
+    for (const side of ['L', 'R']) {
+      const o = geo.label[side], text = side === 'L' ? spec.left : spec.right;
+      if (!spec.verdict) { capsule(ctx, text, { ...o, side }); continue; }
+      // có kết luận: nhãn + dấu ✓ / ✗ đứng cạnh nhau, cả nhóm căn giữa như nhãn cũ
+      const r = 34, gap = 14, maxW = o.maxW - 2 * r - gap;
+      fitSize(ctx, text, 800, 34, maxW - 70, 18);
+      const w = Math.min(maxW, ctx.measureText(text).width + 70), cx = o.cx - (w + gap + 2 * r) / 2 + w / 2;
+      capsule(ctx, text, { cx, cy: o.cy, maxW, side });
+      verdictBadge(ctx, cx + w / 2 + gap + r, o.cy, r, spec.verdict === side);
+    }
     return png(c);
   }
 
@@ -518,6 +543,14 @@
       const t = wrapText(ctx, title, 900, maxSize, 1740, maxLines, minSize), lh = t.size * 1.08, y0 = H - 66 - (t.lines.length - 1) * lh;
       bigText(ctx, t.lines, t.size, W / 2, y0, lh, titleFill(y0 - t.size, y0 + (t.lines.length - 1) * lh));
     };
+    const verdict = opts.verdict === 'L' || opts.verdict === 'R' ? opts.verdict : '';
+    // Hàng trên chung cho mọi kiểu, đối xứng qua giữa khung: dấu ✗ / ✓ lớn ở hai góc ngoài, nhãn hai bên, số % (nếu kiểu đó cần).
+    const topRow = withChips => {
+      capsule(ctx, left, { cx: 570, cy: 104, maxW: 680, side: 'L', size: 56, height: 100 });
+      capsule(ctx, right, { cx: 1350, cy: 104, maxW: 680, side: 'R', size: 56, height: 100 });
+      if (verdict) { verdictBadge(ctx, 118, 128, 96, verdict === 'L'); verdictBadge(ctx, W - 118, 128, 96, verdict === 'R'); }
+      if (withChips && hasScores) { scoreChip(ctx, 570, 226, scoreL, scoreR); scoreChip(ctx, 1350, 226, scoreR, scoreL); }
+    };
     if (style === 3) {
       // Chéo: đường chia nghiêng từ (1180,0) xuống (740,1080); mỗi ảnh phủ rộng hơn nửa khung để thấy nhiều cảnh hơn.
       ctx.save(); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(1180, 0); ctx.lineTo(740, H); ctx.lineTo(0, H); ctx.closePath(); ctx.clip();
@@ -528,11 +561,27 @@
       shade(ctx, 0, 330, .62, 0); shade(ctx, H - 480, H, 0, .88);
       ctx.save(); ctx.lineWidth = 18; ctx.strokeStyle = '#fff'; ctx.shadowColor = 'rgba(255,190,60,.95)'; ctx.shadowBlur = 40;
       ctx.beginPath(); ctx.moveTo(1180, 0); ctx.lineTo(740, H); ctx.stroke(); ctx.restore();
-      capsule(ctx, left, { cx: 450, cy: 104, maxW: 700, side: 'L', size: 52, height: 96 });
-      capsule(ctx, right, { cx: 1540, cy: 104, maxW: 700, side: 'R', size: 52, height: 96 });
-      if (hasScores) { scoreChip(ctx, 450, 226, scoreL, scoreR); scoreChip(ctx, 1540, 226, scoreR, scoreL); }
+      topRow(true);
       vsBadge(ctx, 1180 - 440 * 520 / H, 520, 118);   // nằm đúng trên đường chia nghiêng
       bottomTitle(128, 56);
+    } else if (style === 0) {
+      // Đối đầu: hai nửa SÁNG và đối xứng (không vignette, không bloom, không chữ to che cảnh); bên ✓ rực màu, bên ✗ hơi nhạt.
+      // Khung xanh / đỏ ôm từng nửa, tiêu đề thu vào một dải mỏng dưới đáy, VS nhỏ nằm trên mép dải đó.
+      const vivid = 'saturate(1.35) contrast(1.1) brightness(1.06)', calm = 'saturate(.8) contrast(1.08) brightness(.96)';
+      const fl = verdict ? (verdict === 'L' ? vivid : calm) : PUNCH, fr = verdict ? (verdict === 'R' ? vivid : calm) : PUNCH;
+      drawCover(ctx, imgL, 0, 0, W / 2, H, fl); drawCover(ctx, imgR, W / 2, 0, W / 2, H, fr);
+      let t = wrapText(ctx, title, 900, 104, 1740, 1, 76);
+      if (t.lines.length > 1 || ctx.measureText(t.lines[0]).width > 1741) t = wrapText(ctx, title, 900, 92, 1740, 2, 54);
+      const lh = t.size * 1.08, y0 = H - 54 - (t.lines.length - 1) * lh, bandTop = y0 - t.size - 40;
+      shade(ctx, 0, 300, .5, 0); shade(ctx, bandTop - 50, H, 0, .9);
+      for (const [x, side] of [[0, 'L'], [W / 2, 'R']]) {
+        const good = verdict ? verdict === side : null, col = good == null ? SIDE[side].b : good ? '#2df0a0' : '#ff3b52';
+        ctx.save(); ctx.lineWidth = 16; ctx.strokeStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 26;
+        ctx.strokeRect(x + 8, 8, W / 2 - 16, H - 16); ctx.restore();
+      }
+      topRow(true);
+      bigText(ctx, t.lines, t.size, W / 2, y0, lh, titleFill(y0 - t.size, y0 + (t.lines.length - 1) * lh));
+      vsBadge(ctx, W / 2, bandTop - 6, 60);
     } else {
       drawCover(ctx, imgL, 0, 0, W / 2, H, fL); drawCover(ctx, imgR, W / 2, 0, W / 2, H, fR);
       loserTint(0, W / 2, 'L'); loserTint(W / 2, W / 2, 'R');
@@ -546,22 +595,18 @@
         const t = wrapText(ctx, title, 900, 210, 1760, 3, 80);
         const g = ctx.createLinearGradient(100, 0, W - 100, 0); g.addColorStop(0, L.a); g.addColorStop(.5, '#ffffff'); g.addColorStop(1, R.a);
         bigText(ctx, t.lines, t.size, W / 2, 470 - (t.lines.length - 1) * t.size * .55 + t.size * .35, t.size * 1.1, g);
+        if (verdict) { verdictBadge(ctx, 118, 128, 96, verdict === 'L'); verdictBadge(ctx, W - 118, 128, 96, verdict === 'R'); }
         capsule(ctx, left, { cx: 480, cy: 930, maxW: 880, side: 'L', size: 60, height: 104 });
         capsule(ctx, right, { cx: 1440, cy: 930, maxW: 880, side: 'R', size: 60, height: 104 });
         vsBadge(ctx, W / 2, 930, 62);
       } else {
-        capsule(ctx, left, { cx: 480, cy: 104, maxW: 860, side: 'L', size: 56, height: 100 });
-        capsule(ctx, right, { cx: 1440, cy: 104, maxW: 860, side: 'R', size: 56, height: 100 });
-        if (style === 1 && hasScores) {
+        topRow(false);
+        if (hasScores) {
           scoreBlock(ctx, 'L', 480, scoreL, String(opts.meter || ''));
           scoreBlock(ctx, 'R', 1440, scoreR, String(opts.meter || ''));
           vsBadge(ctx, W / 2, 540, 74);
           bottomTitle(96, 48);
-        } else {
-          if (hasScores) { scoreChip(ctx, 480, 226, scoreL, scoreR); scoreChip(ctx, 1440, 226, scoreR, scoreL); }
-          vsBadge(ctx, W / 2, 520, 118);
-          bottomTitle(136, 56);
-        }
+        } else { vsBadge(ctx, W / 2, 520, 118); bottomTitle(136, 56); }   // kiểu «Điểm cuối» thiếu điểm: bố cục đơn giản
       }
     }
     // JPEG ≤ MAX_BYTES: giảm dần chất lượng.
@@ -576,7 +621,7 @@
   // ---------- Giao diện gọi từ bộ dựng ----------
   function init(options = {}) {
     geo = geometry(options.layout);
-    spec = { title: String(options.title || ''), left: String(options.left || ''), right: String(options.right || ''), meter: String(options.meter || ''), total: Math.max(1, Number(options.total) || 1), lang: String(options.lang || 'en'), tagline: String(options.tagline || 'ONE PERSON · TWO PATHS'), lessonsTitle: String(options.lessonsTitle || 'WHAT TO TAKE AWAY') };
+    spec = { title: String(options.title || ''), left: String(options.left || ''), right: String(options.right || ''), meter: String(options.meter || ''), verdict: options.verdict === 'L' || options.verdict === 'R' ? options.verdict : '', total: Math.max(1, Number(options.total) || 1), lang: String(options.lang || 'en'), tagline: String(options.tagline || 'ONE PERSON · TWO PATHS'), lessonsTitle: String(options.lessonsTitle || 'WHAT TO TAKE AWAY') };
     return { W: geo.W, H: geo.H };
   }
   async function ready() {

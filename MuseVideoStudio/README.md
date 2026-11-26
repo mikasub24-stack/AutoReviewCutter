@@ -142,6 +142,15 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.15.7
+
+- **Viết kịch bản dùng tài khoản Muse rảnh.** Tab So sánh song song, Động vật hoang dã và Kể chuyện (phân tích truyện, viết lời quảng cáo / mẹo) trước đây luôn dùng tài khoản 1 và báo «Dừng hàng đợi…» khi hàng đợi đang chạy. Giờ app chọn tài khoản Muse đang mở và rảnh; không có thì tự mở tài khoản đã đăng nhập sẵn (đã lưu phiên); chỉ khi mọi tài khoản đều bận mới báo và nói rõ cách xử lý. Tài khoản 1 không còn bị coi là bận chỉ vì có việc đang chạy ở tài khoản khác. Tab Bản đồ vẫn như bản 1.11.1 và cũng tự mở được tài khoản đã đăng nhập sẵn.
+- **Dấu ✗ đỏ / ✓ xanh trong video So sánh song song.** Bên có điểm cuối cao hơn (chênh từ 5 điểm) được ✓ xanh, bên kia ✗ đỏ; dấu nằm cạnh nhãn hai bên suốt video. Chênh dưới 5 điểm thì không đánh dấu.
+- **Thumbnail So sánh song song vẽ lại.** Kiểu «Đối đầu» giờ hai nửa sáng, đối xứng, có khung đỏ / xanh ôm từng nửa, dấu ✗ ✓ lớn ở hai góc, tiêu đề thu vào một dải mỏng dưới đáy (không còn chữ to che cảnh, không còn lớp tối làm mờ). Ba kiểu còn lại cũng có dấu ✗ ✓. Số % trên ảnh luôn cùng chiều với dấu.
+- **Khung «Thông tin đăng YouTube» gọn hơn.** Bỏ ô hashtag riêng (hashtag đã nằm cuối mô tả); cả khung và từng phần Tiêu đề, Mô tả, Thẻ tag mở / đóng được, nhớ lựa chọn theo từng video. Tab Bản đồ cũng bỏ ô hashtag riêng và đóng / mở được cả khung.
+- Test mới: `account-lease.test` (chọn tài khoản rảnh, trả tài khoản kể cả khi lỗi), `pair-verdict.test` (kết luận ✓ ✗, chọn mốc thumbnail cùng chiều), `pair-hud-smoke` (đo màu thật của dấu ở hai góc, lớp nền video), smoke hai tab (đóng / mở khung, không còn ô hashtag).
+- **Chưa kiểm được trên Windows, Electron và Muse thật.** Ảnh xem thử dựng bằng Chromium với cảnh giả; việc tự mở tài khoản đã đăng nhập sẵn mới được kiểm bằng test, chưa thử với Muse thật.
+
 ## Update 1.15.6
 
 - **Thumbnail «Trước / Sau» của tab Bản đồ: phóng bản đồ to thật sự.** Bản 1.15.5 gần như không khác bản cũ khi thế lực gồm nhiều tỉnh (vd Nhật chia 47 tỉnh): đảo xa của MỘT tỉnh (quần đảo Amami của Kagoshima, Ryukyu của Okinawa) vẫn kéo khung xuống tận 24°N nên nước chính nhỏ. Giờ khung gom vòng lớn của CẢ NHÓM tỉnh rồi mới lấy phần phủ 96% diện tích, và khung mỗi nửa ảnh tăng lên ~92% bề rộng / 72% chiều cao nửa ảnh; mặt nhân vật nhỏ lại thêm để không che bản đồ. Đo trên thumbnail Nhật 47 tỉnh: nước nửa phải phủ gấp ~1,5 lần bản 1.15.5.

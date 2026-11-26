@@ -212,17 +212,37 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.deepEqual((await calls('pairPublish'))[0].data, { storyId: 'SS-Raised-with-Yelling' });
     assert.equal(await page.locator('#pairRuns .publishBox input.publishTitle').inputValue(), 'The Same Child, Two Fathers: Yelling vs Listening');
     assert.match(await page.locator('#pairRuns .publishBox textarea.publishDesc').inputValue(), /Chapters:\n0:00 Intro/);
-    assert.equal(await page.locator('#pairRuns .publishBox textarea[aria-label^="Hashtag"]').inputValue(), '#TwoPaths #LifeLessons');
+    // Hashtag đã nằm cuối mô tả nên không còn ô hashtag riêng.
+    assert.match(await page.locator('#pairRuns .publishBox textarea.publishDesc').inputValue(), /#TwoPaths #LifeLessons$/);
+    assert.equal(await page.locator('#pairRuns .publishBox textarea[aria-label^="Hashtag"]').count(), 0, 'không còn ô hashtag thừa');
+    assert.equal(await page.locator('#pairRuns .publishBox button', { hasText: 'Sao chép hashtag' }).count(), 0);
     // Tiêu đề gợi ý khác (khung đúng / sai): mỗi gợi ý một ô kèm nút «Sao chép».
     assert.deepEqual(await page.locator('#pairRuns .publishBox .publishIdeas input.publishIdea').evaluateAll(a => a.map(x => x.value)), ['Right vs Wrong: The Same Child, Two Fathers', 'The Same Child, Two Fathers: Do This, Not That'], 'hiện các tiêu đề gợi ý');
     assert.equal(await page.locator('#pairRuns .publishBox textarea[aria-label^="Thẻ tag"]').inputValue(), 'the same child, life lessons');
-    for (const [btn, want] of [['Sao chép tiêu đề', 'The Same Child, Two Fathers: Yelling vs Listening'], ['Sao chép hashtag', '#TwoPaths #LifeLessons'], ['Sao chép thẻ tag', 'the same child, life lessons']]) {
+    for (const [btn, want] of [['Sao chép tiêu đề', 'The Same Child, Two Fathers: Yelling vs Listening'], ['Sao chép thẻ tag', 'the same child, life lessons']]) {
       await page.click(`#pairRuns .publishBox button:has-text("${btn}")`);
       assert.equal(await page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n')), want, btn);
     }
     await page.click('#pairRuns .publishBox button:has-text("Sao chép mô tả")');
     assert.match(await page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n')), /^The Same Child\n\nChapters:/);
     assert.match(await page.locator('#toast').textContent(), /Đã sao chép mô tả/);
+    // Mở / đóng từng phần (Tiêu đề, Mô tả, Thẻ tag) và cả khung; lựa chọn được nhớ khi danh sách vẽ lại.
+    const shown = sel => page.locator(sel).isVisible();
+    for (const [name, sel] of [['Tiêu đề', '#pairRuns .publishBox input.publishTitle'], ['Mô tả', '#pairRuns .publishBox textarea.publishDesc'], ['Thẻ tag', '#pairRuns .publishBox textarea.publishTags']]) {
+      assert.equal(await shown(sel), true, name + ' mở sẵn');
+      await page.click(`#pairRuns .publishBox details.publishSec > summary:text-is("${name}"), #pairRuns .publishBox details.publishSec > summary:text-matches("^${name}")`);
+      assert.equal(await shown(sel), false, name + ' đóng được');
+      await page.evaluate(() => { window.s.pair.stories['SS-Raised-with-Yelling'].publish = { ...window.s.pair.stories['SS-Raised-with-Yelling'].publish, title: window.s.pair.stories['SS-Raised-with-Yelling'].publish.title }; window.push(); });
+      await page.waitForTimeout(150);
+      assert.equal(await shown(sel), false, name + ' vẫn đóng sau khi vẽ lại');
+      await page.click(`#pairRuns .publishBox details.publishSec > summary:text-matches("^${name}")`);
+      assert.equal(await shown(sel), true, name + ' mở lại được');
+    }
+    await page.click('#pairRuns .publishBox details.publishWhole > summary');
+    assert.equal(await shown('#pairRuns .publishBox input.publishTitle'), false, 'đóng cả khung');
+    assert.equal(await page.locator('#pairRuns .publishBox details.publishWhole > summary').isVisible(), true, 'dòng tiêu đề khung vẫn còn để mở lại');
+    await page.click('#pairRuns .publishBox details.publishWhole > summary');
+    assert.equal(await shown('#pairRuns .publishBox input.publishTitle'), true, 'mở lại cả khung');
     // Dữ liệu lạ làm hỏng một thẻ: thẻ đó thành thẻ tối thiểu kèm lý do, không làm mất danh sách; sửa dữ liệu thì thẻ đầy đủ trở lại.
     const goodPublish = await page.evaluate(() => window.s.pair.stories['SS-Raised-with-Yelling'].publish);
     await page.evaluate(() => { window.s.pair.stories['SS-Raised-with-Yelling'].publish = { title: 'x', tags: 'không phải mảng' }; window.push(); });

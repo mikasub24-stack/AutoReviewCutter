@@ -278,8 +278,18 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.equal((await calls('mapPublish')).length, 1, 'chỉ nhờ máy lập một lần');
     // Tiêu đề gợi ý khác + hashtag đề xuất: hiện sẵn kèm nút sao chép.
     assert.deepEqual(await page.locator('#mapRuns .publishIdeas input.publishIdea').evaluateAll(a => a.map(x => x.value)), ['Evolution of Testland: 1350 – 1945 (Map Animation)', 'The Entire History of Testland (Map Animation)']);
-    assert.equal(await page.locator('#mapRuns textarea.publishHashtags').inputValue(), '#Testland #MapAnimation #History');
-    assert.equal(await page.locator('#mapRuns .publishBox button', { hasText: 'Sao chép hashtag' }).count(), 1);
+    // Hashtag đã nằm cuối mô tả nên không còn ô hashtag riêng.
+    assert.equal(await page.locator('#mapRuns textarea.publishHashtags').count(), 0, 'không còn ô hashtag thừa');
+    assert.equal(await page.locator('#mapRuns .publishBox button', { hasText: 'Sao chép hashtag' }).count(), 0);
+    // Cả khung mở / đóng được; lựa chọn được nhớ khi danh sách vẽ lại.
+    assert.equal(await page.locator('#mapRuns input.publishTitle').isVisible(), true);
+    await page.click('#mapRuns details.publishWhole > summary');
+    assert.equal(await page.locator('#mapRuns input.publishTitle').isVisible(), false, 'đóng cả khung');
+    await page.evaluate(() => window.push && window.push());
+    await page.waitForTimeout(150);
+    assert.equal(await page.locator('#mapRuns input.publishTitle').isVisible(), false, 'vẫn đóng sau khi vẽ lại');
+    await page.click('#mapRuns details.publishWhole > summary');
+    assert.equal(await page.locator('#mapRuns input.publishTitle').isVisible(), true, 'mở lại được');
     assert.equal((await calls('mapPublish'))[0].data.runId, 'History-of-Testland');
     assert.match(await page.locator('#mapRuns .publishBox').textContent(), /chưa có chương/);
     assert.equal(await page.locator('#mapRuns .publishMore').count(), 1);

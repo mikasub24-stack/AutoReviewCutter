@@ -176,10 +176,16 @@ function accountOperationBusy() {
 }
 // Tài khoản Muse đang mở mà rảnh để viết kịch bản bản đồ: tài khoản 1 bận (hàng đợi, phân tích truyện…) thì dùng tài khoản khác (xem account-pick.cjs).
 const museLeases = new Map();
+// Tài khoản chưa mở nhưng đã đăng nhập sẵn (đã lưu cookie phiên): app tự mở thêm cửa sổ Muse cho tài khoản đó khi các tài khoản đang mở đều bận.
+function hasSavedLogin(index) {
+  if (settings.browserChoice !== 'builtin') return false;
+  try { return require('node:fs').existsSync(path.join(app.getPath('userData'), 'account-sessions', `account-${index + 1}.enc`)); } catch { return false; }
+}
 function leaseMuseAccount(owner) {
   if (testing || starting || stopping || externalLaunches.size || resettingAccounts.size || opening.size) return null;
-  const taken = takenAccounts({ leases: [...museLeases.keys()], accountOneBusy: Boolean(storyAnalyzer?.busy || wildWriter?.busy || pairWriter?.busy), queueActive: queue.active, jobs: queue.jobs, accountCount: settings.accountCount });
-  const pick = pickAccount({ taken, max: MAX_ACCOUNTS, isOpen: i => { const browser = browsers.get(i); return Boolean(browser && !browser.isDestroyed() && browser.museStarted); } });
+  // Các việc viết / phân tích đều thuê tài khoản qua museLeases nên tài khoản 1 không còn bị coi là bận chỉ vì có việc đang chạy ở tài khoản khác.
+  const taken = takenAccounts({ leases: [...museLeases.keys()], queueActive: queue.active, jobs: queue.jobs, accountCount: settings.accountCount });
+  const pick = pickAccount({ taken, max: MAX_ACCOUNTS, isOpen: i => { const browser = browsers.get(i); return Boolean(browser && !browser.isDestroyed() && browser.museStarted); }, canOpen: hasSavedLogin });
   if (pick < 0) return null;
   museLeases.set(pick, owner); notify();
   let released = false;
@@ -1153,11 +1159,11 @@ app.whenReady().then(async () => {
   voiceService=createVoiceService({dataDir:app.getPath('userData'),getFfmpeg:()=>settings.ffmpeg,notify});await voiceService.load();voiceService.refreshCatalog().catch(()=>{});
   storyService=createStoryService({getSettings:()=>settings,getJobs:()=>queue.jobs,voice:voiceService,ensureAllowed:()=>licenseManager.ensureAllowed(),notify,userDataDir:app.getPath('userData')});
   void pruneStoryRuns().catch(()=>{});
-  storyAnalyzer=createStoryAnalyzer({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.ensureAllowed()});
+  storyAnalyzer=createStoryAnalyzer({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,leaseAccount:owner=>leaseMuseAccount(owner),ensureAllowed:()=>licenseManager.ensureAllowed()});
   wildBuilder=createStoryService({getSettings:()=>settings,getJobs:()=>queue.jobs,voice:voiceService,ensureAllowed:()=>licenseManager.requireLongTerm(),notify,userDataDir:app.getPath('userData'),kind:'wild',folderOf:wildFolder,runName:'wild-run'});
-  wildWriter=createWildWriter({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.requireLongTerm()});
+  wildWriter=createWildWriter({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,leaseAccount:owner=>leaseMuseAccount(owner),ensureAllowed:()=>licenseManager.requireLongTerm()});
   pairHud=createWindowHud({BrowserWindow});
-  pairWriter=createPairWriter({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,ensureAllowed:()=>licenseManager.requireLongTerm()});
+  pairWriter=createPairWriter({dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,leaseAccount:owner=>leaseMuseAccount(owner),ensureAllowed:()=>licenseManager.requireLongTerm()});
   mapService=createMapService({getSettings:()=>settings,voice:voiceService,ensureAllowed:()=>licenseManager.requireLongTerm(),notify,...(()=>{const f=createWindowFrames({BrowserWindow,ipcMain});return{renderFrames:f.renderFrames,renderStill:f.renderStill};})(),userDataDir:app.getPath('userData')});
   mapWriter=createMapWriter({geo:()=>mapGeoObject,dom,openMuse,getMuse:index=>browsers.get(index),getSettings:()=>settings,delay,notify,isBusy:()=>accountOperationBusy()||resettingAccounts.size>0,leaseAccount:owner=>leaseMuseAccount(owner),ensureAllowed:()=>licenseManager.requireLongTerm()});
   await recoverPairStories().catch(()=>{});
