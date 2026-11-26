@@ -178,38 +178,49 @@
   // ---------- Ngôn ngữ video: lời đọc, chữ trên video, tiêu đề và mô tả YouTube đều theo một ngôn ngữ ----------
   const fmtNum = (x, lang, max = 1) => x.toLocaleString(lang === 'en' ? 'en-US' : lang === 'de' ? 'de-DE' : lang === 'fr' ? 'fr-FR' : 'ru-RU', { maximumFractionDigits: max });
   const LANGUAGES = [
-    { id: 'en', label: 'English', vi: 'tiếng Anh', voice: 'en-US-GuyNeural', hookExample: 'RULERS OF THE STEPPE', titleExample: 'The Mongol Empire: From Steppe to Superpower',
+    { id: 'en', label: 'English', vi: 'tiếng Anh', voice: 'en-US-GuyNeural', hookExample: 'RULERS OF THE STEPPE', titleExample: 'How the Mongols Conquered Half the World (Map Animation)',
       sample: 'In the year thirteen fifty, a great kingdom rose from the sea and ruled the islands for generations.',
       s: { thanks: 'Thanks for watching', subscribe: 'Subscribe for more history', sub: 'Subscribe', stickers: { battle: 'BOOM!', ship: 'LAND HO!' }, shouts: { voyage: 'SET SAIL!', arrival: 'LAND HO!', battle: 'CHARGE!', court: 'ALL HAIL!', market: 'FRESH GOODS!', build: 'HEAVE HO!', volcano: 'RUN!' }, est: 'est.', fav: 'Which era is your favourite?', favSub: 'Tell us in the comments', bc: 'BC', ad: 'AD', bcTag: 'BC', adTag: 'AD',
         yearBC: y => `${y} BC`, yearAD: y => `${y} AD`, from: (a, b) => `from ${a} to ${b}`,
         people: n => (n >= 1e9 ? `${fmtNum(n / 1e9, 'en', 2)} billion` : n >= 1e6 ? `${fmtNum(n / 1e6, 'en', n >= 1e8 ? 0 : 1)} million` : n >= 1e3 ? `${Math.round(n / 1e3)} thousand` : String(Math.round(n))) + ' people' },
       pub: { chapters: 'Chapters', about: (t, span) => `${t}: an animated history map${span ? ' ' + span : ''}, told era by era as the borders change.`,
         note: 'Borders and territories are drawn on a modern map, so they are approximate. Please check dates and details before you rely on them.',
-        hash: ['#History', '#HistoryMap', '#AnimatedMap'], tags: ['history', 'history map', 'animated map', 'map history', 'historical maps'], countryTag: c => `${c} history` } },
-    { id: 'de', label: 'Deutsch', vi: 'tiếng Đức', voice: 'de-DE-ConradNeural', hookExample: 'HERREN DER STEPPE', titleExample: 'Das Mongolische Reich: Von der Steppe zur Supermacht',
+        hashTop: ['#MapAnimation', '#History'], hash: ['#HistoryMap', '#AnimatedMap', '#WorldHistory', '#Geography', '#Maps', '#HistoryDocumentary', '#Educational', '#Documentary', '#Mapping'],
+        countryHash: c => ['#' + c, '#' + c + 'History', '#HistoryOf' + c], tags: ['history', 'map animation', 'history map', 'animated map', 'map history', 'historical maps', 'world history', 'history documentary', 'geography', 'borders over time', 'territorial changes'],
+        countryTags: c => [`${c} history`, `history of ${c}`, `${c} map`, `${c} map animation`, `evolution of ${c}`, `${c} borders`],
+        ideas: { evolution: (c, a, b) => `Evolution of ${c}: ${a} – ${b} (Map Animation)`, years: (c, y, m) => `${y} Years of ${c} in ${m} Minutes (Map Animation)`, entire: c => `The Entire History of ${c} (Map Animation)`, how: c => `How ${c} Became What It Is Today (Map Animation)` } } },
+    { id: 'de', label: 'Deutsch', vi: 'tiếng Đức', voice: 'de-DE-ConradNeural', hookExample: 'HERREN DER STEPPE', titleExample: 'Wie die Mongolen die halbe Welt eroberten (Karten-Animation)',
       sample: 'Im Jahr dreizehnhundertfünfzig erhob sich ein großes Königreich aus dem Meer und herrschte über Generationen über die Inseln.',
       s: { thanks: 'Danke fürs Zuschauen', subscribe: 'Abonniere für mehr Geschichte', sub: 'Abonnieren', stickers: { battle: 'BUMM!', ship: 'LAND IN SICHT!' }, shouts: { voyage: 'LEINEN LOS!', arrival: 'LAND IN SICHT!', battle: 'ANGRIFF!', court: 'HEIL DEM KÖNIG!', market: 'FRISCHE WARE!', build: 'HOPP, HOPP!', volcano: 'LAUFT!' }, est: 'ca.', fav: 'Welche Epoche gefällt dir am besten?', favSub: 'Schreib es in die Kommentare', bc: 'v. Chr.', ad: 'n. Chr.', bcTag: 'v. Chr.', adTag: 'n. Chr.',
         yearBC: y => `${y} v. Chr.`, yearAD: y => `${y} n. Chr.`, from: (a, b) => `von ${a} bis ${b}`,
         people: n => (n >= 1e9 ? `${fmtNum(n / 1e9, 'de', 2)} Mrd.` : n >= 1e6 ? `${fmtNum(n / 1e6, 'de', n >= 1e8 ? 0 : 1)} Mio.` : n >= 1e3 ? `${Math.round(n / 1e3)} Tsd.` : String(Math.round(n))) + ' Menschen' },
       pub: { chapters: 'Kapitel', about: (t, span) => `${t}: eine animierte Geschichtskarte${span ? ' ' + span : ''}, Epoche für Epoche erzählt, während sich die Grenzen verändern.`,
         note: 'Grenzen und Gebiete sind auf einer modernen Karte eingezeichnet und daher nur ungefähre Angaben. Bitte prüfe Daten und Details, bevor du dich darauf verlässt.',
-        hash: ['#Geschichte', '#Geschichtskarte', '#AnimierteKarte'], tags: ['geschichte', 'weltgeschichte', 'geschichtskarte', 'animierte karte', 'karte geschichte', 'historische karten'], countryTag: c => `${c} geschichte` } },
-    { id: 'fr', label: 'Français', vi: 'tiếng Pháp', voice: 'fr-FR-HenriNeural', hookExample: 'MAÎTRES DE LA STEPPE', titleExample: 'L’Empire mongol : de la steppe à la superpuissance',
+        hashTop: ['#Geschichte', '#Kartenanimation'], hash: ['#Geschichtskarte', '#AnimierteKarte', '#Weltgeschichte', '#Geografie', '#Landkarten', '#Dokumentation', '#Lernen', '#Karten'],
+        countryHash: c => ['#' + c, '#' + c + 'Geschichte', '#GeschichteVon' + c], tags: ['geschichte', 'weltgeschichte', 'kartenanimation', 'geschichtskarte', 'animierte karte', 'karte geschichte', 'historische karten', 'geografie', 'grenzen im wandel'],
+        countryTags: c => [`${c} geschichte`, `geschichte von ${c}`, `${c} karte`, `${c} karten animation`, `entwicklung von ${c}`, `${c} grenzen`],
+        ideas: { evolution: (c, a, b) => `Entwicklung von ${c}: ${a} – ${b} (Karten-Animation)`, years: (c, y, m) => `${y} Jahre ${c} in ${m} Minuten (Karten-Animation)`, entire: c => `Die ganze Geschichte von ${c} (Karten-Animation)`, how: c => `Wie ${c} wurde, was es heute ist (Karten-Animation)` } } },
+    { id: 'fr', label: 'Français', vi: 'tiếng Pháp', voice: 'fr-FR-HenriNeural', hookExample: 'MAÎTRES DE LA STEPPE', titleExample: 'Comment les Mongols ont conquis la moitié du monde (carte animée)',
       sample: 'En treize cent cinquante, un grand royaume surgit de la mer et domina les îles pendant des générations.',
       s: { thanks: 'Merci d’avoir regardé', subscribe: 'Abonnez-vous pour plus d’histoire', sub: 'S’abonner', stickers: { battle: 'BOUM !', ship: 'TERRE !' }, shouts: { voyage: 'EN MER !', arrival: 'TERRE !', battle: 'À L’ASSAUT !', court: 'VIVE LE ROI !', market: 'PRODUITS FRAIS !', build: 'OH HISSE !', volcano: 'FUYEZ !' }, est: 'env.', fav: 'Quelle époque préférez-vous ?', favSub: 'Dites-le-nous en commentaire', bc: 'av. J.-C.', ad: 'apr. J.-C.', bcTag: 'av. J.-C.', adTag: 'apr. J.-C.',
         yearBC: y => `${y} av. J.-C.`, yearAD: y => `${y} apr. J.-C.`, from: (a, b) => `de ${a} à ${b}`,
         people: n => (n >= 1e9 ? `${fmtNum(n / 1e9, 'fr', 2)} Md d’habitants` : n >= 1e6 ? `${fmtNum(n / 1e6, 'fr', n >= 1e8 ? 0 : 1)} M d’habitants` : n >= 1e3 ? `${fmtNum(Math.round(n / 1e3) * 1e3, 'fr', 0)} habitants` : `${Math.round(n)} habitants`) },
       pub: { chapters: 'Chapitres', about: (t, span) => `${t} : une carte historique animée${span ? ' ' + span : ''}, racontée époque par époque au fil des frontières.`,
         note: 'Les frontières et les territoires sont tracés sur une carte moderne : ils sont donc approximatifs. Vérifiez les dates et les détails avant de vous y fier.',
-        hash: ['#Histoire', '#CarteHistorique', '#CarteAnimée'], tags: ['histoire', 'histoire du monde', 'carte historique', 'carte animée', 'histoire en cartes', 'cartes historiques'], countryTag: c => `histoire ${c}` } },
-    { id: 'ru', label: 'Русский', vi: 'tiếng Nga', voice: 'ru-RU-DmitryNeural', hookExample: 'ВЛАСТЕЛИНЫ СТЕПИ', titleExample: 'Монгольская империя: от степи до сверхдержавы',
+        hashTop: ['#Histoire', '#CarteAnimée'], hash: ['#CarteHistorique', '#HistoireDuMonde', '#Géographie', '#Cartes', '#Documentaire', '#Éducation', '#Frontières'],
+        countryHash: c => ['#' + c, '#Histoire' + c, '#HistoireDe' + c], tags: ['histoire', 'carte animée', 'histoire du monde', 'carte historique', 'histoire en cartes', 'cartes historiques', 'géographie', 'documentaire histoire', 'évolution des frontières'],
+        countryTags: c => [`histoire ${c}`, `histoire de ${c}`, `carte ${c}`, `${c} carte animée`, `évolution de ${c}`, `frontières ${c}`],
+        ideas: { evolution: (c, a, b) => `Évolution de ${c} : ${a} – ${b} (carte animée)`, years: (c, y, m) => `${y} ans d’histoire de ${c} en ${m} minutes (carte animée)`, entire: c => `Toute l’histoire de ${c} (carte animée)`, how: c => `${c} : comment les frontières ont changé (carte animée)` } } },
+    { id: 'ru', label: 'Русский', vi: 'tiếng Nga', voice: 'ru-RU-DmitryNeural', hookExample: 'ВЛАСТЕЛИНЫ СТЕПИ', titleExample: 'Как монголы завоевали полмира (анимация карты)',
       sample: 'В тысяча триста пятидесятом году из моря поднялось великое королевство и столетиями правило островами.',
       s: { thanks: 'Спасибо за просмотр', subscribe: 'Подпишитесь, чтобы узнать больше истории', sub: 'Подписаться', stickers: { battle: 'БАХ!', ship: 'ЗЕМЛЯ!' }, shouts: { voyage: 'В ПЛАВАНИЕ!', arrival: 'ЗЕМЛЯ!', battle: 'В АТАКУ!', court: 'СЛАВА КОРОЛЮ!', market: 'СВЕЖИЙ ТОВАР!', build: 'РАЗ-ДВА, ВЗЯЛИ!', volcano: 'БЕГИТЕ!' }, est: 'ок.', fav: 'Какая эпоха вам нравится больше всего?', favSub: 'Напишите в комментариях', bc: 'до н. э.', ad: 'н. э.', bcTag: 'до н.э.', adTag: 'н.э.',
         yearBC: y => `${y} до н. э.`, yearAD: y => `${y} н. э.`, from: (a, b) => `с ${a} по ${b}`,
         people: n => (n >= 1e9 ? `${fmtNum(n / 1e9, 'ru', 2)} млрд` : n >= 1e6 ? `${fmtNum(n / 1e6, 'ru', n >= 1e8 ? 0 : 1)} млн` : n >= 1e3 ? `${Math.round(n / 1e3)} тыс.` : String(Math.round(n))) + ' человек' },
       pub: { chapters: 'Главы', about: (t, span) => `${t}: анимированная историческая карта${span ? ' ' + span : ''}, рассказ эпоха за эпохой по мере того, как менялись границы.`,
         note: 'Границы и территории нарисованы на современной карте, поэтому они приблизительны. Проверяйте даты и подробности, прежде чем на них полагаться.',
-        hash: ['#История', '#ИсторическаяКарта', '#АнимированнаяКарта'], tags: ['история', 'всемирная история', 'историческая карта', 'анимированная карта', 'карта истории', 'исторические карты'], countryTag: c => `история ${c}` } }
+        hashTop: ['#История', '#АнимацияКарты'], hash: ['#ИсторическаяКарта', '#АнимированнаяКарта', '#ВсемирнаяИстория', '#География', '#Карты', '#Документалистика', '#Образование'],
+        countryHash: c => ['#' + c], ideas: { evolution: (c, a, b) => `Эволюция: ${c}, ${a} – ${b} (анимация карты)`, years: (c, y, m) => `${y} лет истории: ${c} за ${m} мин (анимация карты)`, entire: c => `Вся история: ${c} (анимация карты)`, how: c => `${c}: как менялись границы (анимация карты)` },
+        countryTags: c => [`история ${c}`, `карта ${c}`, `${c} анимация карты`], tags: ['история', 'анимация карты', 'всемирная история', 'историческая карта', 'анимированная карта', 'карта истории', 'исторические карты'], countryTag: c => `история ${c}` } }
   ];
   const langOf = id => LANGUAGES.find(l => l.id === id) || LANGUAGES[0];
   const strings = id => langOf(id).s;
@@ -538,7 +549,7 @@
         ? `4. «country» ĐÚNG là: ${config.country}.`
         : '4. «country»: nước hiện nay nằm ở trung tâm câu chuyện, ghi đúng tên tiếng Anh trong danh sách bên dưới. Nếu chủ đề trải ra nhiều nước (đế quốc, chiến tranh lớn) hãy chọn nước ở lõi câu chuyện; chỉ khi thật sự toàn cầu mới để chuỗi rỗng "".',
       '5. Năm trước Công nguyên ghi số âm (ví dụ -221). Chỉ trả lời DUY NHẤT một khối JSON, không viết thêm câu dẫn hay giải thích, đúng khuôn:',
-      `{"title":"<tiêu đề video YouTube hấp dẫn, ${L.vi}, tối đa 60 ký tự, có tên chủ đề, ví dụ: ${L.titleExample}>","subtitle":"<phụ đề ngắn>","hook":"<CHỮ TO trên ảnh bìa: 2–4 từ VIẾT HOA, gợi tò mò hoặc nói điều gây sốc về chủ đề, ${L.vi}, ví dụ: ${L.hookExample}>","country":"<tên nước>","eras":[{"year":-2879,"title":"<tên giai đoạn>","focus":"<một câu: chuyện gì xảy ra và bản đồ đổi ra sao>"}]}`,
+      `{"title":"<tiêu đề YouTube HÚT VIEW, ${L.vi}, 45–68 ký tự: từ khóa chính (chủ đề / tên nước) đặt ở ĐẦU; thêm MỘT yếu tố gây tò mò hoặc cảm xúc (How… / Why… / Rise and Fall / Evolution of… / con số năm, thế kỷ hoặc số phút); ghi chú trong ngoặc đơn kiểu (Map Animation) bằng đúng ${L.vi}; chỉ hứa điều CÓ THẬT trong video, không giật gân sai sự thật, không viết HOA toàn bộ, không emoji. Ví dụ: ${L.titleExample}>","subtitle":"<phụ đề ngắn>","hook":"<CHỮ TO trên ảnh bìa: 2–4 từ VIẾT HOA, gợi tò mò hoặc nói điều gây sốc về chủ đề, ${L.vi}, ví dụ: ${L.hookExample}>","country":"<tên nước>","eras":[{"year":-2879,"title":"<tên giai đoạn>","focus":"<một câu: chuyện gì xảy ra và bản đồ đổi ra sao>"}]}`,
       ...tail(marker),
       ...(config.country ? [] : ['', 'DANH SÁCH TÊN NƯỚC (chọn đúng một tên trong đây cho «country»):', countryNames.join(', ')]),
       ...(fix ? ['', 'SỬA LỖI – lần trước còn lỗi sau; viết lại ĐỦ toàn bộ khối JSON:', fix] : []),
@@ -662,7 +673,30 @@
     const t = Math.max(0, Math.round(Number(sec) || 0)), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60);
     return h ? `${h}:${pad2(m)}:${pad2(t % 60)}` : `${m}:${pad2(t % 60)}`;
   }
-  function publishPack(script, timeline) {
+  // Hashtag không dấu cách: chữ + số (mọi ngôn ngữ), mỗi từ viết hoa chữ đầu.
+  const hashWord = text => flat(text).split(/[^\p{L}\p{N}\p{M}_]+/u).filter(Boolean).map(w => w.charAt(0).toLocaleUpperCase() + w.slice(1)).join('');
+  const HASH_MAX = 14;   // YouTube bỏ qua TOÀN BỘ hashtag nếu video có hơn 15; 3 cái đầu hiện ngay trên tiêu đề
+  // Chủ đề của video: nước nếu có, không thì phần đầu tiêu đề (trước dấu hai chấm / ngoặc), bỏ mạo từ đầu câu.
+  function topicOf(script, L) {
+    const country = flat(script && script.country).slice(0, 60);
+    if (L.id === 'en' && country) return country;
+    let h = flat(script && script.title).split(/\s*[:：—–|(]\s*|\s+-\s+/)[0] || '';
+    if (ARTICLE[L.id]) h = h.replace(ARTICLE[L.id], '');
+    return (L.id === 'en' ? country || h : h || country).slice(0, 50);
+  }
+  // Bộ tiêu đề gợi ý khác (≤ 70 ký tự): đặt tên theo kiểu các kênh bản đồ hay được xem — «Evolution of X: năm – năm», «N năm trong M phút», «Toàn bộ lịch sử X», «Làm sao X thành như hôm nay».
+  function titleIdeas(script, timeline, L, opts) {
+    const I = L.pub.ideas, topic = topicOf(script, L), eras = (timeline && timeline.eras) || (script && script.eras) || [], first = eras[0], last = eras[eras.length - 1];
+    const secs = Number(timeline && timeline.total) || Number(opts && opts.seconds) || 0, minutes = Math.round(secs / 60), years = first && last ? Math.abs(Math.round(last.year - first.year)) : 0;
+    if (!I || !topic) return [];
+    const out = [];
+    if (first && last && first.year !== last.year) out.push(I.evolution(topic, yearLabel(first.year, L.id), yearLabel(last.year, L.id)));
+    if (years >= 100 && minutes >= 2) out.push(I.years(topic, fmtNum(years, L.id, 0), minutes));
+    out.push(I.entire(topic), I.how(topic));
+    const mine = flat(script && script.title).toLocaleLowerCase(L.id);
+    return [...new Set(out.map(x => x.replace(/\s+/g, ' ').trim()))].filter(x => x.length <= 70 && x.toLocaleLowerCase(L.id) !== mine).slice(0, 4);
+  }
+  function publishPack(script, timeline, opts = {}) {
     const L = langOf((timeline && timeline.lang) || (script && script.lang)), t = L.s, P = L.pub;
     const title = flat(script && script.title).slice(0, 100) || (L.id === 'en' ? 'History' : L.label);
     const subtitle = flat(script && script.subtitle).slice(0, 150);
@@ -679,11 +713,18 @@
         chapters.push({ t: Math.round(at), clock: clock(at), label: `${e.label}: ${e.title}`.slice(0, 80) });
       }
     }
-    const lc = x => x.toLocaleLowerCase(L.id);
-    const tagWords = [...new Set([title, ...P.tags, country, country && P.countryTag(country), ...title.split(/[:\-–—,]/).map(x => x.trim()).filter(x => x.length > 3)].filter(Boolean).map(lc))];
+    const lc = x => x.toLocaleLowerCase(L.id), cw = hashWord(country);
+    // Thẻ tag (từ khóa): tiêu đề, từ khóa chung, từ khóa theo nước (history of X, X map, evolution of X…), các cụm trong tiêu đề, tên các giai đoạn.
+    const eraTitles = eras.slice(0, 8).map(e => flat(e.title)).filter(x => x.length > 3 && x.length < 40);
+    const tagWords = [...new Set([title, ...P.tags.slice(0, 3), country, ...(country ? P.countryTags(country) : []), ...P.tags.slice(3), ...title.split(/[:\-–—,()]/).map(x => x.trim()).filter(x => x.length > 3), ...eraTitles].filter(Boolean).map(lc))];
     const tags = []; let size = 0;
     for (const x of tagWords) { if (size + x.length + 2 > 450) break; tags.push(x); size += x.length + 2; }
-    const hash = [...P.hash, country && '#' + country.replace(/[^\p{L}\p{N}]+/gu, '')].filter(Boolean);
+    // Hashtag đề xuất: tên nước đứng đầu (3 cái đầu hiện trên tiêu đề), rồi hashtag theo nước, vài từ khóa RIÊNG của video, rồi hashtag chung (cắt ở 14 nên hashtag riêng luôn còn).
+    const STOP = /^(from|history|years?|story|animation|evolution|world|about|their|there|which|empire|geschichte|histoire|история)$/iu;
+    const titleTags = title.split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 5 && /^\p{Lu}/u.test(w) && !STOP.test(w) && lc(w) !== lc(cw)).map(w => '#' + hashWord(w)).slice(0, 2);
+    const ch = country ? P.countryHash(cw) : [];
+    const hash = [...new Map([...(ch[0] ? [ch[0]] : []), ...P.hashTop, ...ch.slice(1), ...titleTags, ...P.hash].map(h => [lc(h), h])).values()].slice(0, HASH_MAX);
+    const titles = titleIdeas(script, timeline, L, opts);
     const body = [
       subtitle || title,
       '',
@@ -695,8 +736,8 @@
       hash.join(' ')
     ];
     const description = body.join('\n').slice(0, 4900);
-    const text = ['TITLE', title, '', 'DESCRIPTION', description, '', 'TAGS', tags.join(', ')].join('\n') + '\n';
-    return { lang: L.id, title, description, tags, chapters: chapters.length >= 3 ? chapters : [], text };
+    const text = ['TITLE', title, '', 'DESCRIPTION', description, '', 'TAGS', tags.join(', '), '', 'HASHTAGS', hash.join(' '), ...(titles.length ? ['', 'TITLE IDEAS', ...titles] : [])].join('\n') + '\n';
+    return { lang: L.id, title, description, tags, hashtags: hash, titles, chapters: chapters.length >= 3 ? chapters : [], text };
   }
 
   return {

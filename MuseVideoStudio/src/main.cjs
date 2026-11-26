@@ -1645,10 +1645,17 @@ app.whenReady().then(async () => {
       if(!meta)throw Error('Không thấy video này.');
       const raw=await readJsonFile(mapScriptFile(id));
       if(!raw)throw Error('Chưa có kịch bản của video này.');
-      if(meta.publish?.title)return {publish:meta.publish};
+      if(meta.publish?.title&&meta.publish.titles)return {publish:meta.publish};
       const {script}=mapPlan.normalizeScript(raw,await ensureMapGeo());
-      const pack=mapPlan.publishPack(script,null);
-      meta.publish={title:pack.title,description:pack.description,tags:pack.tags,chapters:[],partial:true};
+      const pack=mapPlan.publishPack(script,null,{seconds:meta.seconds});
+      if(meta.publish?.title){
+        // Gói đăng của bản cũ (chỉ 3 hashtag, chưa có tiêu đề gợi ý): giữ tiêu đề và chương, đổi dòng hashtag cuối mô tả + thẻ + thêm tiêu đề gợi ý.
+        const lines=String(meta.publish.description||'').split('\n');
+        while(lines.length&&!lines[lines.length-1].trim())lines.pop();
+        const tagLine=pack.hashtags.join(' ');
+        if(/^#\S/.test(lines[lines.length-1]||''))lines[lines.length-1]=tagLine;else lines.push('',tagLine);
+        meta.publish={...meta.publish,description:lines.join('\n'),tags:pack.tags,hashtags:pack.hashtags,titles:pack.titles};
+      }else meta.publish={title:pack.title,description:pack.description,tags:pack.tags,hashtags:pack.hashtags,titles:pack.titles,chapters:[],partial:true};
       await save();notify();
       return {publish:meta.publish};
     },
@@ -1711,10 +1718,10 @@ app.whenReady().then(async () => {
       await licenseManager.requireLongTerm();
       const raw=await readJsonFile(mapScriptFile(id));
       if(!raw)throw Error('Không tìm thấy kịch bản của video này.');
-      const r=await mapService.thumbnail({dir:mapFolder(settings.output,id),name:meta.name,script:raw,variant:Number(meta.thumbVariant)||0});
-      meta.thumb=r.file;meta.thumbAt=Date.now();meta.thumbVariant=(r.variant+1)%r.count;
+      const r=await mapService.thumbnail({dir:mapFolder(settings.output,id),name:meta.name,script:raw});
+      meta.thumb=r.file;meta.thumbAt=Date.now();
       await save();notify();
-      return {file:r.file,variant:r.variant+1,count:r.count};
+      return {file:r.file};
     },
     mapSave: async data => {
       const meta=mapRuns()[String(data?.runId||'')],thumb=Boolean(data?.thumb),out=thumb?meta?.thumb:meta?.output;
@@ -1868,7 +1875,7 @@ app.whenReady().then(async () => {
       await recoverPairStories().catch(()=>{});
       const meta=settings.pairStories?.[storyId];
       if(!meta)throw Error(ui('Không thấy video này.','This video was not found.'));
-      if(meta.publish?.title&&!data?.force)return {publish:meta.publish};
+      if(meta.publish?.title&&meta.publish.titles&&!data?.force)return {publish:meta.publish};   // gói đăng bản cũ chưa có tiêu đề gợi ý / hashtag mới: lập lại từ kịch bản
       const draft=await readPairDraft(storyId);
       if(!draft?.script)throw Error(ui('Không thấy kịch bản đã lưu của video này.','The saved script of this video was not found.'));
       const publish=await makePairPublish(storyId,meta,draft.script,{force:true});

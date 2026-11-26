@@ -39,6 +39,18 @@ test('vùng tròn (circles) thành đơn vị B:lon,lat,km và đọc lại đú
 });
 
 // ---------- kịch bản + dòng thời gian ----------
+test('ảnh bìa phóng vào phần lãnh thổ chính: coreBox bỏ đảo xa nhỏ (Nhật không bị kéo ra tận Ogasawara), giữ đủ đảo lớn', () => {
+  const jp = geo.byA3.get('JPN'), core = Geo.coreBox(jp);
+  assert.ok(jp.bb[2] > 148 || jp.bb[0] < 128 || jp.bb[1] < 26, 'hộp bao đầy đủ của Nhật vươn ra đảo xa: ' + jp.bb);
+  assert.ok(core[2] < 147 && core[1] > 29, 'hộp bao phần chính bỏ đảo xa (đông < 147°E, nam > 29°N): ' + core);
+  assert.ok(core[0] < 131.5 && core[3] > 45 && core[2] > 144, 'vẫn đủ Kyushu, Hokkaido và Honshu: ' + core);
+  const area = b => (b[2] - b[0]) * (b[3] - b[1]);
+  assert.ok(area(core) < area(jp.bb) * .55, 'phần chính nhỏ hơn hẳn: ' + area(core).toFixed(0) + ' / ' + area(jp.bb).toFixed(0));
+  const tiny = geo.byA3.get('VAT') || geo.countries.slice().sort((a, b) => a.area - b.area)[0];
+  assert.deepEqual(Geo.coreBox(tiny).length, 4);
+  for (const u of geo.countries) { const c = Geo.coreBox(u); assert.ok(c[0] >= u.bb[0] - 1e-9 && c[2] <= u.bb[2] + 1e-9 && c[1] >= u.bb[1] - 1e-9 && c[3] <= u.bb[3] + 1e-9 && c[2] >= c[0] && c[3] >= c[1], u.a3 + ' hộp bao phần chính nằm trong hộp bao đủ'); }
+});
+
 test('chuẩn hóa kịch bản mẫu: không lỗi, vùng đổi thành đơn vị, nhãn năm đúng', () => {
   const { script, issues } = Plan.normalizeScript(copy(sample), geo);
   assert.deepEqual(issues, []);
@@ -452,27 +464,20 @@ test('nguồn khung hình trả thiếu khung: báo lỗi chứ không xuất vi
 });
 
 // ---------- nối vào app ----------
-test('ảnh bìa 16:9: chọn giai đoạn nhiều lãnh thổ nhất, đổi ảnh theo variant, nén xuống ≤ 2 MB, ghi tệp riêng từng ảnh', { skip: !ffmpegOk && 'cần ffmpeg để tạo JPEG mẫu' }, async () => {
+test('ảnh bìa 16:9: chỉ MỘT kiểu «Trước / Sau», nén xuống ≤ 2 MB, ghi một tệp thumbnail.jpg (bấm lại thì ghi đè)', { skip: !ffmpegOk && 'cần ffmpeg để tạo JPEG mẫu' }, async () => {
   const dir = tmp(), asked = [], small = jpeg();
   const service = createMapService({ getSettings: () => ({}), renderFrames: fakeFrames(), renderStill: async a => { asked.push(a); return a.quality > .8 ? Buffer.alloc(2_100_000, 1) : small; } });
-  const a = await service.thumbnail({ dir, name: 'Thử', script: copy(sample), variant: 0 });
-  assert.equal(path.basename(a.file), 'thumbnail-1.jpg');
+  const a = await service.thumbnail({ dir, name: 'Thử', script: copy(sample), variant: 3 });
+  assert.equal(path.basename(a.file), 'thumbnail.jpg');
   assert.ok(fs.existsSync(a.file) && fs.statSync(a.file).size <= 1.9e6, 'JPEG nhỏ hơn 2 MB (YouTube)');
   assert.ok(asked.length >= 2 && asked[0].quality > asked.at(-1).quality, 'quá nặng thì nén thêm');
-  assert.equal(asked[0].variant, 0); assert.equal('title' in asked[0] || 'years' in asked[0], false, 'ảnh bìa chỉ nhận vài từ to (hook), không nhận cả tiêu đề');
-  assert.equal(asked[0].hook, Plan.hookOf(sample)); assert.ok(asked[0].hook.split(' ').length <= 5 && asked[0].hook === asked[0].hook.toLocaleUpperCase('en'));
+  for (const k of ['variant', 'hook', 'index', 'count', 'era']) assert.equal(k in asked[0] || k in a, false, 'đã bỏ các kiểu cũ: không còn «' + k + '»');
+  assert.equal('title' in asked[0] || 'years' in asked[0], false, 'ảnh bìa không nhận cả tiêu đề');
   assert.equal(asked[0].timeline.W, 1920);
   assert.equal(asked[0].timeline.H, 1080);
-  assert.equal(a.count, 5, 'năm kiểu bố cục');
-  const b = await service.thumbnail({ dir, name: 'Thử', script: copy(sample), variant: 1 });
-  assert.equal(path.basename(b.file), 'thumbnail-2.jpg');
-  assert.notEqual(b.era, a.era, 'bấm lại ra giai đoạn khác'); assert.equal(asked.at(-1).variant, 1);
-  const ba = await service.thumbnail({ dir, name: 'Thử', script: copy(sample), variant: 3 });
-  assert.equal(path.basename(ba.file), 'thumbnail-4.jpg', 'kiểu thứ 4 «Trước / Sau» ghi ra tệp riêng'); assert.equal(asked.at(-1).variant, 3);
-  const pa = await service.thumbnail({ dir, name: 'Thử', script: copy(sample), variant: 4 });
-  assert.equal(path.basename(pa.file), 'thumbnail-5.jpg', 'kiểu thứ 5 «Hoảng loạn» ghi ra tệp riêng'); assert.equal(asked.at(-1).variant, 4);
-  const wrapped = await service.thumbnail({ dir, name: 'Thử', script: copy(sample), variant: a.count });
-  assert.equal(wrapped.variant, 0, 'hết vòng thì quay lại ảnh đầu');
+  const again = await service.thumbnail({ dir, name: 'Thử', script: copy(sample) });
+  assert.equal(again.file, a.file, 'bấm lại ghi đè cùng một tệp');
+  assert.deepEqual(fs.readdirSync(dir).filter(f => /thumbnail/.test(f)), ['thumbnail.jpg']);
   assert.equal(fs.readdirSync(dir).filter(f => f.endsWith('.tmp')).length, 0);
 });
 
@@ -526,7 +531,21 @@ test('thông tin đăng YouTube: tiêu đề đúng như trên video, chương c
   assert.equal(pack.chapters[0].clock, '0:00', 'chương đầu phải ở 0:00 (YouTube yêu cầu)');
   for (let k = 1; k < pack.chapters.length; k++) assert.ok(pack.chapters[k].t - pack.chapters[k - 1].t >= 10, 'mỗi chương dài từ 10 giây');
   assert.match(pack.description, /Chapters\n0:00 1206: Temujin united\n/);
-  assert.match(pack.description, /#History #HistoryMap #AnimatedMap #Mongolia/);
+  // Hashtag: tên nước đứng đầu (3 cái đầu hiện ngay trên tiêu đề YouTube), tổng ≤ 14 (YouTube bỏ qua TẤT CẢ nếu > 15), không trùng, không dấu cách, có cả từ khóa riêng của video.
+  assert.match(pack.description, /#Mongolia #MapAnimation #History #MongoliaHistory #HistoryOfMongolia #Mongol #Steppe #HistoryMap/);
+  assert.ok(pack.hashtags.length >= 12 && pack.hashtags.length <= 14, 'nhiều hashtag đề xuất nhưng không quá 15: ' + pack.hashtags.length);
+  assert.equal(new Set(pack.hashtags.map(h => h.toLowerCase())).size, pack.hashtags.length, 'không trùng');
+  assert.ok(pack.hashtags.every(h => /^#[\p{L}\p{N}_]+$/u.test(h)), 'hashtag không có dấu cách / ký tự lạ: ' + pack.hashtags);
+  assert.ok(pack.hashtags.includes('#Steppe') || pack.hashtags.includes('#Mongol'), 'có hashtag lấy từ tiêu đề riêng của video: ' + pack.hashtags);
+  assert.ok(pack.description.trim().endsWith(pack.hashtags.join(' ')), 'dòng cuối mô tả là toàn bộ hashtag');
+  // Tiêu đề gợi ý khác: kiểu «Evolution of X: năm – năm (Map Animation)», ≤ 70 ký tự, khác tiêu đề hiện tại, không trùng nhau.
+  assert.ok(pack.titles.length >= 3 && pack.titles.length <= 4, pack.titles.join(' | '));
+  assert.equal(pack.titles[0], 'Evolution of Mongolia: 1206 AD – 1368 AD (Map Animation)'.replace(/ AD/g, ''), 'năm của giai đoạn đầu và cuối: ' + pack.titles[0]);
+  assert.ok(pack.titles.every(x => x.length <= 70 && x !== script.title) && new Set(pack.titles).size === pack.titles.length);
+  assert.ok(pack.titles.some(x => /Entire History of Mongolia/.test(x)));
+  assert.match(pack.text, /\nHASHTAGS\n#Mongolia #MapAnimation #History[^\n]*\n\nTITLE IDEAS\nEvolution of Mongolia/);
+  const long = Plan.publishPack({ title: 'Egypt', country: 'Egypt', eras: [era(-3000, 'a'), era(-1500, 'b'), era(2000, 'c')] }, Plan.compile({ title: 'Egypt', country: 'Egypt', eras: [era(-3000, 'a'), era(-1500, 'b'), era(2000, 'c')] }, null, { durations: [60, 60, 60], fps: 30 }));
+  assert.ok(long.titles.some(x => /^5,000 Years of Egypt in \d+ Minutes \(Map Animation\)$/.test(x)), 'chủ đề trải dài nhiều thế kỷ có kiểu «N năm trong M phút»: ' + long.titles.join(' | '));
   assert.ok(pack.description.length < 5000);
   assert.ok(pack.tags.join(', ').length <= 460 && pack.tags.includes('mongolia history') && pack.tags.includes('the mongol empire'));
   assert.match(pack.text, /^TITLE\nThe Mongol Empire: From Steppe to Superpower\n\nDESCRIPTION\n/);

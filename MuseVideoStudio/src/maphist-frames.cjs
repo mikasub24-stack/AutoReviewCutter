@@ -110,8 +110,8 @@ function createWindowFrames({ BrowserWindow, ipcMain, quality = .92, workers = 0
       stopAll();
     }
   }
-  // Một ảnh bìa tĩnh: cửa sổ ẩn vẽ giai đoạn index kèm tiêu đề, trả về Buffer JPEG.
-  async function renderStill({ timeline, raw, index, variant = 0, hook = '', quality = .92, signal }) {
+  // Một ảnh bìa tĩnh «Trước / Sau» (giai đoạn đầu | giai đoạn cuối): cửa sổ ẩn vẽ, trả về Buffer JPEG.
+  async function renderStill({ timeline, raw, quality = .92, signal }) {
     const win = makeWindow(timeline);
     const stop = () => destroy(win);
     signal?.addEventListener('abort', stop, { once: true });
@@ -119,7 +119,7 @@ function createWindowFrames({ BrowserWindow, ipcMain, quality = .92, workers = 0
       await win.loadFile(path.join(__dirname, 'maphist-render.html'));
       const wc = win.webContents;
       await wc.executeJavaScript('window.__mapRenderReady === true');
-      const b64 = await wc.executeJavaScript(`MapRender.thumbnail(${JSON.stringify({ raw, timeline, index, variant, hook, quality })})`);
+      const b64 = await wc.executeJavaScript(`MapRender.thumbnail(${JSON.stringify({ raw, timeline, quality })})`);
       return Buffer.from(b64, 'base64');
     } finally {
       signal?.removeEventListener('abort', stop);

@@ -78,8 +78,8 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
           }
           if (name === 'mapSaveScript') return { issues: [] };
           if (name === 'mapRender') { s.maphist.runs[data.runId].status = 'building'; Object.assign(s.maphist, { busy: true, phase: 'build', runId: data.runId }); s.maphist.build = { busy: true, progress: 'Đang vẽ khung hình 300/900 · còn khoảng 2 phút', done: 300, total: 900, preview: 'C:\\Videos\\BanDo\\History-of-Testland\\.dang-dung\\xem-truoc-0.jpg', previewAt: 111 }; setTimeout(window.push, 0); return { runId: data.runId }; }
-          if (name === 'mapThumb') { Object.assign(s.maphist.runs[data.runId], { thumb: 'C:\\Videos\\BanDo\\History-of-Testland\\thumbnail-1.jpg', thumbAt: 5 }); setTimeout(window.push, 0); return { file: 'C:\\Videos\\BanDo\\History-of-Testland\\thumbnail-1.jpg', variant: 1, count: 4 }; }
-          if (name === 'mapPublish') { Object.assign(s.maphist.runs[data.runId], { publish: { title: 'Testland: The Full Story from Dust to Empire', description: 'A tale of Testland.', tags: ['history'], chapters: [], partial: true } }); setTimeout(window.push, 0); return { publish: s.maphist.runs[data.runId].publish }; }
+          if (name === 'mapThumb') { Object.assign(s.maphist.runs[data.runId], { thumb: 'C:\\Videos\\BanDo\\History-of-Testland\\thumbnail.jpg', thumbAt: 5 }); setTimeout(window.push, 0); return { file: 'C:\\Videos\\BanDo\\History-of-Testland\\thumbnail-1.jpg', variant: 1, count: 4 }; }
+          if (name === 'mapPublish') { Object.assign(s.maphist.runs[data.runId], { publish: { title: 'Testland: The Full Story from Dust to Empire', description: 'A tale of Testland.', tags: ['history'], hashtags: ['#Testland', '#MapAnimation', '#History'], titles: ['Evolution of Testland: 1350 – 1945 (Map Animation)', 'The Entire History of Testland (Map Animation)'], chapters: [], partial: true } }); setTimeout(window.push, 0); return { publish: s.maphist.runs[data.runId].publish }; }
           if (name === 'mapRemove') { delete s.maphist.runs[data.runId]; return structuredClone(s); }
           return structuredClone(s);
         }
@@ -262,7 +262,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.match(await page.locator('#mapRuns img.restoreLive').getAttribute('src'), /xem-truoc-0\.jpg$/);
 
     // Đang dựng video mới vẫn xóa được video cũ (chỉ «Dựng lại» và «Xem và sửa» bị khóa).
-    await page.evaluate(() => { window.s.maphist.runs['Old-Video'] = { name: 'Old video', status: 'done', output: 'C:\\Videos\\BanDo\\Old-Video\\Old-Video.mp4', seconds: 100, eras: 3, builtAt: 1, createdAt: 1, publish: { title: 'Old', description: '', tags: [], chapters: [] } }; window.push(); });
+    await page.evaluate(() => { window.s.maphist.runs['Old-Video'] = { name: 'Old video', status: 'done', output: 'C:\\Videos\\BanDo\\Old-Video\\Old-Video.mp4', seconds: 100, eras: 3, builtAt: 1, createdAt: 1, publish: { title: 'Old', description: '', tags: [], hashtags: [], titles: [], chapters: [] } }; window.push(); });
     await page.waitForFunction(() => document.querySelectorAll('#mapRuns .restoreRun').length === 2);
     const oldRun = page.locator('#mapRuns .restoreRun', { hasText: 'Old video' });
     assert.equal(await oldRun.locator('button', { hasText: 'Xóa' }).isDisabled(), false, 'xóa video cũ được khi đang dựng video khác');
@@ -276,6 +276,10 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     await page.waitForSelector('#mapRuns .publishBox');
     await page.waitForFunction(() => document.querySelector('#mapRuns input.publishTitle')?.value === 'Testland: The Full Story from Dust to Empire');
     assert.equal((await calls('mapPublish')).length, 1, 'chỉ nhờ máy lập một lần');
+    // Tiêu đề gợi ý khác + hashtag đề xuất: hiện sẵn kèm nút sao chép.
+    assert.deepEqual(await page.locator('#mapRuns .publishIdeas input.publishIdea').evaluateAll(a => a.map(x => x.value)), ['Evolution of Testland: 1350 – 1945 (Map Animation)', 'The Entire History of Testland (Map Animation)']);
+    assert.equal(await page.locator('#mapRuns textarea.publishHashtags').inputValue(), '#Testland #MapAnimation #History');
+    assert.equal(await page.locator('#mapRuns .publishBox button', { hasText: 'Sao chép hashtag' }).count(), 1);
     assert.equal((await calls('mapPublish'))[0].data.runId, 'History-of-Testland');
     assert.match(await page.locator('#mapRuns .publishBox').textContent(), /chưa có chương/);
     assert.equal(await page.locator('#mapRuns .publishMore').count(), 1);
@@ -305,7 +309,7 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     await page.waitForSelector('#mapRuns img.restoreThumb');
     assert.deepEqual((await calls('mapThumb'))[0].data, { runId: 'History-of-Testland' });
     assert.match(await page.locator('#toast').textContent(), /thumbnail 1920×1080/);
-    assert.equal(await page.locator('#mapRuns button', { hasText: 'Tạo thumbnail khác' }).count(), 1);
+    assert.equal(await page.locator('#mapRuns button', { hasText: 'Tạo lại thumbnail' }).count(), 1);
     await page.click('#mapRuns button:has-text("Lưu thumbnail…")'); await flush();
     assert.deepEqual((await calls('mapSave')).at(-1).data, { runId: 'History-of-Testland', thumb: true }, 'có nút lưu thumbnail như nút lưu video');
     await page.click('#mapRuns button:has-text("Mở thumbnail")'); await flush();
@@ -328,42 +332,59 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     await page.click('#navMap');
     assert.equal(await page.locator('#mapTopic').inputValue(), 'History of Testland');
     assert.equal(await page.locator('#mapCountry').inputValue(), 'Indonesia');
-    // 11) Ảnh bìa: bốn kiểu bố cục thật sự khác nhau (kiểu 4 «Trước / Sau» có hai năm RẤT TO thay cho hook), màu rực; chữ duy nhất là vài từ to (hook), không nhãn nhỏ nào khác; hook trống thì không chữ.
+    // 11) Ảnh bìa: chỉ còn MỘT kiểu «Trước / Sau» (hai năm RẤT TO thay cho chữ hook, vết nứt tia sét ở giữa, màu rực). Gọi kiểu cũ (variant / hook) cũng chỉ ra đúng kiểu này.
     const thumbs = await page.evaluate(async () => {
       const raw = await window.nodeJson('world'), sample = await window.nodeJson('sample');
       const geo = maphistGeo.build(raw), n = maphistPlan.normalizeScript(sample, geo);
       const tl = maphistPlan.compile(n.script, geo, { durations: n.script.eras.map(() => 14), fps: 30 });
       const canvas = Object.assign(document.createElement('canvas'), { width: 1920, height: 1080 });
       const R = maphistDraw.create({ canvas, geo }); R.setTimeline(tl);
-      let textCalls = 0, said = new Set(); const proto = CanvasRenderingContext2D.prototype, f = proto.fillText, k = proto.strokeText;
-      proto.fillText = function (...a) { textCalls++; said.add(a[0]); return f.apply(this, a); }; proto.strokeText = function (...a) { textCalls++; return k.apply(this, a); };
+      let said = new Set(); const proto = CanvasRenderingContext2D.prototype, f = proto.fillText;
+      proto.fillText = function (...a) { said.add(a[0]); return f.apply(this, a); };
       const out = [];
       try {
-        textCalls = 0; R.drawThumbnail(1, { variant: 0, hook: '' }); const none = textCalls;
-        for (let v = 0; v < 5; v++) {
-          textCalls = 0; said = new Set(); R.drawThumbnail(1, { variant: v, hook: 'AZTEC EMPIRE' });
+        for (const args of [[], [{ variant: 0, hook: 'AZTEC EMPIRE' }], [{ variant: 4, hook: 'AZTEC EMPIRE' }]]) {
+          said = new Set(); R.drawThumbnail(1, ...args);
           const d = canvas.getContext('2d').getImageData(0, 0, 1920, 1080).data; let sat = 0, cnt = 0, hash = 0;
           for (let i = 0; i < d.length; i += 4 * 97) { const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]); sat += mx ? (mx - mn) / mx : 0; cnt++; hash = (hash * 31 + d[i] + d[i + 2] * 7) % 1000003; }
-          let blueL = 0, redR = 0, tot = 0;   // kiểu 4: thế lực xưa XANH rực ở nửa trái, thế lực nay ĐỎ rực ở nửa phải (không phải màu vàng xỉn)
+          let blueL = 0, redR = 0, tot = 0;   // thế lực xưa XANH rực ở nửa trái, thế lực nay ĐỎ rực ở nửa phải (không phải màu vàng xỉn)
           for (let y = 0; y < 1080; y += 5) for (let x = 0; x < 1920; x += 5) {
             const i = (y * 1920 + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2]; tot++;
             if (x < 900 && b > 190 && r < 100 && g < 140) blueL++;
             if (x > 1020 && r > 210 && g < 100 && b < 110) redR++;
           }
-          const px = canvas.getContext('2d').getImageData(970, 216, 1, 1).data;   // tâm vết nứt tia sét (kiểu 4) phải trắng
-          out.push({ textCalls, said: [...said].join(' '), none, sat: sat / cnt, hash, blueL: blueL / tot, redR: redR / tot, crack: [px[0], px[1], px[2]], years: [Math.abs(tl.eras[0].year), Math.abs(tl.eras.at(-1).year)] });
+          const px = canvas.getContext('2d').getImageData(970, 216, 1, 1).data;   // tâm vết nứt tia sét phải trắng
+          out.push({ said: [...said].join(' '), sat: sat / cnt, hash, blueL: blueL / tot, redR: redR / tot, crack: [px[0], px[1], px[2]], years: [Math.abs(tl.eras[0].year), Math.abs(tl.eras.at(-1).year)] });
         }
-      } finally { proto.fillText = f; proto.strokeText = k; }
+      } finally { proto.fillText = f; }
       return out;
     });
-    assert.equal(thumbs[0].none, 0, 'hook trống thì không vẽ chữ');
-    assert.deepEqual(thumbs.slice(0, 3).map(t => t.said), ['AZTEC EMPIRE', 'AZTEC EMPIRE', 'AZTEC EMPIRE'], 'chữ duy nhất trên ảnh bìa là hook (một hoặc hai dòng)');
-    assert.ok(thumbs[3].said.includes(String(thumbs[3].years[0])) && thumbs[3].said.includes(String(thumbs[3].years[1])) && !thumbs[3].said.includes('AZTEC'), 'kiểu «Trước / Sau»: chữ là năm đầu và năm cuối: ' + thumbs[3].said);
-    assert.ok(thumbs[3].crack[0] > 215 && thumbs[3].crack[1] > 200 && thumbs[3].crack[2] > 120, 'vết nứt tia sét ở giữa ảnh sáng trắng / vàng nhạt: ' + thumbs[3].crack);
-    assert.ok(thumbs[3].blueL > .004 && thumbs[3].redR > .004, 'kiểu «Trước / Sau»: bản đồ xanh (trái) và đỏ (phải) rực, đủ to: ' + thumbs[3].blueL.toFixed(3) + ' / ' + thumbs[3].redR.toFixed(3));
+    assert.ok(thumbs[0].said.includes(String(thumbs[0].years[0])) && thumbs[0].said.includes(String(thumbs[0].years[1])) && !thumbs[0].said.includes('AZTEC'), 'chữ là năm đầu và năm cuối: ' + thumbs[0].said);
+    assert.ok(thumbs[0].crack[0] > 215 && thumbs[0].crack[1] > 200 && thumbs[0].crack[2] > 120, 'vết nứt tia sét ở giữa ảnh sáng trắng / vàng nhạt: ' + thumbs[0].crack);
+    assert.ok(thumbs[0].blueL > .004 && thumbs[0].redR > .004, 'bản đồ xanh (trái) và đỏ (phải) rực, đủ to: ' + thumbs[0].blueL.toFixed(3) + ' / ' + thumbs[0].redR.toFixed(3));
     assert.ok(thumbs.every(t => t.sat > .3), 'màu rực (độ bão hòa cao): ' + thumbs.map(t => t.sat.toFixed(2)));
-    assert.equal(thumbs[4].said.replace(/\s+/g, ''), 'AZTECEMPIRE?!', 'kiểu «Hoảng loạn»: chỉ chữ hook, thêm ?! ở cuối: ' + thumbs[4].said);
-    assert.equal(new Set(thumbs.map(t => t.hash)).size, 5, 'năm kiểu bố cục khác nhau');
+    assert.equal(new Set(thumbs.map(t => t.hash)).size, 1, 'chỉ còn một kiểu: tham số kiểu / hook cũ không đổi ảnh: ' + thumbs.map(t => t.hash));
+    // 11a) Kiểu «Trước / Sau»: bản đồ PHÓNG TO vào phần lãnh thổ chính (đảo xa không kéo ra xa, không làm lệch tâm): nước hiện tại phủ to nửa phải ảnh, như thumbnail «so sánh» của các kênh bản đồ.
+    const zoom = await page.evaluate(async () => {
+      const raw = await window.nodeJson('world'), geo = maphistGeo.build(raw);
+      const era = (year, realms) => ({ year, title: 'T' + year, caption: 'C' + year, narration: 'Narration for ' + year + '.', population: 0, icon: 'crown', realms, markers: [], routes: [] });
+      const script = { title: 'History of Japan', subtitle: 'x', country: 'Japan', eras: [
+        era(-10000, [{ name: 'Jomon', regions: ['Hokkaidō', 'Aomori', 'Iwate', 'Akita', 'Miyagi', 'Yamagata', 'Fukushima'], colors: ['#2e6bff', '#ffffff'], flag: 'h', mood: 'calm', face: true }]),
+        era(2024, [{ name: 'Japan', regions: ['Japan'], colors: ['#d62839', '#ffffff'], flag: 'h', mood: 'shock', face: true }])] };
+      const n = maphistPlan.normalizeScript(script, geo);
+      const tl = maphistPlan.compile(n.script, geo, { durations: n.script.eras.map(() => 14), fps: 30 });
+      const canvas = Object.assign(document.createElement('canvas'), { width: 1920, height: 1080 }), R = maphistDraw.create({ canvas, geo }); R.setTimeline(tl);
+      R.drawThumbnail(1, { variant: 3, hook: '' });
+      const d = canvas.getContext('2d').getImageData(0, 0, 1920, 1080).data; let cnt = 0, y0 = 1e9, y1 = -1, x0 = 1e9, x1 = -1;
+      for (let y = 260; y < 1080; y++) for (let x = 1020; x < 1920; x++) {
+        const i = (y * 1920 + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2];
+        if (r > 150 && r - g > 90 && r - b > 80) { cnt++; if (y < y0) y0 = y; if (y > y1) y1 = y; if (x < x0) x0 = x; if (x > x1) x1 = x; }
+      }
+      return { frac: cnt / (1920 * 1080), h: (y1 - y0) / 1080, w: (x1 - x0) / 1920, cx: (x0 + x1) / 2 / 1920 };
+    });
+    assert.ok(zoom.frac > .011, 'kiểu «Trước / Sau»: nước hiện tại phóng to, phủ > 1,1% ảnh (bản cũ chỉ ~0,3%): ' + zoom.frac.toFixed(4));
+    assert.ok(zoom.h > .58, 'lãnh thổ chính cao > 58% khung ảnh (bản cũ ~52%): ' + zoom.h.toFixed(2));
+    assert.ok(zoom.cx > .6 && zoom.cx < .85, 'nằm giữa nửa phải, không bị đảo xa kéo lệch: ' + zoom.cx.toFixed(2));
     // 11b) Mặt lãnh thổ đổi theo sự kiện: mất ≥ 20% vùng -> choáng; mở rộng mạnh -> cười lớn; còn lại theo mood kịch bản; mặt choáng vẽ được (không lỗi, khác mặt cười).
     const faces = await page.evaluate(async () => {
       const raw = await window.nodeJson('world'), sample = await window.nodeJson('sample');

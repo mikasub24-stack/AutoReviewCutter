@@ -184,7 +184,7 @@
       `8. DÀN Ý có ĐÚNG ${config.beats} dòng (đánh số 1 đến ${config.beats}); mỗi dòng: số | nhãn mốc | tóm tắt (1 câu, ≤ 25 từ, nói tình huống của mốc và điểm KHÁC nhau giữa hai bên) | chỉ số bên trái 0-100 | chỉ số bên phải 0-100. Không mốc nào lặp tình huống của mốc khác; nhịp phim có thăng trầm (nhiều mốc nhỏ trong một giai đoạn rồi chuyển giai đoạn); mốc cuối là hệ quả rõ nhất và một tia hy vọng / lời chốt.`,
       '',
       'Trả lời đúng khuôn sau, KHÔNG viết thêm câu dẫn hay giải thích:',
-      `TIÊU ĐỀ: <tiêu đề video hấp dẫn, trung thực, bằng ${LANG_VI[config.lang]}; nêu đúng điều RIÊNG của kịch bản này, không chỉ lặp lại chủ đề>`,
+      `TIÊU ĐỀ: <tiêu đề video HÚT VIEW bằng ${LANG_VI[config.lang]}, 45–68 ký tự, nói rõ cuộc so sánh ĐÚNG / SAI (nên / không nên): từ khóa chủ đề đặt ở ĐẦU, kèm MỘT yếu tố gây tò mò hoặc cảm xúc (ví dụ kiểu Do This, Not That · Right vs Wrong · Same Start, Two Endings · The Choice That Changes Everything — hãy viết đúng ${LANG_VI[config.lang]}); nêu đúng điều RIÊNG của kịch bản này, không chỉ lặp lại chủ đề; chỉ hứa điều CÓ THẬT trong video, không giật gân sai sự thật, không viết HOA toàn bộ, không emoji>`,
       'NHÃN TRÁI: <...>', 'NHÃN PHẢI: <...>', 'CHỈ SỐ: <...>',
       'NHÂN VẬT: <ENGLISH: một đoạn mô tả cố định các nhân vật>',
       'KẾT LUẬN:', '- <bài học 1>', '- <bài học 2>',
@@ -399,6 +399,26 @@
     ko: pub('챕터', '이 영상의 이미지는 AI로 생성되었습니다. 퍼센트는 이야기를 위한 연출이며 연구 데이터가 아닙니다.', ['두갈래길', '인생교훈', '자기계발'], ['인생 교훈', '자기계발', '이야기', '애니메이션']),
     zh: pub('章节', '本视频的画面由 AI 生成。百分比仅用于讲故事的示意，并非研究数据。', ['两条路', '人生感悟', '自我成长'], ['人生感悟', '自我成长', '故事', '动画'])
   };
+  // Thêm cho gói đăng: top = 2 hashtag khung «đúng / sai, nên / không nên» (đứng ngay sau hashtag của tiêu đề nên hiện trên tiêu đề video), rest = hashtag chung,
+  // kw = từ khóa thẻ tag, ideas = 4 mẫu tiêu đề gợi ý ({h} cụm đầu tiêu đề, {l}/{r} nhãn hai bên): làm / không làm · hai con đường · đúng / sai · cùng một khởi đầu.
+  const more = (top, rest, kw, ideas) => ({ top, rest, kw, ideas });
+  const MORE = {
+    en: more(['RightVsWrong', 'DoAndDont'], ['Mindset', 'Habits', 'Motivation', 'Storytelling', 'Animation', 'GoodVsBad', 'Choices', 'PersonalGrowth'], ['right vs wrong', 'do and dont', 'good habits vs bad habits', 'same start two endings', 'life choices', 'what to do and what not to do', 'animated story'], ['{h}: Do This, Not That', '{l} vs {r}: Which Path Would You Choose?', 'Right vs Wrong: {h}', 'Same Start, Two Endings: {h}']),
+    vi: more(['DungVaSai', 'NenVaKhongNen'], ['TuDuy', 'ThoiQuen', 'DongLuc', 'KeChuyen', 'HoatHinh', 'LuaChon', 'PhatTrien', 'BaiHoc'], ['đúng và sai', 'nên và không nên', 'thói quen tốt và xấu', 'cùng một khởi đầu hai kết cục', 'lựa chọn trong cuộc sống', 'nên làm gì không nên làm gì', 'hoạt hình kể chuyện'], ['{h}: Nên làm gì, không nên làm gì', '{l} vs {r}: Bạn chọn con đường nào?', 'Đúng và sai: {h}', 'Cùng một khởi đầu, hai kết cục: {h}']),
+    es: more(['CorrectoVsIncorrecto', 'HazYNoHagas'], ['Mentalidad', 'Habitos', 'Motivacion', 'Narrativa', 'Animacion', 'Decisiones', 'Crecimiento', 'Aprendizaje'], ['correcto vs incorrecto', 'qué hacer y qué no hacer', 'buenos hábitos vs malos hábitos', 'mismo comienzo dos finales', 'decisiones de vida', 'historia animada'], ['{h}: haz esto, no aquello', '{l} vs {r}: ¿qué camino eliges?', 'Lo correcto vs lo incorrecto: {h}', 'Mismo comienzo, dos finales: {h}']),
+    pt: more(['CertoVsErrado', 'FacaENaoFaca'], ['Mentalidade', 'Habitos', 'Motivacao', 'Historias', 'Animacao', 'Escolhas', 'Crescimento', 'Aprendizado'], ['certo vs errado', 'o que fazer e o que não fazer', 'bons hábitos vs maus hábitos', 'mesmo começo dois finais', 'escolhas de vida', 'história animada'], ['{h}: faça isso, não aquilo', '{l} vs {r}: qual caminho você escolhe?', 'Certo vs errado: {h}', 'Mesmo começo, dois finais: {h}']),
+    fr: more(['BonVsMauvais', 'AFaireAEviter'], ['Mentalite', 'Habitudes', 'Motivation', 'Storytelling', 'Animation', 'Choix', 'Croissance', 'Apprendre'], ['bon vs mauvais choix', 'à faire et à ne pas faire', 'bonnes habitudes vs mauvaises habitudes', 'même départ deux fins', 'choix de vie', 'histoire animée'], ['{h} : à faire, à ne pas faire', '{l} vs {r} : quel chemin choisissez-vous ?', 'Le bon vs le mauvais choix : {h}', 'Même départ, deux fins : {h}']),
+    de: more(['RichtigVsFalsch', 'TunUndLassen'], ['Mindset', 'Gewohnheiten', 'Motivation', 'Geschichten', 'Animation', 'Entscheidungen', 'Wachstum', 'Lernen'], ['richtig vs falsch', 'was man tun und lassen sollte', 'gute gewohnheiten vs schlechte gewohnheiten', 'gleicher start zwei enden', 'lebensentscheidungen', 'animierte geschichte'], ['{h}: Das solltest du tun – und das nicht', '{l} vs {r}: Welchen Weg wählst du?', 'Richtig vs. falsch: {h}', 'Gleicher Start, zwei Enden: {h}']),
+    id: more(['BenarVsSalah', 'LakukanDanJangan'], ['Mindset', 'Kebiasaan', 'Motivasi', 'Cerita', 'Animasi', 'Pilihan', 'Pertumbuhan', 'Belajar'], ['benar vs salah', 'yang harus dan jangan dilakukan', 'kebiasaan baik vs kebiasaan buruk', 'awal yang sama dua akhir', 'pilihan hidup', 'cerita animasi'], ['{h}: lakukan ini, jangan itu', '{l} vs {r}: pilih jalan yang mana?', 'Benar vs salah: {h}', 'Awal yang sama, dua akhir berbeda: {h}']),
+    ru: more(['ПравильноИНеправильно', 'ЧтоДелатьИНеДелать'], ['Мышление', 'Привычки', 'Мотивация', 'История', 'Анимация', 'Выбор', 'Рост', 'Обучение'], ['правильно и неправильно', 'что делать и чего не делать', 'хорошие и плохие привычки', 'одно начало два финала', 'жизненный выбор', 'анимационная история'], ['{h}: так делать, так — нет', '{l} или {r}: какой путь выберете вы?', 'Правильно и неправильно: {h}', 'Одно начало, два финала: {h}']),
+    tr: more(['DoğruVsYanlış', 'YapVeYapma'], ['Zihniyet', 'Alışkanlıklar', 'Motivasyon', 'Hikaye', 'Animasyon', 'Seçimler', 'Gelişim', 'Öğrenme'], ['doğru vs yanlış', 'ne yapmalı ne yapmamalı', 'iyi alışkanlıklar vs kötü alışkanlıklar', 'aynı başlangıç iki son', 'hayat seçimleri', 'animasyon hikaye'], ['{h}: bunu yap, şunu yapma', '{l} vs {r}: Hangi yolu seçerdin?', 'Doğru vs yanlış: {h}', 'Aynı başlangıç, iki farklı son: {h}']),
+    hi: more(['सहीयागलत', 'क्याकरेंक्यानहीं'], ['सोच', 'आदतें', 'प्रेरणा', 'कहानी', 'एनिमेशन', 'फैसले', 'विकास', 'सीख'], ['सही बनाम गलत', 'क्या करें क्या न करें', 'अच्छी आदतें बनाम बुरी आदतें', 'एक जैसी शुरुआत दो अंजाम', 'जीवन के फैसले', 'एनिमेटेड कहानी'], ['{h}: ये करें, वो नहीं', '{l} बनाम {r}: आप कौन-सा रास्ता चुनेंगे?', 'सही बनाम गलत: {h}', 'एक जैसी शुरुआत, दो अलग अंजाम: {h}']),
+    ar: more(['صحيح_أم_خطأ', 'افعل_ولا_تفعل'], ['عقلية', 'عادات', 'تحفيز', 'قصة', 'رسوم_متحركة', 'قرارات', 'تطوير', 'تعلم'], ['صحيح أم خطأ', 'ماذا تفعل وماذا لا تفعل', 'عادات جيدة مقابل عادات سيئة', 'بداية واحدة ونهايتان', 'قرارات الحياة', 'قصة متحركة'], ['{h}: افعل هذا ولا تفعل ذاك', '{l} مقابل {r}: أي طريق ستختار؟', 'الصواب مقابل الخطأ: {h}', 'بداية واحدة ونهايتان: {h}']),
+    th: more(['ถูกหรือผิด', 'ควรหรือไม่ควร'], ['ความคิด', 'นิสัย', 'แรงบันดาลใจ', 'เล่าเรื่อง', 'แอนิเมชัน', 'ทางเลือก', 'พัฒนา', 'เรียนรู้'], ['ถูกหรือผิด', 'ควรทำและไม่ควรทำ', 'นิสัยดีกับนิสัยไม่ดี', 'จุดเริ่มต้นเดียวกันสองจุดจบ', 'ทางเลือกในชีวิต', 'แอนิเมชันเล่าเรื่อง'], ['{h}: ควรทำแบบนี้ ไม่ควรทำแบบนั้น', '{l} vs {r}: คุณจะเลือกทางไหน?', 'ถูก vs ผิด: {h}', 'จุดเริ่มต้นเดียวกัน จุดจบต่างกัน: {h}']),
+    ja: more(['正しいvs間違い', 'やるべきvsやめるべき'], ['マインドセット', '習慣', 'モチベーション', 'ストーリー', 'アニメーション', '選択', '成長', '学び'], ['正しい vs 間違い', 'やるべきこと やめるべきこと', '良い習慣 悪い習慣', '同じスタート 違う結末', '人生の選択', 'アニメーションストーリー'], ['{h}：これをして、あれはしない', '{l} vs {r}：あなたはどちらを選ぶ？', '正しい vs 間違い：{h}', '同じスタート、違う結末：{h}']),
+    ko: more(['옳고그름', '해야할것과하지말것'], ['마인드셋', '습관', '동기부여', '이야기', '애니메이션', '선택', '성장', '배움'], ['옳고 그름', '해야 할 것과 하지 말 것', '좋은 습관 나쁜 습관', '같은 출발 다른 결말', '인생의 선택', '애니메이션 스토리'], ['{h}: 이렇게 하세요, 저렇게는 하지 마세요', '{l} vs {r}: 당신의 선택은?', '옳은 선택 vs 잘못된 선택: {h}', '같은 출발, 다른 결말: {h}']),
+    zh: more(['对与错', '该做与不该做'], ['思维', '习惯', '动力', '故事', '动画', '选择', '成长', '学习'], ['对与错', '该做与不该做', '好习惯 坏习惯', '同一起点两种结局', '人生选择', '动画故事'], ['{h}：该这样做，别那样做', '{l} vs {r}：你会选哪条路？', '对与错：{h}', '同一个起点，两种结局：{h}'])
+  };
   const clockOf = sec => {
     const t = Math.max(0, Math.round(Number(sec) || 0)), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), pad = n => String(n).padStart(2, '0');
     return h ? `${h}:${pad(m)}:${pad(t % 60)}` : `${m}:${pad(t % 60)}`;
@@ -446,18 +466,26 @@
       const end = L.lessons.charAt(0) + L.lessons.slice(1).toLocaleLowerCase(L.id);
       if (Number(opts.outroStart) - chapters[chapters.length - 1].t >= 10) chapters.push({ t: Math.round(opts.outroStart), clock: clockOf(opts.outroStart), label: end });
     }
-    const hashtags = [...new Set([hashOf(hook).slice(0, 40), ...X.hash, opts.layout === 'stack' ? 'Shorts' : ''].filter(Boolean))].map(h => '#' + h);
+    // Hashtag đề xuất (tối đa 14: YouTube bỏ qua TẤT CẢ nếu video có hơn 15; 3 cái đầu hiện ngay trên tiêu đề): hashtag của tiêu đề, khung đúng / sai, #Shorts (nếu dọc),
+    // hashtag chung của loạt video, vài từ khóa RIÊNG của kịch bản (lấy từ tiêu đề), rồi hashtag chủ đề chung.
+    const M = MORE[L.id] || MORE.en, titleWords = hook.split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 5 && /^\p{Lu}/u.test(w) && !/^(Spending|Saving|Wrong|Right)$/iu.test(w)).map(w => hashOf(w)).slice(0, 2);
+    const hashtags = [...new Map([hashOf(hook).slice(0, 40), ...M.top, opts.layout === 'stack' ? 'Shorts' : '', ...X.hash, ...titleWords, ...M.rest].filter(Boolean).map(h => '#' + h).map(h => [lc(h), h])).values()].slice(0, 14);
     const body = [title];
     if (closing) body.push('', closing);
     if (lessons.length) body.push('', L.lessons.charAt(0) + L.lessons.slice(1).toLocaleLowerCase(L.id) + ':', ...lessons.map(x => '• ' + x));
     if (chapters.length >= 3) body.push('', X.chapters + ':', ...chapters.map(c => `${c.clock} ${c.label}`));
     body.push('', X.note, '', hashtags.join(' '));
     const description = body.join('\n').slice(0, 4900);
-    const words = [title, hook, flat(script && script.left), flat(script && script.right), ...flat(L.tagline).split('·'), flat(script && script.meter), ...X.kw].map(x => lc(flat(x))).filter(x => x.length > 1);
+    const words = [title, hook, flat(script && script.left), flat(script && script.right), ...X.kw, ...M.kw, ...flat(L.tagline).split('·'), flat(script && script.meter)].map(x => lc(flat(x))).filter(x => x.length > 1);
     const tags = []; let size = 0;
     for (const t of [...new Set(words)]) { if (size + t.length + 2 > 450) break; tags.push(t); size += t.length + 2; }
-    const text = ['TITLE', title, '', 'DESCRIPTION', description, '', 'HASHTAGS', hashtags.join(' '), '', 'TAGS', tags.join(', ')].join('\n') + '\n';
-    return { lang: L.id, title, description, hashtags, tags, chapters: chapters.length >= 3 ? chapters : [], partial: chapters.length < 3, text };
+    // Tiêu đề gợi ý khác (≤ 70 ký tự, khác tiêu đề hiện tại): làm / không làm · hai con đường · đúng / sai · cùng một khởi đầu.
+    const sentence = t => { const x = lc(flat(t)); return x.charAt(0).toLocaleUpperCase(L.id) + x.slice(1); };
+    const left = sentence(script && script.left), right = sentence(script && script.right), okLabels = left && right && left.length <= 28 && right.length <= 28;
+    const hs = Array.from(hook).length > 40 ? (Array.from(hook).slice(0, 40).join('').replace(/\s+\S*$/u, '').trim() || Array.from(hook).slice(0, 40).join('')) : hook;   // cụm đầu quá dài thì cắt ở ranh giới từ để tiêu đề gợi ý vẫn ≤ 70
+    const titles = [...new Set(M.ideas.filter(x => okLabels || !/\{l\}/.test(x)).map(x => x.replace('{h}', hs).replace('{l}', left).replace('{r}', right).replace(/\s+/g, ' ').trim()))].filter(x => Array.from(x).length <= 70 && lc(x) !== lc(title)).slice(0, 4);
+    const text = ['TITLE', title, '', 'DESCRIPTION', description, '', 'HASHTAGS', hashtags.join(' '), '', 'TAGS', tags.join(', '), ...(titles.length ? ['', 'TITLE IDEAS', ...titles] : [])].join('\n') + '\n';
+    return { lang: L.id, title, description, hashtags, tags, titles, chapters: chapters.length >= 3 ? chapters : [], partial: chapters.length < 3, text };
   }
 
   return {

@@ -125,7 +125,7 @@
   function publishBox(meta, id) {
     const p = meta.publish, box = node('div', 'publishBox');
     // Chưa có gói đăng (video làm bằng bản cũ): nhờ máy lập từ kịch bản đã lưu, không cần Muse.
-    if (!p && !publishAsked.has(id)) {
+    if ((!p || !p.titles) && !publishAsked.has(id)) {
       publishAsked.add(id);
       Promise.resolve().then(() => window.studio.invoke('pairPublish', { storyId: id })).then(() => { runsKey = ''; return window.studio.invoke('state'); }).then(st => { if (st) render(st); }).catch(() => {});
     }
@@ -148,11 +148,18 @@
       wrap.append(col, copyButton(copyLabel, () => area.value.trim(), done), save);
       return wrap;
     };
-    const tags = (p.tags || []).join(', '), hashtags = (p.hashtags || []).join(' ');
+    const tags = (p.tags || []).join(', '), hashtags = (p.hashtags || []).join(' ');   // hashtag: tối đa 14, 3 cái đầu hiện ngay trên tiêu đề video
     box.append(
       field('Tiêu đề video', p.title || '', 0, 'Sao chép tiêu đề', 'Đã sao chép tiêu đề.', true),
+      ...(p.titles && p.titles.length ? [(() => {
+        // Tiêu đề gợi ý khác (khung đúng / sai, nên / không nên): chọn một cái để dán lúc đăng; muốn đổi cả tiêu đề trên video thì dán vào ô trên rồi «Lưu tiêu đề».
+        const ideas = node('div', 'publishIdeas');
+        ideas.append(node('small', 'hint', 'Tiêu đề gợi ý khác (hút view, khung đúng / sai): sao chép để đăng, hoặc dán vào ô trên rồi «Lưu tiêu đề».'));
+        p.titles.forEach((t, k) => { const row = field('Gợi ý ' + (k + 1), t, 0, 'Sao chép', 'Đã sao chép tiêu đề gợi ý.'), inp = row.querySelector('input'); if (inp) inp.className = 'publishIdea'; ideas.append(row); });
+        return ideas;
+      })()] : []),
       field('Mô tả video' + (p.chapters && p.chapters.length ? ' (có chương theo giờ)' : ''), p.description || '', 9, 'Sao chép mô tả', 'Đã sao chép mô tả.'),
-      field('Hashtag', hashtags, 2, 'Sao chép hashtag', 'Đã sao chép hashtag.'),
+      field('Hashtag đề xuất (' + (p.hashtags || []).length + ', đã nằm cuối mô tả)', hashtags, 3, 'Sao chép hashtag', 'Đã sao chép hashtag.'),
       field('Thẻ tag (dán vào ô «Thẻ» của YouTube)', tags, 3, 'Sao chép thẻ tag', 'Đã sao chép thẻ tag.')
     );
     if (meta.output && meta.videoTitle && meta.videoTitle !== (meta.name || p.title)) box.append(node('small', 'hint', 'Thẻ mở đầu trong video vẫn hiện tên cũ. Bấm «Dựng lại video» để đổi.'));

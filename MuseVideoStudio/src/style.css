@@ -490,6 +490,10 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .publishField input, .publishField textarea { width: 100%; box-sizing: border-box; }
 .publishField textarea { font-size: 13px; line-height: 1.45; resize: vertical; }
 .publishRow > button { align-self: flex-end; }
+.publishIdeas { display: grid; gap: 6px; }
+.publishIdeas .publishRow { gap: 6px; }
+.publishIdeas input.publishIdea { flex: 1 1 320px; min-width: 0; font-size: 14px; font-weight: 500; }
+.publishIdeas .publishField input.publishIdea { width: 100%; box-sizing: border-box; }
 .publishMore { display: grid; gap: 8px; }
 .publishMore summary { cursor: pointer; font-size: 13px; }
 .publishMore textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; line-height: 1.45; resize: vertical; }

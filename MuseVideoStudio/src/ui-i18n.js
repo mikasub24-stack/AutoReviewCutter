@@ -18,7 +18,7 @@ Lời đọc và chữ trên video bằng tiếng Đức (làm cho khán giả n
 Lời đọc và chữ trên video bằng tiếng Pháp (làm cho khán giả nói tiếng Pháp). Cần có mạng lúc đọc.|Narration and on-screen text are in French (made for French-speaking viewers). An internet connection is needed while narrating.
 Lời đọc và chữ trên video bằng tiếng Nga (làm cho khán giả nói tiếng Nga). Cần có mạng lúc đọc.|Narration and on-screen text are in Russian (made for Russian-speaking viewers). An internet connection is needed while narrating.
 Tạo thumbnail 16:9|Create 16:9 thumbnail
-Tạo thumbnail khác|Create another thumbnail
+Tạo lại thumbnail|Recreate thumbnail
 Đang tạo thumbnail…|Creating thumbnail…
 Thông tin đăng YouTube (đúng như trên video)|YouTube publishing info (exactly as on the video)
 Mô tả video (có chương theo giờ)|Video description (with timed chapters)
@@ -1152,6 +1152,7 @@ Video ghép chưa hợp lệ.|The joined video is not valid.
       [/^Đã gỡ câu khóa hình dạng nhân vật khỏi (\d+) cảnh \(không còn ảnh tham chiếu\)\.$/,m=>'Removed the character shape lock from '+m[1]+' scene(s) (no reference image any more).'],
       [/^Đã gắn khóa vào (\d+) cảnh\.$/,m=>'Added the lock to '+m[1]+' scene(s).'],
       [/^Đã lưu video: (.+)$/,m=>'Video saved: '+m[1]],
+      [/^Đã tạo thumbnail 1920×1080 kiểu «Trước \/ Sau»\.$/,()=>'Created the 1920×1080 "Before / After" thumbnail.'],
       [/^Đã lưu thumbnail: (.+)$/,m=>'Thumbnail saved: '+m[1]],
       [/^Không hiển thị đầy đủ được thẻ video này(?: \((.+)\))?\. Các nút bên dưới vẫn dùng được\.$/,m=>'This video card could not be shown in full'+(m[1]?' ('+m[1]+')':'')+'. The buttons below still work.'],
       [/^Đã tạo thumbnail 1920×1080 \(ảnh (\d+)\/(\d+)\)\. Bấm lại để đổi sang kiểu khác\.$/,m=>'Created the 1920×1080 thumbnail (style '+m[1]+'/'+m[2]+'). Press again to switch to another style.'],

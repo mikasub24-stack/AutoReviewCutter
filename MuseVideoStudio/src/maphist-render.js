@@ -15,10 +15,10 @@
     },
     // Vẽ khung i/fps. Mã hóa JPEG của khung i chạy song song với việc vẽ khung i+1.
     async frame(t, quality = .92) { R.drawFrame(t); return encode(quality); },
-    // Ảnh bìa 16:9 (một khung JPEG, trả về base64): bản đồ giai đoạn index, quả cầu cờ mặt giận dữ, vài từ rất to (hook); variant chọn kiểu bố cục.
-    async thumbnail({ raw, timeline, index, variant = 0, hook = '', quality = .92 }) {
+    // Ảnh bìa 16:9 (một khung JPEG, trả về base64): kiểu duy nhất «Trước / Sau» (giai đoạn đầu | giai đoạn cuối, bản đồ phóng to, năm RẤT TO).
+    async thumbnail({ raw, timeline, quality = .92 }) {
       await this.init({ raw, timeline });
-      R.drawThumbnail(index, { variant, hook });
+      R.drawThumbnail();
       const buf = await encode(quality);
       let str = '';
       for (let i = 0; i < buf.length; i += 0x8000) str += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));

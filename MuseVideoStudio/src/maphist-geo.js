@@ -95,5 +95,17 @@
   const blobKey = (lon, lat, km) => `B:${Math.round(lon * 100) / 100},${Math.round(lat * 100) / 100},${Math.round(km)}`;
   function parseBlob(key) { const m = /^B:(-?[\d.]+),(-?[\d.]+),(\d+)$/.exec(key || ''); return m ? { lon: Number(m[1]), lat: Number(m[2]), km: Number(m[3]) } : null; }
 
-  return { build, norm, blobKey, parseBlob, ALIASES, SCALE };
+  // Hộp bao [lon0, lat0, lon1, lat1] của PHẦN CHÍNH một đơn vị: các vòng lớn nhất cộng lại phủ ≥ share diện tích (bỏ đảo xa nhỏ xíu như Ogasawara của Nhật,
+  // vùng hải ngoại của Pháp...). Dùng để phóng ảnh bìa vào đúng phần lãnh thổ chính chứ không bị đảo xa kéo ra xa và lệch tâm.
+  function coreBox(unit, share = .96) {
+    const rings = unit.rings.length > 1 ? unit.rings.slice().sort((p, q) => q.area - p.area) : unit.rings, total = rings.reduce((t, r) => t + r.area, 0);
+    let a = 1e9, b = 1e9, c = -1e9, d = -1e9, acc = 0;
+    for (const r of rings) {
+      a = Math.min(a, r.bb[0]); b = Math.min(b, r.bb[1]); c = Math.max(c, r.bb[2]); d = Math.max(d, r.bb[3]); acc += r.area;
+      if (acc >= total * share) break;
+    }
+    return a > c ? unit.bb : [a, b, c, d];
+  }
+
+  return { build, norm, blobKey, parseBlob, coreBox, ALIASES, SCALE };
 });

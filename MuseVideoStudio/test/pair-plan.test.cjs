@@ -246,11 +246,21 @@ test('gói đăng YouTube: tiêu đề, mô tả có chương theo giờ, hashta
   assert.ok(pack.description.endsWith(pack.hashtags.join(' ')), 'hashtag nằm cuối mô tả');
   assert.ok(pack.hashtags.length >= 3 && pack.hashtags.every(h => /^#[^\s#]+$/u.test(h)), 'hashtag không có dấu cách');
   assert.ok(!pack.hashtags.includes('#Shorts'), 'chia ngang không gắn #Shorts');
+  // Nhiều hashtag đề xuất (≤ 14: YouTube bỏ qua TẤT CẢ nếu > 15), khung đúng / sai đứng ngay sau hashtag tiêu đề (3 cái đầu hiện trên tiêu đề), không trùng.
+  assert.ok(pack.hashtags.length >= 12 && pack.hashtags.length <= 14, 'hashtag: ' + pack.hashtags.length);
+  assert.deepEqual(pack.hashtags.slice(1, 3), ['#RightVsWrong', '#DoAndDont'], 'khung đúng / sai nằm trong 3 hashtag đầu');
+  assert.equal(new Set(pack.hashtags.map(h => h.toLowerCase())).size, pack.hashtags.length, 'hashtag không trùng');
+  assert.ok(pack.tags.includes('right vs wrong') && pack.tags.includes('do and dont') && pack.tags.length >= 12, 'thẻ tag có khung đúng / sai: ' + pack.tags.length);
+  // Tiêu đề gợi ý khác: ≤ 70 ký tự, không trùng nhau, khác tiêu đề hiện tại, có kiểu làm / không làm và đúng / sai.
+  assert.ok(pack.titles.length >= 3 && pack.titles.length <= 4, pack.titles.join(' | '));
+  assert.ok(pack.titles.every(x => Array.from(x).length <= 70 && x !== pack.title) && new Set(pack.titles).size === pack.titles.length, pack.titles.join(' | '));
+  assert.ok(pack.titles.some(x => /Do This, Not That/.test(x)) && pack.titles.some(x => /^Right vs Wrong: /.test(x)), pack.titles.join(' | '));
+  assert.match(pack.text, /\n\nTITLE IDEAS\n.+\n$/s);
   assert.ok(pack.tags.join(', ').length <= 450);
   assert.ok(pack.tags.includes('life lessons'));
   assert.equal(new Set(pack.tags).size, pack.tags.length, 'thẻ tag không trùng');
   assert.match(pack.text, /^TITLE\n.+\n\nDESCRIPTION\n/);
-  assert.match(pack.text, /\nTAGS\n.+\n$/);
+  assert.match(pack.text, /\nTAGS\n.+\n/);
 });
 
 test('gói đăng YouTube: video dựng bằng bản cũ (không có mốc giờ) vẫn có tiêu đề / mô tả / hashtag / thẻ tag nhưng chưa có chương; xếp dọc gắn #Shorts', () => {
@@ -287,11 +297,18 @@ test('gói đăng YouTube: đủ 15 ngôn ngữ, tiêu đề ≤ 100 ký tự, m
     const pack = P.publishPack(script, { lang, layout: 'side', timeline, outroStart: 120, seconds: 130 });
     assert.ok(pack.title.length <= 100, lang);
     assert.ok(pack.description.length <= 5000, lang);
-    assert.ok(pack.hashtags.length >= 3 && pack.hashtags.every(h => /^#[^\s#]+$/u.test(h)), lang);
+    assert.ok(pack.hashtags.length >= 12 && pack.hashtags.length <= 14 && pack.hashtags.every(h => /^#[^\s#]+$/u.test(h)), lang + ': ' + pack.hashtags.length);
+    assert.ok(pack.titles.length >= 2 && pack.titles.every(x => Array.from(x).length <= 70), lang + ': ' + pack.titles.join(' | '));
     assert.ok(pack.tags.join(', ').length <= 450, lang);
     assert.equal(pack.chapters.length >= 3, true, lang);
   }
   assert.ok(P.publishPack(script, { lang: 'ja', timeline, outroStart: 120, seconds: 130 }).hashtags.includes('#ふたつの道'));
+});
+
+test('lời nhắc tiêu đề: HÚT VIEW, khung đúng / sai (nên / không nên), trung thực, ≤ 68 ký tự', () => {
+  const ask = P.buildBibleInstruction({ topic: 'Money', minutes: 1, lang: 'en' }, { marker: 'm1' });
+  assert.match(ask, /TIÊU ĐỀ: <tiêu đề video HÚT VIEW bằng tiếng Anh, 45–68 ký tự, nói rõ cuộc so sánh ĐÚNG \/ SAI \(nên \/ không nên\)/);
+  assert.match(ask, /Do This, Not That/); assert.match(ask, /CÓ THẬT trong video, không giật gân sai sự thật, không viết HOA toàn bộ, không emoji/);
 });
 
 test('tiêu đề đúng từng video: dặn Muse tránh tiêu đề đã dùng (cả khi có chủ đề); trùng thì thêm ý riêng của kịch bản', () => {

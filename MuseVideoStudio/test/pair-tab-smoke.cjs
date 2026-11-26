@@ -55,7 +55,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
             return { title, publish: m.publish };
           }
           if (name === 'pairPublish') {
-            const publish = { title: 'The Same Child, Two Fathers: Yelling vs Listening', description: 'The Same Child\n\nChapters:\n0:00 Intro\n1:07 AGE 3\n2:07 AGE 6\n\n#TwoPaths #LifeLessons', hashtags: ['#TwoPaths', '#LifeLessons'], tags: ['the same child', 'life lessons'], chapters: [{}, {}, {}], partial: false };
+            const publish = { title: 'The Same Child, Two Fathers: Yelling vs Listening', description: 'The Same Child\n\nChapters:\n0:00 Intro\n1:07 AGE 3\n2:07 AGE 6\n\n#TwoPaths #LifeLessons', hashtags: ['#TwoPaths', '#LifeLessons'], titles: ['Right vs Wrong: The Same Child, Two Fathers', 'The Same Child, Two Fathers: Do This, Not That'], tags: ['the same child', 'life lessons'], chapters: [{}, {}, {}], partial: false };
             Object.assign(s.pair.stories[data.storyId], { publish, publishFile: 'C:\\Videos\\SoSanh\\x\\tieu-de-youtube.txt' });
             setTimeout(window.push, 0);
             return { publish };
@@ -212,7 +212,9 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.deepEqual((await calls('pairPublish'))[0].data, { storyId: 'SS-Raised-with-Yelling' });
     assert.equal(await page.locator('#pairRuns .publishBox input.publishTitle').inputValue(), 'The Same Child, Two Fathers: Yelling vs Listening');
     assert.match(await page.locator('#pairRuns .publishBox textarea.publishDesc').inputValue(), /Chapters:\n0:00 Intro/);
-    assert.equal(await page.locator('#pairRuns .publishBox textarea[aria-label="Hashtag"]').inputValue(), '#TwoPaths #LifeLessons');
+    assert.equal(await page.locator('#pairRuns .publishBox textarea[aria-label^="Hashtag"]').inputValue(), '#TwoPaths #LifeLessons');
+    // Tiêu đề gợi ý khác (khung đúng / sai): mỗi gợi ý một ô kèm nút «Sao chép».
+    assert.deepEqual(await page.locator('#pairRuns .publishBox .publishIdeas input.publishIdea').evaluateAll(a => a.map(x => x.value)), ['Right vs Wrong: The Same Child, Two Fathers', 'The Same Child, Two Fathers: Do This, Not That'], 'hiện các tiêu đề gợi ý');
     assert.equal(await page.locator('#pairRuns .publishBox textarea[aria-label^="Thẻ tag"]').inputValue(), 'the same child, life lessons');
     for (const [btn, want] of [['Sao chép tiêu đề', 'The Same Child, Two Fathers: Yelling vs Listening'], ['Sao chép hashtag', '#TwoPaths #LifeLessons'], ['Sao chép thẻ tag', 'the same child, life lessons']]) {
       await page.click(`#pairRuns .publishBox button:has-text("${btn}")`);
