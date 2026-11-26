@@ -140,6 +140,7 @@
     const row = node('div', 'publishRow'); row.append(input, copyButton('Sao chép tiêu đề', title, 'Đã sao chép tiêu đề.'));
     const whole = node('details', 'publishWhole'), head = node('summary', 'publishHead', 'Thông tin đăng YouTube (đúng như trên video)'), body = node('div', 'publishBody');
     whole.open = foldOpen.has(id) ? foldOpen.get(id) : true;
+    head.addEventListener('click', () => foldOpen.set(id, !whole.open));   // ghi ngay lúc bấm (trước khi trình duyệt đổi trạng thái); sự kiện toggle đến muộn hơn một nhịp
     whole.addEventListener('toggle', () => foldOpen.set(id, whole.open));
     whole.append(head, body); box.append(whole);
     body.append(row);

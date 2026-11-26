@@ -285,10 +285,17 @@ const http = require('http'), fs = require('fs/promises'), zlib = require('zlib'
     assert.equal(await page.locator('#mapRuns input.publishTitle').isVisible(), true);
     await page.click('#mapRuns details.publishWhole > summary');
     assert.equal(await page.locator('#mapRuns input.publishTitle').isVisible(), false, 'đóng cả khung');
-    await page.evaluate(() => window.push && window.push());
+    // Vẽ lại THẬT danh sách (khóa vẽ lại có thời điểm dựng xong): lựa chọn đóng vẫn được giữ.
+    await page.evaluate(() => { const r = window.s.maphist.runs['History-of-Testland']; r.builtAt = (r.builtAt || 0) + 5; window.push(); });
     await page.waitForTimeout(150);
     assert.equal(await page.locator('#mapRuns input.publishTitle').isVisible(), false, 'vẫn đóng sau khi vẽ lại');
-    await page.click('#mapRuns details.publishWhole > summary');
+    // Bấm mở rồi vẽ lại NGAY trong cùng một nhịp (sự kiện toggle của trình duyệt chưa kịp chạy): lựa chọn vẫn được giữ.
+    const keptOpen = await page.evaluate(() => {
+      document.querySelector('#mapRuns details.publishWhole > summary').click();
+      const r = window.s.maphist.runs['History-of-Testland']; r.builtAt = (r.builtAt || 0) + 5; window.push();
+      return document.querySelector('#mapRuns details.publishWhole').open === true;
+    });
+    assert.equal(keptOpen, true, 'vẽ lại ngay sau khi bấm mở không làm đóng lại');
     assert.equal(await page.locator('#mapRuns input.publishTitle').isVisible(), true, 'mở lại được');
     assert.equal((await calls('mapPublish'))[0].data.runId, 'History-of-Testland');
     assert.match(await page.locator('#mapRuns .publishBox').textContent(), /chưa có chương/);

@@ -127,8 +127,10 @@
   function fold(id, key, label, cls, open = true) {
     const d = node('details', cls), k = id + '|' + key;
     d.open = foldState.has(k) ? foldState.get(k) : open;
+    const head = node('summary', '', label);
+    head.addEventListener('click', () => foldState.set(k, !d.open));   // ghi ngay lúc bấm (trước khi trình duyệt đổi trạng thái); sự kiện toggle đến muộn hơn một nhịp
     d.addEventListener('toggle', () => foldState.set(k, d.open));
-    d.append(node('summary', '', label));
+    d.append(head);
     return d;
   }
   function publishBox(meta, id) {

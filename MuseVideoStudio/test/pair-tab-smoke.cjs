@@ -228,21 +228,37 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.match(await page.locator('#toast').textContent(), /Đã sao chép mô tả/);
     // Mở / đóng từng phần (Tiêu đề, Mô tả, Thẻ tag) và cả khung; lựa chọn được nhớ khi danh sách vẽ lại.
     const shown = sel => page.locator(sel).isVisible();
+    // Vẽ lại THẬT danh sách: khóa vẽ lại có tiêu đề nên mỗi lần thêm / bớt một dấu cách ở cuối tiêu đề thì thẻ video được dựng lại.
+    const redraw = () => page.evaluate(() => { const p = window.s.pair.stories['SS-Raised-with-Yelling']; p.publish = { ...p.publish, title: p.publish.title.endsWith(' ') ? p.publish.title.trim() : p.publish.title + ' ' }; window.push(); });
     for (const [name, sel] of [['Tiêu đề', '#pairRuns .publishBox input.publishTitle'], ['Mô tả', '#pairRuns .publishBox textarea.publishDesc'], ['Thẻ tag', '#pairRuns .publishBox textarea.publishTags']]) {
       assert.equal(await shown(sel), true, name + ' mở sẵn');
       await page.click(`#pairRuns .publishBox details.publishSec > summary:text-is("${name}"), #pairRuns .publishBox details.publishSec > summary:text-matches("^${name}")`);
       assert.equal(await shown(sel), false, name + ' đóng được');
-      await page.evaluate(() => { window.s.pair.stories['SS-Raised-with-Yelling'].publish = { ...window.s.pair.stories['SS-Raised-with-Yelling'].publish, title: window.s.pair.stories['SS-Raised-with-Yelling'].publish.title }; window.push(); });
+      await redraw();
       await page.waitForTimeout(150);
       assert.equal(await shown(sel), false, name + ' vẫn đóng sau khi vẽ lại');
       await page.click(`#pairRuns .publishBox details.publishSec > summary:text-matches("^${name}")`);
       assert.equal(await shown(sel), true, name + ' mở lại được');
     }
+    // Bấm đóng rồi vẽ lại NGAY trong cùng một nhịp (sự kiện toggle của trình duyệt chưa kịp chạy): lựa chọn vẫn được giữ.
+    const stillClosed = await page.evaluate(() => {
+      const sec = () => document.querySelector('#pairRuns .publishBox details.publishSec');
+      sec().querySelector('summary').click();
+      const p = window.s.pair.stories['SS-Raised-with-Yelling'];
+      p.publish = { ...p.publish, title: p.publish.title.endsWith(' ') ? p.publish.title.trim() : p.publish.title + ' ' };
+      window.push();
+      return sec().open === false;
+    });
+    assert.equal(stillClosed, true, 'vẽ lại ngay sau khi bấm đóng không làm mở lại phần vừa đóng');
+    await page.click('#pairRuns .publishBox details.publishSec > summary:text-matches("^Tiêu đề")');
+    assert.equal(await shown('#pairRuns .publishBox input.publishTitle'), true, 'mở lại phần Tiêu đề');
     await page.click('#pairRuns .publishBox details.publishWhole > summary');
     assert.equal(await shown('#pairRuns .publishBox input.publishTitle'), false, 'đóng cả khung');
     assert.equal(await page.locator('#pairRuns .publishBox details.publishWhole > summary').isVisible(), true, 'dòng tiêu đề khung vẫn còn để mở lại');
     await page.click('#pairRuns .publishBox details.publishWhole > summary');
     assert.equal(await shown('#pairRuns .publishBox input.publishTitle'), true, 'mở lại cả khung');
+    if ((await page.locator('#pairRuns .publishBox input.publishTitle').inputValue()).endsWith(' ')) await redraw();
+    assert.equal(await page.locator('#pairRuns .publishBox input.publishTitle').inputValue(), 'The Same Child, Two Fathers: Yelling vs Listening', 'tiêu đề trở lại như cũ');
     // Dữ liệu lạ làm hỏng một thẻ: thẻ đó thành thẻ tối thiểu kèm lý do, không làm mất danh sách; sửa dữ liệu thì thẻ đầy đủ trở lại.
     const goodPublish = await page.evaluate(() => window.s.pair.stories['SS-Raised-with-Yelling'].publish);
     await page.evaluate(() => { window.s.pair.stories['SS-Raised-with-Yelling'].publish = { title: 'x', tags: 'không phải mảng' }; window.push(); });
