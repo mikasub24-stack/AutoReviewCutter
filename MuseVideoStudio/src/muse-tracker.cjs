@@ -266,6 +266,9 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     // several times. The newest copy is the latest send of this prompt, so its reply is the picture to save; an older reply is never taken.
     if(imageMode&&recover&&!recoverRequireAnchor&&!s.echo&&echoes.length!==1){const pool=echoes.length?echoes:echoCandidates(true);if(pool.length)echoes=[pool[pool.length-1]];}
     if(!s.echo&&!echoes.length&&recover&&!recoverRequireAnchor&&(echoKey||echoMarker)){const exact=echoCandidates(true);if(exact.length===1)echoes=exact;else if(exact.length>1)throw Error('Có nhiều tin nhắn trùng prompt nhưng ID cũ đã thay đổi. Không chọn clip khi chưa xác định được cảnh.');}
+    // Clips, live send: when Muse rebuilds rows already in the chat, every earlier copy of this prompt looks new. Exactly one copy
+    // more than there were before sending means the newest copy is the one sent now; more than that stays ambiguous and fails closed.
+    if(!imageMode&&!recover&&!s.echo&&echoes.length>1){const all=echoCandidates(true);if(all.length===s.baselineMatches+1)echoes=[all[all.length-1]];}
     if(!s.echo&&echoes.length>1&&!(imageMode&&!recover&&echoes.every(e=>resend(e.leaf)||resend(e.root))))throw Error('Có nhiều tin nhắn trùng chính xác prompt. Không xác định được video của tác vụ; hãy dùng chat riêng hoặc xử lý thủ công.');
     if(!s.echo) {
       if(!echoes.length){if(recover&&recoverRequireAnchor)return {...result('recovery-unbound','Chưa xác nhận được tin nhắn của đúng lượt gửi cũ',null),recoveryUnbound:true,historicalEchoCount:echoCandidates(true).length};return result('waiting-prompt','Chờ Muse hiển thị đúng prompt đã gửi');}
@@ -278,6 +281,9 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
       // remaining copy may be an old one from history, so the "only one match" rule is not used for them.
       if(imageMode&&!recover){if(!anchored.length&&all.length>s.baselineMatches)anchored=[all[s.baselineMatches]];}
       else if(imageMode&&!recoverRequireAnchor&&!anchored.length&&all.length){anchored=[all[all.length-1]];}
+      // Clips, live send: Muse replaced the message it showed while sending (new node, new id) and the chat holds earlier copies of
+      // the same prompt, so the copy sent now is the one added after those counted before sending: the newest.
+      else if(!imageMode&&!recover&&!anchored.length&&all.length===s.baselineMatches+1){anchored=[all[all.length-1]];}
       else if(!recoverRequireAnchor&&!anchored.length&&all.length===1&&s.echoContexts?.some(parent=>parent.isConnected&&parent.contains(all[0].root)))anchored=all;
       if(anchored.length!==1)return {...result('waiting-response','Muse đang dựng lại tin nhắn · chờ khôi phục đúng cảnh gốc',null),hint:`thấy ${all.length} tin nhắn giống prompt, lúc gửi có ${s.baselineMatches??'?'}`};
       s.echo=anchored[0].leaf;s.echoRoot=anchored[0].root;s.echoContexts=rememberContext(s.echoRoot);s.echoNativeKey=s.echoRoot.id||s.echoRoot.getAttribute('data-message-id')||s.echoRoot.getAttribute('data-id')||'';if(s.echoNativeKey)s.echoAliases.add(s.echoNativeKey);s.echoRoot.setAttribute('data-muse-studio-attempt',id);s.ready=false;s.responseRoot=null;s.video=null;

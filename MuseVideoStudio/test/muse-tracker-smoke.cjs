@@ -323,6 +323,53 @@ const assert = require('node:assert/strict');
     assert.equal((await page.evaluate(pollTracking,{id:'choice-8'})).ready,false,'clip cũ một mình chưa phải kết quả');
     await append({id:'cr-reply',role:'user',text:'Gửi lại clip vừa tạo'});await append({id:'r-cr-new',src:'/choice-resent.webm',ref:'u-cr-new'});await ready('r-cr-new');
     cs=await page.evaluate(pollTracking,{id:'choice-8'});assert.equal(cs.ready,true);assert.equal(cs.url,'https://muse.ai/choice-resent.webm');
+    // Muse "hatch" markup, as seen in a real chat export: reference picture above a plain user bubble, reply = text bubble + a clip
+    // in its own wrapper; no roles, no thread marker. The same prompt can sit in the chat several times (earlier sends), and Muse can
+    // swap the bubble it showed while sending for a rebuilt one: the clip for the copy sent now must still be found, an older reply never.
+    await page.evaluate(()=>{document.getElementById('unrelated').innerHTML='<video autoplay muted loop data-hatch-avatar-layer src="/avatar.webm" width="120" height="120"></video>';});
+    const HATCH='Look: clean 3D-rendered animation.\nOne single scene only: no split screen.\nAudio: only soft room tone.';
+    const PIXEL='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    const hatchUser=(id,busy=false)=>page.evaluate(a=>{const row=document.createElement('div');row.className='flex w-full flex-col items-end';row.id=a.id;row.innerHTML='<div class="relative flex w-full flex-col items-end"><div class="flex shrink-0"><button type="button"><img alt="" src="'+a.pixel+'" width="120" height="68"></button></div><div class="relative"><div class="relative max-w-[520px]"><div class="hatch-chat-groupable-bubble bg-chat-user-bubble" aria-busy="'+a.busy+'"><span class="sr-only" data-copy-exclude></span><p class="whitespace-pre-wrap"></p></div></div></div></div>';row.querySelector('p').textContent=a.text;document.getElementById('thread').append(row);},{id,busy,pixel:PIXEL,text:HATCH});
+    const hatchBot=(id,src)=>page.evaluate(a=>{const row=document.createElement('div');row.className='flex w-full flex-col items-start';row.id=a.id;row.innerHTML='<div class="hatch-chat-groupable-bubble"><p>Done — another take</p></div><div data-testid="hatch-chat-attachment-presentation-video"><span class="contents"><span class="inline-grid"><div role="button" tabindex="0" data-hatch-video-wrapper data-hatch-video-src="'+a.src+'" class="hatch-chat-groupable-bubble group"><div class="relative h-full w-full"><video playsinline loop src="'+a.src+'" width="160" height="90"></video></div><img alt="" aria-hidden="true" src="'+a.pixel+'" width="160" height="90"></div></span></span></div>';document.getElementById('thread').append(row);},{id,src,pixel:PIXEL});
+    const hatchPrior=async n=>{for(let i=1;i<=n;i++){await hatchUser('hu-old'+i);await hatchBot('hb-old'+i,'/hatch-old'+i+'.webm');await ready('hb-old'+i);}};
+    const rebuild=prefix=>page.evaluate(prefix=>{const list=document.getElementById('thread');const kids=[...list.children];list.innerHTML='';kids.forEach((k,i)=>{const c=k.cloneNode(true);c.id=prefix+i;list.append(c);});},prefix);
+    const settled=()=>page.waitForFunction(()=>[...document.querySelectorAll('#thread video')].every(v=>v.readyState>=2));
+    const hatchReset=async()=>{await reset();await page.evaluate(()=>{document.getElementById('thread').removeAttribute('data-chat-thread');document.getElementById('unrelated').innerHTML='<video autoplay muted loop data-hatch-avatar-layer src="/avatar.webm" width="120" height="120"></video>';});};
+    // 1. Two earlier sends with their clips, the new copy's reply is a new clip.
+    await hatchReset();await hatchPrior(2);await page.evaluate(beginTracking,{id:'hatch-1',prompt:HATCH});await hatchUser('hu-new',true);
+    assert.equal((await page.evaluate(pollTracking,{id:'hatch-1'})).ready,false);
+    await hatchBot('hb-new','/hatch-new-1.webm');await ready('hb-new');
+    let hs=await page.evaluate(pollTracking,{id:'hatch-1'});assert.equal(hs.ready,true);assert.equal(hs.url,'https://muse.ai/hatch-new-1.webm');
+    // 2. Muse swaps the bubble it showed while sending for a rebuilt one (new id) with earlier copies in the chat: no stall.
+    await hatchReset();await hatchPrior(2);await page.evaluate(beginTracking,{id:'hatch-2',prompt:HATCH});await hatchUser('hu-tmp',true);await page.evaluate(pollTracking,{id:'hatch-2'});
+    await page.evaluate(()=>document.getElementById('hu-tmp').remove());await hatchUser('hu-real');
+    hs=await page.evaluate(pollTracking,{id:'hatch-2'});assert.equal(hs.phase,'waiting-response');assert.equal(hs.echoMatched,true);assert.ok(!/dựng lại/.test(hs.stage),'phải nhận lại đúng tin nhắn mới nhất: '+hs.stage);
+    await hatchBot('hb-new','/hatch-new-2.webm');await ready('hb-new');
+    hs=await page.evaluate(pollTracking,{id:'hatch-2'});assert.equal(hs.ready,true,'clip của bản vừa gửi phải được nhận');assert.equal(hs.url,'https://muse.ai/hatch-new-2.webm');
+    // 3. The whole list rebuilt as new nodes (all ids new), old clips keep their addresses: only the clip after the newest copy counts.
+    await hatchReset();await hatchPrior(2);await page.evaluate(beginTracking,{id:'hatch-3',prompt:HATCH});await hatchUser('hu-tmp3',true);await page.evaluate(pollTracking,{id:'hatch-3'});
+    await rebuild('hu-rebuilt-');await settled();
+    hs=await page.evaluate(pollTracking,{id:'hatch-3'});assert.equal(hs.ready,false);assert.ok(!/dựng lại/.test(hs.stage),hs.stage);
+    await hatchBot('hb-new','/hatch-new-3.webm');await ready('hb-new');
+    hs=await page.evaluate(pollTracking,{id:'hatch-3'});assert.equal(hs.ready,true);assert.equal(hs.url,'https://muse.ai/hatch-new-3.webm');
+    // 4. Rebuilt before the first poll: every copy looks new, yet exactly one more than before sending is the newest.
+    await hatchReset();await hatchPrior(2);await page.evaluate(beginTracking,{id:'hatch-4',prompt:HATCH});await hatchUser('hu-new4',true);await rebuild('hu-rb4-');await settled();
+    assert.equal((await page.evaluate(pollTracking,{id:'hatch-4'})).ready,false);
+    await hatchBot('hb-new','/hatch-new-4.webm');await ready('hb-new');
+    hs=await page.evaluate(pollTracking,{id:'hatch-4'});assert.equal(hs.ready,true);assert.equal(hs.url,'https://muse.ai/hatch-new-4.webm');
+    // 5. Two new identical copies after sending: nobody can tell which is ours, so it still fails closed.
+    await hatchReset();await hatchPrior(1);await page.evaluate(beginTracking,{id:'hatch-5',prompt:HATCH});await hatchUser('hu-n5a',true);await hatchUser('hu-n5b',true);
+    await assert.rejects(page.evaluate(pollTracking,{id:'hatch-5'}),/nhiều tin nhắn/);
+    // 6. After the swap, the late reply of an EARLIER copy is never taken as this prompt's clip.
+    await hatchReset();await hatchPrior(2);await page.evaluate(beginTracking,{id:'hatch-6',prompt:HATCH});await hatchUser('hu-tmp6',true);await page.evaluate(pollTracking,{id:'hatch-6'});
+    await page.evaluate(()=>document.getElementById('hu-tmp6').remove());await hatchUser('hu-real6');await page.evaluate(pollTracking,{id:'hatch-6'});
+    await page.evaluate(()=>{const c=document.getElementById('hb-old1').cloneNode(true);c.id='hb-late';document.getElementById('thread').insertBefore(c,document.getElementById('hu-old2'));});await settled();
+    assert.equal((await page.evaluate(pollTracking,{id:'hatch-6'})).ready,false,'phản hồi muộn của bản cũ không phải kết quả');
+    // 7. Muse sends the clip it already made (same address) under the newest copy, after the swap: still this prompt's result.
+    await hatchReset();await hatchPrior(2);await page.evaluate(beginTracking,{id:'hatch-7',prompt:HATCH});await hatchUser('hu-tmp7',true);await page.evaluate(pollTracking,{id:'hatch-7'});
+    await page.evaluate(()=>document.getElementById('hu-tmp7').remove());await hatchUser('hu-real7');
+    await hatchBot('hb-resent','/hatch-old2.webm');await ready('hb-resent');
+    hs=await page.evaluate(pollTracking,{id:'hatch-7'});assert.equal(hs.ready,true);assert.equal(hs.url,'https://muse.ai/hatch-old2.webm');
     console.log('PASS: real Chromium decoded-video tracker fixture — exact prompt binding, delayed result/progress, old/unrelated/wrong/out-of-order media rejection, ambiguity fail-closed, scoped menu download and unique recovery. No live Muse requests.');
   } finally {if(browser)await browser.close();await fs.rm(dir,{recursive:true,force:true});}
 })().catch(error=>{console.error(error);process.exitCode=1;});

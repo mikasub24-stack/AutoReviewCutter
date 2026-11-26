@@ -15,7 +15,10 @@ function chatDiagnostics({jobs=[],composerSelector='textarea'}) {
   const matches=jobs.slice(-8).map(job=>{
     const wanted=norm(job.prompt),found=all.filter(e=>norm(e.innerText??e.textContent)===wanted);
     const leaves=found.filter(e=>!found.some(child=>child!==e&&e.contains(child))).slice(0,3);
-    return {id:job.id,number:job.number,renderedMatches:leaves.length,plainTextMatches:all.filter(e=>norm(e.textContent)===wanted).length,contexts:leaves.map(e=>({ancestors:trail(e),nearby:tree(e.parentElement?.parentElement)}))};
+    // What this scene's tracker is holding right now (counts only): shows why a clip is not being picked up.
+    const state=job.trackerId?globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]?.get(job.trackerId):null;
+    const tracker=state?{echoBound:Boolean(state.echo),echoConnected:Boolean(state.echo?.isConnected),rootConnected:Boolean(state.echoRoot?.isConnected),ownStamps:[...document.querySelectorAll('[data-muse-studio-attempt]')].filter(e=>e.getAttribute('data-muse-studio-attempt')===job.trackerId).length,stampsInChat:document.querySelectorAll('[data-muse-studio-attempt]').length,copiesBeforeSend:state.baselineMatches??null,rejected:state.reject||{}}:null;
+    return {id:job.id,number:job.number,tracker,renderedMatches:leaves.length,plainTextMatches:all.filter(e=>norm(e.textContent)===wanted).length,contexts:leaves.map(e=>({ancestors:trail(e),nearby:tree(e.parentElement?.parentElement)}))};
   });
   let composers=[];try{composers=[...document.querySelectorAll(composerSelector)].filter(visible).map(e=>({ancestors:trail(e),controls:tree(e.parentElement?.parentElement)}));}catch{}
   const media=[...document.querySelectorAll('video,iframe,a[download],a[type^="video/"],img')].filter(visible).slice(-60).map(e=>({ancestors:trail(e),context:tree(e.parentElement)}));

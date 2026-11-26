@@ -142,6 +142,14 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.15.8
+
+- **Sửa lỗi Muse đã làm xong clip nhưng tool không tải về (cảnh đứng ở «waiting»).** Khi trong chat Muse đã có sẵn một hay nhiều tin nhắn giống hệt prompt của cảnh (do bấm Tạo lại / Tiếp tục gửi lại prompt) và Muse dựng lại tin nhắn vừa gửi thành một phần tử mới, tool không biết bản nào là của cảnh đang chờ nên đứng ở «Muse đang dựng lại tin nhắn · chờ khôi phục đúng cảnh gốc» và bỏ qua clip. Giờ tool đếm số bản giống prompt lúc gửi: đúng một bản nhiều hơn thì bản mới nhất là bản vừa gửi, clip sau nó được nhận (kể cả khi Muse gửi lại đúng clip cũ). Nếu có từ hai bản mới trở lên thì vẫn dừng, không đoán. Phản hồi muộn của một bản cũ không bao giờ bị nhận nhầm.
+- **«Xuất thông tin lỗi chat» ghi thêm trạng thái bộ theo dõi của từng cảnh** (đã gắn tin nhắn chưa, còn nối với trang không, dấu đánh dấu còn bao nhiêu, có bao nhiêu bản giống prompt lúc gửi, lý do từng clip bị từ chối): chỉ có số đếm, không có prompt hay đường dẫn.
+- Test mới: bảy tình huống trong `muse-tracker-smoke` dựng theo đúng cấu trúc chat Muse trong file xuất lỗi (ảnh đính kèm trên bong bóng, clip trong khung riêng, video avatar ở cột bên); gỡ bản sửa thì test rớt. `submit-diagnostics-smoke` kiểm phần trạng thái bộ theo dõi.
+- **Cảnh đang kẹt từ bản cũ:** cài bản này rồi bấm «Tạo lại ngay» (Muse sẽ làm một clip mới), hoặc dùng «Tải video lên» với clip đã có trong chat Muse. Bấm «Tiếp tục» trên cảnh kẹt chưa chắc nhận lại được clip vì chat đã có nhiều bản giống nhau.
+- **Chưa kiểm được trên Windows, Electron và Muse thật.** Test dùng Chromium với cấu trúc chat dựng lại từ file xuất lỗi; cách Muse thật dựng lại tin nhắn là suy ra từ file đó, chưa quan sát trực tiếp.
+
 ## Update 1.15.7
 
 - **Viết kịch bản dùng tài khoản Muse rảnh.** Tab So sánh song song, Động vật hoang dã và Kể chuyện (phân tích truyện, viết lời quảng cáo / mẹo) trước đây luôn dùng tài khoản 1 và báo «Dừng hàng đợi…» khi hàng đợi đang chạy. Giờ app chọn tài khoản Muse đang mở và rảnh; không có thì tự mở tài khoản đã đăng nhập sẵn (đã lưu phiên); chỉ khi mọi tài khoản đều bận mới báo và nói rõ cách xử lý. Tài khoản 1 không còn bị coi là bận chỉ vì có việc đang chạy ở tài khoản khác. Tab Bản đồ vẫn như bản 1.11.1 và cũng tự mở được tài khoản đã đăng nhập sẵn.

@@ -1417,7 +1417,7 @@ app.whenReady().then(async () => {
     diagnostics: async index=>{
       index=Number(index??0);validLoginAccount(index);const muse=browsers.get(index);assertMuse(muse);
       const jobs=queue.jobs.filter(j=>j.account===index+1).slice(-8);
-      const structure=await dom(muse,chatDiagnostics,{jobs:jobs.map(j=>({id:j.id,prompt:j.lockedInput?.prompt||j.prompt,number:j.number})),composerSelector:settings.composer});
+      const structure=await dom(muse,chatDiagnostics,{jobs:jobs.map(j=>({id:j.id,prompt:j.lockedInput?.prompt||j.prompt,number:j.number,trackerId:j.trackerId||j.id})),composerSelector:settings.composer});
       const result=await dialog.showSaveDialog(main,{defaultPath:`Muse-chat-diagnostics-TK${index+1}.json`,filters:[{name:'Thông tin lỗi',extensions:['json']}]});
       if(result.canceled)return false;
       await atomic(result.filePath,{version:app.getVersion?.()||'0.7.1',account:index+1,jobs:jobs.map(j=>({id:j.id,title:j.title,number:j.number,status:j.status,stage:j.stage,error:j.error,submittedAt:j.submittedAt,remoteStop:j.remoteStop,trackerId:j.trackerId,echoKey:j.echoKey,echoMarker:j.echoMarker,acknowledgedAt:j.acknowledgedAt,promptHash:j.lockedInput?.promptHash,referenceHashes:j.lockedInput?.references.map(r=>r.sha256)})),structure});

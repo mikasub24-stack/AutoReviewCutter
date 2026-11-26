@@ -17,6 +17,11 @@ const{chatDiagnostics}=require('../src/chat-diagnostics.cjs');
   await page.evaluate(()=>{const a=document.createElement('a');a.href='https://example.test/file.mp4?token=SECRET_TOKEN';a.title='PRIVATE_PROMPT_SECRET';a.innerHTML='<img alt="PRIVATE_PROMPT_SECRET">';document.body.append(a);});
   const report=await page.evaluate(chatDiagnostics,{jobs:[{id:'job',prompt:'PRIVATE_PROMPT_SECRET'}],composerSelector:'textarea'}),json=JSON.stringify(report);
   assert.ok(report.composers.length);assert.ok(report.media.length);assert.equal(json.includes('PRIVATE_PROMPT_SECRET'),false);assert.equal(json.includes('SECRET_TOKEN'),false);assert.equal(json.includes('https://'),false);
+  // The export also says what a scene's tracker holds (counts only), so a stuck clip can be explained from the file.
+  await page.evaluate(()=>{const s=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')].get('one');s.echo=document.body;s.echoRoot=document.body;s.baselineMatches=2;s.reject={'sau tin nhắn khác':1};document.querySelector('aside').setAttribute('data-muse-studio-attempt','one');});
+  const withTracker=await page.evaluate(chatDiagnostics,{jobs:[{id:'job',prompt:'PRIVATE_PROMPT_SECRET',trackerId:'one'},{id:'job-2',prompt:'PRIVATE_PROMPT_SECRET',trackerId:'khong-co'}],composerSelector:'textarea'});
+  assert.deepEqual(withTracker.matches[0].tracker,{echoBound:true,echoConnected:true,rootConnected:true,ownStamps:1,stampsInChat:1,copiesBeforeSend:2,rejected:{'sau tin nhắn khác':1}});
+  assert.equal(withTracker.matches[1].tracker,null);assert.equal(JSON.stringify(withTracker).includes('PRIVATE_PROMPT_SECRET'),false);
   console.log('PASS: actual Muse-style send arrow clicked once, draft preserved for disabled/ambiguous controls, canceled token blocked, diagnostic input/prompt/URL redaction.');
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
