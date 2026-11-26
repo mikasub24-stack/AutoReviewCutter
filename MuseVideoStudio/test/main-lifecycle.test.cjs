@@ -28,7 +28,7 @@ const safeStorage = {
   }
 };
 
-async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, longTerm, wildWriterFactory, pairWriterFactory, pairHudFactory, domTimeoutMs=20000, logoutResponse=1,closeResponse=1,closeGate } = {}) {
+async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, longTerm, wildWriterFactory, pairWriterFactory, pairHudFactory, voiceServiceFactory, domTimeoutMs=20000, logoutResponse=1,closeResponse=1,closeGate } = {}) {
   const handlers = new Map(), sessions = new Map(), windows = [], errors = [], notices = [], trashed = [];
   const lifecycle = [],updates=[];
   let loaded, quit;
@@ -105,6 +105,7 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
       if(name==='./wild-write.cjs' && wildWriterFactory)return{createWildWriter:wildWriterFactory};
       if(name==='./pair-write.cjs' && pairWriterFactory)return{createPairWriter:pairWriterFactory};
       if(name==='./pair-hud-window.cjs' && pairHudFactory)return{createWindowHud:pairHudFactory};
+      if(name==='./story-voice.cjs' && voiceServiceFactory){const real=localRequire(name);return{...real,createVoiceService:voiceServiceFactory};}
       if(name === './electron-network-check.cjs') return {checkElectronNetwork:networkProbe || (async()=>({ip:'203.0.113.9',countryCode:'US',countryName:'United States',observedAt:new Date().toISOString()}))};
       if(name === './external-browser.cjs' && externalLauncher) return {launchExternalBrowser:externalLauncher};
       if(name === './browser-discovery.cjs' && browserResolver) return {resolveBrowser:browserResolver};
@@ -641,6 +642,27 @@ test('a temporary DOM timeout while Muse creates does not fail, resend or dispat
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
 
+test('Muse hỏi «gửi lại clip hay tạo mới»: tool tự trả lời (không bấm thì clip không bao giờ về), rồi tải đúng clip',{timeout:30000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-choice-card-'));let app,sent=0,answers=0,answered=false;const picks=[];
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',openMuse:async()=>{},show:async()=>{},close:async()=>{},evaluate:async(fn,arg)=>{
+   if(fn.name==='submitPrompt'){sent++;return{clicked:true};}
+   if(fn.name==='answerChoice'){answers++;picks.push(arg.pick);if(answers===1)return{answered:false,reason:'chưa thấy nút'};answered=true;return{answered:true,pick:arg.pick};}
+   if(fn.name==='pollTracking')return answered?{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null}:{phase:'waiting-response',ready:false,echoMatched:true,responseMatched:false,progress:null,choice:{answered:false}};
+   if(fn.name==='downloadAction')return{action:'clicked',clicked:true};return null;
+  },captureDownload:async(target,{trigger})=>{await trigger();await fs.writeFile(target,fixtureMp4());}})});
+  await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Scene already made once'}]);await app.invoke('start');
+  await until(()=>!app.invoke('state').active,20000);
+  assert.equal(sent,1,'chỉ gửi prompt một lần, không gửi đi gửi lại');
+  assert.deepEqual(picks,['resend','resend'],'lần đầu bấm chưa được thì thử lại; cảnh chưa từng tạo thì chọn «gửi lại clip vừa tạo»');
+  assert.equal(app.invoke('state').jobs[0].status,'completed');
+  assert.ok(app.updates.some(rows=>rows.some(j=>/bấm một lựa chọn/.test(j.stageMessage||''))),'khi chưa bấm được thì cảnh nói rõ Muse đang hỏi và cần bấm tay');
+  assert.ok(app.updates.some(rows=>rows.some(j=>/Gửi lại clip vừa tạo/.test(j.stageMessage||''))),'báo tool đã chọn gì');
+  await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
 test('Continue resends an uncertain original attempt; transfer retries do not send it again',{timeout:30000},async()=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-retry-transfer-'));let app,recovering=false,sent=0,downloads=0;const attempts=[];
  try{
@@ -1155,13 +1177,35 @@ test('tab So sánh song song: Muse tự chọn chủ đề → kịch bản → 
     await fs.writeFile(path.join(dir, 'studio.json'), JSON.stringify({ configVersion: 2, settings: { output: dir, accountCount: 1, cooldownSeconds: 0 } }));
     let failing = true;
     const fake = fakeMuse({ total: 7, topic: 'Sleeping on time and staying up late', bad: n => failing && n === 3 ? 'short' : '' });
-    const bootOpts = { longTerm: true, domTimeoutMs: 300, pairWriterFactory: options => createPairWriter({ ...options, ask: fake.ask, delay: async () => {} }), pairHudFactory: fakeHudFactory(hudLog) };
+    // Giọng đọc giả: «đã cài» khi voiceReady = true; mỗi đoạn là một tiếng bíp 1,2 giây (đủ để kiểm tra phần trộn âm thanh bằng ffmpeg thật).
+    let voiceReady = false;
+    const voiceLog = [];
+    const voiceServiceFactory = options => {
+      const real = require('../src/story-voice.cjs').createVoiceService(options);
+      return { ...real,
+        status: () => ({ ...real.status(), ready: { ...real.status().ready, edge: voiceReady } }),
+        synth: async ({ voice, items, dir, volume }) => {
+          voiceLog.push({ voice, ids: items.map(i => i.id), volume });
+          await fs.mkdir(dir, { recursive: true });
+          const out = [];
+          for (const item of items) {
+            const file = path.join(dir, `${item.id}.wav`);
+            const r = require('node:child_process').spawnSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=330:duration=1.2:sample_rate=24000', file]);
+            assert.equal(r.status, 0, String(r.stderr));
+            out.push({ id: item.id, file, seconds: 1.2 });
+          }
+          return out;
+        } };
+    };
+    const bootOpts = { longTerm: true, voiceServiceFactory, domTimeoutMs: 300, pairWriterFactory: options => createPairWriter({ ...options, ask: fake.ask, delay: async () => {} }), pairHudFactory: fakeHudFactory(hudLog) };
     app = await boot(dir, bootOpts);
     await assert.rejects(app.invoke('pairMake', { topic: '', minutes: 1, voice: { voice: 'en-US-GuyNeural' } }), /Chưa cài giọng Microsoft/);
     assert.equal(fake.log.bible, 0, 'lỗi đầu vào thì chưa gửi gì cho Muse');
+    await assert.rejects(app.invoke('pairMake', { topic: '', minutes: 1, voice: { voice: '' } }), /Chưa cài giọng Microsoft/, 'không chọn giọng cũng không được dựng video câm');
     await assert.rejects(app.invoke('pairMake', { topic: '', minutes: 1, music: path.join(dir, 'x.txt'), voice: { voice: '' } }), /Nhạc nền phải là/);
     assert.equal(Object.keys((await app.invoke('state')).pair.stories).length, 0, 'lỗi đầu vào thì không lưu video dở');
 
+    voiceReady = true;
     // Lần 1: Muse viết sai mốc 3 → dừng đúng chỗ, giữ nháp, hỏi «Viết tiếp».
     const made = await app.invoke('pairMake', { topic: '', minutes: 1, lang: 'en', layout: 'side', voice: { voice: '' } });
     assert.equal(made.storyId, 'SS-phim');
@@ -1242,6 +1286,12 @@ test('tab So sánh song song: Muse tự chọn chủ đề → kịch bản → 
     const probe = require('node:child_process').spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration:stream=width,height', '-of', 'json', meta.output]);
     const info = JSON.parse(String(probe.stdout));
     assert.deepEqual([info.streams[0].width, info.streams[0].height], [1920, 1080]);
+    const audioProbe = require('node:child_process').spawnSync('ffprobe', ['-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', meta.output]);
+    assert.match(String(audioProbe.stdout), /aac/, 'video có tiếng (giọng đọc + nhạc + hiệu ứng)');
+    assert.ok(voiceLog.length >= 1 && voiceLog[0].voice === 'en-US-GuyNeural', 'không chọn giọng thì dùng giọng mặc định của ngôn ngữ video: ' + JSON.stringify(voiceLog[0]));
+    assert.ok(voiceLog[0].ids.includes('intro') && voiceLog[0].ids.includes('b1'), 'đọc cả mở đầu lẫn từng mốc');
+    const autoMusic = (await fs.readdir(folder)).filter(n => /^nhac-nen-tu-dong-(warm|calm|lofi)\.wav$/.test(n));
+    assert.equal(autoMusic.length, 1, 'tự tạo đúng một bản nhạc nền miễn bản quyền cho video: ' + autoMusic);
     assert.ok(Math.abs(Number(info.format.duration) - meta.seconds) < 0.5);
     assert.ok(Math.abs(meta.seconds - (4.5 + 8 + 7 * 2)) < 1, 'mở đầu + 7 mốc (mỗi mốc ≥ 2 giây) + kết: ' + meta.seconds);
     assert.deepEqual(hudLog.filter(x => x[0] === 'init'), [['init', 'side', 'en']]);

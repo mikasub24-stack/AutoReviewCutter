@@ -26,6 +26,7 @@ require('./wild-write.test.cjs');
 require('./pair-plan.test.cjs');
 require('./pair-write.test.cjs');
 require('./pair-render.test.cjs');
+require('./pair-music.test.cjs');
 require('./pair-hud-window.test.cjs');
 require('./maphist.test.cjs');
 require('./maphist-frames.test.cjs');

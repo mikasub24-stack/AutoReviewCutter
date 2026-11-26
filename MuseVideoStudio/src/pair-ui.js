@@ -90,7 +90,7 @@
     $('pairVoiceInfo').textContent = info;
   }
   function renderMusic() {
-    $('pairMusicName').textContent = music ? 'Nhạc nền: ' + base(music) : 'Không nhạc nền (chỉ có giọng đọc và âm thanh tự tạo).';
+    $('pairMusicName').textContent = music ? 'Nhạc nền: ' + base(music) : 'Nhạc nền tự động (miễn bản quyền, tool tự tạo), nhỏ đi khi có lời đọc.';
     $('pairMusicClear').hidden = !music;
   }
 
@@ -99,7 +99,7 @@
     const c = config();
     $('pairCreate').disabled = true;
     try {
-      const fresh = await call('pairMake', { topic: c.topic, left: c.left, right: c.right, minutes: c.minutes, lang: c.lang, layout: c.layout, voice: { voice: $('pairVoice').value, tempo: tempo() }, music, musicVolume: Number($('pairMusicVol').value) });
+      const fresh = await call('pairMake', { topic: c.topic, left: c.left, right: c.right, minutes: c.minutes, lang: c.lang, layout: c.layout, voice: { voice: $('pairVoice').value, tempo: tempo(), volume: Number($('pairVoiceVol').value) }, music, musicVolume: Number($('pairMusicVol').value) });
       if (fresh) { $('pairForm').open = false; toast(c.topic ? 'Muse đang viết kịch bản. Các bước sau tự chạy, bạn không cần bấm gì thêm.' : 'Muse đang chọn chủ đề và viết kịch bản. Các bước sau tự chạy, bạn không cần bấm gì thêm.'); runsKey = ''; const state = await call('state'); if (state) render(state); }
     } finally { $('pairCreate').disabled = Boolean(lastState && createBlocked(lastState)); }
   }
@@ -234,7 +234,7 @@
         actions.append(button(started ? 'Tạo tiếp' : 'Chạy', 'primary', async () => { const r = await call('start', { kind: 'pair' }); if (r) { runsKey = ''; render(r); } }, anyBusy));
       }
       if (allClips && !queueBusy && !building) actions.append(button(meta.output ? 'Dựng lại video' : 'Dựng video', meta.output ? 'secondary' : 'primary', async () => {
-        const r = await call('pairBuild', { storyId: id, voice: { voice: $('pairVoice').value || (meta.voice && meta.voice.voice) || '', tempo: tempo() }, music });
+        const r = await call('pairBuild', { storyId: id, voice: { voice: $('pairVoice').value || (meta.voice && meta.voice.voice) || '', tempo: tempo(), volume: Number($('pairVoiceVol').value) }, music, musicVolume: Number($('pairMusicVol').value) });
         if (r) { runsKey = ''; render(r); }
       }, anyBusy));
       if (allClips && !building) actions.append(button(thumbBusy === id ? 'Đang tạo thumbnail…' : meta.thumb ? 'Tạo thumbnail khác' : 'Tạo thumbnail 16:9', 'secondary', async () => {
@@ -278,14 +278,17 @@
   $('pairTopic').value = saved.topic || ''; $('pairLeft').value = saved.left || ''; $('pairRight').value = saved.right || '';
   $('pairTempo').value = String(saved.tempo || 1);
   $('pairMusicVol').value = String(saved.musicVol == null ? 0.15 : saved.musicVol);
+  $('pairVoiceVol').value = String(saved.voiceVol == null ? 1 : saved.voiceVol);
+  const showVolumes = () => { $('pairVoiceVolOut').textContent = Math.round(Number($('pairVoiceVol').value) * 100) + '%'; $('pairMusicVolOut').textContent = Math.round(Number($('pairMusicVol').value) * 100) + '%'; };
   const showTempo = () => { $('pairTempoOut').textContent = tempo().toFixed(2) + '×'; };
-  showTempo(); renderMusic(); renderTopics(); renderCount();
-  function remember() { saved = { ...saved, topic: $('pairTopic').value, left: $('pairLeft').value, right: $('pairRight').value, minutes: $('pairMinutes').value, lang: lang(), layout: $('pairLayout').value, tempo: tempo(), music, musicVol: Number($('pairMusicVol').value) }; persist(); }
+  showTempo(); showVolumes(); renderMusic(); renderTopics(); renderCount();
+  function remember() { saved = { ...saved, topic: $('pairTopic').value, left: $('pairLeft').value, right: $('pairRight').value, minutes: $('pairMinutes').value, lang: lang(), layout: $('pairLayout').value, tempo: tempo(), music, musicVol: Number($('pairMusicVol').value), voiceVol: Number($('pairVoiceVol').value) }; persist(); }
   for (const id of ['pairMinutes', 'pairLayout']) $(id).onchange = () => { remember(); renderCount(); };
   $('pairTopic').oninput = () => { remember(); renderTopics(); renderCount(); };
   $('pairLeft').oninput = remember; $('pairRight').oninput = remember;
   $('pairTempo').oninput = () => { showTempo(); remember(); };
-  $('pairMusicVol').oninput = remember;
+  $('pairMusicVol').oninput = () => { showVolumes(); remember(); };
+  $('pairVoiceVol').oninput = () => { showVolumes(); remember(); };
   $('pairLang').onchange = () => {
     // Chủ đề đang là bản gợi ý của ngôn ngữ cũ (nhãn chưa sửa) thì đổi sang bản của ngôn ngữ mới.
     const was = presetOf($('pairTopic').value);

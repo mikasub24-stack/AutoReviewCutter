@@ -26,6 +26,30 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   // second copy still answers this prompt, so for pictures it does not count as another message.
   const resend = e => imageMode && norm(e.innerText ?? e.textContent) === wanted;
   const composer = e => Boolean(e.closest('textarea,input,[contenteditable="true"],[role="textbox"]'));
+  // Muse can ask what to do about a prompt it has already made: "send the clip again" or "create a new clip". Answering
+  // (a click, which shows up as a bubble repeating the chosen label) is part of this same turn, not another prompt.
+  const OPT_RESEND=/(?:gửi|dùng|lấy|xem)\s*lại\s+(?:clip|video)|(?:re-?send|send)\s+(?:the\s+)?(?:last|previous|same|existing)\s+(?:clip|video)/i;
+  const OPT_FRESH=/tạo\s+(?:một\s+)?(?:clip|video)\s+mới|(?:create|generate|make)\s+(?:a\s+)?new\s+(?:clip|video)/i;
+  const CHOICE_CLICK='button,a[href],[role="button"],[tabindex]:not([tabindex="-1"])';
+  const nfc=value=>norm(value).normalize('NFC');
+  const optText=value=>nfc(value).replace(/\s*(?:…|\.{3})\s*$/,'').toLowerCase();
+  // Two or more clickable things side by side: the labels of a question, not a lone button.
+  function choiceGroup(b){
+    for(let p=b.parentElement,d=0;p&&p!==document.body&&d<4;p=p.parentElement,d++){
+      if(p.querySelector('textarea,input,[contenteditable="true"],[role="textbox"]'))return false;
+      if(p.querySelectorAll(CHOICE_CLICK).length>=2)return true;
+    }
+    return false;
+  }
+  function choiceReply(e){
+    if(!s.echoRoot?.isConnected||e===s.echoRoot||!following(s.echoRoot,e))return false;
+    const text=nfc(e.innerText??e.textContent);
+    if(text.length<2||text.length>160)return false;
+    if(OPT_RESEND.test(text)||OPT_FRESH.test(text))return true;
+    // Any other wording: the bubble repeats the label of one of the options the assistant showed after our message.
+    const want=optText(text);
+    return [...document.querySelectorAll(CHOICE_CLICK)].some(b=>b!==e&&!e.contains(b)&&!b.contains(e)&&following(s.echoRoot,b)&&following(b,e)&&author(b).kind!=='user'&&optText(b.innerText??b.textContent)===want&&choiceGroup(b));
+  }
   function author(e) {
     for(let n=e;n && n!==document.body;n=n.parentElement) {
       const values=[n.getAttribute('data-role'),n.getAttribute('data-author'),n.getAttribute('data-message-role'),n.getAttribute('data-message-author-role'),n.getAttribute('data-sender')].filter(Boolean).map(norm);
@@ -185,7 +209,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     const found=[];
     if(!s.echoRoot?.isConnected)return found;
     const bound=chatBound();if(!bound)return found;
-    const users=[...bound.querySelectorAll('*')].filter(e=>e!==s.echoRoot&&following(s.echoRoot,e)&&author(e).kind==='user'&&author(e).root===e&&!resend(e));
+    const users=[...bound.querySelectorAll('*')].filter(e=>e!==s.echoRoot&&following(s.echoRoot,e)&&author(e).kind==='user'&&author(e).root===e&&!resend(e)&&!choiceReply(e));
     const ids=new Set([...s.echoAliases,s.echoRoot.id,s.echoRoot.getAttribute('data-message-id'),s.echoRoot.getAttribute('data-id')].filter(Boolean));
     for(const video of mediaNodes(bound)){
       if(!following(s.echoRoot,video)||s.echoRoot.contains(video)||composer(video))continue;
@@ -232,7 +256,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   const playable=v=>imageMode?(v.tagName==='IMG'&&v.complete&&v.naturalWidth>=IMG_NATURAL_MIN&&v.naturalHeight>=IMG_NATURAL_MIN&&imageSource(source(v),false)):videoLink(v)||(v.tagName==='VIDEO'&&/^(https:|blob:)/i.test(source(v)));
   function rememberContext(root){const parents=[];for(let p=root.parentElement,depth=0;p&&p!==document.body&&depth<8;p=p.parentElement,depth++)if(!p.querySelector('textarea,input,[contenteditable="true"],[role="textbox"],nav,aside'))parents.push(p);return parents;}
   function result(phase,stage,root=s.responseRoot) {return {id,phase,stage,responseMatched:Boolean(root?.isConnected&&s.echoRoot&&following(s.echoRoot,root)),echoAliases:[...s.echoAliases],echoMatched:Boolean(s.echo),echoKey:s.echoRoot?.id||s.echoRoot?.getAttribute('data-message-id')||s.echoRoot?.getAttribute('data-id')||'',echoMarker:s.echoRoot?.getAttribute('data-muse-studio-attempt')||'',ready:phase==='ready',progress:progress(root),...(phase==='ready'?{url:source(s.video),fingerprint:s.fingerprint,...(imageMode?{count:s.images.length}:{})}:{})};}
-  s.poll=()=>{
+  s.pollCore=()=>{
     if(s.echo?.isConnected&&s.echoRoot?.isConnected&&(!s.echoRoot.contains(s.echo)||norm(s.echo.innerText??s.echo.textContent)!==wanted||author(s.echo).kind==='assistant'))throw Error('Tin nhắn của cảnh đã thay đổi. Không lấy video từ câu Test hay cảnh khác.');
     let echoes=echoCandidates();
     // Pictures, live send: the chat may already hold the same prompt from earlier tries, and Muse can
@@ -265,7 +289,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     // response boundaries again. A live DOM node can be recycled for Test or
     // another turn without being disconnected.
     s.ready=false;
-    const userRoots=thread?[...thread.querySelectorAll('*')].filter(e=>e!==s.echoRoot&&following(s.echoRoot,e)&&((author(e).kind==='user'&&author(e).root===e&&!resend(e))||e.hasAttribute('data-muse-studio-attempt'))):[];
+    const userRoots=thread?[...thread.querySelectorAll('*')].filter(e=>e!==s.echoRoot&&following(s.echoRoot,e)&&((author(e).kind==='user'&&author(e).root===e&&!resend(e)&&!choiceReply(e))||e.hasAttribute('data-muse-studio-attempt'))):[];
     const echoIds=new Set([...s.echoAliases,s.echoRoot.id,s.echoRoot.getAttribute('data-message-id'),s.echoRoot.getAttribute('data-id')].filter(Boolean));
     const candidates=[],reject={};const note=k=>{reject[k]=(reject[k]||0)+1;};s.reject=reject;
     for(const video of (thread?mediaNodes(thread):[])) {
@@ -317,6 +341,45 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     if(!playable(s.video))return result('rendering','Muse đang tạo hoặc tải dữ liệu video');
     s.ready=true;s.fingerprint=source(s.video);
     return result('ready','Video của prompt đã sẵn sàng tải');
+  };
+  // Muse's "send the clip again or create a new one?" card, if one sits after this prompt with no answer yet. Both labels must be
+  // in one card (a lone matching button elsewhere is never clicked) and no clip may already follow it.
+  function findChoice(scope){
+    if(!scope||!s.echoRoot?.isConnected)return null;
+    const labelOf=e=>nfc(e.innerText??e.textContent);
+    const hit=re=>{
+      const all=[...scope.querySelectorAll('*')].filter(e=>e!==s.echoRoot&&!s.echoRoot.contains(e)&&following(s.echoRoot,e)&&visible(e)&&!composer(e)&&author(e).kind!=='user'&&labelOf(e).length<=90&&re.test(labelOf(e)));
+      const leaves=all.filter(e=>!all.some(o=>o!==e&&e.contains(o)));
+      return [...new Set(leaves.map(e=>{const c=e.closest(CHOICE_CLICK);return c&&scope.contains(c)&&labelOf(c).length<=90?c:e;}))];
+    };
+    const again=hit(OPT_RESEND),fresh=hit(OPT_FRESH);
+    if(again.length!==1||fresh.length!==1||again[0]===fresh[0])return null;
+    let card=null;
+    for(let p=again[0].parentElement,d=0;p&&p!==document.body&&d<8;p=p.parentElement,d++)if(p.contains(fresh[0])){card=p;break;}
+    if(!card||card.contains(s.echoRoot)||author(card).kind==='user'||card.querySelector('textarea,input,[contenteditable="true"],[role="textbox"]'))return null;
+    if(mediaNodes(scope).some(v=>following(card,v)&&!card.contains(v)))return null;
+    return {card,again:again[0],fresh:fresh[0],answered:card.hasAttribute('data-muse-studio-choice')};
+  }
+  s.poll=()=>{
+    const r=s.pollCore();
+    if(!r.ready){try{const c=findChoice(chatBound());if(c)r.choice={answered:c.answered};}catch{}}
+    return r;
+  };
+  // Answers that card: 'resend' = send the clip it already made, 'fresh' = create a new one. One click per card.
+  s.answerChoice=({pick='resend'}={})=>{
+    if(!s.echoRoot?.isConnected)return {answered:false,reason:'chưa gắn prompt'};
+    const c=findChoice(chatBound());
+    if(!c)return {answered:false,reason:'không có câu hỏi'};
+    if(c.answered)return {answered:false,already:true};
+    const target=pick==='fresh'?c.fresh:c.again;
+    target.scrollIntoView?.({block:'nearest',inline:'nearest',behavior:'instant'});
+    const r=target.getBoundingClientRect(),x=Math.round(r.left+r.width/2),y=Math.round(r.top+r.height/2);
+    const base={clientX:x,clientY:y,screenX:x,screenY:y,button:0,pointerId:1,pointerType:'mouse',isPrimary:true,detail:1};
+    const fire=(type,buttons)=>{const K=type.startsWith('pointer')&&typeof PointerEvent==='function'?PointerEvent:MouseEvent;target.dispatchEvent(new K(type,{bubbles:true,cancelable:true,composed:true,view:window,...base,buttons}));};
+    for(const type of ['pointerover','pointerenter','mouseover','mouseenter','pointermove','mousemove'])fire(type,0);
+    fire('pointerdown',1);fire('mousedown',1);fire('pointerup',0);fire('mouseup',0);target.click();
+    c.card.setAttribute('data-muse-studio-choice',id);
+    return {answered:true,pick:pick==='fresh'?'fresh':'resend'};
   };
   // Opening the clip's menu. Muse offers two routes: the "…" button beside the clip
   // (Download = 2nd row) and a right-click on the clip (Download = 4th row, after the
@@ -565,5 +628,10 @@ function endTracking({id}) {
   const map=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')],state=map?.get(id);
   state?.observer?.disconnect();state?.downloadController?.abort();const stops=globalThis[Symbol.for('MuseVideoStudio.stopRequests.v1')];if(stops)for(const key of stops)if(key.startsWith(id+':'))stops.delete(key);return map?.delete(id)||false;
 }
+function answerChoice({id,pick='resend'}) {
+  const state=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]?.get(id);
+  if(!state)throw Error('Không có trạng thái theo dõi cho tác vụ này.');
+  return state.answerChoice({pick});
+}
 function pollBrowserProbe({id}){const s=globalThis[Symbol.for('MuseVideoStudio.promptTrackers.v1')]?.get(id);if(!s)throw Error('Test không còn gắn với tab này.');return s.probe();}
-module.exports={pollBrowserProbe,beginTracking,pollTracking,downloadAction,endTracking,readTrackedImage};
+module.exports={pollBrowserProbe,beginTracking,pollTracking,downloadAction,answerChoice,endTracking,readTrackedImage};

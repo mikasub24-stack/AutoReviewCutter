@@ -29,9 +29,34 @@ function beatLength(clipSeconds, voiceSeconds) {
 const introLength = voiceSeconds => align(Math.max(INTRO_MIN, Number(voiceSeconds) > 0 ? Number(voiceSeconds) + 1.4 : 0));
 const outroLength = voiceSeconds => align(Math.max(OUTRO_MIN, Number(voiceSeconds) > 0 ? Number(voiceSeconds) + LEAD + OUTRO_TAIL + 0.4 : 0));
 
-// Âm thanh tổng hợp cho một mốc (giây tính từ đầu mốc): vút khi chuyển mốc, pop khi phụ đề hiện, tích tắc khi pin tụt, «bam» khi tụt mạnh, «ding» khi bên phải tăng.
+// Hiệu ứng theo cảnh: đọc mô tả cảnh của từng bên (tiếng Anh, do kịch bản viết) và chọn tiếng hợp với việc đang xảy ra. Mỗi bên tối đa 2 tiếng,
+// đặt lệch về đúng bên đó (trái / phải), đứng sau tiếng vút + pop đầu mốc và trước lúc thanh pin chạy.
+const SCENE_SOUNDS = [
+  { kind: 'coin', gain: .5, re: /\b(coins?|cash|money|wallet|purse|bills?|price|prices|pays?|paying|paid|buys?|buying|bought|purchases?|shopping|shop|store|checkout|receipt|credit card|register|spends?|spending|salary|paycheck|rent|loan|debt|bank|atm)\b/ },
+  { kind: 'bam', gain: .45, re: /\b(yells?|yelling|shouts?|shouting|screams?|screaming|argues?|arguing|angry|anger|slams?|slamming|fights?|fighting|furious|scolds?|scolding|storms?)\b/ },
+  { kind: 'knock', gain: .5, re: /\b(door|knocks?|knocking|doorbell|enters?|entering|arrives?|arriving|leaves?|leaving)\b/ },
+  { kind: 'notify', gain: .4, re: /\b(phone|smartphone|calls?|calling|texts?|texting|messages?|notifications?|app|email)\b/ },
+  { kind: 'chime', gain: .4, re: /\b(smiles?|smiling|laughs?|laughing|celebrates?|celebrating|hugs?|hugging|happy|joy|proud|success|wins?|cheers?|cheering|party|gifts?|graduat\w+)\b/ },
+  { kind: 'swell', gain: .5, re: /\b(cries|cry|crying|tears|sad|lonely|alone|worr(?:y|ies|ied)|stress(?:ed)?|anxious|tired|exhausted|sighs?|panic(?:s|king)?)\b/ },
+  { kind: 'ding', gain: .32, re: /\b(saves?|saving|savings|piggy|deposits?|invests?|investing|interest|budget|grows?|growing|jar)\b/ },
+  { kind: 'steps', gain: .4, re: /\b(walks?|walking|runs?|running|rush(?:es|ing)?|hurr(?:y|ies|ying)|late|strolls?|steps)\b/ },
+  { kind: 'typing', gain: .35, re: /\b(types?|typing|keyboard|laptop|computer|desk|works?|working|office|studies|study|studying|homework)\b/ }
+];
+function sceneCues(beat, total) {
+  const cues = [];
+  const text = side => String((beat && beat[side]) || '').toLowerCase();
+  const sides = [['left', -.6, text('left')], ['right', .6, text('right')]];
+  const shared = String((beat && beat.frame) || '').toLowerCase();
+  sides.forEach(([, pan, own], si) => {
+    const found = SCENE_SOUNDS.filter(s => s.re.test(own) || (!own && s.re.test(shared))).slice(0, 2);
+    found.forEach((s, i) => cues.push({ t: 1.0 + i * .9 + si * .25, kind: s.kind, gain: s.gain, pan }));
+  });
+  return cues.filter(c => c.t < total - .3);
+}
+
+// Âm thanh tổng hợp cho một mốc (giây tính từ đầu mốc): vút khi chuyển mốc, pop khi phụ đề hiện, tiếng theo cảnh (sceneCues), tích tắc khi pin tụt, «bam» khi tụt mạnh, «ding» khi bên phải tăng.
 function cuesFor(beat, prev, total) {
-  const cues = [{ t: .03, kind: 'whoosh', gain: .5 }, { t: .45, kind: 'pop', gain: .3 }];
+  const cues = [{ t: .03, kind: 'whoosh', gain: .5 }, { t: .45, kind: 'pop', gain: .3 }, ...sceneCues(beat, total)];
   const dL = Number(beat.leftScore) - Number(prev.left), dR = Number(beat.rightScore) - Number(prev.right);
   const moveStart = Hud.METER_HOLD / Hud.METER_FPS, moveEnd = Hud.METER_FRAMES / Hud.METER_FPS;
   if (dL <= -4) {
@@ -103,7 +128,7 @@ function outroVideoArgs({ clipL, clipR, geo, total, layers, threads = 2, out }) 
 
 // Tiếng của một đoạn, PCM đúng `total` giây: giọng đọc (giữa) + tiếng nền hai clip (trái / phải, nhỏ lại khi có giọng) + hiệu ứng.
 // ambience = âm lượng tiếng nền (0 = tắt). voiceLead = giây đợi trước khi giọng vào.
-function audioArgs({ clipL = null, clipR = null, hasL = false, hasR = false, voice = null, sfx = null, ambience = 0.45, voiceLead = LEAD, total, out }) {
+function audioArgs({ clipL = null, clipR = null, hasL = false, hasR = false, voice = null, sfx = null, ambience = 0.45, voiceLead = LEAD, voiceVolume = 1, total, out }) {
   const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y'];
   let next = 0;
   const idx = {};
@@ -123,7 +148,7 @@ function audioArgs({ clipL = null, clipR = null, hasL = false, hasR = false, voi
   else if (ambient.length === 1) { f.push(`${ambient[0]}anull[amb]`); amb = '[amb]'; }
   if (idx.voice != null) {
     const lead = Math.round(Math.max(0, voiceLead) * 1000);
-    f.push(`[${idx.voice}:a]${mono},pan=stereo|c0=c0|c1=c0,adelay=${lead}|${lead},apad[vo]`);
+    f.push(`[${idx.voice}:a]${mono},pan=stereo|c0=c0|c1=c0,adelay=${lead}|${lead},volume=${num(voiceVolume)},apad[vo]`);
     if (amb) {
       f.push('[vo]asplit=2[vo1][vo2]', `${amb}[vo1]sidechaincompress=threshold=0.03:ratio=10:attack=15:release=350[duck]`);
       mix.push('[duck]', '[vo2]');
@@ -146,7 +171,7 @@ function finalArgs({ videoList, audioList, music = '', musicVolume = 0.14, total
   const norm = 'aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,asetpts=PTS-STARTPTS';
   const f = ['[1:a]asplit=2[n1][n2]',
     `[2:a]${norm},volume=${num(musicVolume)},atrim=0:${num(total)},afade=t=in:d=2,afade=t=out:st=${num(Math.max(0, total - 3))}:d=3,asetpts=PTS-STARTPTS[mus]`,
-    '[mus][n1]sidechaincompress=threshold=0.04:ratio=9:attack=20:release=600[duck]',
+    '[mus][n1]sidechaincompress=threshold=0.05:ratio=5:attack=60:release=1400[duck]',
     '[duck][n2]amix=inputs=2:duration=longest:dropout_transition=0,volume=2,alimiter=limit=0.95[aout]'];
   return [...args, '-filter_complex', f.join(';'), '-map', '0:v', '-map', '[aout]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-t', num(total), '-movflags', '+faststart', out];
 }
@@ -168,6 +193,8 @@ async function assemblePair({ script, config = {}, clips, hud, voice = null, dir
     if (!MUSIC_EXT.includes(path.extname(config.music).toLowerCase())) throw Error(`Nhạc nền phải là ${MUSIC_EXT.join(', ')}.`);
     await fs.access(config.music).catch(() => { throw Error('Không mở được file nhạc nền. Chọn lại file nhạc.'); });
   }
+  // Âm lượng giọng đọc (thanh kéo): 0.3–1.6 lần mức gốc.
+  const voiceVolume = Math.min(1.6, Math.max(0.3, Number(config.voiceVolume) || 1));
   const t = await checkTools(ffmpeg);
   const geo = Hud.geometry(config.layout === 'stack' ? 'stack' : 'side');
   await fs.mkdir(dir, { recursive: true });
@@ -226,7 +253,7 @@ async function assemblePair({ script, config = {}, clips, hud, voice = null, dir
           clipL: c.left, clipR: c.right, geo, durL: info.l.duration, durR: info.r.duration, total: info.total, threads,
           layers: { ...files, meterL: path.join(temp, `mL-${id}-%03d.png`), meterR: path.join(temp, `mR-${id}-%03d.png`) }, out: video
         }), { signal: stop }),
-        run(t.ffmpeg, audioArgs({ clipL: c.left, clipR: c.right, hasL: info.l.hasAudio, hasR: info.r.hasAudio, voice: info.voice, sfx, ambience: config.ambience == null ? 0.45 : config.ambience, total: info.total, out: audio }), { signal: stop })
+        run(t.ffmpeg, audioArgs({ clipL: c.left, clipR: c.right, hasL: info.l.hasAudio, hasR: info.r.hasAudio, voice: info.voice, sfx, ambience: config.ambience == null ? 0.45 : config.ambience, voiceVolume, total: info.total, out: audio }), { signal: stop })
       ]);
       pieces[i] = { video, audio, total: info.total };
       // đã ghép xong thì xóa ảnh lớp của mốc này cho đỡ tốn ổ đĩa
@@ -257,9 +284,9 @@ async function assemblePair({ script, config = {}, clips, hud, voice = null, dir
     const infoOf = (n, k) => infos[beats.findIndex(b => b.number === n)][k];
     await Promise.all([
       run(t.ffmpeg, introVideoArgs({ clipL: first.left, clipR: first.right, geo, durL: infoOf(beats[0].number, 'l').duration, durR: infoOf(beats[0].number, 'r').duration, total: introTotal, layer: introPng, threads, out: introVideo }), { signal }),
-      run(t.ffmpeg, audioArgs({ voice: spoken.get('intro')?.file || null, sfx: sfxEnabled ? introSfx : null, voiceLead: 0.8, ambience: 0, total: introTotal, out: introAudio }), { signal }),
+      run(t.ffmpeg, audioArgs({ voice: spoken.get('intro')?.file || null, sfx: sfxEnabled ? introSfx : null, voiceLead: 0.8, ambience: 0, voiceVolume, total: introTotal, out: introAudio }), { signal }),
       run(t.ffmpeg, outroVideoArgs({ clipL: last.left, clipR: last.right, geo, total: outroTotal, layers: outroLayers, threads, out: outroVideo }), { signal }),
-      run(t.ffmpeg, audioArgs({ voice: spoken.get('outro')?.file || null, sfx: sfxEnabled ? outroSfx : null, voiceLead: 0.5, ambience: 0, total: outroTotal, out: outroAudio }), { signal })
+      run(t.ffmpeg, audioArgs({ voice: spoken.get('outro')?.file || null, sfx: sfxEnabled ? outroSfx : null, voiceLead: 0.5, ambience: 0, voiceVolume, total: outroTotal, out: outroAudio }), { signal })
     ]);
     // 5. Nối.
     const order = [{ video: introVideo, audio: introAudio, total: introTotal }, ...pieces, { video: outroVideo, audio: outroAudio, total: outroTotal }];
@@ -348,4 +375,4 @@ async function makePairThumbnail({ script, config = {}, clips, hud, dir, variant
   }
 }
 
-module.exports = { makePairThumbnail, thumbBeat, LEAD, TAIL, MUSIC_EXT, beatLength, introLength, outroLength, cuesFor, beatVideoArgs, introVideoArgs, outroVideoArgs, audioArgs, finalArgs, assemblePair, decode };
+module.exports = { makePairThumbnail, thumbBeat, LEAD, TAIL, MUSIC_EXT, beatLength, introLength, outroLength, cuesFor, sceneCues, SCENE_SOUNDS, beatVideoArgs, introVideoArgs, outroVideoArgs, audioArgs, finalArgs, assemblePair, decode };

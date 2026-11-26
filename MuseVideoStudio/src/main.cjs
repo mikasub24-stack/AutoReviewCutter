@@ -10,7 +10,7 @@ const {chatDiagnostics}=require('./chat-diagnostics.cjs');
 const {submitPrompt}=require('./submit-prompt.cjs');
 const {ensureAttachmentInput,composerAttachmentSnapshot}=require('./attachment-input.cjs');
 const {imageSources,attachmentState}=require('./attachment-ready.cjs');
-const {beginTracking,pollTracking,downloadAction,endTracking,readTrackedImage}=require('./muse-tracker.cjs');
+const {beginTracking,pollTracking,downloadAction,answerChoice,endTracking,readTrackedImage}=require('./muse-tracker.cjs');
 const { decodeDataUrl,saveImageBuffer,sniffImage } = require('./image-save.cjs');
 const {captureElectronDownload,validateVideo}=require('./download-capture.cjs');
 const {triggerDownload}=require('./download-trigger.cjs');
@@ -25,6 +25,7 @@ const {createWildWriter}=require('./wild-write.cjs');
 // Tab «Động vật hoang dã»: mỗi phim một thư mục DongVat/<mã phim>; hai tab chuỗi cảnh (Dọn nhà, Động vật) dùng chung luật nối khung cuối.
 const wildFolder=(output,id)=>path.join(output,'DongVat',String(id||'Phim').replace(/[^\w-]/g,'')||'Phim');
 const pairPlan=require('./pair-plan.js');
+const pairMusic=require('./pair-music.cjs');
 const {createPairWriter}=require('./pair-write.cjs');
 const {assemblePair,makePairThumbnail}=require('./pair-render.cjs');
 const {createWindowHud}=require('./pair-hud-window.cjs');
@@ -547,7 +548,7 @@ async function runJob(job,worker,signal,{recover=false}={}) {
       catch(e){if(signal.aborted)throw e;if(!transientDOM(e)){job.mayHaveSubmitted=false;await step(save());throw e;}stage('confirming','Muse đang lag · chờ xác nhận, không bấm Gửi lần nữa');}
     }
     const warnAt=Date.now()+settings.timeoutMinutes*60000,image=isPhoto(job);
-    let warned=false,observedEcho=false;
+    let warned=false,observedEcho=false,choiceClicks=0;
     // A picture is saved only after Muse's own "generating" state has ended, so a
     // preview that is replaced by the final render is never stored.
     const stillGenerating=async()=>{
@@ -567,6 +568,15 @@ async function runJob(job,worker,signal,{recover=false}={}) {
       if(result.echoMatched&&(!job.acknowledgedAt||(result.echoKey&&job.echoKey!==result.echoKey))){job.acknowledgedAt=job.acknowledgedAt||new Date().toISOString();job.echoAliases=result.echoAliases||[];job.echoKey=result.echoKey||'';job.echoMarker=result.echoMarker||trackerId;await step(save());}
       if(result.responseMatched&&!job.confirmedResponseAt){job.confirmedResponseAt=new Date().toISOString();await step(save());}
       job.progress=result.echoMatched&&result.responseMatched&&Number.isFinite(result.progress)?result.progress:null;
+      // Muse asks "send the clip again or create a new one?" when the prompt was already made. Nobody answers it by itself, so the clip
+      // never comes: answer it (a scene being regenerated wants a new clip; otherwise the clip Muse already made is the result).
+      if(!image&&result.choice&&!result.choice.answered&&choiceClicks<3){
+        choiceClicks++;const pick=job.previousOutput||job.previousOutputs?.length?'fresh':'resend';
+        try{
+          const answer=await step(dom(muse,answerChoice,{id:trackerId,pick}));
+          if(answer?.answered){stage('waiting','Muse hỏi gửi lại hay tạo clip mới · tool đã chọn «'+(pick==='fresh'?'Tạo clip mới':'Gửi lại clip vừa tạo')+'»');await step(delay(1500));continue;}
+        }catch(e){check();}
+      }
       let holding=false;
       if(result.ready&&result.echoMatched&&result.responseMatched&&!(holding=await stillGenerating())){
         job.resultReadyAt=new Date().toISOString();job.downloadStartedAt=new Date().toISOString();
@@ -576,7 +586,7 @@ async function runJob(job,worker,signal,{recover=false}={}) {
         }catch(e){check();stage('downloading',(image?'Chưa lưu được ảnh · giữ đúng kết quả và thử lại: ':'Chưa lưu được video · giữ đúng kết quả và thử tải lại: ')+e.message);await step(delay(5000));continue;}
       }
       if(!warned&&Date.now()>warnAt){warned=true;job.late=true;}
-      stage(!result.echoMatched?'confirming':'waiting',(job.late?'Muse chậm hơn thời gian dự kiến · vẫn giữ cảnh này; bấm «Dừng cảnh này» hoặc «Tạo lại ngay» nếu không muốn chờ nữa. ':'')+(!result.echoMatched?'Chưa thấy đúng prompt trong chat Muse':!result.responseMatched?'Đã thấy tin nhắn · chờ Muse phản hồi'+(result.hint?' ('+result.hint+')':''):holding?'Ảnh đã hiện · chờ Muse tạo xong rồi mới lưu':result.stage||(image?'Chờ đúng ảnh của prompt':'Chờ đúng video của prompt')));
+      stage(!result.echoMatched?'confirming':'waiting',(job.late?'Muse chậm hơn thời gian dự kiến · vẫn giữ cảnh này; bấm «Dừng cảnh này» hoặc «Tạo lại ngay» nếu không muốn chờ nữa. ':'')+(!result.echoMatched?'Chưa thấy đúng prompt trong chat Muse':!result.responseMatched?'Đã thấy tin nhắn · chờ Muse phản hồi'+(result.hint?' ('+result.hint+')':''):holding?'Ảnh đã hiện · chờ Muse tạo xong rồi mới lưu':result.stage||(image?'Chờ đúng ảnh của prompt':'Chờ đúng video của prompt'))+(result.choice&&!result.choice.answered?' · Muse đang hỏi gửi lại hay tạo clip mới: hãy bấm một lựa chọn trong cửa sổ Muse':''));
       await step(delay(1500));
     }
   }finally{
@@ -1039,6 +1049,12 @@ async function recoverPairStories(){
   return changed;
 }
 // Giọng đọc + chữ canvas + âm thanh + ghép MP4 (pair-render.cjs). Cửa sổ vẽ chữ chỉ mở trong lúc dựng.
+// Nhạc nền của video «So sánh song song»: file người dùng chọn, hoặc (mặc định) bản nhạc miễn bản quyền tự tổng hợp, chọn theo mã video.
+async function pairMusicFile(meta,storyId){
+  const own=String(meta.music||'');
+  if(own)return own;
+  return pairMusic.ensureTrack(pairFolder(settings.output,storyId),pairMusic.pickKind(storyId));
+}
 async function buildPairStory(storyId){
   const meta=settings.pairStories?.[storyId];
   if(!meta)throw Error('Không thấy thông tin video này.');
@@ -1052,8 +1068,11 @@ async function buildPairStory(storyId){
     await licenseManager.requireLongTerm();
     await closeAllBrowsers().catch(()=>{});
     const v=meta.voice||{};
+    // Video luôn có giọng đọc: không chọn thì dùng giọng mặc định của ngôn ngữ video; chưa cài giọng thì báo rõ, không dựng video câm.
+    const voiceName=(v.engine==='edge'&&v.voice)||pairPlan.langOf(meta.lang).voice;
+    if(!(voiceService?.status()?.ready||{}).edge)throw Error('Chưa cài giọng Microsoft (miễn phí) nên video sẽ không có tiếng đọc. Bấm «Cài giọng miễn phí» ở mục Giọng đọc, đợi cài xong rồi dựng lại.');
     const result=await assemblePair({
-      script:draft.script,config:{voice:v.engine==='edge'?v.voice:'',tempo:v.tempo||1,music:meta.music||'',musicVolume:meta.musicVolume,ambience:meta.ambience,layout:meta.layout,lang:meta.lang},
+      script:draft.script,config:{voice:voiceName,voiceVolume:v.volume,tempo:v.tempo||1,music:await pairMusicFile(meta,storyId),musicVolume:meta.musicVolume,ambience:meta.ambience,layout:meta.layout,lang:meta.lang},
       clips:pairBeatClips(clips),hud:pairHud,voice:voiceService,dir:pairFolder(settings.output,storyId),name:meta.name||storyId,ffmpeg:settings.ffmpeg||'ffmpeg',signal:pairController.signal,
       onProgress:text=>{pairState.progress=text;notify();}
     });
@@ -1782,17 +1801,18 @@ app.whenReady().then(async () => {
         const config=pairPlan.options(data);
         const bad=pairPlan.problems(config);
         if(bad.length)throw Error(bad[0]);
-        const pick=String(data?.voice?.voice||'');
-        const voice={engine:pick?'edge':'none',voice:pick,tempo:Math.min(1.5,Math.max(0.7,Number(data?.voice?.tempo)||1)),volume:1};
-        const ready=voiceService?.status()?.ready||{};
-        if(voice.engine==='edge'&&!ready.edge)throw Error('Chưa cài giọng Microsoft (miễn phí). Bấm «Cài giọng miễn phí» ở mục Giọng đọc, đợi cài xong rồi làm video.');
         const music=String(data?.music||'');
         if(music){
           if(!MUSIC_EXT.has(path.extname(music).toLowerCase()))throw Error('Nhạc nền phải là '+[...MUSIC_EXT].join(', ')+'.');
           if(!await fs.stat(music).then(x=>x.isFile(),()=>false))throw Error('Không mở được file nhạc nền. Chọn lại file nhạc.');
         }
+        // Luôn có giọng đọc: không chọn thì lấy giọng mặc định của ngôn ngữ video.
+        const pick=String(data?.voice?.voice||'')||pairPlan.langOf(config.lang).voice;
+        const voice={engine:'edge',voice:pick,tempo:Math.min(1.5,Math.max(0.7,Number(data?.voice?.tempo)||1)),volume:Math.min(1.6,Math.max(0.3,Number(data?.voice?.volume)||1))};
+        const ready=voiceService?.status()?.ready||{};
+        if(!ready.edge)throw Error('Chưa cài giọng Microsoft (miễn phí). Bấm «Cài giọng miễn phí» ở mục Giọng đọc, đợi cài xong rồi làm video.');
         storyId=await freeStoryId(pairPlan.storyIdBase(config),{output:settings.output,jobs:queue.jobs,folderOf:pairFolder,fallback:'SS-phim'});
-        meta=all[storyId]={topic:config.topic,left:config.left,right:config.right,minutes:config.minutes,lang:config.lang,layout:config.layout,voice,music,musicVolume:Math.min(.6,Math.max(0,Number(data?.musicVolume)||.14)),ambience:.45,auto:true,status:'writing',name:config.topic||'',createdAt:Date.now()};
+        meta=all[storyId]={topic:config.topic,left:config.left,right:config.right,minutes:config.minutes,lang:config.lang,layout:config.layout,voice,music,musicVolume:data?.musicVolume!=null&&Number.isFinite(Number(data.musicVolume))?Math.min(.6,Math.max(0,Number(data.musicVolume))):.14,ambience:.45,auto:true,status:'writing',name:config.topic||'',createdAt:Date.now()};
         for(const id of Object.keys(all).slice(0,Math.max(0,Object.keys(all).length-40)))delete all[id];
       }
       await fs.mkdir(pairFolder(settings.output,storyId),{recursive:true});
@@ -1811,9 +1831,10 @@ app.whenReady().then(async () => {
       if(!pairDone(pairClips(storyId)))throw Error('Chỉ dựng video khi mọi clip đã xong.');
       if(!(await readPairDraft(storyId))?.script)throw Error('Không thấy kịch bản đã lưu của video này.');
       if(data?.voice&&typeof data.voice==='object'&&'voice' in data.voice){
-        const pick=String(data.voice.voice||'');
-        meta.voice={engine:pick?'edge':'none',voice:pick,tempo:Math.min(1.5,Math.max(0.7,Number(data.voice.tempo)||1)),volume:1};
+        const pick=String(data.voice.voice||'')||pairPlan.langOf(meta.lang).voice;
+        meta.voice={engine:'edge',voice:pick,tempo:Math.min(1.5,Math.max(0.7,Number(data.voice.tempo)||1)),volume:Math.min(1.6,Math.max(0.3,Number(data.voice.volume)||1))};
       }
+      if(data?.musicVolume!=null&&Number.isFinite(Number(data.musicVolume)))meta.musicVolume=Math.min(.6,Math.max(0,Number(data.musicVolume)));
       if(typeof data?.music==='string'){
         if(data.music&&!MUSIC_EXT.has(path.extname(data.music).toLowerCase()))throw Error('Nhạc nền phải là '+[...MUSIC_EXT].join(', ')+'.');
         meta.music=data.music;

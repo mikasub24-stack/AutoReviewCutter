@@ -24,7 +24,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
         { id: 'en-US-AndrewMultilingualNeural', lang: '*', language: 'Đa ngôn ngữ', name: 'Andrew (nam) · đa ngôn ngữ' }
       ];
       const s = {
-        version: '1.15.3', active: false, paused: true, jobs: [],
+        version: '1.15.4', active: false, paused: true, jobs: [],
         license: { status: 'active', plan: 'short', longTerm: false, device: 'TESTDEVICE', expiresAt: Date.now() + 86400000 * 30, message: 'Đã kích hoạt key.' },
         story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: true, clone: false }, platform: 'win32', edgeVoices: voices, clones: [] } },
         restore: { busy: false, progress: '', error: '', storyId: '', stories: {} },
@@ -148,12 +148,16 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
 
     // 5) Tạo video với chủ đề: một lệnh duy nhất với đủ lựa chọn; tiến độ viết kịch bản hiện ngay, có nút Dừng viết.
     await page.fill('#pairTempo', '1.1');
+    assert.equal(await page.locator('#pairVoiceVolOut').textContent(), '100%', 'thanh âm lượng giọng đọc mặc định 100%');
+    assert.equal(await page.locator('#pairMusicVolOut').textContent(), '15%', 'thanh âm lượng nhạc hiện số %');
+    await page.fill('#pairVoiceVol', '1.2');
+    assert.equal(await page.locator('#pairVoiceVolOut').textContent(), '120%');
     await page.selectOption('#pairLayout', 'stack');
     await page.click('#pairCreate');
     await page.waitForSelector('#pairRuns .restoreRun');
     const made = await calls('pairMake');
     assert.equal(made.length, 1);
-    assert.deepEqual(made[0].data, { topic: 'The same child: a father who yells and a father who listens', left: 'RAISED WITH SHOUTS', right: 'RAISED WITH LISTENING', minutes: 9, lang: 'en', layout: 'stack', voice: { voice: 'en-US-JennyNeural', tempo: 1.1 }, music: '', musicVolume: 0.15 });
+    assert.deepEqual(made[0].data, { topic: 'The same child: a father who yells and a father who listens', left: 'RAISED WITH SHOUTS', right: 'RAISED WITH LISTENING', minutes: 9, lang: 'en', layout: 'stack', voice: { voice: 'en-US-JennyNeural', tempo: 1.1, volume: 1.2 }, music: '', musicVolume: 0.15 });
     assert.match(await page.locator('#pairRuns .restoreRunText').first().textContent(), /Viết kịch bản 2\/9/);
     assert.match(await page.locator('#pairRunHint').textContent(), /Đang viết kịch bản · 16\/66 mốc/);
     assert.equal(await page.locator('#pairCreate').isDisabled(), true, 'đang làm video thì không tạo thêm');
@@ -283,7 +287,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await flush();
     const built = await calls('pairBuild');
     assert.equal(built.length, 1);
-    assert.deepEqual(built[0].data, { storyId: 'SS-Raised-with-Yelling', voice: { voice: 'en-US-JennyNeural', tempo: 1.1 }, music: '' });
+    assert.deepEqual(built[0].data, { storyId: 'SS-Raised-with-Yelling', voice: { voice: 'en-US-JennyNeural', tempo: 1.1, volume: 1.2 }, music: '', musicVolume: 0.15 });
     await page.evaluate(() => { Object.assign(window.s.pair, { busy: true, phase: 'build', storyId: 'SS-Raised-with-Yelling', progress: 'Đang dựng mốc 12/66…' }); window.push(); });
     await page.waitForFunction(() => /Đang dựng mốc 12\/66/.test(document.querySelector('#pairRuns .restoreRunText')?.textContent || ''));
     assert.equal(await page.locator('#pairRuns button', { hasText: 'Dừng dựng' }).count(), 1);
@@ -313,7 +317,8 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.waitForFunction(() => /piano\.mp3/.test(document.querySelector('#pairMusicName').textContent));
     assert.equal(await page.locator('#pairMusicClear').isHidden(), false);
     await page.click('#pairMusicClear');
-    assert.match(await page.locator('#pairMusicName').textContent(), /Không nhạc nền/);
+    assert.match(await page.locator('#pairMusicName').textContent(), /Nhạc nền tự động \(miễn bản quyền/);
+    assert.equal(await page.locator('#pairMusicClear').isHidden(), true, 'đang dùng nhạc tự động thì không có nút «Về nhạc tự động»');
     await page.evaluate(() => { window.s.story.voice.ready.edge = false; window.push(); });
     await page.waitForFunction(() => document.querySelector('#pairListen').disabled);
     assert.match(await page.locator('#pairVoiceInfo').textContent(), /Chưa cài giọng Microsoft/);

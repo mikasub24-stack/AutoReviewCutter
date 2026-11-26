@@ -242,3 +242,54 @@ test('thumbnail: báo lỗi rõ khi thiếu kịch bản / clip, khi bộ vẽ t
     await assert.rejects(make({ ffmpeg: path.join(dir, 'khong-co-ffmpeg') }), /./);
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
+
+test('hiệu ứng theo cảnh: đọc mô tả từng bên, đặt lệch về đúng bên, tối đa 2 tiếng mỗi bên, bỏ tiếng nằm ngoài độ dài mốc', () => {
+  const beat = { left: 'A young man pays the bill at the clinic desk and checks his phone', right: 'He walks calmly into the office, hugging a smiling friend', frame: '' };
+  const cues = R.sceneCues(beat, 12);
+  assert.deepEqual(cues.filter(c => c.pan < 0).map(c => c.kind), ['coin', 'notify'], 'bên trái: trả tiền → xu, điện thoại → chuông báo');
+  assert.deepEqual(cues.filter(c => c.pan > 0).map(c => c.kind), ['chime', 'steps'], 'bên phải: ôm, cười → chuông ngân; đi bộ → bước chân');
+  assert.ok(cues.every(c => c.t >= 1 && c.t < 3), 'đứng sau tiếng vút + pop đầu mốc');
+  assert.deepEqual(R.sceneCues(beat, 1.2), [], 'mốc quá ngắn thì không chèn tiếng theo cảnh');
+  assert.deepEqual(R.sceneCues({ left: 'a quiet empty hallway', right: 'a plant on a shelf' }, 10), [], 'cảnh không có việc gì rõ rệt thì không bịa tiếng');
+  assert.deepEqual(R.sceneCues({ left: '', right: '', frame: 'Dad shouts and slams the door' }, 10).map(c => c.kind).sort(), ['bam', 'bam', 'knock', 'knock'], 'chỉ có mô tả chung thì cả hai bên cùng nghe');
+  assert.deepEqual(R.sceneCues({ left: 'Priceless family photo, a stranger', right: 'a coin purse? no: a cashier' }, 10).filter(c => c.pan < 0), [], 'khớp nguyên từ, không khớp một phần («priceless» không phải «price»)');
+  const mixed = R.cuesFor({ ...beat, leftScore: 80, rightScore: 90 }, { left: 100, right: 100 }, 12);
+  assert.ok(mixed.some(c => c.kind === 'whoosh') && mixed.some(c => c.kind === 'coin') && mixed.some(c => c.kind === 'tick'), 'cuesFor giữ tiếng cũ và thêm tiếng theo cảnh');
+});
+
+test('mọi tiếng theo cảnh đều nghe được; cue.pan đặt tiếng lệch trái/phải', () => {
+  const Sfx = require('../src/maphist-sfx.cjs');
+  const energy = (wav, ch) => { let e = 0; for (let i = 44 + ch * 2; i < wav.length; i += 4) e += wav.readInt16LE(i) ** 2; return e; };
+  for (const { kind } of R.SCENE_SOUNDS) {
+    const left = Sfx.synth([{ t: 0.1, kind, gain: 1, pan: -0.9 }], 3), right = Sfx.synth([{ t: 0.1, kind, gain: 1, pan: 0.9 }], 3);
+    assert.ok(energy(left, 0) + energy(left, 1) > 1e6, `${kind} im lặng`);
+    assert.ok(energy(left, 0) > energy(left, 1) * 3, `${kind}: pan trái phải nghe ở loa trái`);
+    assert.ok(energy(right, 1) > energy(right, 0) * 3, `${kind}: pan phải nghe ở loa phải`);
+  }
+  assert.ok(R.SCENE_SOUNDS.every(s => s.gain <= 0.5), 'tiếng theo cảnh vừa phải, không át giọng đọc');
+});
+
+test('thanh âm lượng giọng đọc áp vào đúng đường tiếng; nhạc nền hạ xuống mượt khi có lời', () => {
+  const graph = args => args[args.indexOf('-filter_complex') + 1];
+  assert.match(graph(R.audioArgs({ voice: 'v.mp3', voiceVolume: 0.6, ambience: 0, total: 5, out: 'o.wav' })), /adelay=\d+\|\d+,volume=0\.6,apad\[vo\]/);
+  assert.match(graph(R.audioArgs({ voice: 'v.mp3', ambience: 0, total: 5, out: 'o.wav' })), /volume=1,apad\[vo\]/, 'mặc định giữ nguyên mức gốc');
+  const g = graph(R.finalArgs({ videoList: 'v.txt', audioList: 'a.txt', music: 'm.wav', musicVolume: 0.15, total: 60, out: 'f.mp4' }));
+  assert.match(g, /sidechaincompress=threshold=0\.05:ratio=5:attack=60:release=1400/, 'hạ chậm, nhả chậm: không bơm lên xuống theo từng câu');
+  assert.match(g, /volume=0\.15/);
+});
+
+test('dựng thật: âm lượng giọng đọc kéo nhỏ thì tiếng đọc nhỏ đi đúng mức', opts, async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'pair-voicevol-'));
+  try {
+    const voice = path.join(dir, 'v.wav');
+    ff('-f', 'lavfi', '-i', 'sine=frequency=440:duration=2:sample_rate=48000', voice);
+    const level = async volume => {
+      const out = path.join(dir, `a-${volume}.wav`);
+      ff(...R.audioArgs({ voice, voiceVolume: volume, ambience: 0, total: 3, out }).slice(5));
+      const r = spawnSync('ffmpeg', ['-hide_banner', '-nostats', '-i', out, '-af', 'volumedetect', '-f', 'null', '-'], { encoding: 'utf8' });
+      return Number(/max_volume: (-?[\d.]+) dB/.exec(r.stderr)[1]);
+    };
+    const loud = await level(1), quiet = await level(0.5);
+    assert.ok(loud - quiet > 4 && loud - quiet < 8, `giảm một nửa ≈ −6 dB, đo được ${(loud - quiet).toFixed(1)} dB`);
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});

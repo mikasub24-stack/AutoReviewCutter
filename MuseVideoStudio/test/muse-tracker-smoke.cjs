@@ -1,6 +1,6 @@
 // Real browser / real decoded media fixture. Does not contact Muse or submit jobs.
 const { chromium } = require('playwright-core');
-const { beginTracking, pollTracking, pollBrowserProbe, downloadAction, endTracking } = require('../src/muse-tracker.cjs');
+const { beginTracking, pollTracking, pollBrowserProbe, downloadAction, answerChoice, endTracking } = require('../src/muse-tracker.cjs');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const fs = require('node:fs/promises');
@@ -276,6 +276,53 @@ const assert = require('node:assert/strict');
     assert.equal((await page.evaluate(downloadAction,{id:'svg-menu'})).needsMenu,true);
     assert.equal((await page.evaluate(downloadAction,{id:'svg-menu',phase:'menu'})).clicked,true);
     assert.equal(await page.evaluate(()=>window.svgDownloaded),true);
+    // Muse asks "send the clip again or create a new one?" for a prompt it has already made. Answering shows up as a bubble: part of this same
+    // turn, so the clip that follows it is still this prompt's result; a genuinely different message still is not.
+    const card=(id,labels)=>page.evaluate(a=>{const r=document.createElement('article');r.id=a.id;r.dataset.messageRole='assistant';const p=document.createElement('p');p.textContent='Bạn đã có clip này rồi. Muốn làm gì tiếp?';r.append(p);const row=document.createElement('div');for(const l of a.labels){const b=document.createElement('button');b.textContent=l;b.dataset.label=l;row.append(b);}r.append(row);document.getElementById('thread').append(r);},{id,labels});
+    await reset();await page.evaluate(beginTracking,{id:'choice-1',prompt:'Choice scene one'});await append({id:'u-ch1',role:'user',text:'Choice scene one'});await card('card-1',['Gửi lại clip vừa tạo','Tạo một clip mới…']);
+    let cs=await page.evaluate(pollTracking,{id:'choice-1'});assert.equal(cs.ready,false);assert.deepEqual(cs.choice,{answered:false},'thấy câu hỏi chưa ai trả lời');
+    await append({id:'ch1-reply',role:'user',text:'Tạo một clip mới…'});await append({id:'ch1-result',src:'/choice-one.webm',ref:'u-ch1'});await ready('ch1-result');
+    cs=await page.evaluate(pollTracking,{id:'choice-1'});assert.equal(cs.ready,true,'lượt chọn không phải tin nhắn khác');assert.equal(cs.url,'https://muse.ai/choice-one.webm');assert.equal(cs.choice,undefined);
+    // Any wording: the bubble repeats the label of one of the buttons of a card with several buttons.
+    await reset();await page.evaluate(beginTracking,{id:'choice-2',prompt:'Choice scene two'});await append({id:'u-ch2',role:'user',text:'Choice scene two'});await card('card-2',['Giữ bản cũ','Làm bản khác']);
+    assert.equal((await page.evaluate(pollTracking,{id:'choice-2'})).choice,undefined,'nhãn lạ thì tool không tự bấm');
+    await append({id:'ch2-reply',role:'user',text:'Làm bản khác'});await append({id:'ch2-result',src:'/choice-two.webm',ref:'u-ch2'});await ready('ch2-result');
+    assert.equal((await page.evaluate(pollTracking,{id:'choice-2'})).ready,true);
+    // A lone button is not a question: a bubble repeating it is another message and still blocks the clip behind it.
+    await reset();await page.evaluate(beginTracking,{id:'choice-3',prompt:'Choice scene three'});await append({id:'u-ch3',role:'user',text:'Choice scene three'});await card('card-3',['Tiếp tục']);
+    await append({id:'ch3-reply',role:'user',text:'Tiếp tục'});await append({id:'ch3-result',src:'/choice-three.webm',ref:'u-ch3'});await ready('ch3-result');
+    assert.equal((await page.evaluate(pollTracking,{id:'choice-3'})).ready,false);
+    // A different message after the card is never treated as the answer.
+    await reset();await page.evaluate(beginTracking,{id:'choice-4',prompt:'Choice scene four'});await append({id:'u-ch4',role:'user',text:'Choice scene four'});await card('card-4',['Gửi lại clip vừa tạo','Tạo một clip mới…']);
+    await append({id:'ch4-other',role:'user',text:'Một cảnh hoàn toàn khác'});await append({id:'ch4-result',src:'/choice-four.webm',ref:'u-ch4'});await ready('ch4-result');
+    assert.equal((await page.evaluate(pollTracking,{id:'choice-4'})).ready,false);
+    // The tool answers the card itself: one click on the right button, once per card, and the clip Muse then sends is the result.
+    const wire=(resendOrFresh)=>page.evaluate(which=>{globalThis.__picked=[];for(const b of document.querySelectorAll('#thread button')){b.onclick=()=>{globalThis.__picked.push(b.dataset.label);const u=document.createElement('article');u.id='pick-user';u.dataset.messageRole='user';u.textContent=b.dataset.label;document.getElementById('thread').append(u);const a=document.createElement('article');a.id='pick-result';a.dataset.messageRole='assistant';a.setAttribute('data-response-to','u-ch5');a.innerHTML='<video preload="auto" src="/'+which+'.webm" width=160 height=90></video>';document.getElementById('thread').append(a);};}},resendOrFresh);
+    for(const [pick,label,file] of [['resend','Gửi lại clip vừa tạo','picked-resend'],['fresh','Tạo một clip mới…','picked-fresh']]){
+      await reset();await page.evaluate(beginTracking,{id:'choice-5',prompt:'Choice scene five'});await append({id:'u-ch5',role:'user',text:'Choice scene five'});await card('card-5',['Gửi lại clip vừa tạo','Tạo một clip mới…']);await wire(file);
+      assert.deepEqual((await page.evaluate(pollTracking,{id:'choice-5'})).choice,{answered:false});
+      assert.deepEqual(await page.evaluate(answerChoice,{id:'choice-5',pick}),{answered:true,pick});
+      assert.deepEqual(await page.evaluate(()=>globalThis.__picked),[label],`chỉ bấm đúng nút «${label}», đúng một lần`);
+      await ready('pick-result');cs=await page.evaluate(pollTracking,{id:'choice-5'});assert.equal(cs.ready,true);assert.equal(cs.url,`https://muse.ai/${file}.webm`);
+      assert.deepEqual(await page.evaluate(answerChoice,{id:'choice-5',pick}),{answered:false,reason:'không có câu hỏi'},'câu hỏi đã trả lời thì không bấm lại');
+    }
+    // Never click when it is not a card with both options, when a clip already follows it, or when nothing is tracked.
+    await reset();await page.evaluate(beginTracking,{id:'choice-6',prompt:'Choice scene six'});await append({id:'u-ch6',role:'user',text:'Choice scene six'});await card('card-6',['Gửi lại clip vừa tạo']);
+    await page.evaluate(()=>{globalThis.__stray=0;for(const b of document.querySelectorAll('#thread button'))b.onclick=()=>globalThis.__stray++;});
+    assert.equal((await page.evaluate(answerChoice,{id:'choice-6',pick:'resend'})).answered,false);assert.equal(await page.evaluate(()=>globalThis.__stray),0,'thiếu một lựa chọn thì không bấm gì');
+    await reset();await page.evaluate(beginTracking,{id:'choice-7',prompt:'Choice scene seven'});await card('card-7',['Gửi lại clip vừa tạo','Tạo một clip mới…']);
+    assert.equal((await page.evaluate(answerChoice,{id:'choice-7',pick:'resend'})).answered,false,'chưa thấy tin nhắn của prompt thì không bấm');
+    await append({id:'u-ch7',role:'user',text:'Choice scene seven'});await card('card-7b',['Gửi lại clip vừa tạo','Tạo một clip mới…']);
+    await page.evaluate(()=>{globalThis.__stray=0;for(const b of document.querySelectorAll('#card-7b button'))b.onclick=()=>globalThis.__stray++;});
+    await append({id:'ch7-result',src:'/choice-seven.webm',ref:'u-ch7'});
+    assert.equal((await page.evaluate(answerChoice,{id:'choice-7',pick:'fresh'})).answered,false,'đã có clip sau câu hỏi thì thôi');assert.equal(await page.evaluate(()=>globalThis.__stray),0);
+    await assert.rejects(page.evaluate(answerChoice,{id:'khong-co',pick:'resend'}),/Không có trạng thái theo dõi/);
+    // Muse sends the clip it already made (same address) after the answer: still this prompt's result.
+    await reset();await append({id:'u-cr-old',role:'user',text:'Choice resent scene'});await append({id:'r-cr-old',src:'/choice-resent.webm',ref:'u-cr-old'});await ready('r-cr-old');
+    await page.evaluate(beginTracking,{id:'choice-8',prompt:'Choice resent scene'});await append({id:'u-cr-new',role:'user',text:'Choice resent scene'});await card('card-8',['Gửi lại clip vừa tạo','Tạo một clip mới…']);
+    assert.equal((await page.evaluate(pollTracking,{id:'choice-8'})).ready,false,'clip cũ một mình chưa phải kết quả');
+    await append({id:'cr-reply',role:'user',text:'Gửi lại clip vừa tạo'});await append({id:'r-cr-new',src:'/choice-resent.webm',ref:'u-cr-new'});await ready('r-cr-new');
+    cs=await page.evaluate(pollTracking,{id:'choice-8'});assert.equal(cs.ready,true);assert.equal(cs.url,'https://muse.ai/choice-resent.webm');
     console.log('PASS: real Chromium decoded-video tracker fixture — exact prompt binding, delayed result/progress, old/unrelated/wrong/out-of-order media rejection, ambiguity fail-closed, scoped menu download and unique recovery. No live Muse requests.');
   } finally {if(browser)await browser.close();await fs.rm(dir,{recursive:true,force:true});}
 })().catch(error=>{console.error(error);process.exitCode=1;});
