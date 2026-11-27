@@ -370,6 +370,36 @@ const assert = require('node:assert/strict');
     await page.evaluate(()=>document.getElementById('hu-tmp7').remove());await hatchUser('hu-real7');
     await hatchBot('hb-resent','/hatch-old2.webm');await ready('hb-resent');
     hs=await page.evaluate(pollTracking,{id:'hatch-7'});assert.equal(hs.ready,true);assert.equal(hs.url,'https://muse.ai/hatch-old2.webm');
+    // Muse answers in plain text and no clip will ever follow: "prompt vẫn như cũ" (already made) or "chưa làm được từ khung hình này" (cannot make it
+    // from this frame). The tracker must say so, but never for a normal reply, for the prompt's own words, or for a refusal that sits before this prompt.
+    const hatchText=(id,text)=>page.evaluate(a=>{const row=document.createElement('div');row.className='flex w-full flex-col items-start';row.id=a.id;row.innerHTML='<div class="hatch-chat-groupable-bubble"><p></p></div>';row.querySelector('p').textContent=a.text;document.getElementById('thread').append(row);},{id,text});
+    const HATCH_LONG=HATCH+'\nCHARACTERS (identical in every shot, never change): one student, same prompt as before in every scene. Please send an edited version only if the room changes.';
+    const refusal=async(label,text,expected)=>{
+      await hatchReset();await hatchPrior(1);
+      await page.evaluate(({id,prompt})=>{globalThis.__p=prompt;},{id:'x',prompt:HATCH_LONG});
+      await page.evaluate(beginTracking,{id:'refuse-'+label,prompt:HATCH_LONG});
+      await page.evaluate(a=>{const row=document.createElement('div');row.className='flex w-full flex-col items-end';row.id='hu-ref-'+a.label;row.innerHTML='<div class="hatch-chat-groupable-bubble bg-chat-user-bubble"><p></p></div>';row.querySelector('p').textContent=a.text;document.getElementById('thread').append(row);},{label,text:HATCH_LONG});
+      await page.evaluate(pollTracking,{id:'refuse-'+label});
+      if(text)await hatchText('hb-ref-'+label,text);
+      const r=await page.evaluate(pollTracking,{id:'refuse-'+label});
+      assert.equal(r.ready,false,label);assert.equal(r.refused,expected,label+': '+JSON.stringify({stage:r.stage,refused:r.refused}));
+      return r;
+    };
+    await refusal('vi-repeat','Prompt này vẫn như cũ nên mình chưa tạo được. Bạn gửi bản đã chỉnh lại thì mình làm ngay.','repeat');
+    await refusal('vi-frame','Clip mốc 46 bên trái vẫn chưa làm được từ khung hình này. Bạn gửi một khung hình đầu tiên khác cho mốc này, hoặc mình làm mốc khác trước nhé.','blocked');
+    await refusal('en-repeat',"This prompt is the same as before, so I haven't made it. Send me an edited version and I'll start right away.",'repeat');
+    await refusal('en-frame',"I still can't make the clip from this frame. Please send me a different first frame for this milestone.",'blocked');
+    await refusal('normal-reply','Done — another take of the same clip, starting exactly from your frame.',undefined);
+    await refusal('no-reply',null,undefined);
+    // a refusal followed by a clip is not a refusal: the clip is the result
+    await refusal('then-clip','Prompt này vẫn như cũ nên mình chưa tạo được.','repeat');
+    await hatchBot('hb-after-refusal','/hatch-after-refusal.webm');await ready('hb-after-refusal');
+    hs=await page.evaluate(pollTracking,{id:'refuse-then-clip'});assert.equal(hs.ready,true);assert.equal(hs.refused,undefined);
+    // a refusal that belongs to an earlier send (before this prompt) is not this prompt's answer
+    await hatchReset();await hatchText('hb-old-refusal','Prompt này vẫn như cũ nên mình chưa tạo được. Bạn gửi bản đã chỉnh lại thì mình làm ngay.');
+    await page.evaluate(beginTracking,{id:'refuse-old',prompt:HATCH_LONG});
+    await page.evaluate(a=>{const row=document.createElement('div');row.className='flex w-full flex-col items-end';row.id='hu-ref-old';row.innerHTML='<div class="hatch-chat-groupable-bubble bg-chat-user-bubble"><p></p></div>';row.querySelector('p').textContent=a.text;document.getElementById('thread').append(row);},{text:HATCH_LONG});
+    hs=await page.evaluate(pollTracking,{id:'refuse-old'});assert.equal(hs.echoMatched,true);assert.equal(hs.refused,undefined,'câu từ chối của lượt trước không tính');
     console.log('PASS: real Chromium decoded-video tracker fixture — exact prompt binding, delayed result/progress, old/unrelated/wrong/out-of-order media rejection, ambiguity fail-closed, scoped menu download and unique recovery. No live Muse requests.');
   } finally {if(browser)await browser.close();await fs.rm(dir,{recursive:true,force:true});}
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -4,6 +4,7 @@ const path = require('node:path');
 const { Queue,stoppedError,abortable } = require('./queue.cjs');
 const {saveOrderedOutput}=require('./ordered-output.cjs');
 const {lockInput}=require('./locked-input.cjs');
+const {REPEAT_MESSAGE,isRepeatError,FRAME_MESSAGE,variantPrompt}=require('./repeat-prompt.cjs');
 const {browserStop}=require('./browser-stop.cjs');
 const {prepareBrowserProbe,clearBrowserProbeDraft}=require('./browser-probe.cjs');
 const {chatDiagnostics}=require('./chat-diagnostics.cjs');
@@ -474,7 +475,32 @@ async function runFlowJob(job,worker,signal,{recover=false}={}){
   const output=await flowRunner.run(job,{signal,stage,save:()=>save(),model:settings.flowModel,aspect:job.aspect,projectUrl:settings.flowProjectUrl,timeoutMinutes:settings.timeoutMinutes,store:capture=>storeFlowOutput(job,capture,signal)});
   return output;
 }
-async function runJob(job,worker,signal,{recover=false}={}) {
+// Muse answers a prompt it already made with plain text and never makes a clip. Send the scene again in the same chat with one small
+// variation line (twice at most); still refused → the scene fails and avoids this account, so the retry goes to another one.
+async function runJob(job,worker,signal,options={}) {
+  const {recover=false}=options;
+  const vary=()=>{
+    job.repeatVariants=(job.repeatVariants||0)+1;
+    const text=variantPrompt(job.prompt,job.repeatVariants);
+    job.prompt=text;
+    if(job.lockedInput)job.lockedInput={...job.lockedInput,prompt:text,promptHash:createHash('sha256').update(text).digest('hex')};
+  };
+  for(let tries=0;;tries++){
+    try{return await runJobOnce(job,worker,signal,options);}
+    catch(e){
+      if(signal.aborted||!isRepeatError(e?.message))throw e;
+      vary();
+      if(recover||tries>=2){
+        const failedOn=Number(job.account)||0;
+        if(failedOn&&settings.accountCount>1)job.avoidAccounts=[...new Set([...(job.avoidAccounts||[]),failedOn])];
+        throw Error(REPEAT_MESSAGE+' Tool đã thêm dòng biến thể vào prompt; bấm «Thử lại» để gửi bản mới.');
+      }
+      job.stage='preparing';job.stageMessage=REPEAT_MESSAGE+' Tool gửi lại bản có thêm một dòng biến thể ('+job.repeatVariants+').';notify();
+      try{await save();}catch{}
+    }
+  }
+}
+async function runJobOnce(job,worker,signal,{recover=false}={}) {
   if(job.provider==='flow')return runFlowJob(job,worker,signal,{recover});
   const pinned=recover||Boolean(job.resumeMode);
   const rest=isChained(job)?queue.exhaustedAccounts():[];   // tài khoản đang nghỉ vì hết hạn mức thì bỏ qua (nếu còn tài khoản khác)
@@ -554,7 +580,7 @@ async function runJob(job,worker,signal,{recover=false}={}) {
       catch(e){if(signal.aborted)throw e;if(!transientDOM(e)){job.mayHaveSubmitted=false;await step(save());throw e;}stage('confirming','Muse đang lag · chờ xác nhận, không bấm Gửi lần nữa');}
     }
     const warnAt=Date.now()+settings.timeoutMinutes*60000,image=isPhoto(job);
-    let warned=false,observedEcho=false,choiceClicks=0;
+    let warned=false,observedEcho=false,choiceClicks=0,repeatSeen=0;
     // A picture is saved only after Muse's own "generating" state has ended, so a
     // preview that is replaced by the final render is never stored.
     const stillGenerating=async()=>{
@@ -583,6 +609,9 @@ async function runJob(job,worker,signal,{recover=false}={}) {
           if(answer?.answered){stage('waiting','Muse hỏi gửi lại hay tạo clip mới · tool đã chọn «'+(pick==='fresh'?'Tạo clip mới':'Gửi lại clip vừa tạo')+'»');await step(delay(1500));continue;}
         }catch(e){check();}
       }
+      // Muse said in plain text that no clip is coming: the prompt is one it already made ('repeat'), or it cannot make the clip from this frame ('blocked').
+      // Seen twice in a row (not a half-written reply).
+      if(result.refused&&!result.ready){if(++repeatSeen>=2)throw Error(result.refused==='repeat'?REPEAT_MESSAGE:FRAME_MESSAGE);}else repeatSeen=0;
       let holding=false;
       if(result.ready&&result.echoMatched&&result.responseMatched&&!(holding=await stillGenerating())){
         job.resultReadyAt=new Date().toISOString();job.downloadStartedAt=new Date().toISOString();

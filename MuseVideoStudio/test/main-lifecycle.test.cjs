@@ -663,6 +663,65 @@ test('Muse hỏi «gửi lại clip hay tạo mới»: tool tự trả lời (kh
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });
 
+test('Muse từ chối prompt đã làm («vẫn như cũ»): tool gửi lại bản có dòng biến thể ngay trong chat, rồi tải đúng clip',{timeout:40000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-repeat-refusal-'));let app,last='';const prompts=[];
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',openMuse:async()=>{},show:async()=>{},close:async()=>{},evaluate:async(fn,arg)=>{
+   if(fn.name==='beginTracking'){last=arg.prompt;prompts.push(arg.prompt);return{};}
+   if(fn.name==='submitPrompt')return{clicked:true};
+   if(fn.name==='pollTracking')return /VARIATION 2:/.test(last)?{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null}:{phase:'waiting-response',ready:false,echoMatched:true,responseMatched:false,progress:null,refused:'repeat'};
+   if(fn.name==='downloadAction')return{action:'clicked',clicked:true};return null;
+  },captureDownload:async(target,{trigger})=>{await trigger();await fs.writeFile(target,fixtureMp4());}})});
+  await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Line one of the scene\nLine two of the scene'}]);await app.invoke('start');
+  await until(()=>!app.invoke('state').active,35000);
+  assert.equal(prompts.length,3,'bản gốc + hai bản biến thể');
+  assert.equal(prompts[0],'Line one of the scene\nLine two of the scene');
+  assert.match(prompts[1],/^Line one of the scene\nLine two of the scene\nVARIATION 1: /);
+  assert.match(prompts[2],/^Line one of the scene\nLine two of the scene\nVARIATION 2: /);assert.equal(prompts[2].match(/VARIATION/g).length,1,'dòng biến thể cũ được thay, không chồng lên nhau');
+  assert.equal(app.invoke('state').jobs[0].status,'completed');
+  assert.ok(app.updates.some(rows=>rows.some(j=>/giống lần gửi trước/.test(j.stageMessage||'')&&/biến thể/.test(j.stageMessage||''))),'cảnh nói rõ vì sao gửi lại');
+  await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
+test('Muse vẫn từ chối sau hai bản biến thể: cảnh báo lỗi rõ ràng, không chờ mãi, prompt giữ bản biến thể mới để thử lại',{timeout:50000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-repeat-refusal-fail-'));let app,sent=0;
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',openMuse:async()=>{},show:async()=>{},close:async()=>{},evaluate:async(fn,arg)=>{
+   if(fn.name==='submitPrompt'){sent++;return{clicked:true};}
+   if(fn.name==='pollTracking')return{phase:'waiting-response',ready:false,echoMatched:true,responseMatched:false,progress:null,refused:'repeat'};
+   return null;
+  }})});
+  await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Scene that Muse keeps refusing'}]);await app.invoke('start');
+  await until(()=>!app.invoke('state').active,45000);
+  const job=app.invoke('state').jobs[0];
+  assert.equal(sent,3,'ba lần gửi rồi dừng, không gửi vô hạn');assert.equal(job.status,'failed');assert.match(job.error,/giống lần gửi trước/);assert.match(job.error,/Thử lại/);
+  assert.match(job.prompt,/VARIATION 3: /);assert.equal(job.prompt.match(/VARIATION/g).length,1);
+  await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
+test('Muse không làm được clip từ khung hình này: cảnh báo lỗi (kiểu bị chặn nội dung) thay vì chờ mãi, không gửi lại y nguyên prompt bị từ chối',{timeout:30000},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-frame-refusal-'));let app,last='';const prompts=[];
+ try{
+  await fs.writeFile(path.join(dir,'studio.json'),JSON.stringify({configVersion:2,settings:{output:dir,accountCount:1,cooldownSeconds:0}}));
+  app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',openMuse:async()=>{},show:async()=>{},close:async()=>{},evaluate:async(fn,arg)=>{
+   if(fn.name==='beginTracking'){last=arg.prompt;prompts.push(arg.prompt);return{};}
+   if(fn.name==='submitPrompt')return{clicked:true};
+   if(fn.name==='pollTracking')return /Refused frame/.test(last)?{phase:'waiting-response',ready:false,echoMatched:true,responseMatched:false,progress:null,refused:'blocked'}:{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null};
+   if(fn.name==='downloadAction')return{action:'clicked',clicked:true};return null;
+  },captureDownload:async(target,{trigger})=>{await trigger();await fs.writeFile(target,fixtureMp4());}})});
+  await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Refused frame scene'},{prompt:'Normal scene'}]);await app.invoke('start');
+  await until(()=>!app.invoke('state').active,25000);
+  const jobs=app.invoke('state').jobs;
+  assert.equal(prompts.filter(p=>/Refused frame/.test(p)).length,1,'không gửi lại y nguyên prompt bị từ chối');
+  assert.equal(jobs[0].status,'failed');assert.match(jobs[0].error,/từ chối làm clip từ khung hình này/);assert.match(jobs[0].error,/khung hình đầu tiên khác/);
+  await app.stop();
+ }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
+});
+
 test('Continue resends an uncertain original attempt; transfer retries do not send it again',{timeout:30000},async()=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'muse-retry-transfer-'));let app,recovering=false,sent=0,downloads=0;const attempts=[];
  try{

@@ -142,6 +142,15 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.15.9
+
+- **Sửa lỗi cảnh treo mãi khi Muse từ chối bằng chữ.** Hai kiểu trả lời Muse đưa ra mà không có clip, và tool trước đây coi là «đang chờ video» nên đứng im vô hạn, không thử lại, không đổi tài khoản:
+  - «Prompt này vẫn như cũ nên mình chưa tạo được. Bạn gửi bản đã chỉnh lại…» (cảnh đã gửi cùng prompt trước đó). Giờ tool nhận ra, tự gửi lại prompt có thêm MỘT dòng `VARIATION n:` (giữ nguyên cảnh, nhân vật, khung hình; chỉ khác chi tiết nhỏ), tối đa hai lần trong cùng chat. Vẫn bị từ chối thì cảnh báo lỗi «Muse chưa tạo clip vì prompt giống lần gửi trước», prompt giữ dòng biến thể mới và cảnh tránh tài khoản này để lần thử lại đi tài khoản khác.
+  - «Clip mốc 46 bên trái vẫn chưa làm được từ khung hình này. Bạn gửi một khung hình đầu tiên khác… hoặc mình làm mốc khác trước». Giờ cảnh báo lỗi «Muse từ chối làm clip từ khung hình này»; Dọn nhà, Động vật hoang dã và So sánh song song xử lý như khi Muse chặn nội dung: tự viết prompt nhẹ hơn và thử lại ở tài khoản khác (tối đa 3 lần).
+  - Chỉ coi là từ chối khi câu đó nằm SAU prompt của cảnh, ngắn, không có clip theo sau và thấy hai lần liên tiếp; câu từ chối của lượt trước, lời trong chính prompt hay câu trả lời bình thường («Done — another take…») không bị nhầm.
+- Test mới: `repeat-prompt.test`, ba bài trong `main-lifecycle` (gửi lại biến thể rồi tải clip; vẫn bị từ chối thì dừng sau 3 lần gửi; từ chối khung hình), `muse-tracker-smoke` (tiếng Việt và tiếng Anh, câu bình thường, câu của lượt trước, từ chối rồi có clip).
+- **Chưa kiểm được trên Windows, Electron và Muse thật.** Câu nhận diện lấy từ hai ảnh chụp bạn gửi (tiếng Việt) cộng vài cách nói tiếng Anh; nếu Muse đổi cách nói, tool vẫn chờ như cũ và «Xuất thông tin lỗi chat» ghi lại để bổ sung. Từ chối do khung hình thì tool chỉ đổi prompt và tài khoản; nếu khung hình đầu của mốc bị chặn thật thì cần tạo lại ảnh nền của mốc đó.
+
 ## Update 1.15.8
 
 - **Sửa lỗi Muse đã làm xong clip nhưng tool không tải về (cảnh đứng ở «waiting»).** Khi trong chat Muse đã có sẵn một hay nhiều tin nhắn giống hệt prompt của cảnh (do bấm Tạo lại / Tiếp tục gửi lại prompt) và Muse dựng lại tin nhắn vừa gửi thành một phần tử mới, tool không biết bản nào là của cảnh đang chờ nên đứng ở «Muse đang dựng lại tin nhắn · chờ khôi phục đúng cảnh gốc» và bỏ qua clip. Giờ tool đếm số bản giống prompt lúc gửi: đúng một bản nhiều hơn thì bản mới nhất là bản vừa gửi, clip sau nó được nhận (kể cả khi Muse gửi lại đúng clip cũ). Nếu có từ hai bản mới trở lên thì vẫn dừng, không đoán. Phản hồi muộn của một bản cũ không bao giờ bị nhận nhầm.
