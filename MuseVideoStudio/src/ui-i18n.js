@@ -1034,6 +1034,19 @@ Nhãn bên trái (không bắt buộc)|Left label (optional)
 Nhãn bên phải (không bắt buộc)|Right label (optional)
 Ví dụ: RAISED WITH YELLING|For example: RAISED WITH YELLING
 Ví dụ: RAISED WITH LISTENING|For example: RAISED WITH LISTENING
+Chế độ video|Video mode
+Cuộc sống: cùng một nhân vật, hai con đường (gói Năm / Vĩnh viễn)|Daily life: one character, two paths (Year / Lifetime plan)
+Khí tài đối đầu: hai khí tài, so sánh thông số (cần key đã mua, từ gói 30 ngày)|Military gear face-off: two machines, specs compared (purchased key required, 30-day plan or above)
+Cần key đã mua|Purchased key required
+Bản dùng thử 24 giờ không dùng được tab này. Mua key rồi nhập: chế độ «Khí tài đối đầu» dùng được từ gói 30 ngày; chế độ «Cuộc sống» cần gói Năm hoặc Vĩnh viễn.|The 24-hour trial cannot use this tab. Buy a key and enter it: the “Military gear face-off” mode works from the 30-day plan; the “Daily life” mode needs the Year or Lifetime plan.
+Khí tài đối đầu: màn hình chia đôi, mỗi mốc so sánh MỘT hạng mục (tốc độ, tầm, hỏa lực, giáp, tàng hình, giá…) giữa hai khí tài (máy bay, xe tăng, tàu, phòng không, UAV). Muse viết kịch bản từ thông tin công khai, tạo ảnh nền có cả hai khí tài đứng cạnh nhau rồi hai clip trình diễn (không cảnh chiến sự); tool thêm chữ, thanh điểm 0–100, giọng đọc và âm thanh rồi dựng video. Điểm chỉ là ước lượng minh họa; hãy kiểm tra lại thông số với nguồn chính thức trước khi đăng. Để trống thì Muse tự chọn cặp khí tài.|Military gear face-off: split screen, and each beat compares ONE category (speed, range, firepower, armour, stealth, price…) between two machines (aircraft, tanks, ships, air defence, UAVs). Muse writes the script from public information, makes a background image with both machines side by side, then two showcase clips (no combat scenes); the tool adds text, a 0–100 score bar, narration and sound, then assembles the video. Scores are only illustrative estimates; check the specs against official sources before publishing. Leave the topic empty and Muse picks the pair.
+Ví dụ: F-35|For example: F-35
+Ví dụ: SU-57|For example: SU-57
+Để trống: Muse tự chọn cặp khí tài. Hoặc gõ (ví dụ «F-35 và Su-57»), hoặc bấm một cặp gợi ý bên dưới|Leave empty: Muse picks a pair of machines. Or type one (for example “F-35 and Su-57”), or click a suggested pair below
+Muse tự chọn cặp khí tài và làm video|Let Muse choose the pair of machines and make the video
+Gói của bạn dùng được chế độ «Khí tài đối đầu». Chế độ «Cuộc sống» cần gói Năm hoặc Vĩnh viễn.|Your plan can use the “Military gear face-off” mode. The “Daily life” mode needs the Year or Lifetime plan.
+Cặp khí tài gợi ý (bấm để chọn; tên hai bên điền sẵn). Để trống thì Muse tự chọn một cặp đáng so sánh:|Suggested pairs (click to choose; both names are filled in). Leave empty and Muse picks a pair worth comparing:
+Chế độ «Khí tài đối đầu» chỉ dùng được khi đã mua key (gói 30 ngày trở lên). Bản dùng thử 24 giờ không dùng được chế độ này. Liên hệ chủ phần mềm để mua gói rồi nhập key.|The “Military gear face-off” mode needs a purchased key (30-day plan or above). The 24-hour trial cannot use this mode. Contact the software owner to buy a plan, then enter the key.
 Ngôn ngữ video (lời đọc, chữ, giọng)|Video language (narration, text, voice)
 Tiếng Việt|Vietnamese
 Khung hình|Frame layout

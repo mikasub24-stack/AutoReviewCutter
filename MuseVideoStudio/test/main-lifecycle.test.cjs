@@ -102,7 +102,7 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
     require: name => {
       if(name === 'electron') return electron;
       if(name==='./license.cjs' && licenseGate){const real=localRequire(name);return{...real,createLicense:async options=>{const manager=await real.createLicense(options),ensure=manager.ensureAllowed;manager.ensureAllowed=async()=>{licenseGate.entered();await licenseGate.wait;return ensure();};return manager;}};}
-      if(name==='./license.cjs' && longTerm){const real=localRequire(name);return{...real,createLicense:async options=>{const manager=await real.createLicense(options);manager.requireLongTerm=async()=>manager.ensureAllowed();return manager;}};}
+      if(name==='./license.cjs' && longTerm){const real=localRequire(name);return{...real,createLicense:async options=>{const manager=await real.createLicense(options);manager.requireLongTerm=async()=>manager.ensureAllowed();manager.requirePaid=async()=>manager.ensureAllowed();return manager;}};}
       if(name==='./wild-write.cjs' && wildWriterFactory)return{createWildWriter:wildWriterFactory};
       if(name==='./pair-write.cjs' && pairWriterFactory)return{createPairWriter:pairWriterFactory};
       if(name==='./pair-hud-window.cjs' && pairHudFactory)return{createWindowHud:pairHudFactory};

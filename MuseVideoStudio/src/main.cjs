@@ -36,6 +36,9 @@ const pairFolder=(output,id)=>path.join(output,'SoSanh',String(id||'Phim').repla
 // Tên file gợi ý khi «Lưu thumbnail…»: đúng tên video (tiêu đề đăng nếu có, nếu không thì tên video) + « - thumbnail.jpg», giống nút «Lưu video…».
 const thumbSaveName=meta=>(String((meta&&(meta.publish?.title||meta.name))||'video').replace(/[\\/:*?"<>|\x00-\x1f]+/g,' ').replace(/\s+/g,' ').trim().slice(0,100)||'video')+' - thumbnail.jpg';
 const isChained=job=>job.kind==='restore'||job.kind==='wild'||job.kind==='pair';
+// Chế độ «Khí tài đối đầu» của tab So sánh song song: cần key đã mua (30 ngày trở lên); các chế độ/tab dài hạn khác vẫn cần gói Năm hoặc Vĩnh viễn.
+const chainGate=(license,job)=>job&&job.kind==='pair'&&job.mode==='gear'?license.requirePaid():license.requireLongTerm();
+const pairGate=(license,mode)=>mode==='gear'?license.requirePaid():license.requireLongTerm();
 const chainFolder=job=>job.kind==='wild'?wildFolder(settings.output,job.storyId):job.kind==='pair'?pairFolder(settings.output,job.storyId):restoreFolder(settings.output,job.storyId);
 const {createStoryAnalyzer}=require('./story-analyze.cjs');
 const mapPlan=require('./maphist-plan.js');
@@ -519,7 +522,7 @@ async function runJobOnce(job,worker,signal,{recover=false}={}) {
   check();job.account=slot+1;assertMuse(muse);muse.pinPage?.(job.id);
   const profileKey=accountProfileKey(slot),currentSession=sessionId(profileKey);
   if(recover&&((job.submissionProfileKey&&job.submissionProfileKey!==profileKey)||(job.submissionSessionId&&job.submissionSessionId!==currentSession)))throw Error('Mở lại đúng trình duyệt và phiên tài khoản đã gửi prompt.');
-  if(!recover)await step(isChained(job)?licenseManager.requireLongTerm():licenseManager.ensureAllowed());
+  if(!recover)await step(isChained(job)?chainGate(licenseManager,job):licenseManager.ensureAllowed());
   if(!settings.output)throw Error('Chọn thư mục lưu video trước.');
   const stage=(value,message)=>{check();job.stage=value;job.stageMessage=message;notify();};
   const input=recover?(job.lockedInput||{prompt:job.prompt,references:[]}):await step(lockInput(job,path.join(app.getPath('userData'),'locked-references')));
@@ -1072,7 +1075,7 @@ function pairTaken(except){
   for(const m of Object.values(settings.pairStories||{}))if(m!==except){add(m.topic);add(m.name||m.title);}
   return out;
 }
-const pairInput=meta=>({topic:meta.topic,left:meta.left,right:meta.right,minutes:meta.minutes,lang:meta.lang,layout:meta.layout,
+const pairInput=meta=>({mode:meta.mode==='gear'?'gear':'life',topic:meta.topic,left:meta.left,right:meta.right,minutes:meta.minutes,lang:meta.lang,layout:meta.layout,
   avoid:pairTaken(meta).filter(n=>pairSig(n)!==pairSig(meta.topic)).slice(-PAIR_AVOID_MAX)});
 async function writePairNotes(storyId,meta,draft){
   if(!draft?.script)return;
@@ -1082,7 +1085,7 @@ async function writePairNotes(storyId,meta,draft){
 // Gói đăng YouTube (tiêu đề, mô tả có chương, hashtag, thẻ tag) lập từ kịch bản đã lưu; ghi thêm file tieu-de-youtube.txt cạnh video. Không cần Muse, không cần mạng.
 async function makePairPublish(storyId,meta,script,{force=false}={}){
   if(meta.publish?.title&&!force)return meta.publish;
-  meta.publish=pairPlan.publishPack(script,{lang:meta.lang,layout:meta.layout,timeline:meta.timeline,outroStart:meta.outroStart,seconds:meta.seconds});
+  meta.publish=pairPlan.publishPack(script,{mode:meta.mode,lang:meta.lang,layout:meta.layout,timeline:meta.timeline,outroStart:meta.outroStart,seconds:meta.seconds});
   meta.publishFile=path.join(pairFolder(settings.output,storyId),'tieu-de-youtube.txt');
   await fs.mkdir(path.dirname(meta.publishFile),{recursive:true}).then(()=>fs.writeFile(meta.publishFile,meta.publish.text,'utf8')).catch(()=>{meta.publishFile='';});
   return meta.publish;
@@ -1105,7 +1108,7 @@ async function recoverPairStories(){
       if(found[0]){output=found[0].file;const jpg=output.replace(/\.mp4$/i,'.jpg');if(await fs.stat(jpg).then(x=>x.isFile(),()=>false))cover=jpg;}
     }catch{}
     const cfg=draft.config||{};
-    all[storyId]={topic:'',left:script.left,right:script.right,minutes:Number(cfg.minutes)||Math.max(1,Math.round(script.beats.length*8/60)),lang:cfg.lang||'en',layout:cfg.layout==='stack'?'stack':'side',voice:{engine:'none',voice:'',tempo:1,volume:1},music:'',musicVolume:.14,ambience:.45,auto:false,status:output?'built':'queued',
+    all[storyId]={mode:script.mode==='gear'||cfg.mode==='gear'?'gear':'life',topic:'',left:script.left,right:script.right,minutes:Number(cfg.minutes)||Math.max(1,Math.round(script.beats.length*8/60)),lang:cfg.lang||'en',layout:cfg.layout==='stack'?'stack':'side',voice:{engine:'none',voice:'',tempo:1,volume:1},music:'',musicVolume:.14,ambience:.45,auto:false,status:output?'built':'queued',
       name:script.title,title:script.title,meter:script.meter,beatCount:script.beats.length,createdAt:Date.now(),...(output?{output,cover,builtAt:Date.now()}:{})};
     changed=true;
   }
@@ -1129,7 +1132,7 @@ async function buildPairStory(storyId){
   pairState={busy:true,phase:'build',progress:'Đang đóng trình duyệt để nhường RAM…',error:'',storyId};meta.status='building';notify();
   pairController=new AbortController();
   try{
-    await licenseManager.requireLongTerm();
+    await pairGate(licenseManager,meta.mode);
     await closeAllBrowsers().catch(()=>{});
     const v=meta.voice||{};
     // Video luôn có giọng đọc: không chọn thì dùng giọng mặc định của ngôn ngữ video; chưa cài giọng thì báo rõ, không dựng video câm.
@@ -1173,7 +1176,7 @@ async function runPair(storyId){
     result.script.title=pairPlan.uniqueTitle(result.script,pairTaken(meta))||result.script.title;
     rememberPair(meta.topic,result.script.title);
     const jobs=pairPlan.buildJobs(result.config,result.script,{storyId});
-    await savePairDraft(storyId,{bible:result.bible,beats:result.script.beats,script:result.script,final:true,config:{lang:result.config.lang,layout:result.config.layout,minutes:result.config.minutes}});
+    await savePairDraft(storyId,{bible:result.bible,beats:result.script.beats,script:result.script,final:true,config:{lang:result.config.lang,layout:result.config.layout,minutes:result.config.minutes,mode:result.config.mode}});
     if(!queue.jobs.some(j=>j.kind==='pair'&&j.storyId===storyId))await queue.add(jobs);
     Object.assign(meta,{name:result.script.title,title:result.script.title,left:result.script.left,right:result.script.right,meter:result.script.meter,status:'queued',beatCount:result.script.beats.length});
     await save();
@@ -1391,7 +1394,7 @@ app.whenReady().then(async () => {
       const picked=await dialog.showOpenDialog(main,{title:ui('Chọn video của cảnh này (MP4 hoặc WebM)','Choose the video for this scene (MP4 or WebM)'),properties:['openFile'],filters:[{name:ui('Video MP4 / WebM','MP4 / WebM video'),extensions:['mp4','webm']}]});
       if(picked.canceled||!picked.filePaths?.[0])return snapshot();
       let job=find();
-      if(isChained(job))await licenseManager.requireLongTerm();
+      if(isChained(job))await chainGate(licenseManager,job);
       const outputDir=jobFolder(job);
       await fs.mkdir(outputDir,{recursive:true});
       const temporary=path.join(outputDir,`.muse-${job.id}-${randomUUID().slice(0,8)}.part`);
@@ -1494,7 +1497,7 @@ app.whenReady().then(async () => {
       try {
         if(testing){probeController?.abort();await Promise.allSettled([...probeMutations]);await probeSettled;}
         if(epoch!==runEpoch || flushingQuit)return snapshot();
-        if(kind==='restore'||kind==='wild'||kind==='pair'){await licenseManager.requireLongTerm();await checkTools(settings.ffmpeg).catch(()=>{throw Error((kind==='wild'?'Tab «Động vật hoang dã»':kind==='pair'?'Tab «So sánh song song»':'Tab «Dọn nhà · Sinh tồn»')+' cần FFmpeg để nối cảnh và dựng video. Chọn ffmpeg.exe (cùng thư mục ffprobe.exe) ở «Kết nối & cài đặt».');});}
+        if(kind==='restore'||kind==='wild'||kind==='pair'){{const open=queue.jobs.filter(j=>j.kind===kind&&!['done','completed'].includes(j.status));await pairGate(licenseManager,kind==='pair'&&open.length&&open.every(j=>j.mode==='gear')?'gear':'life');}await checkTools(settings.ffmpeg).catch(()=>{throw Error((kind==='wild'?'Tab «Động vật hoang dã»':kind==='pair'?'Tab «So sánh song song»':'Tab «Dọn nhà · Sinh tồn»')+' cần FFmpeg để nối cảnh và dựng video. Chọn ffmpeg.exe (cùng thư mục ffprobe.exe) ở «Kết nối & cài đặt».');});}
         else await licenseManager.ensureAllowed();
         if(epoch!==runEpoch || flushingQuit)return snapshot();
         const pendingRestore=kind==='restore'?queue.jobs.filter(j=>j.kind==='restore'&&j.status!=='completed'):[];
@@ -1862,7 +1865,7 @@ app.whenReady().then(async () => {
       if(merging||packaging)throw Error('Chờ xử lý đầu ra xong trước khi làm video mới.');
       if(pairState.busy||pairWriter?.busy)throw Error('Đang làm video, chờ xong hoặc bấm Dừng.');
       if(queue.active||starting)throw Error('Hàng đợi đang chạy. Dừng hàng đợi trước khi làm video mới.');
-      await licenseManager.requireLongTerm();
+      await pairGate(licenseManager,(data?.resumeId&&settings.pairStories?.[String(data.resumeId)]?.mode)||data?.mode);
       if(!settings.output)throw Error('Chọn thư mục lưu video trước.');
       await checkTools(settings.ffmpeg).catch(()=>{throw Error('Tab «So sánh song song» cần FFmpeg để ghép video. Chọn ffmpeg.exe (cùng thư mục ffprobe.exe) ở «Kết nối & cài đặt».');});
       const all=settings.pairStories||(settings.pairStories={});
@@ -1884,7 +1887,7 @@ app.whenReady().then(async () => {
         const ready=voiceService?.status()?.ready||{};
         if(!ready.edge)throw Error('Chưa cài giọng Microsoft (miễn phí). Bấm «Cài giọng miễn phí» ở mục Giọng đọc, đợi cài xong rồi làm video.');
         storyId=await freeStoryId(pairPlan.storyIdBase(config),{output:settings.output,jobs:queue.jobs,folderOf:pairFolder,fallback:'SS-phim'});
-        meta=all[storyId]={topic:config.topic,left:config.left,right:config.right,minutes:config.minutes,lang:config.lang,layout:config.layout,voice,music,musicVolume:data?.musicVolume!=null&&Number.isFinite(Number(data.musicVolume))?Math.min(.6,Math.max(0,Number(data.musicVolume))):.14,ambience:.45,auto:true,status:'writing',name:config.topic||'',createdAt:Date.now()};
+        meta=all[storyId]={mode:config.mode,topic:config.topic,left:config.left,right:config.right,minutes:config.minutes,lang:config.lang,layout:config.layout,voice,music,musicVolume:data?.musicVolume!=null&&Number.isFinite(Number(data.musicVolume))?Math.min(.6,Math.max(0,Number(data.musicVolume))):.14,ambience:.45,auto:true,status:'writing',name:config.topic||'',createdAt:Date.now()};
         for(const id of Object.keys(all).slice(0,Math.max(0,Object.keys(all).length-40)))delete all[id];
       }
       await fs.mkdir(pairFolder(settings.output,storyId),{recursive:true});
@@ -1925,7 +1928,7 @@ app.whenReady().then(async () => {
       if(!pairDone(clips))throw Error(ui('Chỉ tạo thumbnail khi mọi clip đã xong.','Create the thumbnail once every clip is done.'));
       const draft=await readPairDraft(storyId);
       if(!draft?.script)throw Error(ui('Không thấy kịch bản đã lưu của video này.','The saved script of this video was not found.'));
-      await licenseManager.requireLongTerm();
+      await pairGate(licenseManager,meta.mode);
       pairState={busy:true,phase:'thumb',progress:ui('Đang tạo thumbnail…','Creating the thumbnail…'),error:'',storyId};notify();
       try{
         const r=await makePairThumbnail({script:draft.script,config:{lang:meta.lang},clips:pairBeatClips(clips),hud:pairHud,dir:pairFolder(settings.output,storyId),variant:Number(meta.thumbVariant)||0,ffmpeg:settings.ffmpeg||'ffmpeg'});

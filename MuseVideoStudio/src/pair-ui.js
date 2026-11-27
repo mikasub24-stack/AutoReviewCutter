@@ -26,7 +26,10 @@
 
   const lang = () => ($('pairLang') && P.LANGUAGES.some(l => l.id === $('pairLang').value)) ? $('pairLang').value : 'en';
   const tempo = () => Math.min(1.3, Math.max(0.8, Number($('pairTempo').value) || 1));
-  const config = () => P.options({ topic: $('pairTopic').value, left: $('pairLeft').value, right: $('pairRight').value, minutes: $('pairMinutes').value, lang: lang(), layout: $('pairLayout').value });
+  const mode = () => ($('pairMode') && $('pairMode').value === 'gear') ? 'gear' : 'life';
+  const topicsOf = m => m === 'gear' ? P.GEAR_TOPICS : P.TOPICS;
+  const presetFor = (m, id, l) => (m === 'gear' ? P.gearPreset : P.topicPreset)(id, l);
+  const config = () => P.options({ mode: mode(), topic: $('pairTopic').value, left: $('pairLeft').value, right: $('pairRight').value, minutes: $('pairMinutes').value, lang: lang(), layout: $('pairLayout').value });
 
   // ---- ô chọn tĩnh
   function fillSelects() {
@@ -35,21 +38,22 @@
     $('pairMinutes').value = P.MINUTES.includes(Number(saved.minutes)) ? String(saved.minutes) : '9';
     $('pairLang').value = P.LANGUAGES.some(l => l.id === saved.lang) ? saved.lang : 'en';
     $('pairLayout').value = P.LAYOUTS.includes(saved.layout) ? saved.layout : 'side';
+    $('pairMode').value = saved.mode === 'gear' ? 'gear' : 'life';
   }
   function renderCount() {
     const c = config();
     $('pairCount').textContent = `Video khoảng ${c.minutes} phút = ${c.beats} mốc → ${c.beats} ảnh nền chung + ${c.clips} clip (mỗi clip ${c.seconds} giây, hai clip mỗi mốc). Tạo ảnh và clip trên Muse mất nhiều giờ: cứ để máy chạy, tool tự thử lại clip lỗi và tự dựng video khi đủ clip.`;
-    $('pairCreate').textContent = c.topic ? 'Làm video tự động' : 'Muse tự chọn chủ đề và làm video';
+    $('pairCreate').textContent = c.topic ? 'Làm video tự động' : mode() === 'gear' ? 'Muse tự chọn cặp khí tài và làm video' : 'Muse tự chọn chủ đề và làm video';
   }
 
   // ---- chủ đề gợi ý
-  const topicText = (preset, id) => (P.topicPreset(preset.id, id) || {}).topic || '';
-  function presetOf(text) {
+  const topicText = (preset, id) => (presetFor(mode(), preset.id, id) || {}).topic || '';
+  function presetOf(text, m = mode()) {
     const t = String(text || '').trim();
-    return t ? P.TOPICS.find(x => P.topicPreset(x.id, 'en').topic === t || P.topicPreset(x.id, 'vi').topic === t) : null;
+    return t ? topicsOf(m).find(x => presetFor(m, x.id, 'en').topic === t || presetFor(m, x.id, 'vi').topic === t) : null;
   }
   function applyPreset(preset, id) {
-    const p = P.topicPreset(preset.id, id);
+    const p = presetFor(mode(), preset.id, id);
     $('pairTopic').value = p.topic; $('pairLeft').value = p.left; $('pairRight').value = p.right;
     remember(); renderTopics(); renderCount();
   }
@@ -58,8 +62,8 @@
     const chips = [];
     const auto = button('🎲 Để Muse tự chọn', 'topicChip' + (!$('pairTopic').value.trim() ? ' active' : ''), () => { $('pairTopic').value = ''; $('pairLeft').value = ''; $('pairRight').value = ''; remember(); renderTopics(); renderCount(); });
     chips.push(auto);
-    for (const t of P.TOPICS) { const b = button(topicText(t, lang()), 'topicChip' + (cur && cur.id === t.id ? ' active' : ''), () => applyPreset(t, lang())); b.dataset.topic = t.id; chips.push(b); }
-    box.replaceChildren(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'Chủ đề gợi ý (bấm để chọn). Nhãn hai bên điền sẵn nếu có; để trống thì Muse tự viết đúng ngôn ngữ video:' }), ...chips);
+    for (const t of topicsOf(mode())) { const b = button(topicText(t, lang()), 'topicChip' + (cur && cur.id === t.id ? ' active' : ''), () => applyPreset(t, lang())); b.dataset.topic = t.id; chips.push(b); }
+    box.replaceChildren(Object.assign(document.createElement('span'), { className: 'hint', textContent: mode() === 'gear' ? 'Cặp khí tài gợi ý (bấm để chọn; tên hai bên điền sẵn). Để trống thì Muse tự chọn một cặp đáng so sánh:' : 'Chủ đề gợi ý (bấm để chọn). Nhãn hai bên điền sẵn nếu có; để trống thì Muse tự viết đúng ngôn ngữ video:' }), ...chips);
   }
 
   // ---- giọng đọc (giọng Microsoft miễn phí, cùng bộ làm giọng dùng chung của Muse Studio)
@@ -99,7 +103,7 @@
     const c = config();
     $('pairCreate').disabled = true;
     try {
-      const fresh = await call('pairMake', { topic: c.topic, left: c.left, right: c.right, minutes: c.minutes, lang: c.lang, layout: c.layout, voice: { voice: $('pairVoice').value, tempo: tempo(), volume: Number($('pairVoiceVol').value) }, music, musicVolume: Number($('pairMusicVol').value) });
+      const fresh = await call('pairMake', { mode: c.mode, topic: c.topic, left: c.left, right: c.right, minutes: c.minutes, lang: c.lang, layout: c.layout, voice: { voice: $('pairVoice').value, tempo: tempo(), volume: Number($('pairVoiceVol').value) }, music, musicVolume: Number($('pairMusicVol').value) });
       if (fresh) { $('pairForm').open = false; toast(c.topic ? 'Muse đang viết kịch bản. Các bước sau tự chạy, bạn không cần bấm gì thêm.' : 'Muse đang chọn chủ đề và viết kịch bản. Các bước sau tự chạy, bạn không cần bấm gì thêm.'); runsKey = ''; const state = await call('state'); if (state) render(state); }
     } finally { $('pairCreate').disabled = Boolean(lastState && createBlocked(lastState)); }
   }
@@ -285,9 +289,15 @@
 
   // ---- khóa theo gói
   function renderLock(s) {
-    const ok = Boolean(s.license && s.license.longTerm);
+    const lic = s.license || {}, longTerm = Boolean(lic.longTerm), paid = Boolean(lic.paid);
+    const ok = longTerm || paid;           // chế độ «Cuộc sống» cần gói Năm / Vĩnh viễn; «Khí tài đối đầu» chỉ cần key đã mua (từ gói 30 ngày)
     $('pairLock').hidden = ok; $('pairBody').hidden = !ok;
-    $('pairLockText').textContent = 'Bản dùng thử và gói 30 ngày không dùng được tab này. Nâng cấp lên gói Năm hoặc Vĩnh viễn rồi nhập key mới.';
+    $('pairLockText').textContent = 'Bản dùng thử 24 giờ không dùng được tab này. Mua key rồi nhập: chế độ «Khí tài đối đầu» dùng được từ gói 30 ngày; chế độ «Cuộc sống» cần gói Năm hoặc Vĩnh viễn.';
+    const life = $('pairMode') && [...$('pairMode').options].find(o => o.value === 'life');
+    if (life) life.disabled = ok && !longTerm;
+    if (ok && !longTerm && mode() === 'life') { $('pairMode').value = 'gear'; modeChanged(); }
+    const hint = $('pairModeHint');
+    if (hint) { hint.hidden = !(ok && !longTerm); hint.textContent = 'Gói của bạn dùng được chế độ «Khí tài đối đầu». Chế độ «Cuộc sống» cần gói Năm hoặc Vĩnh viễn.'; }
   }
   const createBlocked = s => Boolean(((s && s.pair) || {}).busy || (s && (s.active || s.starting || s.merging || s.packaging)));
   function render(s) {
@@ -299,6 +309,17 @@
     }
   }
 
+  // Đổi chế độ: chủ đề / nhãn đang là bản gợi ý của chế độ cũ thì xóa (chủ đề tự gõ giữ nguyên), đổi gợi ý và chữ mẫu.
+  function modeChanged() {
+    const other = mode() === 'gear' ? 'life' : 'gear', t = $('pairTopic').value;
+    if (presetOf(t, other)) { $('pairTopic').value = ''; $('pairLeft').value = ''; $('pairRight').value = ''; }
+    const gear = mode() === 'gear', intro = $('pairIntro');
+    if (intro) { if (!intro.dataset.life) intro.dataset.life = intro.textContent; intro.textContent = gear ? 'Khí tài đối đầu: màn hình chia đôi, mỗi mốc so sánh MỘT hạng mục (tốc độ, tầm, hỏa lực, giáp, tàng hình, giá…) giữa hai khí tài (máy bay, xe tăng, tàu, phòng không, UAV). Muse viết kịch bản từ thông tin công khai, tạo ảnh nền có cả hai khí tài đứng cạnh nhau rồi hai clip trình diễn (không cảnh chiến sự); tool thêm chữ, thanh điểm 0–100, giọng đọc và âm thanh rồi dựng video. Điểm chỉ là ước lượng minh họa; hãy kiểm tra lại thông số với nguồn chính thức trước khi đăng. Để trống thì Muse tự chọn cặp khí tài.' : intro.dataset.life; }
+    $('pairLeft').placeholder = gear ? 'Ví dụ: F-35' : 'Ví dụ: RAISED WITH YELLING'; $('pairRight').placeholder = gear ? 'Ví dụ: SU-57' : 'Ví dụ: RAISED WITH LISTENING';
+    $('pairTopic').placeholder = gear ? 'Để trống: Muse tự chọn cặp khí tài. Hoặc gõ (ví dụ «F-35 và Su-57»), hoặc bấm một cặp gợi ý bên dưới' : 'Để trống: Muse tự chọn. Hoặc gõ, hoặc bấm một chủ đề gợi ý bên dưới';
+    remember(); renderTopics(); renderCount();
+  }
+
   // ---- khởi tạo
   fillSelects();
   $('pairTopic').value = saved.topic || ''; $('pairLeft').value = saved.left || ''; $('pairRight').value = saved.right || '';
@@ -307,8 +328,9 @@
   $('pairVoiceVol').value = String(saved.voiceVol == null ? 1 : saved.voiceVol);
   const showVolumes = () => { $('pairVoiceVolOut').textContent = Math.round(Number($('pairVoiceVol').value) * 100) + '%'; $('pairMusicVolOut').textContent = Math.round(Number($('pairMusicVol').value) * 100) + '%'; };
   const showTempo = () => { $('pairTempoOut').textContent = tempo().toFixed(2) + '×'; };
-  showTempo(); showVolumes(); renderMusic(); renderTopics(); renderCount();
-  function remember() { saved = { ...saved, topic: $('pairTopic').value, left: $('pairLeft').value, right: $('pairRight').value, minutes: $('pairMinutes').value, lang: lang(), layout: $('pairLayout').value, tempo: tempo(), music, musicVol: Number($('pairMusicVol').value), voiceVol: Number($('pairVoiceVol').value) }; persist(); }
+  showTempo(); showVolumes(); renderMusic(); modeChanged();
+  function remember() { saved = { ...saved, mode: mode(), topic: $('pairTopic').value, left: $('pairLeft').value, right: $('pairRight').value, minutes: $('pairMinutes').value, lang: lang(), layout: $('pairLayout').value, tempo: tempo(), music, musicVol: Number($('pairMusicVol').value), voiceVol: Number($('pairVoiceVol').value) }; persist(); }
+  $('pairMode').onchange = modeChanged;
   for (const id of ['pairMinutes', 'pairLayout']) $(id).onchange = () => { remember(); renderCount(); };
   $('pairTopic').oninput = () => { remember(); renderTopics(); renderCount(); };
   $('pairLeft').oninput = remember; $('pairRight').oninput = remember;
@@ -318,7 +340,7 @@
   $('pairLang').onchange = () => {
     // Chủ đề đang là bản gợi ý của ngôn ngữ cũ (nhãn chưa sửa) thì đổi sang bản của ngôn ngữ mới.
     const was = presetOf($('pairTopic').value);
-    if (was) { const old = ['en', 'vi'].map(l => P.topicPreset(was.id, l)).find(p => p.topic === $('pairTopic').value.trim()); const l = $('pairLeft').value.trim(), r = $('pairRight').value.trim(); if (old && (!l || l === old.left) && (!r || r === old.right)) applyPreset(was, lang()); }
+    if (was) { const old = ['en', 'vi'].map(l => presetFor(mode(), was.id, l)).find(p => p.topic === $('pairTopic').value.trim()); const l = $('pairLeft').value.trim(), r = $('pairRight').value.trim(); if (old && (!l || l === old.left) && (!r || r === old.right)) applyPreset(was, lang()); }
     remember(); shownVoiceKey = ''; renderVoice(lastState); renderTopics(); renderCount();
   };
   $('pairVoice').onchange = () => { saved.voices = { ...(saved.voices || {}), [lang()]: $('pairVoice').value }; persist(); };

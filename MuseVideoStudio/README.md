@@ -142,6 +142,15 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.15.16
+
+- **«So sánh song song» có thêm chế độ «Khí tài đối đầu».** Màn hình chia đôi: mỗi mốc so sánh MỘT hạng mục (tốc độ, tầm bay, hỏa lực, giáp, tàng hình, giá…) giữa hai khí tài (máy bay, xe tăng, tàu, phòng không, UAV). Chọn ở ô «Chế độ video» đầu tab; chế độ «Cuộc sống» (nhân vật người que, hai con đường) vẫn như cũ.
+  - **12 cặp gợi ý:** F-35/Su-57, F-22/J-20, Rafale/Typhoon, Abrams/T-90, Leopard 2A7/K2, TB2/Reaper, S-400/Patriot, Apache/Ka-52, Type 055/Burke, Virginia/Yasen, A-10/Su-25, B-2/B-21. Để trống chủ đề thì Muse tự chọn một cặp đáng so sánh; cũng gõ tay được cặp bất kỳ.
+  - **Kịch bản & hình:** Muse viết theo thông tin công khai, mỗi mốc có điểm 0–100 cho từng bên (thanh điểm trên video thay cho thanh pin); ảnh nền là cả hai khí tài đứng cạnh nhau, hai clip là cảnh trình diễn (chạy chậm, bay, cơ động), KHÔNG có cảnh chiến sự hay người bị thương; ảnh thật, không dùng người que.
+  - **Kết luận & đăng video:** phần chốt nêu mỗi bên mạnh ở đâu thay vì «ai thắng»; tiêu đề, mô tả, thẻ tag, thumbnail và chữ trên video đều theo kiểu khí tài.
+  - **Điều kiện dùng:** cần key ĐÃ MUA (gói 30 ngày trở lên); bản dùng thử 24 giờ không dùng được. Chế độ «Cuộc sống» vẫn cần gói Năm hoặc Vĩnh viễn; người dùng gói 30 ngày vào tab thì chỉ thấy chế độ khí tài.
+  - Điểm số chỉ là ước lượng minh họa từ thông tin công khai; nên đối chiếu thông số với nguồn chính thức trước khi đăng. Phần giao diện đã có bản tiếng Anh.
+
 ## Update 1.15.15
 
 - **«Bản đồ lịch sử»: mỗi dạng chủ đề dựng video KHÁC NHAU, không còn một khuôn cho mọi chủ đề.** Trước đây chỉ thumbnail và lời dặn kịch bản khác nhau, còn video thì cùng một bản đồ hoạt hình, cùng camera, cùng bộ cảnh minh họa (xem «The Eighty Years' War» thấy rõ: khung hình ra cả thế giới vì thuộc địa, cảnh kim tự tháp/núi lửa, dân số đứng yên, mặt nhân vật đè lên thanh thời gian). Giờ mỗi dạng có camera, cảnh, bộ đếm và «không khí» bản đồ riêng:

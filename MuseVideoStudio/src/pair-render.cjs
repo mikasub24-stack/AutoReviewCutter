@@ -227,7 +227,7 @@ async function assemblePair({ script, config = {}, clips, hud, voice = null, dir
     const introVoice = await voiceSeconds('intro'), outroVoice = await voiceSeconds('outro');
     // 3. Dựng từng mốc (nhiều mốc cùng lúc): vẽ lớp chữ, ghép hình, trộn tiếng.
     const language = Plan.langOf(config.lang);
-    await hud.init({ layout: geo.layout, title: script.title, left: script.left, right: script.right, meter: script.meter, verdict: Plan.verdictOf(beats), total: beats.length, lang: language.id, tagline: language.tagline, lessonsTitle: language.lessons });
+    await hud.init({ layout: geo.layout, title: script.title, left: script.left, right: script.right, meter: script.meter, verdict: Plan.verdictOf(beats, script.mode), total: beats.length, lang: language.id, tagline: Plan.taglineOf(language.id, script.mode), lessonsTitle: Plan.lessonsTitleOf(language.id, script.mode) });
     const base = path.join(temp, 'base.png');
     await fs.writeFile(base, decode(await hud.base()));
     const pieces = [];
@@ -321,11 +321,11 @@ async function assemblePair({ script, config = {}, clips, hud, voice = null, dir
 // ---------- Thumbnail 16:9 ----------
 // Mốc làm ảnh bìa theo kiểu: kiểu 1 «Điểm cuối» lấy mốc cuối (điểm cuối cùng của hai bên); các kiểu còn lại lấy mốc chênh điểm nhiều nhất,
 // rồi nhiều nhì, nhiều ba (hai nửa khác nhau rõ nhất nên thumbnail «kể» được câu chuyện).
-function thumbBeat(beats, style) {
+function thumbBeat(beats, style, mode) {
   if (style === 1) return beats[beats.length - 1];
   const gap = b => Math.abs(Number(b.leftScore) - Number(b.rightScore)) || 0;
   // Ưu tiên mốc mà bên dẫn điểm là bên được ✓ ở cuối video, để số % trên ảnh không mâu thuẫn với dấu ✗ / ✓.
-  const verdict = Plan.verdictOf(beats), leads = b => Number(b.rightScore) > Number(b.leftScore) ? 'R' : Number(b.leftScore) > Number(b.rightScore) ? 'L' : '';
+  const verdict = Plan.verdictOf(beats, mode), leads = b => Number(b.rightScore) > Number(b.leftScore) ? 'R' : Number(b.leftScore) > Number(b.rightScore) ? 'L' : '';
   const same = verdict ? beats.filter(b => leads(b) === verdict) : [];
   const ranked = (same.length ? same : beats).map(b => ({ b, i: beats.indexOf(b), g: gap(b) })).sort((x, y) => y.g - x.g || y.i - x.i);
   const rank = style === 0 ? 0 : style === 2 ? 1 : 2;
@@ -353,7 +353,7 @@ async function makePairThumbnail({ script, config = {}, clips, hud, dir, variant
   if (!script || !Array.isArray(script.beats) || !script.beats.length) throw Error('Chưa có kịch bản để làm thumbnail.');
   const count = Hud.THUMB.STYLES, k = ((Math.round(Number(variant)) || 0) % count + count) % count;
   const byNumber = new Map((clips || []).map(c => [c.number, c]));
-  const beat = thumbBeat(script.beats, k), c = byNumber.get(beat.number);
+  const beat = thumbBeat(script.beats, k, script.mode), c = byNumber.get(beat.number);
   if (!c || !c.left || !c.right) throw Error(`Mốc ${beat.number} chưa có đủ hai clip để làm thumbnail.`);
   const t = await checkTools(ffmpeg);
   await fs.mkdir(dir, { recursive: true });
@@ -366,7 +366,7 @@ async function makePairThumbnail({ script, config = {}, clips, hud, dir, variant
     const last = script.beats[script.beats.length - 1], shown = k === 1 ? last : beat;
     const jpeg = decodeJpeg(await hud.thumb({
       variant: k, leftImage, rightImage, title: script.title, left: script.left, right: script.right, meter: script.meter,
-      leftScore: shown.leftScore, rightScore: shown.rightScore, verdict: Plan.verdictOf(script.beats), lang: Plan.langOf(config.lang).id
+      leftScore: shown.leftScore, rightScore: shown.rightScore, verdict: Plan.verdictOf(script.beats, script.mode), lang: Plan.langOf(config.lang).id
     }));
     if (jpeg.length > Hud.THUMB.MAX_BYTES + 5e4) throw Error('Ảnh thumbnail quá nặng (hơn 2 MB). Bấm tạo lại để thử kiểu khác.');
     const file = path.join(dir, `thumbnail-${k + 1}.jpg`), part = path.join(temp, 'out.jpg');

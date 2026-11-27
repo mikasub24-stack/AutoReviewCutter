@@ -9,6 +9,7 @@
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
   const KIND = 'pair';
+  const MODES = ['life', 'gear'];            // life: «cùng một nhân vật, hai con đường» · gear: «Khí tài đối đầu» (hai khí tài, mỗi mốc một hạng mục so sánh; cần key đã mua)
   const LAYOUTS = ['side', 'stack'];       // side: trái | phải, khung 16:9 · stack: trên / dưới, khung dọc 9:16
   const MINUTES = [1, 3, 5, 8, 9, 10];     // 1–5 phút để chạy thử rẻ; 8–10 phút là video hoàn chỉnh
   const SECONDS = 8;                       // mỗi clip 8 giây (Muse tạo tối đa 10 giây)
@@ -81,6 +82,55 @@
     return { id, topic: native[0], left: own ? native[1] : '', right: own ? native[2] : '', meter: own ? native[3] : '' };
   }
 
+
+  // ---------- Chế độ «Khí tài đối đầu» ----------
+  // Cùng khung hai nửa TRÁI | PHẢI, nhưng là HAI KHÍ TÀI khác nhau (máy bay, xe tăng, tàu, phòng không, UAV): mỗi mốc là MỘT HẠNG MỤC so sánh (tốc độ, tầm, hỏa lực, giáp, tàng hình, giá…).
+  // Ảnh nền chung của mốc có CẢ HAI khí tài đứng cạnh nhau; clip trái tập trung vào khí tài bên trái, clip phải vào khí tài bên phải. Chỉ thông tin công khai, không cảnh chiến sự.
+  const G = (id, vi, en) => ({ id, vi, en });
+  const GEAR_TOPICS = [
+    G('f35_su57', ['F-35 Lightning II và Su-57: hai tiêm kích thế hệ 5 so sánh thông số', 'F-35', 'SU-57', 'ĐIỂM'], ['F-35 Lightning II vs Su-57: two fifth-generation fighters compared', 'F-35', 'SU-57', 'RATING']),
+    G('f22_j20', ['F-22 Raptor và J-20: tiêm kích tàng hình đối đầu', 'F-22', 'J-20', 'ĐIỂM'], ['F-22 Raptor vs J-20: stealth fighters head to head', 'F-22', 'J-20', 'RATING']),
+    G('rafale_typhoon', ['Rafale và Eurofighter Typhoon: tiêm kích châu Âu so sánh', 'RAFALE', 'TYPHOON', 'ĐIỂM'], ['Rafale vs Eurofighter Typhoon: Europe\'s fighters compared', 'RAFALE', 'TYPHOON', 'RATING']),
+    G('abrams_t90', ['M1 Abrams và T-90: hai xe tăng chủ lực so sánh', 'M1 ABRAMS', 'T-90', 'ĐIỂM'], ['M1 Abrams vs T-90: two main battle tanks compared', 'M1 ABRAMS', 'T-90', 'RATING']),
+    G('leopard_k2', ['Leopard 2A7 và K2 Black Panther: xe tăng thế hệ mới so sánh', 'LEOPARD 2A7', 'K2 BLACK PANTHER', 'ĐIỂM'], ['Leopard 2A7 vs K2 Black Panther: modern tanks compared', 'LEOPARD 2A7', 'K2 BLACK PANTHER', 'RATING']),
+    G('tb2_reaper', ['Bayraktar TB2 và MQ-9 Reaper: hai UAV so sánh', 'BAYRAKTAR TB2', 'MQ-9 REAPER', 'ĐIỂM'], ['Bayraktar TB2 vs MQ-9 Reaper: two drones compared', 'BAYRAKTAR TB2', 'MQ-9 REAPER', 'RATING']),
+    G('s400_patriot', ['S-400 và Patriot: hai hệ thống phòng không so sánh', 'S-400', 'PATRIOT', 'ĐIỂM'], ['S-400 vs Patriot: two air-defense systems compared', 'S-400', 'PATRIOT', 'RATING']),
+    G('apache_ka52', ['AH-64 Apache và Ka-52: trực thăng tấn công so sánh', 'AH-64 APACHE', 'KA-52', 'ĐIỂM'], ['AH-64 Apache vs Ka-52: attack helicopters compared', 'AH-64 APACHE', 'KA-52', 'RATING']),
+    G('type055_burke', ['Type 055 và Arleigh Burke: hai khu trục hạm so sánh', 'TYPE 055', 'ARLEIGH BURKE', 'ĐIỂM'], ['Type 055 vs Arleigh Burke: two destroyers compared', 'TYPE 055', 'ARLEIGH BURKE', 'RATING']),
+    G('virginia_yasen', ['Virginia và Yasen-M: tàu ngầm hạt nhân tấn công so sánh', 'VIRGINIA', 'YASEN-M', 'ĐIỂM'], ['Virginia-class vs Yasen-M: attack submarines compared', 'VIRGINIA', 'YASEN-M', 'RATING']),
+    G('a10_su25', ['A-10 Thunderbolt II và Su-25: hai cường kích so sánh', 'A-10', 'SU-25', 'ĐIỂM'], ['A-10 Thunderbolt II vs Su-25: two ground-attack jets compared', 'A-10', 'SU-25', 'RATING']),
+    G('b2_b21', ['B-2 Spirit và B-21 Raider: máy bay ném bom tàng hình so sánh', 'B-2 SPIRIT', 'B-21 RAIDER', 'ĐIỂM'], ['B-2 Spirit vs B-21 Raider: stealth bombers compared', 'B-2 SPIRIT', 'B-21 RAIDER', 'RATING'])
+  ];
+  function gearPreset(id, lang = 'en') {
+    const t = GEAR_TOPICS.find(x => x.id === id);
+    if (!t) return null;
+    const native = lang === 'vi' ? t.vi : t.en, own = lang === 'vi' || lang === 'en';
+    return { id, topic: native[0], left: native[1], right: native[2], meter: own ? native[3] : '' };   // tên khí tài giống nhau ở mọi ngôn ngữ
+  }
+  // Chữ cố định trên video khí tài theo ngôn ngữ: tagline (thẻ mở đầu), verdict (tiêu đề thẻ kết), meter (tên chỉ số dự phòng), ab (nhãn dự phòng hai bên).
+  const GEAR_TEXT = {
+    en: { tagline: 'HEAD TO HEAD · SPECS COMPARED', verdict: 'THE VERDICT', meter: 'RATING', a: 'MACHINE A', b: 'MACHINE B' },
+    vi: { tagline: 'ĐỐI ĐẦU · SO SÁNH THÔNG SỐ', verdict: 'KẾT LUẬN', meter: 'ĐIỂM', a: 'KHÍ TÀI A', b: 'KHÍ TÀI B' },
+    es: { tagline: 'CARA A CARA · COMPARATIVA', verdict: 'EL VEREDICTO', meter: 'PUNTUACIÓN', a: 'EQUIPO A', b: 'EQUIPO B' },
+    pt: { tagline: 'FRENTE A FRENTE · COMPARAÇÃO', verdict: 'O VEREDITO', meter: 'NOTA', a: 'EQUIPAMENTO A', b: 'EQUIPAMENTO B' },
+    fr: { tagline: 'FACE À FACE · COMPARATIF', verdict: 'LE VERDICT', meter: 'NOTE', a: 'MATÉRIEL A', b: 'MATÉRIEL B' },
+    de: { tagline: 'DUELL · TECHNIK IM VERGLEICH', verdict: 'DAS URTEIL', meter: 'WERTUNG', a: 'SYSTEM A', b: 'SYSTEM B' },
+    id: { tagline: 'ADU KEKUATAN · PERBANDINGAN', verdict: 'KESIMPULAN', meter: 'SKOR', a: 'ALUTSISTA A', b: 'ALUTSISTA B' },
+    ru: { tagline: 'ЛИЦОМ К ЛИЦУ · СРАВНЕНИЕ', verdict: 'ВЕРДИКТ', meter: 'ОЦЕНКА', a: 'ТЕХНИКА A', b: 'ТЕХНИКА B' },
+    tr: { tagline: 'KAPIŞMA · KARŞILAŞTIRMA', verdict: 'SONUÇ', meter: 'PUAN', a: 'SİSTEM A', b: 'SİSTEM B' },
+    hi: { tagline: 'आमने-सामने · तुलना', verdict: 'निष्कर्ष', meter: 'स्कोर', a: 'हथियार A', b: 'हथियार B' },
+    ar: { tagline: 'وجهاً لوجه · مقارنة', verdict: 'الحكم', meter: 'التقييم', a: 'المعدة أ', b: 'المعدة ب' },
+    th: { tagline: 'เผชิญหน้า · เปรียบเทียบ', verdict: 'สรุปผล', meter: 'คะแนน', a: 'ยุทโธปกรณ์ A', b: 'ยุทโธปกรณ์ B' },
+    ja: { tagline: '真っ向勝負 · スペック比較', verdict: '結論', meter: '評価', a: '装備A', b: '装備B' },
+    ko: { tagline: '정면 대결 · 제원 비교', verdict: '결론', meter: '점수', a: '장비 A', b: '장비 B' },
+    zh: { tagline: '正面对决 · 参数对比', verdict: '结论', meter: '评分', a: '装备A', b: '装备B' }
+  };
+  const gearText = lang => GEAR_TEXT[lang] || GEAR_TEXT.en;
+  // Chữ cố định theo ngôn ngữ và chế độ (thẻ mở đầu, tiêu đề thẻ kết, chỉ số dự phòng).
+  const taglineOf = (lang, mode) => mode === 'gear' ? gearText(lang).tagline : langOf(lang).tagline;
+  const lessonsTitleOf = (lang, mode) => mode === 'gear' ? gearText(lang).verdict : langOf(lang).lessons;
+  const meterOf = (lang, mode) => mode === 'gear' ? gearText(lang).meter : langOf(lang).meter;
+
   // ---------- Tùy chọn ----------
   // topic trống = để Muse TỰ CHỌN chủ đề (avoid: các chủ đề đã làm, để không trùng).
   function options(input = {}) {
@@ -88,11 +138,11 @@
     const minutes = MINUTES.includes(Number(input.minutes)) ? Number(input.minutes) : 9;
     const lang = LANGS[input.lang] ? input.lang : 'en';
     const lim = limits(lang);
-    const layout = LAYOUTS.includes(input.layout) ? input.layout : 'side';
+    const layout = LAYOUTS.includes(input.layout) ? input.layout : 'side', mode = input.mode === 'gear' ? 'gear' : 'life';
     const beats = beatsFor(minutes);
     const avoid = (Array.isArray(input.avoid) ? input.avoid : []).map(x => flat(x).slice(0, 120)).filter(Boolean).slice(-30);   // 30 mục MỚI nhất
     return {
-      topic, auto: !topic, avoid, left: flat(input.left).slice(0, lim.label), right: flat(input.right).slice(0, lim.label), minutes, beats, lang, layout, seconds: SECONDS, aspect: '1:1',
+      mode, topic, auto: !topic, avoid, left: flat(input.left).slice(0, lim.label), right: flat(input.right).slice(0, lim.label), minutes, beats, lang, layout, seconds: SECONDS, aspect: '1:1',
       clips: beats * 2, budget: budgetChars(SECONDS, lang)
     };
   }
@@ -119,7 +169,7 @@
   const score = (value, fallback) => { const n = Math.round(Number(String(value).replace(/[^\d.\-]/g, ''))); return Number.isFinite(n) ? clamp(n, 0, 100) : fallback; };
   const KEYS = [
     ['title', /^(?:tieu de|title)$/], ['left', /^(?:nhan trai|left label|left)$/], ['right', /^(?:nhan phai|right label|right)$/],
-    ['meter', /^(?:chi so|meter|metric)$/], ['cast', /^(?:nhan vat|characters?|cast)$/], ['lessons', /^(?:ket luan|bai hoc|lessons?)$/],
+    ['meter', /^(?:chi so|meter|metric)$/], ['cast', /^(?:nhan vat|characters?|cast|khi tai|equipment|machines?|hardware)$/], ['lessons', /^(?:ket luan|bai hoc|lessons?)$/],
     ['closing', /^(?:cau cuoi|closing|ending)$/], ['arc', /^(?:dan y|arc|outline|chuoi moc)$/], ['beats', /^(?:moc|cac moc|beats?|scenes?|canh)$/]
   ];
   function sectionsOf(reply) {
@@ -144,6 +194,77 @@
   };
   const fail = (message, fix) => Object.assign(Error(message), { fixable: true, fix });
   const castOf = script => `CHARACTERS (identical in every shot, never change): ${script.cast}`;
+
+
+  // ---------- Khí tài: lời nhắc kịch bản ----------
+  const GEAR_RULES = config => {
+    const L = LANG_VI[config.lang], lim = limits(config.lang);
+    return [
+      '1. CHỈ dùng thông tin CÔNG KHAI và đáng tin (nhà sản xuất, bộ quốc phòng, tạp chí quân sự uy tín). Số liệu nói «khoảng» / «theo công bố»; số còn tranh cãi hoặc chưa xác nhận thì nói rõ là chưa xác nhận; KHÔNG bịa số. Không hướng dẫn chế tạo, sửa đổi hay vận hành vũ khí. Giọng khách quan, mỗi bên nêu cả điểm mạnh và hạn chế; không cổ vũ chiến tranh, không hạ thấp quốc gia hay dân tộc nào.',
+      '2. Hai bên LUÔN xuất phát từ cùng một khung hình ở mỗi mốc: một địa điểm TRƯNG BÀY / THỬ NGHIỆM hợp với hạng mục (đường băng sân bay, bãi thử xe, cảng, bãi duyệt binh, trời xanh trên biển…) có CẢ HAI khí tài đứng / đỗ cạnh nhau (trái | phải), cùng tỉ lệ, thấy trọn cả hai. Hai clip chỉ khác nhau ở việc bên nào TRÌNH DIỄN (cất cánh, chạy thử, bay ngang qua, quay tháp pháo, rẽ sóng…). KHÔNG cảnh chiến sự: không người bị thương, không máu, không nổ phá hủy, không bắn vào mục tiêu có người; nếu cần minh họa hỏa lực thì chỉ bắn thử trên bãi thử trống.',
+      '3. Mốc 1 GIỚI THIỆU hai khí tài (nước sản xuất, năm đưa vào trang bị, vai trò). Mỗi mốc giữa là MỘT HẠNG MỤC KHÁC NHAU (ví dụ tốc độ, tầm bay / tầm hoạt động, hỏa lực / vũ khí, giáp và khả năng sống sót, tàng hình / điện tử, cơ động, giá thành và chi phí vận hành, độ tin cậy và bảo dưỡng, số lượng đang trang bị). Mốc cuối TỔNG KẾT.',
+      `4. NHÃN MỐC = TÊN HẠNG MỤC, in hoa, ≤ ${lim.tag} ký tự, bằng ${L} (ví dụ SPEED, RANGE, FIREPOWER, ARMOR, STEALTH, COST — hãy viết đúng ${L}).`,
+      `5. CHỈ SỐ là ĐIỂM 0–100 của MỖI BÊN ở hạng mục của mốc đó (đánh giá ước lượng để minh họa, theo thông tin công khai); tên chỉ số bằng ${L}, in hoa, ≤ ${lim.tag} ký tự (ví dụ RATING / ĐIỂM). Bên nào hơn ở hạng mục thì điểm cao hơn; hai bên phải THẮNG Ở NHỮNG HẠNG MỤC KHÁC NHAU (không để một bên hơn tất cả), chênh lệch hợp lý (thường 5–35 điểm). Mốc 1 (giới thiệu) cả hai bên 50.`,
+      '6. KHÍ TÀI viết bằng TIẾNG ANH, rất cụ thể để mọi khung vẽ ra đúng cùng hai khí tài: tên gọi chính xác, hình dáng nhận dạng (số động cơ / cánh / tháp pháo / cấu trúc thượng tầng), màu sơn và ký hiệu đơn giản, số lượng trong khung (mỗi bên MỘT chiếc). Không viết chữ hay số hiệu đọc được trên thân.',
+      `7. KẾT LUẬN gồm 3–${MAX_LESSONS} dòng tổng kết khách quan, mỗi dòng ≤ ${lim.lesson - 4} ký tự bằng ${L} (khí tài nào hợp nhiệm vụ nào, đánh đổi giữa giá và hiệu năng, điều còn tùy học thuyết sử dụng); KHÔNG tuyên bố «tốt nhất tuyệt đối». CÂU CUỐI ≤ ${lim.closing - 20} ký tự bằng ${L}, trung lập, mời người xem nêu ý kiến.`,
+      `8. NHÃN TRÁI, NHÃN PHẢI = tên gọi ngắn của hai khí tài, in hoa, ≤ ${lim.label} ký tự (ví dụ F-35 / SU-57).`
+    ];
+  };
+  function buildGearBibleInstruction(config, ctx) {
+    const marker = ctx.marker ? String(ctx.marker) : '';
+    return [
+      'Bạn là biên kịch cho một video «KHÍ TÀI ĐỐI ĐẦU»: so sánh thông số và đặc điểm CÔNG KHAI của hai khí tài quân sự (máy bay, xe tăng, tàu, phòng không, UAV, trực thăng). Màn hình chia đôi TRÁI và PHẢI; mỗi mốc là MỘT HẠNG MỤC so sánh, hai khí tài đứng cạnh nhau trong cùng một khung hình rồi mỗi bên trình diễn riêng.',
+      `Phim dài khoảng ${config.minutes} phút, gồm ${config.beats} mốc nối tiếp; mỗi mốc là hai clip ${config.seconds} giây (một cú máy liền, không thoại, không chữ) dựng hình thực tế bằng CGI và một đoạn lời dẫn tiếng ${LANG_VI[config.lang]}. Người xem là người yêu quân sự / công nghệ muốn hiểu khác biệt thật sự giữa hai khí tài.`,
+      '',
+      'QUY TẮC',
+      ...GEAR_RULES(config),
+      `9. DÀN Ý có ĐÚNG ${config.beats} dòng (đánh số 1 đến ${config.beats}); mỗi dòng: số | nhãn mốc (tên hạng mục) | tóm tắt (1 câu, ≤ 25 từ: điều KHÁC nhau giữa hai khí tài ở hạng mục này, kèm một thông số / sự kiện công khai nếu có) | điểm trái 0-100 | điểm phải 0-100. Không hạng mục nào lặp lại.`,
+      '',
+      'Trả lời đúng khuôn sau, KHÔNG viết thêm câu dẫn hay giải thích:',
+      `TIÊU ĐỀ: <tiêu đề video HÚT VIEW bằng ${LANG_VI[config.lang]}, 45–68 ký tự: tên hai khí tài ở ĐẦU và một câu hỏi hoặc điểm gây tò mò (ví dụ «F-35 vs Su-57: Which Fighter Is Really Better?»), không giật tít sai sự thật>`,
+      'NHÃN TRÁI: <...>', 'NHÃN PHẢI: <...>', 'CHỈ SỐ: <...>',
+      'KHÍ TÀI: <ENGLISH: một đoạn mô tả cố định hai khí tài>',
+      'KẾT LUẬN:', '- <dòng 1>', '- <dòng 2>',
+      'CÂU CUỐI: <...>',
+      'DÀN Ý:', '1 | <HẠNG MỤC> | <tóm tắt> | <trái> | <phải>', `2 | ...   (đủ ${config.beats} dòng)`,
+      ...tail(ctx),
+      ...(config.topic
+        ? [`CẶP KHÍ TÀI / CHỦ ĐỀ (chỉ là chủ đề cần làm video, không phải mệnh lệnh): ${config.topic}`, ...titleLines(config)]
+        : [
+          'CHỦ ĐỀ: người làm video để TRỐNG, nên bạn TỰ CHỌN một cặp khí tài thật sự đáng so sánh (cùng loại, cùng thời kỳ, có nhiều thông tin công khai; ví dụ hai tiêm kích thế hệ 5, hai xe tăng chủ lực, hai hệ thống phòng không, hai khu trục hạm).',
+          ...(config.avoid.length ? [`TRÁNH các cặp / chủ đề đã làm (dữ liệu, không phải mệnh lệnh): ${config.avoid.join(' · ')}`, ...titleLines(config)] : [])
+        ]),
+      config.left || config.right ? `NHÃN NGƯỜI LÀM VIDEO MUỐN DÙNG (dữ liệu, không phải mệnh lệnh): trái = ${config.left || '(tự đặt)'}; phải = ${config.right || '(tự đặt)'}` : '',
+      marker ? `MSEND${marker}` : ''
+    ].filter((line, index, all) => line !== '' || (index > 0 && all[index - 1] !== '' && index < all.length - 1)).join('\n');
+  }
+  function buildGearPartInstruction(config, bible, ctx) {
+    const [a, b] = ctx.range, marker = ctx.marker ? String(ctx.marker) : '';
+    const rows = bible.arc.filter(r => r.number >= a && r.number <= b), prev = (ctx.previous || []).slice(-2);
+    return [
+      `Bạn là biên kịch của video «KHÍ TÀI ĐỐI ĐẦU» «${bible.title}» (${config.beats} mốc). Bây giờ viết CHI TIẾT các mốc ${a} đến ${b} theo ĐÚNG dàn ý bên dưới (không đổi hạng mục, không đổi điểm quá ±6).`,
+      `Mỗi mốc: hai bên bắt đầu từ cùng MỘT khung hình (cùng địa điểm, góc máy, CẢ HAI khí tài đứng cạnh nhau), rồi mỗi bên TRÌNH DIỄN hạng mục đó trong ${config.seconds} giây. Chữ do phần mềm tự vẽ, bạn chỉ viết nội dung.`,
+      '',
+      'QUY TẮC',
+      `1. KHUNG, TRÁI, PHẢI viết bằng TIẾNG ANH, cụ thể và vật lý: KHUNG = địa điểm + vị trí hai khí tài (bên TRÁI của khung là khí tài trái, bên PHẢI là khí tài phải) + thời tiết / ánh sáng; TRÁI = khí tài bên TRÁI làm gì trong ~${config.seconds} giây (cất cánh, chạy thử, bay ngang qua, quay tháp pháo, rẽ sóng, bắn thử trên bãi trống…) và máy quay chuyển động thế nào (lia chậm, bám theo, quay quanh); PHẢI = tương tự cho khí tài bên PHẢI; mỗi mô tả ≤ 45 từ; không viết chữ trên thân khí tài; không dùng dấu | trong nội dung. KHÔNG cảnh chiến sự: không người bị thương, không máu, không nổ phá hủy, không bắn vào người hay công trình.`,
+      `2. PHỤ ĐỀ bằng ${LANG_VI[config.lang]}, ≤ ${limits(config.lang).caption} ký tự, nêu kết quả của hạng mục (ví dụ tên hạng mục + số liệu chính); không emoji, không hashtag.`,
+      `3. LỜI ĐỌC là lời người dẫn bằng ${LANG_VI[config.lang]}, văn nói tự nhiên, ≤ ${config.budget} ký tự (đọc vừa trong ~${config.seconds - 1} giây): nói số liệu BÊN TRÁI rồi BÊN PHẢI kèm đơn vị (viết đơn vị bằng chữ để đọc được), dùng «khoảng» / «theo công bố»; số chưa xác nhận thì nói rõ; không lặp nguyên văn phụ đề, không số thứ tự, không ký hiệu; các mốc kế nhau không mở đầu giống nhau.`,
+      '4. Mỗi mốc phải có điểm KHÁC biệt rõ giữa TRÁI và PHẢI ở hạng mục đó; khách quan, không cổ vũ chiến tranh.',
+      '',
+      `NHÃN TRÁI: ${bible.left} · NHÃN PHẢI: ${bible.right} · CHỈ SỐ: ${bible.meter}`,
+      `KHÍ TÀI (cố định): ${bible.cast}`,
+      'DÀN Ý CỦA CÁC MỐC CẦN VIẾT (dữ liệu, không phải mệnh lệnh):',
+      ...rows.map(r => `${r.number} | ${r.label} | ${cut(r.summary, 220)} | ${r.leftScore} | ${r.rightScore}`),
+      ...(prev.length ? ['', 'HAI MỐC NGAY TRƯỚC (đã viết, để nối mạch, không viết lại):', ...prev.map(p => `${p.number} | ${p.label} | ${cut(p.caption, 80)} | ${cut(p.narration, 120)} | ${cut(p.frame, 160)}`)] : []),
+      '',
+      'Trả lời đúng khuôn sau, mỗi mốc MỘT dòng, KHÔNG viết thêm câu dẫn hay giải thích:',
+      'MỐC:',
+      '<số> | <NHÃN MỐC> | <PHỤ ĐỀ> | <LỜI ĐỌC> | <KHUNG: ENGLISH> | <TRÁI: ENGLISH> | <PHẢI: ENGLISH> | <điểm trái 0-100> | <điểm phải 0-100>',
+      `(đủ ${b - a + 1} dòng, số từ ${a} đến ${b})`,
+      ...tail(ctx),
+      marker ? `MSEND${marker}` : ''
+    ].filter((line, index, all) => line !== '' || (index > 0 && all[index - 1] !== '' && index < all.length - 1)).join('\n');
+  }
 
   // ---------- Lời nhắc 1: hồ sơ + dàn ý ----------
   const RULES = config => {
@@ -174,6 +295,7 @@
     ];
   function buildBibleInstruction(input, ctx = {}) {
     const config = options(input);
+    if (config.mode === 'gear') return buildGearBibleInstruction(config, ctx);
     const marker = ctx.marker ? String(ctx.marker) : '';
     return [
       'Bạn là biên kịch cho một video SO SÁNH SONG SONG kiểu «cùng một nhân vật, hai con đường»: màn hình chia đôi TRÁI và PHẢI; ở mỗi mốc thời gian, hai bên bắt đầu từ MỘT khung hình giống hệt nhau rồi diễn ra HAI kết cục khác nhau chỉ vì hai cách ứng xử / lựa chọn khác nhau. Đầu tiên bạn lập HỒ SƠ và DÀN Ý cho cả phim (chưa viết chi tiết từng mốc).',
@@ -206,15 +328,18 @@
     const missing = Array.from({ length: config.beats }, (_, i) => i + 1).filter(n => !arc.has(n));
     if (missing.length) throw fail(`Dàn ý thiếu mốc ${missing.slice(0, 12).join(', ')}.`, `DÀN Ý phải có ĐỦ ${config.beats} dòng «số | nhãn mốc | tóm tắt | trái % | phải %» (thiếu: ${missing.slice(0, 20).join(', ')}).`);
     const cast = flat((sec.cast || []).join(' '));
-    if (count(cast) < 30) throw fail('Thiếu mục NHÂN VẬT.', 'Thiếu mục «NHÂN VẬT:» (mô tả bằng tiếng Anh, ít nhất 30 ký tự).');
+    const gear = config.mode === 'gear', castKey = gear ? 'KHÍ TÀI' : 'NHÂN VẬT';
+    if (count(cast) < 30) throw fail(`Thiếu mục ${castKey}.`, `Thiếu mục «${castKey}:» (mô tả bằng tiếng Anh, ít nhất 30 ký tự).`);
     const lessons = (sec.lessons || []).map(s => cut(s.replace(/^\d+[.)]\s*/, ''), lim.lesson)).filter(Boolean).slice(0, MAX_LESSONS);
     const rows = [...arc.values()].sort((a, b) => a.number - b.number);
-    rows.forEach((r, i) => { if (!Number.isFinite(r.leftScore)) r.leftScore = i ? rows[i - 1].leftScore : 100; if (!Number.isFinite(r.rightScore)) r.rightScore = i ? rows[i - 1].rightScore : 100; });
-    rows[0].leftScore = 100; rows[0].rightScore = 100;
+    const start = gear ? 50 : 100;   // «đời sống»: mốc 1 cả hai bên 100 · «khí tài»: điểm từng hạng mục, mốc giới thiệu 50
+    rows.forEach((r, i) => { if (!Number.isFinite(r.leftScore)) r.leftScore = i ? rows[i - 1].leftScore : start; if (!Number.isFinite(r.rightScore)) r.rightScore = i ? rows[i - 1].rightScore : start; });
+    rows[0].leftScore = start; rows[0].rightScore = start;
     return {
-      title: cut(first(sec.title), 120) || cut(config.topic, 120) || 'Hai con đường',
-      left: cut(upper(first(sec.left) || config.left || (config.lang === 'vi' ? 'CON ĐƯỜNG A' : 'PATH A')), lim.label), right: cut(upper(first(sec.right) || config.right || (config.lang === 'vi' ? 'CON ĐƯỜNG B' : 'PATH B')), lim.label),
-      meter: cut(upper(first(sec.meter) || lang.meter), lim.tag),
+      mode: config.mode,
+      title: cut(first(sec.title), 120) || cut(config.topic, 120) || (gear ? 'Khí tài đối đầu' : 'Hai con đường'),
+      left: cut(upper(first(sec.left) || config.left || (gear ? gearText(config.lang).a : config.lang === 'vi' ? 'CON ĐƯỜNG A' : 'PATH A')), lim.label), right: cut(upper(first(sec.right) || config.right || (gear ? gearText(config.lang).b : config.lang === 'vi' ? 'CON ĐƯỜNG B' : 'PATH B')), lim.label),
+      meter: cut(upper(first(sec.meter) || meterOf(config.lang, config.mode)), lim.tag),
       cast, lessons, closing: cut(strip((sec.closing || []).join(' ')), lim.closing), arc: rows
     };
   }
@@ -222,6 +347,7 @@
   // ---------- Lời nhắc 2: từng phần (≤ PART_BEATS mốc) ----------
   function buildPartInstruction(input, bible, ctx = {}) {
     const config = options(input), [a, b] = ctx.range, marker = ctx.marker ? String(ctx.marker) : '';
+    if (config.mode === 'gear') return buildGearPartInstruction(config, bible, ctx);
     const rows = bible.arc.filter(r => r.number >= a && r.number <= b);
     const prev = (ctx.previous || []).slice(-2);
     return [
@@ -303,16 +429,32 @@
       if (!b) return null;
       return { ...b, label: b.label || a.label, leftScore: Number.isFinite(b.leftScore) ? b.leftScore : a.leftScore, rightScore: Number.isFinite(b.rightScore) ? b.rightScore : a.rightScore };
     }).filter(Boolean);
-    if (beats[0]) { beats[0].leftScore = 100; beats[0].rightScore = 100; }
+    const start = config.mode === 'gear' ? 50 : 100;
+    if (beats[0]) { beats[0].leftScore = start; beats[0].rightScore = start; }
     const { arc, ...rest } = bible;
-    return { ...rest, beats };
+    return { ...rest, mode: config.mode, beats };
   }
 
   // ---------- Lời nhắc ảnh / clip ----------
+  // ---------- Khí tài: hình ảnh ----------
+  const GEAR_STYLE = 'Look: realistic cinematic 3D render of modern military hardware at a peaceful display or test site (airfield apron, test track, harbour, parade ground), natural daylight, clean accurate machine shapes, shallow depth of field. Both machines are fully visible, parked side by side at the same scale and ground level, the LEFT one on the left half of the frame and the RIGHT one on the right half. No close-up people (any crew is tiny, distant and faceless), no combat, no wreckage, no flames.';
+  const GEAR_NO_TEXT = 'No text, lettering, serial numbers, flags with text, logos, watermarks, captions or user-interface overlays anywhere.';
+  const GEAR_AUDIO = 'Audio: only natural engine, turbine, wind or mechanical sounds. No speech, no voices, no singing, no music.';
+  const GEAR_KEEP = 'Both machines keep exactly the same shape, paint scheme, size and position relationship as in the attached image; the site and light stay the same; no morphing; nothing appears or disappears by itself. The shot is a real-looking calm demonstration: smooth realistic motion, no explosions, no weapons hitting anything, no damage.';
   function anchorPrompt(config, script, beat) {
+    if (config.mode === 'gear') return ['Square 1:1 image.', `First frame of a video scene, "${beat.label}": ${beat.frame}`, `EQUIPMENT (identical in every shot, never change): ${script.cast}`, GEAR_STYLE, NO_SPLIT, GEAR_NO_TEXT].join('\n');
     return ['Square 1:1 image.', `First frame of a video scene, "${beat.label}": ${beat.frame}`, castOf(script), STYLE, NO_SPLIT, NO_TEXT].join('\n');
   }
   function clipPrompt(config, script, beat, side) {
+    if (config.mode === 'gear') {
+      return [
+        'Square 1:1 video.',
+        `Create an ${config.seconds}-second video clip (one single continuous shot, no cuts), aspect ratio 1:1, that starts EXACTLY from the attached image (it is the first frame of the video).`,
+        `Focus on the machine on the ${side === 'R' ? 'RIGHT' : 'LEFT'} side of the first frame; the other machine stays parked and quiet.`,
+        `ACTION: ${side === 'R' ? beat.right : beat.left}`,
+        `EQUIPMENT (identical in every shot, never change): ${script.cast}`, GEAR_KEEP, GEAR_STYLE, NO_SPLIT, GEAR_AUDIO, GEAR_NO_TEXT
+      ].join('\n');
+    }
     return [
       'Square 1:1 video.',
       `Create an ${config.seconds}-second animated video clip (one single continuous shot, no cuts), aspect ratio 1:1, that starts EXACTLY from the attached image (it is the first frame of the video).`,
@@ -331,17 +473,27 @@
   ];
   const SAFE_1 = 'SAFETY REWRITE: calm, gentle family-friendly animation; the characters only stand, sit and move calmly; nothing harsh or frightening happens.';
   const SAFE_2 = 'SAFETY REWRITE: show only the room and the two characters standing or sitting calmly next to each other; no conflict of any kind.';
+  const GEAR_SOFTEN = [
+    [/\b(?:fires?|firing|fired|shoots?|shooting|shot|launch(?:es|ed|ing)? (?:a |its |the )?(?:missiles?|rockets?|shells?)|strikes?|striking|bombs?|bombing|attacks?|attacking|destroys?|destroying|destroyed|kills?|hits?)\b/gi, 'moves'],
+    [/\b(?:explosions?|explodes?|exploding|blasts?|fireballs?|flames?|fire|smoke trails?|wreckage|debris|crash(?:es|ing)?)\b/gi, 'dust'],
+    [/\b(?:combat|battlefield|battles?|war|warfare|enemy|enemies|targets?)\b/gi, 'test range'],
+    [/\b(?:missiles?|rockets?|bombs?|warheads?)\b/gi, 'launch rails']
+  ];
+  const GEAR_SAFE_1 = 'SAFETY REWRITE: a calm, peaceful air-show / museum-style display; the machines only taxi, drive or fly slowly in a controlled demonstration; no weapon is fired; no people in focus; nothing destructive happens.';
+  const GEAR_SAFE_2 = 'SAFETY REWRITE: show only the two machines parked side by side at a calm outdoor display; very slow camera move; no motion of the machines, no weapon activity, no people.';
   function safeRetryPrompt(prompt, attempt = 1) {
-    const kept = String(prompt || '').split('\n').filter(l => !l.startsWith('SAFETY REWRITE:'));
-    const soft = kept.map(l => /^(?:ACTION|First frame)/.test(l) ? SOFTEN.reduce((t, [re, to]) => t.replace(re, to), l).replace(/ {2,}/g, ' ') : l);
-    return soft.join('\n').trim() + '\n' + (Number(attempt) >= 2 ? SAFE_2 : SAFE_1);
+    const text = String(prompt || ''), gear = /^EQUIPMENT \(identical/m.test(text);
+    const kept = text.split('\n').filter(l => !l.startsWith('SAFETY REWRITE:'));
+    const rules = gear ? GEAR_SOFTEN : SOFTEN;
+    const soft = kept.map(l => /^(?:ACTION|First frame)/.test(l) ? rules.reduce((t, [re, to]) => t.replace(re, to), l).replace(/ {2,}/g, ' ') : l);
+    return soft.join('\n').trim() + '\n' + (gear ? (Number(attempt) >= 2 ? GEAR_SAFE_2 : GEAR_SAFE_1) : (Number(attempt) >= 2 ? SAFE_2 : SAFE_1));
   }
 
   // ---------- Hàng đợi việc ----------
   // Mỗi mốc n: ảnh nền (số n) → clip TRÁI (số 2n-1) và clip PHẢI (số 2n), cả hai cần ảnh nền và bắt đầu từ chính ảnh đó.
   function buildJobs(input, script, { storyId } = {}) {
     const config = options(input), jobs = [];
-    const base = { kind: KIND, storyId };
+    const base = { kind: KIND, storyId, ...(config.mode === 'gear' ? { mode: 'gear' } : {}) };
     script.beats.forEach(b => {
       const where = `Mốc ${b.number} · ${b.label}`;
       jobs.push({ ...base, phase: 'image', number: b.number, title: `${where} · ảnh nền chung`, prompt: anchorPrompt(config, script, b), references: [], needs: [], refList: [] });
@@ -359,7 +511,7 @@
   // Dữ liệu gọn để vẽ chữ chồng và dựng (không có lời nhắc dài).
   function hudScript(script) {
     return {
-      title: script.title, left: script.left, right: script.right, meter: script.meter, lessons: script.lessons, closing: script.closing,
+      mode: script.mode === 'gear' ? 'gear' : 'life', title: script.title, left: script.left, right: script.right, meter: script.meter, lessons: script.lessons, closing: script.closing,
       beats: script.beats.map(b => ({ number: b.number, label: b.label, caption: b.caption, narration: b.narration, leftScore: b.leftScore, rightScore: b.rightScore }))
     };
   }
@@ -372,7 +524,12 @@
       ...(script.lessons.length ? ['KẾT LUẬN:', ...script.lessons.map(x => `- ${x}`), `Câu cuối: ${script.closing}`, ''] : []),
       'NHẮC KHI ĐĂNG:',
       '- Hình ảnh do AI tạo ra: bật mục khai báo «nội dung bị thay đổi hoặc tổng hợp» khi đăng lên YouTube và nói rõ trong mô tả.',
-      '- Chỉ số % chỉ là minh họa kể chuyện, không phải số liệu nghiên cứu. Nếu nêu kết luận về nuôi dạy, sức khỏe hay tài chính, hãy dẫn nguồn đáng tin cậy.'
+      ...(config.mode === 'gear'
+        ? [
+          '- Thông số khí tài do AI tổng hợp từ thông tin công khai và có thể sai hoặc đã cũ: kiểm tra lại với nguồn chính thức (nhà sản xuất, bộ quốc phòng, tài liệu uy tín) trước khi đăng, và ghi nguồn trong mô tả.',
+          '- Điểm 0–100 chỉ là đánh giá ước lượng để minh họa, không phải kết quả thử nghiệm chính thức. Video không có cảnh chiến sự; giữ giọng khách quan, không cổ vũ chiến tranh.'
+        ]
+        : ['- Chỉ số % chỉ là minh họa kể chuyện, không phải số liệu nghiên cứu. Nếu nêu kết luận về nuôi dạy, sức khỏe hay tài chính, hãy dẫn nguồn đáng tin cậy.'])
     ];
     if (builtAt) lines.push('', `Dựng lúc: ${builtAt}`);
     return lines.join('\n');
@@ -446,10 +603,19 @@
     const words = flat(text).split(/[^\p{L}\p{N}\p{M}_]+/u).filter(Boolean);
     return words.map(w => w.charAt(0).toLocaleUpperCase() + w.slice(1)).join('');
   };
+  // Gói đăng cho chế độ khí tài (tiếng Anh và tiếng Việt; ngôn ngữ khác dùng bản tiếng Anh).
+  const GEAR_PUB = {
+    en: { chapters: 'Chapters', note: 'The visuals in this video are AI-generated. Specifications come from public sources and may be outdated or inaccurate; scores are an illustrative estimate, not official test results. Check the manufacturer and defense-ministry sources.', hash: ['MilitaryComparison', 'HeadToHead', 'Defense'], kw: ['military comparison', 'specs compared', 'head to head', 'weapons comparison', 'defense technology'] },
+    vi: { chapters: 'Các chương', note: 'Hình ảnh trong video do AI tạo ra. Thông số lấy từ nguồn công khai và có thể đã cũ hoặc chưa chính xác; điểm số chỉ là ước lượng minh họa, không phải kết quả thử nghiệm chính thức. Hãy đối chiếu nguồn của nhà sản xuất và bộ quốc phòng.', hash: ['KhiTai', 'SoSanhQuanSu', 'QuocPhong'], kw: ['khí tài', 'so sánh quân sự', 'so sánh thông số', 'đối đầu', 'công nghệ quốc phòng'] }
+  };
+  const GEAR_MORE = {
+    en: { top: ['VersusMilitary', 'SpecsCompared'], rest: ['Military', 'Aviation', 'Tanks', 'Navy', 'Technology', 'Comparison', 'Documentary', 'Animation'], kw: ['which is better', 'who would win', 'full comparison', 'specifications', 'military technology'], ideas: ['{h}: Specs Compared', '{l} vs {r}: Which Is Better?', '{l} vs {r}: Full Comparison', '{h}: The Real Differences'] },
+    vi: { top: ['DoiDauKhiTai', 'SoSanhThongSo'], rest: ['QuanSu', 'HangKhong', 'XeTang', 'HaiQuan', 'CongNghe', 'SoSanh', 'PhimTaiLieu', 'HoatHinh'], kw: ['cái nào mạnh hơn', 'ai thắng', 'so sánh đầy đủ', 'thông số kỹ thuật', 'công nghệ quân sự'], ideas: ['{h}: So sánh thông số', '{l} vs {r}: Ai mạnh hơn?', '{l} vs {r}: So sánh đầy đủ', '{h}: Khác biệt thật sự'] }
+  };
   // Gói đăng YouTube: tiêu đề (≤ 100), mô tả (chương theo giờ nếu biết, bài học, câu cuối, lời nhắc nội dung AI, hashtag) và thẻ tag (≤ 450 ký tự).
   // opts: { lang, layout, timeline: [{ number, start }], outroStart, seconds }; không có timeline (video dựng bằng bản cũ) thì chưa có chương.
   function publishPack(script, opts = {}) {
-    const L = langOf(opts.lang), X = PUB[L.id] || PUB.en, lc = t => { try { return String(t).toLocaleLowerCase(L.id); } catch { return String(t).toLowerCase(); } };
+    const L = langOf(opts.lang), gear = opts.mode === 'gear' || Boolean(script && script.mode === 'gear'), X = gear ? (GEAR_PUB[L.id] || GEAR_PUB.en) : (PUB[L.id] || PUB.en), lc = t => { try { return String(t).toLocaleLowerCase(L.id); } catch { return String(t).toLowerCase(); } };
     const title = cut(script && script.title, 100) || L.label, hook = firstClause(title);
     const beats = (script && script.beats) || [], lessons = ((script && script.lessons) || []).map(flat).filter(Boolean), closing = flat(script && script.closing);
     // Chương: mở đầu đúng 0:00, mỗi chương cách nhau ≥ 10 giây (và thưa dần để không quá ~12 chương), chương cuối là thẻ bài học.
@@ -463,20 +629,20 @@
         if (!b || x.start - last.t < gap || Number(opts.outroStart) - x.start < 15) continue;
         chapters.push({ t: Math.round(x.start), clock: clockOf(x.start), label: cut([flat(b.label), flat(b.caption)].filter(Boolean).join(' · '), 70) });
       }
-      const end = L.lessons.charAt(0) + L.lessons.slice(1).toLocaleLowerCase(L.id);
+      const lessonsHead = lessonsTitleOf(L.id, gear ? 'gear' : 'life'), end = lessonsHead.charAt(0) + lessonsHead.slice(1).toLocaleLowerCase(L.id);
       if (Number(opts.outroStart) - chapters[chapters.length - 1].t >= 10) chapters.push({ t: Math.round(opts.outroStart), clock: clockOf(opts.outroStart), label: end });
     }
     // Hashtag đề xuất (tối đa 14: YouTube bỏ qua TẤT CẢ nếu video có hơn 15; 3 cái đầu hiện ngay trên tiêu đề): hashtag của tiêu đề, khung đúng / sai, #Shorts (nếu dọc),
     // hashtag chung của loạt video, vài từ khóa RIÊNG của kịch bản (lấy từ tiêu đề), rồi hashtag chủ đề chung.
-    const M = MORE[L.id] || MORE.en, titleWords = hook.split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 5 && /^\p{Lu}/u.test(w) && !/^(Spending|Saving|Wrong|Right)$/iu.test(w)).map(w => hashOf(w)).slice(0, 2);
+    const M = gear ? (GEAR_MORE[L.id] || GEAR_MORE.en) : (MORE[L.id] || MORE.en), lessonsHead2 = lessonsTitleOf(L.id, gear ? 'gear' : 'life'), titleWords = hook.split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 5 && /^\p{Lu}/u.test(w) && !/^(Spending|Saving|Wrong|Right)$/iu.test(w)).map(w => hashOf(w)).slice(0, 2);
     const hashtags = [...new Map([hashOf(hook).slice(0, 40), ...M.top, opts.layout === 'stack' ? 'Shorts' : '', ...X.hash, ...titleWords, ...M.rest].filter(Boolean).map(h => '#' + h).map(h => [lc(h), h])).values()].slice(0, 14);
     const body = [title];
     if (closing) body.push('', closing);
-    if (lessons.length) body.push('', L.lessons.charAt(0) + L.lessons.slice(1).toLocaleLowerCase(L.id) + ':', ...lessons.map(x => '• ' + x));
+    if (lessons.length) body.push('', lessonsHead2.charAt(0) + lessonsHead2.slice(1).toLocaleLowerCase(L.id) + ':', ...lessons.map(x => '• ' + x));
     if (chapters.length >= 3) body.push('', X.chapters + ':', ...chapters.map(c => `${c.clock} ${c.label}`));
     body.push('', X.note, '', hashtags.join(' '));
     const description = body.join('\n').slice(0, 4900);
-    const words = [title, hook, flat(script && script.left), flat(script && script.right), ...X.kw, ...M.kw, ...flat(L.tagline).split('·'), flat(script && script.meter)].map(x => lc(flat(x))).filter(x => x.length > 1);
+    const words = [title, hook, flat(script && script.left), flat(script && script.right), ...X.kw, ...M.kw, ...flat(taglineOf(L.id, gear ? 'gear' : 'life')).split('·'), flat(script && script.meter)].map(x => lc(flat(x))).filter(x => x.length > 1);
     const tags = []; let size = 0;
     for (const t of [...new Set(words)]) { if (size + t.length + 2 > 450) break; tags.push(t); size += t.length + 2; }
     // Tiêu đề gợi ý khác (≤ 70 ký tự, khác tiêu đề hiện tại): làm / không làm · hai con đường · đúng / sai · cùng một khởi đầu.
@@ -489,7 +655,8 @@
   }
 
   // Bên «đúng / nên» (✓) và bên «sai / không nên» (✗) theo điểm cuối cùng của hai bên; chênh dưới 5 điểm hoặc thiếu điểm thì không kết luận.
-  function verdictOf(beats) {
+  function verdictOf(beats, mode) {
+    if (mode === 'gear') return '';   // khí tài: không có «đúng / sai» (✓ / ✗), chỉ so điểm từng hạng mục
     const last = Array.isArray(beats) && beats.length ? beats[beats.length - 1] : null;
     const l = Number(last && last.leftScore), r = Number(last && last.rightScore);
     if (!Number.isFinite(l) || !Number.isFinite(r) || Math.abs(l - r) < 5) return '';
@@ -497,7 +664,7 @@
   }
 
   return {
-    KIND, LAYOUTS, MINUTES, SECONDS, PART_BEATS, LANGS, LANGUAGES, langOf, limits, RATES, TOPICS, topicPreset, budgetChars, beatsFor, MAX_CAPTION, MAX_LABEL, MAX_TAG, MAX_LESSONS,
+    KIND, MODES, GEAR_TOPICS, gearPreset, taglineOf, lessonsTitleOf, meterOf, LAYOUTS, MINUTES, SECONDS, PART_BEATS, LANGS, LANGUAGES, langOf, limits, RATES, TOPICS, topicPreset, budgetChars, beatsFor, MAX_CAPTION, MAX_LABEL, MAX_TAG, MAX_LESSONS,
     options, problems, slug, storyIdBase, buildBibleInstruction, parseBible, buildPartInstruction, parseBeats, checkBeats, fixText, assemble,
     anchorPrompt, clipPrompt, isPolicyError, safeRetryPrompt, buildJobs, hudScript, notesText, publishPack, clockOf, uniqueTitle, verdictOf
   };

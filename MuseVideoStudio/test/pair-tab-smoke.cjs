@@ -25,7 +25,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
       ];
       const s = {
         version: '1.15.4', active: false, paused: true, jobs: [],
-        license: { status: 'active', plan: 'short', longTerm: false, device: 'TESTDEVICE', expiresAt: Date.now() + 86400000 * 30, message: 'Đã kích hoạt key.' },
+        license: { status: 'active', plan: 'trial', longTerm: false, paid: false, device: 'TESTDEVICE', expiresAt: Date.now() + 86400000, message: 'Đang dùng thử 24 giờ.' },
         story: { busy: false, progress: '', error: '', output: '', srt: '', notes: [], voice: { setupBusy: false, setupMessage: '', setupError: '', ready: { edge: true, clone: false }, platform: 'win32', edgeVoices: voices, clones: [] } },
         restore: { busy: false, progress: '', error: '', storyId: '', stories: {} },
         wild: { busy: false, phase: '', progress: '', error: '', storyId: '', stories: {}, write: {}, build: {} },
@@ -77,21 +77,51 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     const calls = name => page.evaluate(n => window.calls.filter(c => c.name === n), name);
     const flush = () => page.evaluate(() => new Promise(r => setTimeout(r, 120)));
 
-    // 1) Nút tab nằm ngay dưới «Động vật hoang dã»; gói 30 ngày thấy khóa.
+    // 1) Nút tab nằm ngay dưới «Động vật hoang dã»; bản dùng thử 24 giờ thấy khóa.
     const order = await page.evaluate(() => [...document.querySelectorAll('aside nav button')].map(b => b.id));
     assert.ok(order.indexOf('navPair') === order.indexOf('navWild') + 1, 'tab So sánh nằm ngay dưới Động vật: ' + order.join(','));
     assert.match(await page.locator('#navPair').textContent(), /So sánh song song/);
     await page.click('#navPair');
     assert.equal(await page.locator('#pairPanel').isVisible(), true);
     for (const id of ['restorePanel', 'wildPanel', 'storyPanel']) assert.equal(await page.locator('#' + id).isVisible(), false, 'không dính panel ' + id);
-    assert.equal(await page.locator('#pairLock').isVisible(), true, 'gói 30 ngày thấy khóa');
+    assert.equal(await page.locator('#pairLock').isVisible(), true, 'bản dùng thử thấy khóa');
+    assert.match(await page.locator('#pairLock').textContent(), /Cần key đã mua[\s\S]*Khí tài đối đầu/);
     assert.equal(await page.locator('#pairBody').isVisible(), false);
     assert.match(await page.locator('#headingText').textContent(), /video so sánh song song/);
     assert.match(await page.locator('#folderPath').textContent(), /SoSanh$/);
 
+    // 1b) Gói 30 ngày (key đã mua): mở khóa nhưng chỉ dùng được «Khí tài đối đầu»; chế độ Cuộc sống bị khóa.
+    await page.evaluate(() => { window.s.license = { status: 'active', plan: 'short', longTerm: false, paid: true, device: 'T', expiresAt: Date.now() + 86400000 * 30, message: 'Đã kích hoạt key.' }; window.push(); });
+    await page.waitForSelector('#pairBody', { state: 'visible' });
+    assert.equal(await page.locator('#pairLock').isVisible(), false, 'gói 30 ngày không còn khóa');
+    assert.equal(await page.locator('#pairMode').inputValue(), 'gear', 'tự chuyển sang Khí tài đối đầu');
+    assert.equal(await page.locator('#pairMode option[value=life]').evaluate(o => o.disabled), true, 'chế độ Cuộc sống bị khóa với gói 30 ngày');
+    assert.equal(await page.locator('#pairModeHint').isVisible(), true);
+    assert.match(await page.locator('#pairIntro').textContent(), /Khí tài đối đầu: màn hình chia đôi/);
+    assert.match(await page.locator('#pairTopic').getAttribute('placeholder'), /cặp khí tài/);
+    const gearChips = await page.locator('#pairTopics .topicChip').allTextContents();
+    assert.ok(gearChips.length >= 12 && gearChips.some(t => /F-35/.test(t)), 'có gợi ý cặp khí tài: ' + gearChips.join(' | '));
+    await page.click('#pairTopics .topicChip:has-text("F-35")');
+    assert.match(await page.locator('#pairLeft').inputValue(), /F-35/i);
+    assert.match(await page.locator('#pairRight').inputValue(), /SU-57/i);
+    await page.click('#pairCreate');
+    await page.waitForSelector('#pairRuns .restoreRun');
+    const gearMade = await calls('pairMake');
+    assert.equal(gearMade.length, 1);
+    assert.equal(gearMade[0].data.mode, 'gear', 'lệnh pairMake mang mode khí tài');
+    assert.match(gearMade[0].data.topic, /F-35/i);
+    await page.evaluate(() => { window.calls.length = 0; window.s.pair = { busy: false, phase: '', progress: '', error: '', storyId: '', stories: {}, write: {} }; window.push(); });
+    await page.waitForSelector('#pairCreate:not([disabled])', { state: 'attached' });
+    await page.evaluate(() => { document.getElementById('pairForm').open = true; });
+
     // 2) Gói Năm: mở khóa, mặc định là tiếng Anh, 9 phút, chia đôi ngang; đủ 15 ngôn ngữ.
     await page.evaluate(() => { window.s.license = { status: 'active', plan: 'year', longTerm: true, device: 'T', expiresAt: Date.now() + 86400000 * 365, message: 'Đã kích hoạt key (gói Năm).' }; window.push(); });
     await page.waitForSelector('#pairBody', { state: 'visible' });
+    assert.equal(await page.locator('#pairMode option[value=life]').evaluate(o => o.disabled), false, 'gói Năm mở lại chế độ Cuộc sống');
+    assert.equal(await page.locator('#pairModeHint').isVisible(), false);
+    await page.selectOption('#pairMode', 'life');
+    assert.match(await page.locator('#pairIntro').textContent(), /cùng một nhân vật người que 3D/, 'đổi lại chế độ Cuộc sống: chữ giới thiệu cũ');
+    await page.fill('#pairTopic', ''); await page.fill('#pairLeft', ''); await page.fill('#pairRight', '');
     assert.deepEqual(await page.locator('#pairMinutes option').allTextContents(), ['1 phút (chạy thử, ít clip)', '3 phút (chạy thử, ít clip)', '5 phút (chạy thử, ít clip)', '8 phút', '9 phút', '10 phút']);
     assert.equal(await page.locator('#pairMinutes').inputValue(), '9');
     assert.equal(await page.locator('#pairLang option').count(), 15, 'đủ 15 ngôn ngữ');
@@ -157,7 +187,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await page.waitForSelector('#pairRuns .restoreRun');
     const made = await calls('pairMake');
     assert.equal(made.length, 1);
-    assert.deepEqual(made[0].data, { topic: 'The same child: a father who yells and a father who listens', left: 'RAISED WITH SHOUTS', right: 'RAISED WITH LISTENING', minutes: 9, lang: 'en', layout: 'stack', voice: { voice: 'en-US-JennyNeural', tempo: 1.1, volume: 1.2 }, music: '', musicVolume: 0.15 });
+    assert.deepEqual(made[0].data, { mode: 'life', topic: 'The same child: a father who yells and a father who listens', left: 'RAISED WITH SHOUTS', right: 'RAISED WITH LISTENING', minutes: 9, lang: 'en', layout: 'stack', voice: { voice: 'en-US-JennyNeural', tempo: 1.1, volume: 1.2 }, music: '', musicVolume: 0.15 });
     assert.match(await page.locator('#pairRuns .restoreRunText').first().textContent(), /Viết kịch bản 2\/9/);
     assert.match(await page.locator('#pairRunHint').textContent(), /Đang viết kịch bản · 16\/66 mốc/);
     assert.equal(await page.locator('#pairCreate').isDisabled(), true, 'đang làm video thì không tạo thêm');

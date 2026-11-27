@@ -11,10 +11,12 @@ test('gói dài hạn: key ≥360 ngày (Năm / Vĩnh viễn) mở được tab 
     assert.equal(license.status().plan, 'trial'); assert.equal(license.status().longTerm, false);
     await assert.rejects(license.requireLongTerm(), /gói Năm hoặc Vĩnh viễn/);
     await license.ensureAllowed();                                   // dùng thử vẫn tạo video ở các tab khác
+    assert.equal(license.status().paid, false); await assert.rejects(license.requirePaid(), /đã mua key/);   // «Khí tài đối đầu»: dùng thử không dùng được
     for (const [days, plan, ok] of [[30, 'short', false], [90, 'short', false], [359, 'short', false], [365, 'year', true], [3650, 'lifetime', true]]) {
       await license.activate(key(days));
       const s = license.status();
       assert.equal(s.status, 'active'); assert.equal(s.plan, plan, days + ' ngày'); assert.equal(s.longTerm, ok);
+      assert.equal(s.paid, true); assert.equal((await license.requirePaid()).plan, plan, 'khí tài: mọi gói đã mua (kể cả 30 ngày) đều dùng được');
       if (ok) assert.equal((await license.requireLongTerm()).plan, plan);
       else await assert.rejects(license.requireLongTerm(), /gói Năm hoặc Vĩnh viễn/);
       await license.ensureAllowed();                                 // gói ngắn vẫn dùng các tab khác bình thường
@@ -22,5 +24,6 @@ test('gói dài hạn: key ≥360 ngày (Năm / Vĩnh viễn) mở được tab 
     // key dài hạn hết hạn thì hết quyền
     await license.activate(key(365)); clock += 366 * DAY;
     await assert.rejects(license.requireLongTerm());
+    await assert.rejects(license.requirePaid(), 'key hết hạn thì hết quyền');
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });

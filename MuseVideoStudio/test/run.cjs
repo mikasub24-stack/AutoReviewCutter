@@ -25,6 +25,7 @@ require('./wild-plan.test.cjs');
 require('./wild-write.test.cjs');
 require('./pair-plan.test.cjs');
 require('./pair-write.test.cjs');
+require('./pair-gear.test.cjs');
 require('./pair-render.test.cjs');
 require('./pair-verdict.test.cjs');
 require('./account-lease.test.cjs');
