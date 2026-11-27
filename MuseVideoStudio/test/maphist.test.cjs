@@ -525,6 +525,43 @@ test('nhóm chủ đề: bảy nhóm, mỗi nhóm có đề tài gợi ý và m�
   assert.doesNotMatch(own, /CHƯA chọn đề tài/, 'đã gõ đề tài thì không bảo Muse tự chọn');
 });
 
+test('dạng chủ đề: đoán từ đề tài hoặc theo nhóm đã chọn; lời dặn riêng cho chiến tranh / độc lập / khám phá; lưu vào kịch bản và dòng thời gian', () => {
+  assert.deepEqual(Plan.KINDS, Plan.CATEGORIES.map(c => c.id), 'mỗi nhóm chủ đề là một dạng');
+  assert.equal(Plan.inferKind('World War I'), 'war');
+  assert.equal(Plan.inferKind('Chiến tranh Việt Nam'), 'war');
+  assert.equal(Plan.inferKind('The Battle of Stalingrad'), 'war');
+  assert.equal(Plan.inferKind("Indonesia's Road to Independence"), 'independence');
+  assert.equal(Plan.inferKind('Cách mạng tháng Tám'), 'independence');
+  assert.equal(Plan.inferKind('The Mongol Empire'), 'empire');
+  assert.equal(Plan.inferKind('The Tang Dynasty'), 'dynasty');
+  assert.equal(Plan.inferKind('The Age of Exploration'), 'explore');
+  assert.equal(Plan.inferKind('Ancient Egypt'), 'ancient');
+  assert.equal(Plan.inferKind('History of Vietnam'), 'country');
+  assert.equal(Plan.kindOf({ category: 'war', topic: '' }), 'war', 'chọn nhóm, chưa gõ đề tài');
+  assert.equal(Plan.kindOf({ category: 'war', topic: 'Vietnam and America' }), 'war', 'đề tài chung chung thì theo nhóm đã chọn');
+  assert.equal(Plan.kindOf({ category: 'country', topic: 'World War II' }), 'war', 'chữ trong đề tài nói rõ thì theo chữ');
+  assert.equal(Plan.kindOf({ kind: 'explore', title: 'World War II' }), 'explore', 'kịch bản đã ghi dạng thì giữ nguyên');
+  assert.equal(Plan.kindOf({ title: 'History of Vietnam', subtitle: 'A thousand years of independence' }), 'country', 'phụ đề không làm đổi dạng');
+  assert.equal(Plan.kindOf({}), 'country');
+  // lời dặn gửi Muse: chiến tranh KHÔNG kể trăm năm, có hai phe; độc lập có bên đô hộ; nước thường thì không thêm gì
+  const war = Plan.buildOutlineInstruction(Plan.options({ topic: 'World War I', minutes: 8 }), { countryNames: ['France'] });
+  assert.match(war, /DẠNG VIDEO – CHIẾN TRANH/); assert.match(war, /KHÔNG kể lịch sử cả quốc gia/);
+  const ind = Plan.buildOutlineInstruction(Plan.options({ topic: '', category: 'independence', minutes: 8 }), { countryNames: ['Indonesia'] });
+  assert.match(ind, /ĐỘC LẬP/); assert.doesNotMatch(ind, /DẠNG VIDEO – CHIẾN TRANH/);
+  assert.doesNotMatch(Plan.buildOutlineInstruction(Plan.options({ topic: 'History of Vietnam', minutes: 8 }), { countryNames: ['Vietnam'] }), /DẠNG VIDEO/);
+  const outline = { title: 'World War I', country: '', lang: 'vi', kind: 'war', eras: [{ year: 1914, title: 'a', focus: 'f' }, { year: 1918, title: 'b', focus: 'f' }] };
+  const eras = Plan.buildErasInstruction(Plan.options({ topic: 'World War I', language: 'vi' }), outline, { range: [1, 2], countryNames: ['France'] });
+  assert.match(eras, /MỖI PHE|mỗi PHE/); assert.ok(eras.indexOf('DẠNG VIDEO – CHIẾN TRANH') < eras.indexOf('"eras":[{"n":1'), 'lời dặn nằm trước khuôn JSON');
+  assert.doesNotMatch(Plan.buildErasInstruction(Plan.options({ topic: 'History of Vietnam', language: 'vi' }), { ...outline, title: 'History of Vietnam', kind: 'country' }, { range: [1, 2] }), /DẠNG VIDEO/);
+  // dạng đi từ dàn ý → kịch bản → dòng thời gian
+  const parsed = Plan.parseOutline(JSON.stringify({ title: 'World War I', subtitle: 's', eras: Array.from({ length: Plan.eraCount(6) }, (_, i) => ({ year: 1914 + i, title: 't' + i, focus: 'f' })) }), Plan.options({ topic: 'World War I', minutes: 6 }));
+  assert.equal(parsed.kind, 'war');
+  const norm = Plan.normalizeScript(copy(sample), geo).script;
+  assert.equal(Plan.compile({ ...norm, kind: 'war' }, geo, { durations: [], fps: 30 }).kind, 'war');
+  assert.equal(Plan.compile({ ...norm, kind: 'bậy' }, geo, { durations: [], fps: 30 }).kind, 'country', 'dạng lạ thì về chung');
+  assert.equal(Plan.normalizeScript({ ...copy(sample), kind: 'independence' }, geo).script.kind, 'independence');
+});
+
 test('thông tin đăng YouTube: tiêu đề đúng như trên video, chương có mốc giờ thật, thẻ và mô tả trong giới hạn', () => {
   const era = (year, title) => ({ year, title, caption: 'c', narration: 'One two three four five six seven eight nine ten eleven twelve words here today.', realms: [], markers: [], routes: [] });
   const script = { title: 'The Mongol Empire: From Steppe to Superpower', subtitle: 'How a few tribes ruled half the world', country: 'Mongolia', eras: [era(1206, 'Temujin united'), era(1219, 'Khwarazm falls'), era(1241, 'Europe trembles'), era(1260, 'Empire splits'), era(1368, 'Yuan ends')] };

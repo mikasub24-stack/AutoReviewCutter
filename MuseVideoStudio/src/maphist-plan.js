@@ -134,6 +134,42 @@
     }
   ];
   const categoryOf = id => CATEGORIES.find(c => c.id === id) || null;
+  // Dạng chủ đề quyết định cách kể (lời dặn gửi Muse) và kiểu ảnh bìa: trùng id nhóm chủ đề. Chọn nhóm thì lấy nhóm đó; gõ chủ đề tay thì đoán từ chữ.
+  const KINDS = ['country', 'empire', 'dynasty', 'war', 'explore', 'ancient', 'independence'];
+  function inferKind(text) {
+    const t = String(text || '').normalize('NFC').toLowerCase();
+    if (/independence|revolution|liberation|decoloni[sz]ation|road to freedom|độc lập|cách mạng|giải phóng/.test(t)) return 'independence';
+    if (/\b(wars?|battles?|invasions?|sieges?|crusades?|conquests?|campaigns?)\b|chiến tranh|thế chiến|xâm lược|trận /.test(t)) return 'war';
+    if (/\bempires?\b|đế chế|đế quốc/.test(t)) return 'empire';
+    if (/dynast|triều đại|vương triều/.test(t)) return 'dynasty';
+    if (/explor|age of discovery|silk road|trade route|voyage|navigat|thám hiểm|thương mại|con đường tơ/.test(t)) return 'explore';
+    if (/ancient|civili[sz]ation|bronze age|mesopotamia|cổ đại|văn minh/.test(t)) return 'ancient';
+    return 'country';
+  }
+  // config: { category, topic, title }; script thô: { kind, title }.
+  const kindOf = c => {
+    const given = c && KINDS.includes(String(c.kind || '')) ? String(c.kind) : '';
+    if (given) return given;
+    const guess = inferKind([c && c.topic, c && c.title].filter(Boolean).join(' '));   // không đọc phụ đề: «A thousand years of independence» không làm lịch sử một nước thành video độc lập
+    // Chữ trong đề tài nói rõ dạng (chiến tranh, độc lập…) thì theo chữ; chung chung thì theo nhóm người dùng đã chọn.
+    return guess !== 'country' ? guess : (c && KINDS.includes(String(c.category || '')) ? String(c.category) : 'country');
+  };
+  // Lời dặn riêng theo dạng chủ đề: không cho video chiến tranh kể cả trăm năm, video độc lập có hai phe, v.v.
+  const OUTLINE_GUIDE = {
+    war: 'DẠNG VIDEO – CHIẾN TRANH: chỉ kể MỘT cuộc chiến (hoặc một chiến dịch lớn), KHÔNG kể lịch sử cả quốc gia và TUYỆT ĐỐI không kéo dài hàng trăm năm. Thời gian phủ từ ngay trước chiến tranh (nguyên nhân, liên minh) đến hệ quả ngay sau (hiệp ước, biên giới mới), thường vài năm đến vài thập kỷ. Giai đoạn đầu: bối cảnh và các phe; các giai đoạn giữa: từng chiến dịch / mặt trận / bước ngoặt (năm có thể cách nhau vài tháng); giai đoạn cuối: kết cục và bản đồ sau chiến tranh. Tiêu đề phải nói đúng cuộc chiến, không hứa «lịch sử hàng trăm năm».',
+    independence: 'DẠNG VIDEO – ĐỘC LẬP / CÁCH MẠNG: kể từ thời bị đô hộ hoặc chế độ cũ, qua các phong trào và cuộc đấu tranh, tới ngày giành độc lập và hệ quả ngay sau. Hai thế lực chính: bên đô hộ và bên giành độc lập; lãnh thổ độc lập chỉ được tô màu khi đã giành được.',
+    explore: 'DẠNG VIDEO – KHÁM PHÁ / THƯƠNG MẠI: trọng tâm là các HÀNH TRÌNH và tuyến đường; mỗi giai đoạn nên gắn với một chuyến đi, một cảng hay một tuyến thương mại làm bản đồ đổi hình.',
+    empire: 'DẠNG VIDEO – ĐẾ CHẾ: hình thành → mở rộng → đỉnh cao (lãnh thổ lớn nhất) → suy tàn hoặc sụp đổ. Giữ nhất quán tên đế chế để thấy lãnh thổ lớn lên rồi thu hẹp.',
+    dynasty: 'DẠNG VIDEO – TRIỀU ĐẠI: lập triều → thịnh trị → rối loạn → diệt vong; mỗi giai đoạn nêu vua hoặc biến cố làm đổi hình bản đồ.',
+    ancient: 'DẠNG VIDEO – VĂN MINH CỔ ĐẠI: nguồn gốc → các công trình và thành tựu lớn → suy tàn; nhấn vào dòng sông, thành phố và công trình đặc trưng.',
+    country: ''
+  };
+  const ERAS_GUIDE = {
+    war: 'DẠNG VIDEO – CHIẾN TRANH: mỗi PHE (liên minh) là MỘT thế lực với màu riêng, hai phe chính phải có màu tương phản (ví dụ xanh dương và đỏ); "regions" là các nước thuộc phe đó đang giữ hoặc chiếm ở giai đoạn đó, và chỉ cần tô vùng quan trọng. markers ưu tiên type "battle"; scene ưu tiên "battle"; icon "swords" cho giai đoạn giao tranh; mood: phe đang tiến "angry" hoặc "proud", phe đang lùi "shock" hoặc "sad".',
+    independence: 'DẠNG VIDEO – ĐỘC LẬP: có hai thế lực rõ ràng (bên đô hộ màu đậm, bên đấu tranh màu sáng); mood bên đấu tranh: "sad" hoặc "angry" lúc bị đô hộ, "proud" khi giành độc lập; icon "flag" cho ngày độc lập.',
+    explore: 'DẠNG VIDEO – KHÁM PHÁ: dùng "routes" (ship:true) cho mỗi hành trình, markers type "ship" hoặc "city"; scene "voyage", "arrival" hoặc "market".',
+    empire: '', dynasty: '', ancient: '', country: ''
+  };
   const MOODS = ['happy', 'proud', 'tired', 'angry', 'sad', 'calm', 'shock'];   // shock: mặt choáng (do bản vẽ tự suy ra khi thế lực mất đất; kịch bản cũng có thể viết)
   const FLAGS = ['solid', 'h', 'v', 'disc', 'cross'];
   const MARKERS = ['city', 'capital', 'temple', 'castle', 'ship', 'battle'];
@@ -305,7 +341,7 @@
     });
     if (!eras.length) issues.push({ era: 0, text: 'Kịch bản chưa có giai đoạn nào.' });
     return {
-      script: { lang: langOf(src.lang).id, theme: src.theme === 'classic' ? 'classic' : 'cartoon', title: flat(src.title).slice(0, 120) || 'History', subtitle: flat(src.subtitle).slice(0, 120), hook: flat(src.hook).slice(0, 60), country, outro: flat(src.outro).slice(0, 120), eras },
+      script: { kind: kindOf({ kind: src.kind, title: flat(src.title), subtitle: flat(src.subtitle) }), lang: langOf(src.lang).id, theme: src.theme === 'classic' ? 'classic' : 'cartoon', title: flat(src.title).slice(0, 120) || 'History', subtitle: flat(src.subtitle).slice(0, 120), hook: flat(src.hook).slice(0, 60), country, outro: flat(src.outro).slice(0, 120), eras },
       issues
     };
   }
@@ -392,7 +428,7 @@
     const milestones = order.map((idx, k) => ({ era: idx, year: eras[idx].year, label: eras[idx].label, icon: eras[idx].icon || icons[k % icons.length] }));
     const outroStart = t;
     return {
-      lang, theme: script.theme === 'cartoon' ? 'cartoon' : 'classic', title: script.title, subtitle: script.subtitle, hook: hookOf(script), outro: script.outro, country: script.country, fps, W, H,
+      kind: KINDS.includes(script.kind) ? script.kind : 'country', lang, theme: script.theme === 'cartoon' ? 'cartoon' : 'classic', title: script.title, subtitle: script.subtitle, hook: hookOf(script), outro: script.outro, country: script.country, fps, W, H,
       introEnd: INTRO, outroStart, total: outroStart + OUTRO, worldView: { ...WORLD_VIEW },
       eras, milestones,
       focus: mainHit ? mainHit.a3 : ''
@@ -545,6 +581,7 @@
       `1. Mọi chữ trong JSON (title, subtitle, tên giai đoạn, focus) viết bằng ${L.vi.toUpperCase()}.${isEn ? '' : ' Riêng «country» vẫn ghi TIẾNG ANH đúng như trong danh sách.'}`,
       '2. Sự thật lịch sử phải chính xác, đúng năm, không bịa. Không chắc năm hay con số thì dùng mốc tròn mà sử sách thường dùng.',
       `3. Có khoảng ${n} giai đoạn (được lệch tối đa ${Math.max(2, Math.round(n * .1))}), xếp theo thời gian tăng dần. Mỗi giai đoạn là MỘT bước ngoặt làm bản đồ đổi hình (lập quốc, mở rộng, chia cắt, chiến tranh, thống nhất, độc lập…). Giai đoạn đầu kể nguồn gốc; giai đoạn cuối là hiện đại hoặc kết cục. Các giai đoạn phải cách nhau đủ xa để thấy lãnh thổ thay đổi.`,
+      ...(OUTLINE_GUIDE[kindOf(config)] ? [OUTLINE_GUIDE[kindOf(config)]] : []),
       config.country
         ? `4. «country» ĐÚNG là: ${config.country}.`
         : '4. «country»: nước hiện nay nằm ở trung tâm câu chuyện, ghi đúng tên tiếng Anh trong danh sách bên dưới. Nếu chủ đề trải ra nhiều nước (đế quốc, chiến tranh lớn) hãy chọn nước ở lõi câu chuyện; chỉ khi thật sự toàn cầu mới để chuỗi rỗng "".',
@@ -568,7 +605,7 @@
 
   function buildErasInstruction(config, outline, { marker = '', range, previous = null, provinces = [], countryNames = [], fix = '' } = {}) {
     const [a, b] = range, L = langOf(config.language || outline.lang), isEn = L.id === 'en';
-    const rows = outline.eras.map((e, i) => `${i + 1} | ${e.year} | ${e.title} | ${e.focus}`);
+    const rows = outline.eras.map((e, i) => `${i + 1} | ${e.year} | ${e.title} | ${e.focus}`), eraGuide = ERAS_GUIDE[kindOf({ ...config, title: outline.title, subtitle: outline.subtitle, kind: outline.kind })] || '';
     return [
       `Bạn đang viết kịch bản video bản đồ lịch sử hoạt hình «${outline.title}» cho khán giả nước ngoài. Hãy viết CHI TIẾT các giai đoạn từ ${a} đến ${b} (tổng cộng ${outline.eras.length} giai đoạn).`,
       '',
@@ -586,6 +623,7 @@
       '7. markers: 0–3 địa danh {"type":"city|capital|temple|castle|ship|battle","name":"<tên>","at":[kinh độ,vĩ độ]} (kinh độ trước, vĩ độ sau; Đông và Bắc là số dương). routes (không bắt buộc): [{"points":[[kinh độ,vĩ độ],…],"ship":true}] cho hành trình, thương mại hay cuộc xâm lược.',
       '8. icon: một trong sail, crown, swords, star, flag, person, rocket, scroll, castle (huy hiệu trên thanh thời gian).',
       `9. scene (không bắt buộc): cảnh hoạt hình có người chèn giữa giai đoạn, chọn cảnh hợp với sự kiện chính: voyage (tàu ra khơi, thám hiểm), arrival (tàu cập bến, khám phá), battle (trận đánh, chiến tranh), court (vua và triều đình, đăng quang, hiệp ước), market (chợ, thương mại), build (xây dựng, kim tự tháp, thành quách), volcano (thiên tai, núi lửa). Không dùng cùng một cảnh cho hai giai đoạn liền nhau; để "none" nếu không hợp. shout (không bắt buộc): tiếng hô ngắn hiện trên cảnh, tối đa 18 ký tự, viết bằng ${L.vi}, VIẾT HOA, ví dụ "CHARGE!".`,
+      ...(eraGuide ? [eraGuide] : []),
       `10. Mỗi giai đoạn phải có đúng số thứ tự "n" như dàn ý. Chỉ trả lời DUY NHẤT một khối JSON, không giải thích, đúng khuôn:`,
       '{"eras":[{"n":1,"year":-2879,"title":"…","caption":"…","narration":"…","population":0,"icon":"crown","scene":"court","shout":"…","realms":[{"name":"…","regions":["…"],"circles":[],"colors":["#c0392b"],"flag":"solid","mood":"happy","face":true}],"markers":[{"type":"capital","name":"…","at":[105.8,21.0]}],"routes":[]}]}',
       ...tail(marker),
@@ -622,7 +660,7 @@
     if (!config.topic && !flat(raw.title)) throw Object.assign(Error('Dàn ý thiếu tiêu đề.'), { fixable: true, fix: `Thiếu «title»: ghi chủ đề bạn đã chọn thành «title» (${langOf(config.language).vi}).` });
     if (eras.length < Math.max(3, Math.floor(want * .6))) throw Object.assign(Error('Dàn ý có quá ít giai đoạn.'), { fixable: true, fix: `Dàn ý chỉ có ${eras.length} giai đoạn hợp lệ (cần khoảng ${want}, mỗi giai đoạn đủ "year" là số và "title"). Viết lại ĐỦ.` });
     for (let i = 1; i < eras.length; i++) if (eras[i].year <= eras[i - 1].year) throw Object.assign(Error('Năm không tăng dần.'), { fixable: true, fix: `Các giai đoạn phải xếp theo năm TĂNG DẦN; giai đoạn ${i + 1} (năm ${eras[i].year}) không lớn hơn giai đoạn ${i} (năm ${eras[i - 1].year}). Sửa rồi viết lại ĐỦ.` });
-    return { lang: langOf(config.language).id, title: flat(raw.title).slice(0, 120) || config.topic, subtitle: flat(raw.subtitle).slice(0, 120), hook: flat(raw.hook).slice(0, 60), country: config.country || flat(raw.country).slice(0, 80), eras: eras.slice(0, MAX_ERAS) };
+    return { kind: kindOf({ ...config, title: flat(raw.title), subtitle: flat(raw.subtitle) }), lang: langOf(config.language).id, title: flat(raw.title).slice(0, 120) || config.topic, subtitle: flat(raw.subtitle).slice(0, 120), hook: flat(raw.hook).slice(0, 60), country: config.country || flat(raw.country).slice(0, 80), eras: eras.slice(0, MAX_ERAS) };
   }
 
   // Đọc lượt «chi tiết giai đoạn»: trả về Map số thứ tự → giai đoạn thô (chưa chuẩn hóa).
@@ -663,7 +701,7 @@
       if (!raw) return;
       eras.push({ ...raw, year: raw.year != null ? raw.year : o.year, title: raw.title || o.title });
     });
-    return { lang, title: outline.title, subtitle: outline.subtitle, hook: outline.hook || '', country: outline.country, outro: strings(lang).subscribe, eras };
+    return { kind: outline.kind || '', lang, title: outline.title, subtitle: outline.subtitle, hook: outline.hook || '', country: outline.country, outro: strings(lang).subscribe, eras };
   }
 
 
@@ -741,7 +779,7 @@
   }
 
   return {
-    W, H, CY, INTRO, OUTRO, LEAD, TAIL, MIN_ERA, ERA_SECONDS, MIN_MINUTES, MAX_MINUTES, DEFAULT_MINUTES, LENGTHS, MAX_ERAS, CATEGORIES, categoryOf, MOODS, FLAGS, MARKERS, ICONS, PALETTE,
+    W, H, CY, INTRO, OUTRO, LEAD, TAIL, MIN_ERA, ERA_SECONDS, MIN_MINUTES, MAX_MINUTES, DEFAULT_MINUTES, LENGTHS, MAX_ERAS, CATEGORIES, categoryOf, KINDS, inferKind, kindOf, MOODS, FLAGS, MARKERS, ICONS, PALETTE,
     SCENES, TIMING, cuesOf, BATCH, NARRATION_MIN, NARRATION_MAX, buildOutlineInstruction, buildErasInstruction, extractJson, parseOutline, parseEras, checkEras, fixText, assemble,
     eraCount, options, problems, yearLabel, publishPack, hookOf, clock, LANGUAGES, langOf, strings, normalizeScript, compile, stateAt, counterAt, chunksOf, subtitleAt, flyCam, fit, speakSeconds, bigRingsBox, easeInOut, clamp, lerp, mer, unmerLat, hex, num, words, flat, WORLD_VIEW
   };

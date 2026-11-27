@@ -142,6 +142,16 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.15.14
+
+- **«Bản đồ lịch sử»: thumbnail và kịch bản theo từng chủ đề, không còn một khuôn cho tất cả.** Mỗi video có «dạng chủ đề» (Lịch sử một nước, Đế chế, Triều đại, Chiến tranh, Khám phá, Văn minh cổ đại, Độc lập): lấy theo nhóm đã chọn, hoặc đoán từ chữ trong đề tài khi tự gõ («World War I», «Chiến tranh Việt Nam», «…Independence»). Kịch bản cũ không ghi dạng thì đoán từ tiêu đề.
+  - **Thumbnail Chiến tranh** ra kiểu «Đối đầu»: bản đồ tối, nền lửa khói, phóng vào mặt trận (chỗ hai phe giáp nhau), hai nhân vật giận dữ nhìn nhau (xanh – đỏ), vụ nổ và chữ «VS» ở giữa, khoảng năm của cuộc chiến thật to, tên hai phe ở đáy.
+  - **Thumbnail Độc lập** ra kiểu «Trước / Sau» riêng: bên trái xám, ủ rũ, bị đô hộ; bên phải sáng, rực rỡ khi giành độc lập.
+  - Các dạng còn lại vẫn là «Trước / Sau» (giai đoạn đầu | giai đoạn cuối) như trước.
+  - **Lời dặn kịch bản gửi Muse theo dạng**: Chiến tranh chỉ kể MỘT cuộc chiến (không kể cả trăm năm của cả quốc gia), mỗi phe là một thế lực màu tương phản, ưu tiên cảnh/điểm đánh dấu trận đánh; Độc lập có bên đô hộ và bên đấu tranh; Khám phá xoay quanh các hành trình/tuyến đường. Dạng Nước / Đế chế / Triều đại / Cổ đại giữ nguyên lời dặn cũ.
+- Video đã dựng rồi không bị viết lại. Muốn có cấu trúc kể mới thì tạo lại kịch bản; còn thumbnail thì bấm «Tạo thumbnail 16:9» lại là ra kiểu mới.
+- Test: `maphist.test` kiểm đoán dạng, lời dặn theo dạng, dạng đi từ dàn ý → kịch bản → dòng thời gian; `maphist-thumb-smoke` vẽ thumbnail thật cho cả 7 nhóm (JPEG hợp lệ, ≤ 1,9 MB), chiến tranh/độc lập phải khác kiểu «Trước / Sau» thường.
+
 ## Update 1.15.13
 
 - **«Lưu thumbnail…» lưu theo tên video.** Ở tab «Bản đồ lịch sử», tên gợi ý khi lưu thumbnail là «thumbnail.jpg» chung chung (chỗ đổi tên chỉ khớp tên kiểu «thumbnail-1», còn file thật tên «thumbnail.jpg»). Giờ cả «Bản đồ lịch sử» và «So sánh song song» gợi ý «<tiêu đề video> - thumbnail.jpg», cùng tiêu đề với nút «Lưu video…» (ưu tiên tiêu đề đăng YouTube nếu có). Tab «Dọn nhà · Sinh tồn» vốn đã đặt tên theo video.

@@ -21,6 +21,7 @@
   "sample": {
    "frame": 1,
    "script": {
+    "kind": "country",
     "title": "History of Vietnam",
     "subtitle": "A thousand years of independence",
     "country": "Vietnam",
@@ -227,6 +228,7 @@
   "sample": {
    "frame": 1,
    "script": {
+    "kind": "empire",
     "title": "The Mongol Empire",
     "subtitle": "The largest land empire in history",
     "country": "Mongolia",
@@ -403,6 +405,7 @@
   "sample": {
    "frame": 1,
    "script": {
+    "kind": "dynasty",
     "title": "The Tang Dynasty",
     "subtitle": "The golden age of China",
     "country": "China",
@@ -562,6 +565,7 @@
   "sample": {
    "frame": 1,
    "script": {
+    "kind": "war",
     "title": "World War II",
     "subtitle": "The war that redrew the map",
     "country": "Germany",
@@ -756,6 +760,7 @@
   "sample": {
    "frame": 1,
    "script": {
+    "kind": "explore",
     "title": "The Age of Exploration",
     "subtitle": "Sea roads that connected the world",
     "country": "Portugal",
@@ -1024,6 +1029,7 @@
   "sample": {
    "frame": 1,
    "script": {
+    "kind": "ancient",
     "title": "Ancient Egypt",
     "subtitle": "Gift of the Nile",
     "country": "Egypt",
@@ -1195,6 +1201,7 @@
   "sample": {
    "frame": 2,
    "script": {
+    "kind": "independence",
     "title": "Indonesia's Road to Independence",
     "subtitle": "From colony to nation",
     "country": "Indonesia",

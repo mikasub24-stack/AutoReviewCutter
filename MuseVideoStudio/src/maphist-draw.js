@@ -873,7 +873,7 @@
       c.restore();
     }
     function toonRealm(c, r, pr, spots, local, t, opts, idx = 0) {
-      if ((opts.pop || opts.pops) && opts.clean) { popFace(c, r, pr, spots, t, opts); return; }
+      if ((opts.pop || opts.pops) && opts.clean) { if (!opts.noFace) popFace(c, r, pr, spots, t, opts); return; }
       if (!r.units.length || opts.clean) return;
       const key2 = bigUnit(r.units), cl = key2 && centroidOf(key2), b = boxOf(r.units, pr);
       if (!cl || !b) return;
@@ -968,14 +968,15 @@
         const local = st.local, parts = partsFor(st);
         const g = clamp((local - GROW_DELAY) / GROW, 0, 1), grow = easeOut(g);
         const group = cartoon ? toonGroup : drawGroup;
-        for (const p of parts.removed) group(sc, p.keys, p.realm, pr, { alpha: 1 - clamp(local / 1.1, 0, 1), rise: 1 - clamp(local / .9, 0, 1), pop: opts.pop });
-        for (const p of parts.stable) group(sc, p.keys, p.realm, pr, { pop: opts.pop });
+        const popOf = realm => opts.pops ? (opts.pops[realm && realm.name] || null) : opts.pop;   // ảnh bìa «Đối đầu»: mỗi phe một nhân vật riêng
+        for (const p of parts.removed) group(sc, p.keys, p.realm, pr, { alpha: 1 - clamp(local / 1.1, 0, 1), rise: 1 - clamp(local / .9, 0, 1), pop: popOf(p.realm) });
+        for (const p of parts.stable) group(sc, p.keys, p.realm, pr, { pop: popOf(p.realm) });
         for (const p of parts.added) {
           const b = boxOf(p.keys, pr);
           if (!b) continue;
           const first = bigUnit(p.keys), cl = first && centroidOf(first), c0 = cl ? pr.P(cl[0], cl[1]) : [b.cx, b.cy];
           const R = Math.max(Math.hypot(b.w, b.h) * .75, 40);
-          group(sc, p.keys, p.realm, pr, { pop: opts.pop, rise: easeOut(clamp(g * 1.25, 0, 1)), reveal: { cx: c0[0], cy: c0[1], r: R * (cartoon ? Cart.easeBack(g) : grow), p: g, seed: (st.index + 1) * 1.7 } });
+          group(sc, p.keys, p.realm, pr, { pop: popOf(p.realm), rise: easeOut(clamp(g * 1.25, 0, 1)), reveal: { cx: c0[0], cy: c0[1], r: R * (cartoon ? Cart.easeBack(g) : grow), p: g, seed: (st.index + 1) * 1.7 } });
         }
         if (!cartoon) clouds(sc, t);
         for (const r of st.era.routes) drawRoute(sc, r, pr, local, t);
@@ -983,7 +984,7 @@
         const spots = st.era.markers.map(m => pr.P(m.at[0], m.at[1]));
         st.era.realms.forEach(r => {
           if (cartoon) { toonRealm(sc, r, pr, spots, local, t, opts, st.index); return; }
-          if ((opts.pop || opts.pops) && opts.clean) { popFace(sc, r, pr, spots, t, opts); return; }
+          if ((opts.pop || opts.pops) && opts.clean) { if (!opts.noFace) popFace(sc, r, pr, spots, t, opts); return; }
           if (!r.units.length) return;
           const key2 = bigUnit(r.units), cl = key2 && centroidOf(key2), b = boxOf(r.units, pr);
           if (!cl || !b) return;
@@ -1115,14 +1116,15 @@
     }
     // «Trước / Sau» (kiểu thumbnail duy nhất): màn hình chia đôi bằng vết nứt tia sét. Trái = giai đoạn đầu (nhạt, nhân vật bình thản);
     // phải = giai đoạn cuối (rực, nhân vật choáng ngợp, đội vương miện). Hai bên cùng tỉ lệ bản đồ nên thấy lãnh thổ lớn lên; mỗi bên một năm RẤT TO.
-    function drawBeforeAfter() {
+    function drawBeforeAfter(variant = '') {
+      const free = variant === 'free';   // «Độc lập»: bên trái bị đô hộ (xám, buồn), bên phải giành độc lập (rực, tự hào)
       const c = ctx, W2 = width, H2 = height, n = tl.eras.length, i0 = 0, i1 = n - 1, e0 = tl.eras[i0], e1 = tl.eras[i1];
       const big = e => (e.realms || []).filter(r => r.units && r.units.length).sort((a, b) => b.units.length - a.units.length)[0] || null;
       const A = big(e1) || big(e0), keys = A ? A.units : [];
       // Thế lực "diễn viên": bên phải là thế lực lớn nhất hiện tại, bên trái là CHÍNH thế lực đó thời xưa (nếu chưa có thì thế lực lớn nhất thời đó).
       const L = A ? (e0.realms || []).find(r => r.name === A.name && r.units && r.units.length) || big(e0) : null;
-      const popL = L ? { name: L.name, color: '#2e6bff', glow: '#a8dcff', mood: 'calm', t: 1.3, maxR: 80, vis: [W2 * .03, H2 * .27, W2 * .47, H2 * .97] } : null;
-      const popR = A ? { name: A.name, color: '#ff2f3c', glow: '#ffc24a', mood: 'shock', t: 1.3, maxR: 80, vis: [W2 * .53, H2 * .27, W2 * .97, H2 * .97], star: isVietnam(A.name) } : null;   // Việt Nam: có sao vàng của quốc kỳ
+      const popL = L ? { name: L.name, color: '#2e6bff', glow: '#a8dcff', mood: free ? 'sad' : 'calm', t: 1.3, maxR: 80, vis: [W2 * .03, H2 * .27, W2 * .47, H2 * .97] } : null;
+      const popR = A ? { name: A.name, color: '#ff2f3c', glow: '#ffc24a', mood: free ? 'proud' : 'shock', t: 1.3, maxR: 80, vis: [W2 * .53, H2 * .27, W2 * .97, H2 * .97], star: isVietnam(A.name) } : null;   // Việt Nam: có sao vàng của quốc kỳ
       const t0 = stillTime(i0), t1 = stillTime(i1), base = Plan.stateAt(tl, t1).cam;
       // Bên phải: PHÓNG TO vừa khít thế lực hiện tại (phần lãnh thổ chính chiếm ~90% bề rộng nửa ảnh / ~70% chiều cao, như thumbnail «so sánh» của các kênh bản đồ). Bên trái: vừa khít thế lực thời xưa nhưng không nhỏ hơn 27% khung bên phải (xưa nhỏ thì phóng gần hơn, để bản đồ vẫn TO và đọc được).
       const camR = keys.length ? fitCam(base, coreKeys(keys), W2 * .74, H2 * .59, W2 * .46, H2 * .72, 0, 4) : { ...base, span: base.span * .8 };
@@ -1139,8 +1141,8 @@
       const half = side => { c.beginPath(); c.moveTo(side < 0 ? -20 : W2 + 20, P[0][1]); P.forEach(([x, y]) => c.lineTo(x, y)); c.lineTo(side < 0 ? -20 : W2 + 20, P[P.length - 1][1]); c.closePath(); };
       const sat = toon() ? 1.2 : 1.6;
       c.save(); half(-1); c.clip();   // TRÁI: nhạt, hơi lạnh
-      c.filter = 'saturate(.9) contrast(1.06) brightness(.98)'; c.drawImage(thumbCv, 0, 0); c.filter = 'none';
-      c.fillStyle = 'rgba(30,70,140,.12)'; c.fillRect(0, 0, W2, H2); c.restore();
+      c.filter = free ? 'saturate(.3) contrast(1.12) brightness(.82)' : 'saturate(.9) contrast(1.06) brightness(.98)'; c.drawImage(thumbCv, 0, 0); c.filter = 'none';
+      c.fillStyle = free ? 'rgba(70,20,20,.28)' : 'rgba(30,70,140,.12)'; c.fillRect(0, 0, W2, H2); c.restore();
       c.save(); half(1); c.clip();   // PHẢI: rực, vầng sáng ấm
       c.filter = `saturate(${sat}) contrast(1.1) brightness(1.02)`; c.drawImage(thumbCv2, 0, 0); c.filter = 'none';
       c.globalCompositeOperation = 'screen'; rays(c, W2 * .74, H2 * .52, .2, '255,230,170', .14);
@@ -1165,8 +1167,103 @@
       bigYear(c, e1.year, W2 * .75, 232, { maxW: W2 * .38, gold: true, rot: .03 });
       // mặt nhân vật nằm TRÊN lãnh thổ (popFace): trái bình thản, phải choáng ngợp
     }
-    // Ảnh bìa: MỘT kiểu duy nhất «Trước / Sau» (giai đoạn đầu | giai đoạn cuối, bản đồ phóng to vào lãnh thổ chính, năm RẤT TO).
-    function drawThumbnail() { drawBeforeAfter(); }
+    // Chữ RẤT TO viền đen (tên phe, «VS», khoảng năm): cùng kiểu với bigYear nhưng cho chuỗi bất kỳ; fit: bề rộng tối đa.
+    function bigWord(c, str, cx, baseY, { maxW = 700, maxSize = 230, gold = false, rot = 0, tint = null } = {}) {
+      c.save(); c.font = `900 100px ${IMPACT}`;
+      const w100 = c.measureText(str).width; c.restore();
+      const size = Math.min(maxSize, maxW / Math.max(1, w100) * 100), sw = size * .2;
+      c.save(); c.translate(cx, baseY); c.rotate(rot); c.lineJoin = 'round'; c.miterLimit = 2; c.textBaseline = 'alphabetic'; c.textAlign = 'center'; c.font = `900 ${size}px ${IMPACT}`;
+      c.save(); c.translate(0, size * .07); c.strokeStyle = 'rgba(0,0,0,.55)'; c.lineWidth = sw * 1.12; c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = size * .12; c.strokeText(str, 0, 0); c.restore();
+      c.strokeStyle = '#0b0705'; c.lineWidth = sw; c.strokeText(str, 0, 0);
+      const g = c.createLinearGradient(0, -size * .78, 0, 0);
+      if (tint) { g.addColorStop(0, tint[0]); g.addColorStop(1, tint[1]); } else if (gold) { g.addColorStop(0, '#fff27a'); g.addColorStop(.55, '#ffd21f'); g.addColorStop(1, '#ff9d0a'); } else { g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#d9e4f7'); }
+      c.fillStyle = g; c.fillText(str, 0, 0);
+      c.restore();
+    }
+    function burst(c, x, y, R, spikes, rot, fill, line) {
+      c.save(); c.beginPath();
+      for (let k = 0; k < spikes * 2; k++) { const a = rot + k * Math.PI / spikes, r = k % 2 ? R * .55 : R * (.92 + .1 * Math.sin(k * 7.3)); c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); }
+      c.closePath(); c.lineJoin = 'round'; c.lineWidth = R * .07; c.fillStyle = fill; c.strokeStyle = line; c.fill(); c.stroke(); c.restore();
+    }
+    // «Đối đầu» (video chiến tranh): hai phe lớn nhất ở giai đoạn giao tranh quyết liệt nhất, xanh đối đỏ, mặt giận dữ nhìn nhau qua mặt trận có nổ lửa; «VS» ở giữa, khoảng năm của cuộc chiến ở trên, tên hai phe ở dưới.
+    // Trả về false (không vẽ gì) nếu kịch bản không có giai đoạn nào có hai thế lực để đối đầu: khi đó dùng «Trước / Sau».
+    function drawClash() {
+      const c = ctx, W2 = width, H2 = height, eras = tl.eras || [];
+      let best = null;
+      eras.forEach((e, i) => {
+        const rs = (e.realms || []).filter(r => r.units && r.units.length).sort((a, b) => b.units.length - a.units.length);
+        if (rs.length < 2) return;
+        const score = Math.min(rs[0].units.length, rs[1].units.length) + (i + 1) * .001;
+        if (!best || score > best.score) best = { i, rs: [rs[0], rs[1]], score };
+      });
+      if (!best) return false;
+      // Điểm giáp mặt: cặp đơn vị (một của mỗi phe) gần nhau nhất; ảnh bìa chỉ lấy khung quanh chỗ đó (mặt trận), không phóng ra cả hai liên minh trải khắp thế giới.
+      const cen = k => { if (String(k).startsWith('B:')) return null; try { return centroidOf(k) || null; } catch { return null; } };
+      const km = (a, b) => { const p = Math.PI / 180, dLat = (b[1] - a[1]) * p, dLon = (b[0] - a[0]) * p, h = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * p) * Math.cos(b[1] * p) * Math.sin(dLon / 2) ** 2; return 12742 * Math.asin(Math.min(1, Math.sqrt(h))); };
+      const pts = r => r.units.map(k => ({ k, c: cen(k) })).filter(x => x.c);
+      const pa = pts(best.rs[0]), pb = pts(best.rs[1]);
+      if (!pa.length || !pb.length) return false;
+      let near = null;
+      for (const a of pa) for (const b of pb) { const d = km(a.c, b.c); if (!near || d < near.d) near = { d, a: a.c, b: b.c }; }
+      const mid = [(near.a[0] + near.b[0]) / 2, (near.a[1] + near.b[1]) / 2], reach = Math.max(1800, near.d * 1.6 + 1200);
+      const pick = list => { const sorted = list.map(x => ({ ...x, d: km(x.c, mid) })).sort((p, q) => p.d - q.d); const near2 = sorted.filter(x => x.d <= reach); return (near2.length >= 2 ? near2 : sorted.slice(0, 3)).slice(0, 14).map(x => x.k); };
+      const ka = pick(pa), kb = pick(pb);
+      const sideA = { ...best.rs[0], units: ka }, sideB = { ...best.rs[1], units: kb };
+      const lonMean = ks => ks.reduce((t2, k) => t2 + ((cen(k) || [0])[0]), 0) / Math.max(1, ks.length);
+      const [L, R] = lonMean(ka) <= lonMean(kb) ? [sideA, sideB] : [sideB, sideA];
+      const t = stillTime(best.i), base = Plan.stateAt(tl, t).cam;
+      // Khung hình theo tâm các đơn vị quanh mặt trận (không theo hộp bao: Pháp/Nga... có lãnh thổ hải ngoại hay vắt kinh tuyến làm hộp bao phình ra cả châu lục).
+      const cs = [...L.units, ...R.units].map(cen).filter(Boolean), lo = cs.map(q => q[0]), la = cs.map(q => q[1]);
+      const lo0 = Math.min(...lo), lo1 = Math.max(...lo), la0 = Math.min(...la), la1 = Math.max(...la), lat0 = (la0 + la1) / 2;
+      const cam0 = { ...base, lon: (lo0 + lo1) / 2, lat: lat0, span: clamp(Math.max((lo1 - lo0) * 1.5 + 8, (merY(la1) - merY(la0)) / DEG * 2.4 + 8, 34), 34, 120) };
+      const pr0 = projector(cam0), cam = { ...cam0, lat: unMer(merY(lat0) - (CY - H2 * .6) / pr0.S) };
+      const pops = {
+        [L.name]: { name: L.name, color: '#2e6bff', glow: '#9fd2ff', mood: 'angry', t: 1.3, maxR: 84, vis: [W2 * .03, H2 * .3, W2 * .4, H2 * .82] },
+        [R.name]: { name: R.name, color: '#ff2f3c', glow: '#ffb347', mood: 'angry', t: 1.3, maxR: 84, vis: [W2 * .6, H2 * .3, W2 * .97, H2 * .82] }
+      };
+      starSpot = null;
+      const st = drawFrame(t, { bare: true, clean: true, cam, pops, noFace: true });   // bản đồ + màu hai phe; mặt vẽ sau cùng để nằm trên khói và vụ nổ
+      thumbCv = thumbCv || mkSize(W2, H2);
+      { const x = thumbCv.getContext('2d'); x.clearRect(0, 0, W2, H2); x.drawImage(canvas, 0, 0); }
+      // bản đồ tối và đục hơn: không khí chiến tranh
+      c.save(); c.filter = 'saturate(.8) contrast(1.15) brightness(.78)'; c.drawImage(thumbCv, 0, 0); c.filter = 'none'; c.restore();
+      c.save();
+      const fire = c.createRadialGradient(W2 / 2, H2 * .58, 20, W2 / 2, H2 * .58, W2 * .5); fire.addColorStop(0, 'rgba(255,140,40,.55)'); fire.addColorStop(.5, 'rgba(210,50,20,.22)'); fire.addColorStop(1, 'rgba(120,10,10,0)');
+      c.globalCompositeOperation = 'screen'; c.fillStyle = fire; c.fillRect(0, 0, W2, H2); c.globalCompositeOperation = 'source-over';
+      const vg = c.createRadialGradient(W2 / 2, H2 * .5, H2 * .3, W2 / 2, H2 * .5, W2 * .7); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(20,0,0,.72)'); c.fillStyle = vg; c.fillRect(0, 0, W2, H2);
+      const tg = c.createLinearGradient(0, 0, 0, H2 * .4); tg.addColorStop(0, 'rgba(10,0,0,.7)'); tg.addColorStop(1, 'rgba(10,0,0,0)'); c.fillStyle = tg; c.fillRect(0, 0, W2, H2 * .4);
+      const bt = c.createLinearGradient(0, H2 * .62, 0, H2); bt.addColorStop(0, 'rgba(10,0,0,0)'); bt.addColorStop(1, 'rgba(10,0,0,.78)'); c.fillStyle = bt; c.fillRect(0, H2 * .62, W2, H2 * .38);
+      // khói bốc lên từ mặt trận
+      for (const [x, y, r, a] of [[.47, .74, 120, .34], [.54, .68, 150, .3], [.5, .85, 190, .36], [.4, .62, 90, .22], [.6, .6, 100, .24]]) {
+        const g = c.createRadialGradient(W2 * x, H2 * y, 4, W2 * x, H2 * y, r); g.addColorStop(0, `rgba(18,14,14,${a})`); g.addColorStop(1, 'rgba(18,14,14,0)'); c.fillStyle = g; c.fillRect(W2 * x - r, H2 * y - r, r * 2, r * 2);
+      }
+      c.restore();
+      // vụ nổ ở mặt trận (giữa hai phe)
+      burst(c, W2 * .5, H2 * .56, 215, 14, .2, '#ff4b1f', '#1a0804');
+      burst(c, W2 * .5, H2 * .56, 160, 12, .5, '#ffb21f', '#1a0804');
+      burst(c, W2 * .5, H2 * .56, 96, 10, .1, '#fff3b0', '#1a0804');
+      burst(c, W2 * .385, H2 * .74, 96, 11, .7, '#ff7a1f', '#1a0804');
+      burst(c, W2 * .385, H2 * .74, 58, 9, .2, '#ffe27a', '#1a0804');
+      burst(c, W2 * .615, H2 * .4, 84, 10, .4, '#ff7a1f', '#1a0804');
+      burst(c, W2 * .615, H2 * .4, 50, 9, .9, '#ffe27a', '#1a0804');
+      bigWord(c, 'VS', W2 * .5, H2 * .56 + 70, { maxW: 280, maxSize: 210, gold: true, rot: -.05 });
+      // hai nhân vật giận dữ nhìn nhau (vẽ sau vụ nổ để luôn thấy mặt)
+      { const pr = projector(cam), spots = (st.era.markers || []).map(m => pr.P(m.at[0], m.at[1])); [L, R].forEach(r => popFace(c, r, pr, spots, t, { pops })); }
+      // khoảng năm của cuộc chiến
+      const S = Plan.strings(tl.lang), y0 = eras[0].year, y1 = eras[eras.length - 1].year, yr = y => `${Math.abs(Math.round(y))}${y < 0 ? ' ' + S.bcTag : ''}`;
+      bigWord(c, y0 === y1 ? yr(y0) : `${yr(y0)} – ${yr(y1)}`, W2 / 2, 212, { maxW: W2 * .7, maxSize: 215, rot: -.01 });
+      // tên hai phe
+      const nm = r => String(r.name || '').toLocaleUpperCase(tl.lang);
+      bigWord(c, nm(L), W2 * .25, H2 - 58, { maxW: W2 * .42, maxSize: 110, tint: ['#e8f3ff', '#7fb6ff'], rot: -.02 });
+      bigWord(c, nm(R), W2 * .75, H2 - 58, { maxW: W2 * .42, maxSize: 110, tint: ['#fff0e0', '#ff9a73'], rot: .02 });
+      return true;
+    }
+    // Ảnh bìa theo dạng chủ đề: chiến tranh → «Đối đầu» (hai phe, nổ lửa, «VS»); độc lập → «Trước / Sau» kiểu bị đô hộ → tự do; còn lại → «Trước / Sau» (giai đoạn đầu | giai đoạn cuối, bản đồ phóng to vào lãnh thổ chính, năm RẤT TO).
+    function drawThumbnail() {
+      const kind = tl && tl.kind;
+      if (kind === 'war' && drawClash()) return;
+      drawBeforeAfter(kind === 'independence' ? 'free' : '');
+    }
     return { setTimeline, drawFrame, drawStill, drawThumbnail, stillTime, stats, projector, moodOf: (r, idx) => reaction(r, idx), profile: p => { profile = p; }, get timeline() { return tl; } };
   }
   return { create, FONT: SERIF, GROW, FINE_SPAN, pigment, titleLayout };
