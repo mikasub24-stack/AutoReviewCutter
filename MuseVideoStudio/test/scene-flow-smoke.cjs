@@ -1,3 +1,4 @@
+process.env.MUSE_NOTIFY_MS='0';
 // Production main.cjs + real Chromium DOM and local media. No live Muse requests.
 const {chromium}=require('playwright-core');
 const {EventEmitter}=require('node:events');

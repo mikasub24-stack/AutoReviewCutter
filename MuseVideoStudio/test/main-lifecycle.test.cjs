@@ -1,3 +1,4 @@
+process.env.MUSE_NOTIFY_MS = '0';   // mỗi lần đổi trạng thái đều phải thấy được (mặc định app gom ~4 lần/giây)
 // Integration of main.cjs with mocked Electron surfaces, real filesystem state,
 // and real encryption through a test adapter. No Muse or Windows login is used.
 const { test } = require('node:test');

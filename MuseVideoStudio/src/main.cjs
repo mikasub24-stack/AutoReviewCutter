@@ -5,6 +5,7 @@ const { Queue,stoppedError,abortable } = require('./queue.cjs');
 const {saveOrderedOutput}=require('./ordered-output.cjs');
 const {lockInput}=require('./locked-input.cjs');
 const {REPEAT_MESSAGE,isRepeatError,FRAME_MESSAGE,variantPrompt}=require('./repeat-prompt.cjs');
+const {createGate}=require('./notify-gate.cjs');
 const {browserStop}=require('./browser-stop.cjs');
 const {prepareBrowserProbe,clearBrowserProbeDraft}=require('./browser-probe.cjs');
 const {chatDiagnostics}=require('./chat-diagnostics.cjs');
@@ -72,7 +73,7 @@ const MAX_ACCOUNTS = 10;
 const resettingAccounts = new Set(), accountResets = new Map();
 const defaults = { language:'en', accountSessionIds:{}, dispatchMode:'parallel', cooldownSeconds:3, messageSelector:'', stopSelector:'', attachmentReadySelector:'', browserChoice: 'builtin', browserPath: '', output: '', autoMerge: false, autoPackage: false, ffmpeg: 'ffmpeg', restoreStories: {}, accountCount: 2, composer: 'textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"][data-placeholder]', fileInput: 'input[type="file"]', submit: '', video: 'video', image: 'img', timeoutMinutes: 15, flowProjectUrl: '', flowParallel: 3, flowModel: 'lite' };
 function ui(vi,en){return settings?.language==='vi'?vi:en;}
-async function atomic(file, data) { await fs.writeFile(file + '.tmp', JSON.stringify(data, null, 2)); await fs.rename(file + '.tmp', file); }
+async function atomic(file, data) { await fs.writeFile(file + '.tmp', typeof data === 'string' ? data : JSON.stringify(data, null, 2)); await fs.rename(file + '.tmp', file); }
 function snapshot() {
   return {version:app.getVersion?.()||require('../package.json').version,jobs:queue.jobs,resting:queue.exhaustedAccounts().sort((a,b)=>a-b),restingUntil:queue.exhausted.size?queue.nextExhaustedAt():0,settings,license:licenseManager?.status(),payment:paymentDetails,starting,stopping,testing,startError,browserTests:Array.from({length:settings.accountCount},(_,index)=>{const t=browserTests.get(index),live=Boolean(t?.browser&&t.browser===browsers.get(index)&&!t.browser.isDestroyed()),status=t?.status==='ready'&&!live?'stale':t?.status||'not-tested';return {index,status,message:status==='stale'?'Trình duyệt đã đóng hoặc đổi · Test lại':t?.message||'Câu bắt đầu: tùy chọn',echoSeen:live&&Boolean(t?.echoSeen),replySeen:live&&Boolean(t?.replySeen)};}),resettingAccounts:[...resettingAccounts],active:queue.active,paused:queue.paused,merging,mergeProgress,mergedOutput,mergeError,packaging,packageProgress,editPackageDir,packageError,restore:{...restoreState,stories:settings.restoreStories||{}},wild:{...wildState,stories:settings.wildStories||{},write:wildWriter?.status()||{},build:wildBuilder?.status()||{}},pair:{...pairState,stories:settings.pairStories||{},write:pairWriter?.status()||{}},maphist:{...mapState,runs:settings.mapRuns||{},write:mapWriter?.status()||{},build:mapService?.status()||{}},story:{...(storyService?.status()||{}),analyze:storyAnalyzer?.status()||{},voice:voiceService?.status()||{}},
     flow:{open:Boolean(flowBrowser&&!flowBrowser.isClosed()),opening:Boolean(flowLaunch)},
@@ -82,9 +83,13 @@ function snapshot() {
     })};
 }
 
-function notify() { if (main && !main.isDestroyed()) main.webContents.send('studio:update', snapshot()); }
+// 250 ms; MUSE_NOTIFY_MS=0 (tests) gives every update. `require('node:process')` because the test sandboxes have no `process` global.
+let notifyMinMs = 250;
+try { const v = require('node:process').env.MUSE_NOTIFY_MS; if (v !== undefined && v !== '') notifyMinMs = Number(v); } catch { /* mặc định */ }
+const notifyGate = createGate(() => { if (main && !main.isDestroyed()) main.webContents.send('studio:update', snapshot()); }, { minMs: notifyMinMs });
+function notify() { notifyGate(); }
 let stateWrites = Promise.resolve();
-async function save() { const data = JSON.parse(JSON.stringify({ jobs: queue.jobs, settings, mergedOutput, mergeError, editPackageDir, packageError, configVersion: 2, dispatchRevision: 1 })); const write = stateWrites.then(() => atomic(stateFile, data)); stateWrites = write.catch(() => {}); await write; }
+async function save() { const data = JSON.stringify({ jobs: queue.jobs, settings, mergedOutput, mergeError, editPackageDir, packageError, configVersion: 2, dispatchRevision: 1 }); const write = stateWrites.then(() => atomic(stateFile, data)); stateWrites = write.catch(() => {}); await write; }
 function assertMuse(muse) {
   if (!muse || muse.isDestroyed()) throw Error('Mở Muse và đăng nhập trước khi chạy.');
   const u = new URL(muse.external ? muse.url() : muse.webContents.getURL());

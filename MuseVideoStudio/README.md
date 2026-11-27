@@ -142,6 +142,13 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.15.11
+
+- **Giảm đơ khi có hàng trăm cảnh (So sánh song song 396 cảnh + Dọn nhà 119 + Bản đồ).** Mỗi lần một cảnh đổi trạng thái (vài lần mỗi giây khi chạy song song), app trước đây gửi nguyên bản chụp trạng thái (hàng MB) sang giao diện và giao diện vẽ lại TẤT CẢ các tab, kể cả tab đang ẩn; nên cửa sổ đơ, không bấm sang tab khác được. Giờ: app gom các lần báo (tối đa khoảng 4 lần mỗi giây, luôn gửi trạng thái mới nhất), tab đang ẩn chỉ vẽ lại tối đa 2 giây một lần (bấm sang tab là thấy ngay bản mới nhất), tab đang xem vẽ ngay như cũ.
+- **Lưu file trạng thái nhẹ hơn.** Trước đây mỗi lần lưu sao chép cả cục dữ liệu rồi mới in đẹp thụt lề; giờ chuyển thẳng sang chuỗi JSON một lần, không thụt lề (file vẫn là JSON hợp lệ, app đọc như cũ).
+- Test mới: `notify-gate.test` (gom loạt cập nhật thành một, luôn trạng thái mới nhất, gửi ngay sau khi yên); `pair-tab-smoke` kiểm tab ẩn chỉ vẽ thưa, bấm sang tab là thấy ngay (bỏ giới hạn thì test rớt). Hai bài `main-lifecycle` và `scene-flow-smoke` đặt `MUSE_NOTIFY_MS=0` để thấy mọi bước trung gian.
+- **Chưa kiểm được trên Windows, Electron và Muse thật.** Mình đo trong Chromium trên máy chủ với ~515 cảnh giả: vẽ danh sách chỉ ~16 ms nên chưa chắc đây là toàn bộ nguyên nhân đơ trên máy bạn. Đây là chỗ nặng nhất mình tìm được trong mã (bản chụp trạng thái hàng MB gửi vài lần mỗi giây, vẽ lại cả tab ẩn). Nếu vẫn đơ, mở «Trình quản lý tác vụ» của Windows xem tiến trình nào ăn CPU (Muse Video Studio chính, GPU, hay ffmpeg đang dựng video) rồi báo mình.
+
 ## Update 1.15.10
 
 - **Nhận ra thêm cách Muse từ chối: «Đây vẫn là prompt gốc, không phải bản đã chỉnh mình vừa gửi… chỉ đổi dòng ACTION… gửi lại kèm ảnh này».** Bản 1.15.9 chưa nhận ra câu này nên cảnh vẫn treo. Giờ nó được xử lý như «prompt vẫn như cũ»: tự gửi lại bản biến thể rồi mới báo lỗi và đổi tài khoản.

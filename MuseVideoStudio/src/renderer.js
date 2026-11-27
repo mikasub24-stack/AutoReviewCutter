@@ -416,12 +416,15 @@ function render(next){
   $('queueFailure').hidden=Boolean(state.active||!failed.length);
   $('queueFailureText').textContent=failed.length?`${failed[0].title||'Prompt '+(jobs.indexOf(failed[0])+1)} · ${failed[0].error}`:'';
   renderJobs(jobs);renderRunning(jobs);
-  try{window.storyUi?.render(state);}catch(e){console.error(e);}
-  try{window.restoreUi?.render(state);}catch(e){console.error(e);}
-  try{window.wildUi?.render(state);}catch(e){console.error(e);}
-  try{window.pairUi?.render(state);}catch(e){console.error(e);}
-  try{window.mapUi?.render(state);}catch(e){console.error(e);}
+  // Tab đang xem vẽ ngay mỗi lần; tab đang ẩn (hàng trăm cảnh) chỉ cần cập nhật thưa, tối đa 2 giây một lần. Bấm sang tab khác vẽ ngay (setMode).
+  const nowMs=performance.now();let deferred=false;
+  for(const [name,key] of [['story','storyUi'],['restore','restoreUi'],['wild','wildUi'],['pair','pairUi'],['maphist','mapUi']]){
+    if(mode!==name){if(nowMs-(hiddenRenderedAt[key]??-1e9)<HIDDEN_RENDER_MS){deferred=true;continue;}hiddenRenderedAt[key]=nowMs;}
+    try{window[key]?.render(state);}catch(e){console.error(e);}
+  }
+  if(deferred&&!hiddenRenderTimer)hiddenRenderTimer=setTimeout(()=>{hiddenRenderTimer=null;if(state)render(state);},HIDDEN_RENDER_MS+100);
 }
+const HIDDEN_RENDER_MS=2000,hiddenRenderedAt={};let hiddenRenderTimer=null;
 $('prompts').oninput=()=>{dirty=true;committed=false;};$('importMode').onchange=()=>{dirty=true;$('rawOptions').hidden=$('importMode').value!=='script';};
 $('add').onclick=prepare;$('quickCreate').onclick=()=>create(true,true);$('commitDrafts').onclick=()=>create(false);$('createDrafts').onclick=()=>create(true);
 $('newDraft').onclick=()=>{drafts.push({prompt:'',references:[...referenceFiles]});renderDrafts();};

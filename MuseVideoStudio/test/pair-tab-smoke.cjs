@@ -403,6 +403,24 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     });
     assert.deepEqual(vi.filter(t => !/^(Nanami|Jenny|Guy|Andrew|Hoài My|Português)/.test(t) && !/đa ngôn ngữ/.test(t)), [], 'còn chữ tiếng Việt chưa dịch trong tab So sánh song song');
 
+    // Hàng trăm cảnh: tab đang ẩn chỉ vẽ lại thưa (tối đa 2 giây một lần), tab đang xem thì vẽ ngay, bấm sang tab là thấy ngay bản mới nhất.
+    await page.click('#navPair');
+    const runsText = () => page.locator('#pairRuns .restoreRunTop').first().textContent();
+    await page.evaluate(() => {
+      window.s.pair.stories = { 'SS-Hidden': { topic: 'x', name: 'Tên khởi đầu', status: 'queued', minutes: 9, lang: 'en', createdAt: 1 } };
+      window.s.jobs = [{ id: 'h1', kind: 'pair', storyId: 'SS-Hidden', phase: 'clip', number: 1, title: 'clip 1', prompt: 'p', status: 'pending', stage: 'pending', order: 1, references: [], needs: [], refList: [] }]; window.push();
+    });
+    const rename = name => page.evaluate(n => { window.s.pair.stories['SS-Hidden'].name = n; window.push(); }, name);
+    await rename('Tên A đang xem'); await page.waitForFunction(() => /Tên A đang xem/.test(document.querySelector('#pairRuns .restoreRunTop')?.textContent || ''));
+    await page.click('#navQueue');
+    await rename('Tên B lần đầu khi ẩn');   // lần vẽ ẩn đầu tiên thì qua
+    await rename('Tên C tới dồn dập');      // trong 2 giây: chưa vẽ
+    assert.doesNotMatch(await runsText(), /Tên C tới dồn dập/, 'tab ẩn không vẽ lại ngay mỗi lần');
+    await page.waitForFunction(() => /Tên C tới dồn dập/.test(document.querySelector('#pairRuns .restoreRunTop')?.textContent || ''), null, { timeout: 4000 });
+    await rename('Tên D khi đã ẩn');
+    await page.click('#navPair');
+    assert.match(await runsText(), /Tên D khi đã ẩn/, 'bấm sang tab thì thấy ngay bản mới nhất');
+
     assert.equal(errors.length, 0, errors.join('\n'));
     console.log('pair tab smoke ok');
   } finally { await browser.close(); server.close(); }
