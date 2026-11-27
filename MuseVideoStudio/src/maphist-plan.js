@@ -165,10 +165,13 @@
     country: ''
   };
   const ERAS_GUIDE = {
-    war: 'DẠNG VIDEO – CHIẾN TRANH: mỗi PHE (liên minh) là MỘT thế lực với màu riêng, hai phe chính phải có màu tương phản (ví dụ xanh dương và đỏ); "regions" là các nước thuộc phe đó đang giữ hoặc chiếm ở giai đoạn đó, và chỉ cần tô vùng quan trọng. markers ưu tiên type "battle"; scene ưu tiên "battle"; icon "swords" cho giai đoạn giao tranh; mood: phe đang tiến "angry" hoặc "proud", phe đang lùi "shock" hoặc "sad".',
+    war: 'DẠNG VIDEO – CHIẾN TRANH: mỗi PHE (liên minh) là MỘT thế lực với màu riêng, hai phe chính phải có màu tương phản (ví dụ xanh dương và đỏ); "regions" là các nước thuộc phe đó đang giữ hoặc chiếm ở giai đoạn đó, và chỉ cần tô vùng quan trọng. markers ưu tiên type "battle"; scene ưu tiên "battle"; icon "swords" cho giai đoạn giao tranh; mood: phe đang tiến "angry" hoặc "proud", phe đang lùi "shock" hoặc "sad". regions của mỗi phe: CHỈ các nước / vùng nằm ở khu vực chiến sự (cùng châu lục, gần nơi đánh nhau); KHÔNG ghi thuộc địa hay lãnh thổ hải ngoại ở xa chiến trường (ví dụ cuộc chiến ở Hà Lan thì không ghi Indonesia, Suriname, Ấn Độ…) trừ khi chính giai đoạn đó diễn ra trận đánh ở đó, vì bản đồ phải zoom vào chiến trường chứ không ra cả thế giới. scene: chỉ dùng battle, court, market, voyage (hải chiến) hoặc none; KHÔNG dùng build, arrival, volcano (đó là cảnh kim tự tháp, đảo nhiệt đới, núi lửa); cuộc vây hãm / thành bị hạ = battle. population: luôn 0.',
     independence: 'DẠNG VIDEO – ĐỘC LẬP: có hai thế lực rõ ràng (bên đô hộ màu đậm, bên đấu tranh màu sáng); mood bên đấu tranh: "sad" hoặc "angry" lúc bị đô hộ, "proud" khi giành độc lập; icon "flag" cho ngày độc lập.',
     explore: 'DẠNG VIDEO – KHÁM PHÁ: dùng "routes" (ship:true) cho mỗi hành trình, markers type "ship" hoặc "city"; scene "voyage", "arrival" hoặc "market".',
-    empire: '', dynasty: '', ancient: '', country: ''
+    empire: 'DẠNG VIDEO – ĐẾ CHẾ: MỘT thế lực chính là đế chế, giữ nguyên tên và màu ở mọi giai đoạn; "regions" liệt kê ĐẦY ĐỦ mọi vùng đế chế đang nắm ở giai đoạn đó (đỉnh cao nhiều nhất, lúc hình thành và lúc sụp đổ ít) — camera đứng yên nên người xem phải THẤY lãnh thổ lớn lên rồi thu lại. Thế lực khác chỉ thêm khi giao tranh. icon "crown" khi lập quốc, "swords" khi chinh phục, "flag" khi đạt đỉnh; scene battle / court / market; population = số dân cả đế chế.',
+    dynasty: 'DẠNG VIDEO – TRIỀU ĐẠI: MỘT thế lực là triều đại (giữ tên + màu), mỗi giai đoạn gắn một vị vua hoặc biến cố làm đổi hình bản đồ; markers type "capital" cho kinh đô (đổi kinh đô nếu có); icon "crown" (lên ngôi) / "scroll" (cải cách, luật) / "swords" (loạn lạc); scene ưu tiên "court"; mood: "proud" lúc thịnh, "tired" hoặc "sad" lúc suy.',
+    ancient: 'DẠNG VIDEO – VĂN MINH CỔ ĐẠI: realms là vùng quanh dòng sông / đồng bằng của nền văn minh (nhỏ, tập trung); markers type "temple", "city" hoặc "capital" cho công trình và đô thị lớn; icon "castle" / "scroll" / "crown"; scene "build" (xây công trình), "market", "court" hoặc "volcano" nếu có thiên tai; population ước tính nếu có.',
+    country: ''
   };
   const MOODS = ['happy', 'proud', 'tired', 'angry', 'sad', 'calm', 'shock'];   // shock: mặt choáng (do bản vẽ tự suy ra khi thế lực mất đất; kịch bản cũng có thể viết)
   const FLAGS = ['solid', 'h', 'v', 'disc', 'cross'];
@@ -269,6 +272,29 @@
     return String(y);
   }
 
+  // ---------- Chiến tranh: giữ khung hình ở chiến trường ----------
+  const geoKm = (a, b) => { const p = Math.PI / 180, dLat = (b[1] - a[1]) * p, dLon = (b[0] - a[0]) * p, h = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * p) * Math.cos(b[1] * p) * Math.sin(dLon / 2) ** 2; return 12742 * Math.asin(Math.min(1, Math.sqrt(h))); };
+  // Cuộc chiến diễn ra trong một khu vực nhỏ (các điểm đánh dấu cách nhau vài nghìn km) mà một phe lại ghi cả thuộc địa / lãnh thổ hải ngoại ở xa
+  // (vd «Cộng hòa Hà Lan» kèm Indonesia, Suriname) thì camera zoom ra cả thế giới và mặt nhân vật bị đặt ở xứ thuộc địa: bỏ các vùng ở xa chiến trường khỏi bản vẽ.
+  // Chiến tranh trải rộng toàn cầu (thế chiến…) thì giữ nguyên.
+  function tidyWar(eras, geo) {
+    const pts = []; for (const e of eras) for (const m of e.markers) pts.push(m.at);
+    if (pts.length < 3) return;
+    const med = a => { const q = a.slice().sort((x, y) => x - y); return q[Math.floor(q.length / 2)]; };
+    const anchor = [med(pts.map(q => q[0])), med(pts.map(q => q[1]))];
+    const dist = pts.map(q => geoKm(q, anchor)).sort((a, b) => a - b);
+    if (dist[Math.min(dist.length - 1, Math.floor(dist.length * .9))] > 2600) return;
+    const centerOf = key => {
+      const b = Geo.parseBlob(key); if (b) return [b.lon, b.lat];
+      const u = geo.units.get(key); if (!u) return null;
+      const bb = bigRingsBox(u); return bb ? [(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2] : null;
+    };
+    for (const e of eras) for (const r of e.realms) {
+      const keep = r.units.filter(k => { const c = centerOf(k); return !c || geoKm(c, anchor) <= 3000 || e.markers.some(m => geoKm(c, m.at) <= 1200); });
+      if (keep.length && keep.length < r.units.length) r.units = keep;
+    }
+  }
+
   // ---------- Chuẩn hóa kịch bản ----------
   // raw: object kịch bản (do Muse viết hoặc người dùng sửa). geo: chỉ mục từ maphist-geo (có thể null khi chỉ cần kiểm tra chữ).
   // Trả về { script, issues:[{era, text}] }: script đã sạch (luôn dựng được), issues là cảnh báo cho người dùng sửa.
@@ -280,6 +306,7 @@
     const mainA3 = main ? main.a3 : '';
     if (geo && country && !main) issues.push({ era: 0, text: `Không nhận ra nước «${country}» trong dữ liệu bản đồ.` });
     const eras = [];
+    const scriptKind = kindOf({ kind: src.kind, title: flat(src.title), subtitle: flat(src.subtitle) });
     const list = Array.isArray(src.eras) ? src.eras : [];
     list.forEach((e, idx) => {
       if (!e || typeof e !== 'object') return;
@@ -331,7 +358,7 @@
         title: flat(e.title).slice(0, 48) || `Era ${n}`,
         caption: flat(e.caption).slice(0, 150) || flat(narration).split(/(?<=[.!?])\s/)[0].slice(0, 150),
         narration,
-        population: num(e.population) > 0 ? Math.round(num(e.population)) : 0,
+        population: scriptKind === 'war' || scriptKind === 'explore' ? 0 : num(e.population) > 0 ? Math.round(num(e.population)) : 0,   // chiến tranh: số dân không phải điều cần kể (Muse hay ghi một con số đứng yên cả 80 năm)
         icon: ICONS.includes(String(e.icon)) ? String(e.icon) : '',
         scene: SCENES.includes(String(e.scene)) ? String(e.scene) : String(e.scene) === 'none' ? 'none' : '',
         shout: flat(e.shout).slice(0, 22),
@@ -340,8 +367,10 @@
       });
     });
     if (!eras.length) issues.push({ era: 0, text: 'Kịch bản chưa có giai đoạn nào.' });
+    if (geo && scriptKind === 'war') tidyWar(eras, geo);
+    if (eras.length >= 3 && eras[0].population && eras.every(e => e.population === eras[0].population)) eras.forEach(e => { e.population = 0; });   // cùng một con số ở mọi giai đoạn = Muse không có số liệu thật: không hiện
     return {
-      script: { kind: kindOf({ kind: src.kind, title: flat(src.title), subtitle: flat(src.subtitle) }), lang: langOf(src.lang).id, theme: src.theme === 'classic' ? 'classic' : 'cartoon', title: flat(src.title).slice(0, 120) || 'History', subtitle: flat(src.subtitle).slice(0, 120), hook: flat(src.hook).slice(0, 60), country, outro: flat(src.outro).slice(0, 120), eras },
+      script: { kind: scriptKind, lang: langOf(src.lang).id, theme: src.theme === 'classic' ? 'classic' : 'cartoon', title: flat(src.title).slice(0, 120) || 'History', subtitle: flat(src.subtitle).slice(0, 120), hook: flat(src.hook).slice(0, 60), country, outro: flat(src.outro).slice(0, 120), eras },
       issues
     };
   }
@@ -370,40 +399,70 @@
     for (const r of rings) if (r.size >= max * .04) box = merge(box, r.bb);
     return box || u.bb;
   }
-  function viewFor(era, geo, mainUnit) {
+  function viewFor(era, geo, mainUnit, kind = '') {
     if (era.view) return era.view;
+    if (kind === 'explore') {        // khám phá: camera chạy theo hành trình — khung ôm các tuyến đường và địa danh của giai đoạn (không ôm cả lãnh thổ thế lực), mỗi giai đoạn một khung khác nhau
+      const pts = [...(era.markers || []).map(m => m.at), ...(era.routes || []).flatMap(r => r.points)];
+      if (pts.length >= 2) { let b = null; for (const q of pts) b = merge(b, [q[0], q[1], q[0], q[1]]); const v = fit(b, 1.45); return { ...v, span: clamp(v.span, 22, 220) }; }
+    }
+    if (kind === 'ancient') {        // cổ đại: vẫn ôm vùng văn minh nhưng không zoom quá sát (còn thấy dòng sông, biển quanh đó)
+      const v = viewFor(era, geo, mainUnit, ''); return { ...v, span: clamp(v.span, 12, 200) };
+    }
+    if (kind === 'war') {            // chiến tranh: khung hình bám các điểm giao tranh / tuyến hành quân của giai đoạn (không ôm cả hai phe trải khắp bản đồ), nhưng không zoom quá sát
+      const pts = [...(era.markers || []).map(m => m.at), ...(era.routes || []).flatMap(r => r.points)];
+      if (pts.length >= 2) { let b = null; for (const q of pts) b = merge(b, [q[0], q[1], q[0], q[1]]); const v = fit(b, 1.6); return { ...v, span: clamp(v.span, 18, 120) }; }
+    }
+    const box = eraBox(era, geo, mainUnit);
+    return box ? fit(box) : { lon: 10, lat: 25, span: 300 };
+  }
+  // Hộp bao mọi thế lực, địa danh và tuyến đường của một giai đoạn.
+  function eraBox(era, geo, mainUnit) {
     let box = null;
     for (const realm of era.realms) for (const key of realm.units) { const b = unitBox(geo, key); if (b) box = merge(box, b); }
     for (const m of era.markers) box = merge(box, [m.at[0], m.at[1], m.at[0], m.at[1]]);
     for (const r of era.routes) for (const p of r.points) box = merge(box, [p[0], p[1], p[0], p[1]]);
     if (!box && mainUnit) box = bigRingsBox(mainUnit);
-    return box ? fit(box) : { lon: 10, lat: 25, span: 300 };
+    return box;
   }
   const WORLD_VIEW = { lon: 10, lat: 28, span: 330 };
 
   // ---------- Cảnh minh hoạ chèn giữa giai đoạn ----------
   // Cảnh do Muse chọn (era.scene) hoặc tự suy ra từ biểu tượng / ký hiệu của giai đoạn; không chèn khi giai đoạn quá ngắn hoặc trùng cảnh liền trước.
-  function sceneKindOf(e, prev) {
+  // Mỗi dạng chủ đề chỉ dùng các cảnh hợp với nó (build = công trường kim tự tháp, arrival = đảo nhiệt đới, volcano = núi lửa, voyage = tàu buồm…).
+  // Cảnh không hợp thì đổi sang trận đánh nếu giai đoạn có giao tranh, không thì bỏ cảnh. Dạng «country» dùng đủ.
+  const KIND_SCENES = {
+    war: ['battle', 'court', 'market', 'voyage'],
+    explore: ['voyage', 'arrival', 'market', 'battle'],
+    ancient: ['build', 'market', 'court', 'volcano', 'battle'],
+    empire: ['battle', 'court', 'market', 'build', 'voyage'],
+    dynasty: ['court', 'battle', 'build', 'market'],
+    independence: ['battle', 'court', 'market', 'voyage', 'arrival']
+  };
+  function sceneKindOf(e, prev, kindOfScript = '') {
     if (e.scene === 'none') return '';
-    if (SCENES.includes(e.scene)) return e.scene;
     const has = type => (e.markers || []).some(m => m.type === type);
+    const fight = e.icon === 'swords' || has('battle'), allow = KIND_SCENES[kindOfScript] || SCENES;
+    const fix = k => allow.includes(k) ? k : fight ? 'battle' : '';
+    if (SCENES.includes(e.scene)) return fix(e.scene);
     let kind = '';
-    if (e.icon === 'swords' || has('battle')) kind = 'battle';
+    if (fight) kind = 'battle';
     else if (e.icon === 'crown' || has('capital')) kind = 'court';
     else if (e.icon === 'sail' || (e.routes || []).some(r => r.ship) || has('ship')) kind = 'voyage';
     else if (e.icon === 'castle' || has('castle') || has('temple')) kind = 'build';
-    else if (e.icon === 'flag') kind = 'market';
+    else if (e.icon === 'flag' || e.icon === 'star') kind = kindOfScript === 'independence' ? 'court' : e.icon === 'flag' ? 'market' : '';
+    else if (e.icon === 'scroll' && kindOfScript === 'dynasty') kind = 'court';
+    kind = fix(kind);
     return kind && prev && prev.cut && prev.cut.kind === kind && !prev.cut.chosen ? '' : kind;
   }
-  function cutOf(e, prev, lang) {
-    const kind = sceneKindOf(e, prev);
+  function cutOf(e, prev, lang, kindOfScript = '') {
+    const kind = sceneKindOf(e, prev, kindOfScript);
     if (!kind) return null;
     const settle = TIMING.growDelay + TIMING.grow + .7;                 // sau khi lãnh thổ mọc xong
     let dur = clamp(e.dur * .3, 2.6, 3.8), at = Math.max(settle, e.dur * .4);
     if (at + dur > e.dur - 1.1) dur = e.dur - 1.1 - at;
     if (dur < 2.4) return null;
     const shouts = (strings(lang).shouts || {});
-    return { kind, at, dur, shout: e.shout || shouts[kind] || '', chosen: SCENES.includes(e.scene) };
+    return { kind, at, dur, shout: e.shout || shouts[kind] || '', chosen: SCENES.includes(e.scene) && e.scene === kind };
   }
 
   // Ước lượng thời gian đọc (giây) khi chưa có giọng thật.
@@ -417,9 +476,14 @@
       const voice = num(durations[i]) > 0 ? num(durations[i]) : speakSeconds(e.narration);
       return { ...e, index: i, voice, dur: Math.max(minEra, LEAD + voice + TAIL), label: yearLabel(e.year, lang) };
     });
-    eras.forEach((e, i) => { e.cut = cutOf(e, i ? eras[i - 1] : null, lang); });
+    eras.forEach((e, i) => { e.cut = cutOf(e, i ? eras[i - 1] : null, lang, KINDS.includes(script.kind) ? script.kind : ''); });
     let t = INTRO;
-    for (const e of eras) { e.start = t; e.end = t + e.dur; t = e.end; if (geo) e.view = viewFor(e, geo, mainHit); else e.view = e.view || { ...WORLD_VIEW }; }
+    for (const e of eras) { e.start = t; e.end = t + e.dur; t = e.end; e.userView = Boolean(e.view); if (geo) e.view = viewFor(e, geo, mainHit, KINDS.includes(script.kind) ? script.kind : ''); else e.view = e.view || { ...WORLD_VIEW }; }
+    // Đế chế / Độc lập: camera ĐỨNG YÊN cả video, ôm toàn bộ phạm vi qua mọi giai đoạn — nhờ vậy người xem THẤY lãnh thổ lớn lên / thu lại (hoặc vùng đòi độc lập) thay vì bản đồ trượt theo.
+    if (geo && (script.kind === 'empire' || script.kind === 'independence') && eras.length > 1 && !eras.some(e => e.userView)) {
+      let box = null; for (const e of eras) box = merge(box, eraBox(e, geo, mainHit) || [0, 0, 0, 0]);
+      if (box && box[2] > box[0]) { const v = fit(box, 1.12), view = { ...v, span: clamp(v.span, 24, 300) }; if (script.kind === 'empire' || view.span <= 140) eras.forEach(e => { e.view = { ...view }; }); }   // độc lập mà bên đô hộ ở tận châu khác (khung > 140°) thì giữ khung riêng từng giai đoạn
+    }
     // Mốc trên thanh thời gian: tối đa 9 mốc rải đều, luôn có giai đoạn đầu và cuối.
     const pick = [];
     if (eras.length) { const n = Math.min(9, eras.length); for (let k = 0; k < n; k++) pick.push(Math.round(k * (eras.length - 1) / Math.max(1, n - 1))); }

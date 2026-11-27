@@ -562,6 +562,81 @@ test('dạng chủ đề: đoán từ đề tài hoặc theo nhóm đã chọn; 
   assert.equal(Plan.normalizeScript({ ...copy(sample), kind: 'independence' }, geo).script.kind, 'independence');
 });
 
+test('chiến tranh: bỏ thuộc địa xa chiến trường (camera không zoom ra cả thế giới), cảnh minh họa không có kim tự tháp / đảo nhiệt đới, không hiện dân số đứng yên', () => {
+  const words = 'The rebels hold the town against a long siege while the old king sends a new army north through the winter.';
+  const era = (year, title, realms, extra = {}) => ({ year, title, caption: title, narration: words, population: 3000000, realms, markers: [{ type: 'battle', name: 'Haarlem', at: [4.64, 52.38] }, { type: 'city', name: 'Antwerp', at: [4.4, 51.2] }, { type: 'city', name: 'Breda', at: [4.78, 51.59] }], routes: [], ...extra });
+  const dutch = { name: 'Dutch Republic', regions: ['Netherlands', 'Indonesia', 'Suriname'], colors: ['#2e6bff'] }, spain = { name: 'Spanish Habsburgs', regions: ['Spain', 'Belgium', 'Mexico'], colors: ['#c0392b'] };
+  const mk = (title, over = {}) => ({ title, subtitle: 's', country: 'Netherlands', eras: [
+    era(1568, 'Revolt', [spain, dutch], { icon: 'swords', scene: 'build' }),
+    era(1573, 'Siege', [spain, dutch], { icon: 'castle', scene: 'arrival', markers: [{ type: 'city', name: 'Haarlem', at: [4.64, 52.38] }, { type: 'city', name: 'Antwerp', at: [4.4, 51.2] }, { type: 'city', name: 'Breda', at: [4.78, 51.59] }] }),
+    era(1585, 'Fall of Antwerp', [spain, dutch], { icon: 'crown', scene: 'volcano' }),
+    era(1648, 'Peace', [spain, dutch], { icon: 'flag' })], ...over });
+  const war = Plan.normalizeScript(mk("The Eighty Years' War"), geo).script;
+  assert.equal(war.kind, 'war');
+  const nl = war.eras[0].realms.find(r => r.name === 'Dutch Republic'), es = war.eras[0].realms.find(r => r.name === 'Spanish Habsburgs');
+  assert.ok(nl.units.length && !nl.units.some(k => /IDN|SUR/.test(k)), 'thuộc địa xa chiến trường bị bỏ: ' + nl.units.join(','));
+  assert.ok(nl.units.some(k => /NLD/.test(k)), 'giữ Hà Lan');
+  assert.ok(!es.units.some(k => /MEX/.test(k)) && es.units.some(k => /ESP/.test(k)), 'Mexico bị bỏ, Tây Ban Nha còn');
+  assert.ok(war.eras.every(e => e.population === 0), 'chiến tranh: không hiện dân số');
+  const tl = Plan.compile(war, geo, { durations: [30, 30, 30, 30], fps: 30 });
+  assert.ok(tl.eras.every(e => e.view.span < 110), 'camera bám chiến trường: ' + tl.eras.map(e => Math.round(e.view.span)).join(','));
+  assert.equal(tl.eras[0].cut && tl.eras[0].cut.kind, 'battle', 'cảnh «build» ở giai đoạn có giao tranh → trận đánh');
+  assert.equal(tl.eras[1].cut, null, 'cảnh «arrival» không hợp chiến tranh, không có giao tranh → không chèn');
+  assert.ok(!tl.eras.some(e => e.cut && ['build', 'arrival', 'volcano'].includes(e.cut.kind)));
+  // dạng khác: giữ nguyên thuộc địa, dân số, cảnh do Muse chọn
+  const plain = Plan.normalizeScript(mk('History of the Dutch Republic', { country: 'Netherlands' }), geo).script;
+  assert.equal(plain.kind, 'country');
+  assert.ok(plain.eras[0].realms[1].units.some(k => /IDN/.test(k)), 'dạng nước: giữ thuộc địa');
+  assert.equal(plain.eras[0].population, 0, 'cùng một con số ở mọi giai đoạn thì không hiện');
+  const varied = mk('History of the Dutch Republic'); varied.eras.forEach((e, i) => { e.population = 1e6 * (i + 1); });
+  const keep = Plan.normalizeScript(varied, geo).script; assert.equal(keep.eras[3].population, 4e6, 'dân số thay đổi thì giữ');
+  assert.equal(Plan.compile(keep, geo, { durations: [30, 30, 30, 30], fps: 30 }).eras[0].cut.kind, 'build', 'dạng khác: giữ cảnh Muse chọn');
+  // chiến tranh trải toàn cầu (điểm đánh dấu xa nhau): không cắt
+  const global = mk('World War II'); global.eras.forEach((e, i) => { e.markers = [{ type: 'battle', name: 'A', at: [4.6, 52.4] }, { type: 'battle', name: 'B', at: [139.7, 35.7] }, { type: 'battle', name: 'C', at: [-157.9, 21.3] }, { type: 'battle', name: 'D', at: [37.6, 55.7] }]; });
+  assert.ok(Plan.normalizeScript(global, geo).script.eras[0].realms[1].units.some(k => /IDN/.test(k)), 'chiến trường toàn cầu: giữ nguyên');
+  // lời dặn cho Muse
+  const guide = Plan.buildErasInstruction(Plan.options({ topic: "The Eighty Years' War", language: 'vi' }), { title: "The Eighty Years' War", country: 'Netherlands', lang: 'vi', kind: 'war', eras: [{ year: 1568, title: 'a', focus: 'f' }, { year: 1648, title: 'b', focus: 'f' }] }, { range: [1, 2], countryNames: ['Netherlands'] });
+  assert.match(guide, /KHÔNG ghi thuộc địa/); assert.match(guide, /KHÔNG dùng build, arrival, volcano/); assert.match(guide, /population: luôn 0/);
+});
+
+test('mỗi dạng chủ đề dựng khác nhau: camera (đế chế / độc lập đứng yên, khám phá bám hành trình), cảnh hợp dạng, dân số khám phá không hiện', () => {
+  const words = 'The people gather in the old town while the great leaders argue about what should happen over the coming winter months.';
+  const era = (year, realms, extra = {}) => ({ year, title: 'T' + year, caption: 'c', narration: words, population: 1000000 + year, realms, markers: [], routes: [], ...extra });
+  const mk = (title, eras) => Plan.normalizeScript({ title, subtitle: 's', country: 'Mongolia', eras }, geo).script;
+  const tlOf = sc => Plan.compile(sc, geo, { durations: sc.eras.map(() => 30), fps: 30 });
+  const spans = tl => tl.eras.map(e => Math.round(e.view.span));
+  // Đế chế: khung đứng yên cả video (thấy lãnh thổ lớn lên), kể cả khi lúc đầu chỉ có một nước nhỏ
+  const mon = { name: 'Mongol Empire', regions: ['Mongolia'], colors: ['#c0392b'] }, big = { name: 'Mongol Empire', regions: ['Mongolia', 'China', 'Kazakhstan', 'Iran'], colors: ['#c0392b'] };
+  const emp = tlOf(mk('The Mongol Empire', [era(1206, [mon], { icon: 'crown' }), era(1227, [big], { icon: 'swords' }), era(1279, [big], { icon: 'flag' })]));
+  assert.equal(emp.kind, 'empire');
+  assert.equal(new Set(emp.eras.map(e => JSON.stringify(e.view))).size, 1, 'đế chế: một khung cho mọi giai đoạn: ' + spans(emp));
+  const country = tlOf(mk('History of Mongolia', [era(1206, [mon]), era(1227, [big]), era(1279, [big])]));
+  assert.ok(new Set(country.eras.map(e => JSON.stringify(e.view))).size > 1, 'dạng nước vẫn đổi khung theo từng giai đoạn');
+  // Khám phá: khung bám tuyến đường của từng giai đoạn; không hiện dân số; không chèn cảnh kim tự tháp
+  const leg = (a, b) => ({ points: [a, b], ship: true });
+  const exp = mk('The Age of Discovery: great voyages', [era(1488, [mon], { icon: 'sail', scene: 'build', routes: [leg([-9, 38], [18, -34])] }), era(1498, [mon], { icon: 'sail', routes: [leg([18, -34], [75, 11])] }), era(1522, [mon], { icon: 'sail', routes: [leg([75, 11], [-70, -55])] })]);
+  assert.equal(exp.kind, 'explore'); assert.ok(exp.eras.every(e => e.population === 0), 'khám phá: không hiện dân số');
+  const etl = tlOf(exp);
+  assert.ok(new Set(etl.eras.map(e => Math.round(e.view.lon))).size === 3, 'khám phá: camera chạy theo hành trình: ' + etl.eras.map(e => Math.round(e.view.lon)));
+  assert.ok(etl.eras.every(e => !e.cut || e.cut.kind !== 'build'), 'khám phá: không có cảnh kim tự tháp');
+  assert.equal(etl.eras[1].cut && etl.eras[1].cut.kind, 'voyage', 'khám phá: tuyến tàu → cảnh hải trình');
+  // Cổ đại: không có cảnh tàu buồm; công trình vẫn có cảnh xây
+  const anc = tlOf(mk('Ancient Egypt: the first civilization', [era(-3100, [mon], { icon: 'crown' }), era(-2560, [mon], { icon: 'castle', scene: 'voyage', markers: [{ type: 'temple', name: 'Giza', at: [31.1, 29.9] }] }), era(-1250, [mon], { icon: 'castle', markers: [{ type: 'temple', name: 'Abu', at: [31.6, 22.3] }] })]));
+  assert.equal(anc.kind, 'ancient'); assert.ok(!anc.eras.some(e => e.cut && e.cut.kind === 'voyage'), 'cổ đại: bỏ cảnh tàu buồm');
+  assert.equal(anc.eras[2].cut && anc.eras[2].cut.kind, 'build', 'cổ đại: công trình → cảnh xây');
+  // Triều đại: cuộn giấy (cải cách) → cảnh triều đình
+  const dyn = tlOf(mk('The Tang Dynasty: a golden age', [era(618, [mon], { icon: 'scroll' }), era(755, [mon], { icon: 'swords' }), era(907, [mon], { icon: 'crown' })]));
+  assert.equal(dyn.kind, 'dynasty'); assert.equal(dyn.eras[0].cut && dyn.eras[0].cut.kind, 'court', 'triều đại: cuộn giấy (cải cách) → triều đình');
+  // Độc lập: ngôi sao (ngày độc lập) → cảnh triều đình / tuyên bố, không phải cảnh chợ
+  const ind = tlOf(mk('Road to Independence', [era(1900, [mon], { icon: 'scroll' }), era(1945, [mon], { icon: 'star' })]));
+  assert.equal(ind.kind, 'independence'); assert.equal(ind.eras[1].cut && ind.eras[1].cut.kind, 'court');
+  // lời dặn riêng cho Muse của đế chế / triều đại / cổ đại
+  for (const [kind, re] of [['empire', /camera đứng yên/], ['dynasty', /MỘT thế lực là triều đại/], ['ancient', /quanh dòng sông/]]) {
+    const g = Plan.buildErasInstruction(Plan.options({ topic: 'X', language: 'vi' }), { title: 'X', country: 'Mongolia', lang: 'vi', kind, eras: [{ year: 1, title: 'a', focus: 'f' }, { year: 2, title: 'b', focus: 'f' }] }, { range: [1, 2], countryNames: ['Mongolia'] });
+    assert.match(g, re, kind);
+  }
+});
+
 test('thông tin đăng YouTube: tiêu đề đúng như trên video, chương có mốc giờ thật, thẻ và mô tả trong giới hạn', () => {
   const era = (year, title) => ({ year, title, caption: 'c', narration: 'One two three four five six seven eight nine ten eleven twelve words here today.', realms: [], markers: [], routes: [] });
   const script = { title: 'The Mongol Empire: From Steppe to Superpower', subtitle: 'How a few tribes ruled half the world', country: 'Mongolia', eras: [era(1206, 'Temujin united'), era(1219, 'Khwarazm falls'), era(1241, 'Europe trembles'), era(1260, 'Empire splits'), era(1368, 'Yuan ends')] };

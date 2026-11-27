@@ -142,6 +142,22 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.15.15
+
+- **«Bản đồ lịch sử»: mỗi dạng chủ đề dựng video KHÁC NHAU, không còn một khuôn cho mọi chủ đề.** Trước đây chỉ thumbnail và lời dặn kịch bản khác nhau, còn video thì cùng một bản đồ hoạt hình, cùng camera, cùng bộ cảnh minh họa (xem «The Eighty Years' War» thấy rõ: khung hình ra cả thế giới vì thuộc địa, cảnh kim tự tháp/núi lửa, dân số đứng yên, mặt nhân vật đè lên thanh thời gian). Giờ mỗi dạng có camera, cảnh, bộ đếm và «không khí» bản đồ riêng:
+  - **Chiến tranh:** camera bám chiến trường (các điểm giao tranh + tuyến hành quân), bỏ thuộc địa xa; bản đồ tối viền, biển xám xanh, khói và tàn lửa bay lên (nhiều hơn ở giai đoạn có trận đánh); không hiện dân số; chỉ dùng cảnh trận đánh / triều đình / chợ / hải chiến.
+  - **Khám phá:** camera chạy theo từng hành trình (mỗi giai đoạn một khung); lưới kinh vĩ tuyến kiểu hải đồ và la bàn ở góc; tông giấy da; không hiện dân số; cảnh hải trình / cập bến / chợ.
+  - **Đế chế:** camera đứng yên cả video, ôm phạm vi lớn nhất để THẤY lãnh thổ lớn lên rồi thu lại; viền tím hoàng gia và sóng lan từ kinh đô mỗi khi sang giai đoạn mới.
+  - **Triều đại:** khung vàng hai lớp có mấu ở bốn góc, cánh hoa rơi; cảnh triều đình cho cải cách/lên ngôi.
+  - **Cổ đại:** sắc cát nắng, ánh mặt trời ở góc, bụi bay; cảnh xây công trình / chợ / triều đình / thiên tai (bỏ tàu buồm); không zoom quá sát.
+  - **Độc lập:** đầu video bản đồ xám, u ám (còn bị đô hộ), rực dần theo từng giai đoạn; giai đoạn cuối có tia sáng và pháo giấy màu cờ; camera đứng yên khi phạm vi vừa phải.
+  - Dạng Nước vẫn như cũ.
+  - **Mặt hai phe** (mọi dạng): đặt trong phần lãnh thổ đang nhìn thấy (kể cả khi trọng tâm nước đó ra ngoài màn hình), né thanh thời gian, năm, cuộn chữ và địa danh; thu nhỏ vừa lãnh thổ.
+  - **Lời dặn gửi Muse** cho Đế chế / Triều đại / Cổ đại / Chiến tranh nói rõ cần viết gì để hợp cách dựng (ví dụ Đế chế: liệt kê ĐỦ mọi vùng giữ ở mỗi giai đoạn; Chiến tranh: chỉ vùng ở chiến trường).
+- Video đã dựng không bị viết lại. Camera, hiệu ứng, vị trí mặt áp dụng ngay khi dựng lại video từ kịch bản đang có; phần gọt lãnh thổ chiến tranh, cảnh theo dạng và lời dặn mới cần tạo lại kịch bản (hoặc mở/lưu lại để chuẩn hóa).
+- **Chưa kiểm được trên Windows, Electron và Muse thật.** Kiểm bằng kịch bản mẫu của 7 dạng và kịch bản giả «Eighty Years' War» trong Chromium trên máy chủ (đã xem khung hình từng dạng).
+- Test: `maphist.test` thêm ca chiến tranh và ca «mỗi dạng dựng khác nhau» (camera đứng yên / bám hành trình, cảnh hợp dạng, dân số khám phá, lời dặn); `maphist-thumb-smoke` / smoke vẽ khung vẫn chạy cho cả 7 dạng.
+
 ## Update 1.15.14
 
 - **«Bản đồ lịch sử»: thumbnail và kịch bản theo từng chủ đề, không còn một khuôn cho tất cả.** Mỗi video có «dạng chủ đề» (Lịch sử một nước, Đế chế, Triều đại, Chiến tranh, Khám phá, Văn minh cổ đại, Độc lập): lấy theo nhóm đã chọn, hoặc đoán từ chữ trong đề tài khi tự gõ («World War I», «Chiến tranh Việt Nam», «…Independence»). Kịch bản cũ không ghi dạng thì đoán từ tiêu đề.

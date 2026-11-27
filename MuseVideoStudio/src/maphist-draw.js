@@ -829,9 +829,9 @@
       const b = boxOf(r.units, pr); if (!b) return null;
       const x0 = Math.max(b.x, vis[0]), y0 = Math.max(b.y, vis[1]), x1 = Math.min(b.x + b.w, vis[2]), y1 = Math.min(b.y + b.h, vis[3]);
       if (x1 <= x0 || y1 <= y0) return null;
-      const sx = Math.max(8, (x1 - x0) / 24), sy = Math.max(8, (y1 - y0) / 30), mx = (x0 + x1) / 2, my = (y0 + y1) / 2, K = .2; let best = null;
+      const avoids = avoid ? [].concat(avoid) : [], sx = Math.max(8, (x1 - x0) / 24), sy = Math.max(8, (y1 - y0) / 30), mx = (x0 + x1) / 2, my = (y0 + y1) / 2, K = .2; let best = null;
       for (let y = y0; y <= y1; y += sy) for (let x = x0; x <= x1; x += sx) {
-        if (avoid && Math.hypot((x - avoid.x) * .8, y - avoid.y) < avoid.r) continue;
+        if (avoid && avoids.some(a => Math.hypot((x - a.x) * .8, y - a.y) < a.r)) continue;
         if (!inside(x, y)) continue;
         const pen = K * Math.hypot(x - mx, y - my), need = best ? best.score + pen + 6 : 8;
         if (best && !ok(x, y, need)) continue;
@@ -872,6 +872,119 @@
       c.strokeStyle = INK; c.lineWidth = Math.max(4, R * .16); c.stroke();
       c.restore();
     }
+    // ---------- Không khí riêng theo dạng chủ đề ----------
+    // Mỗi dạng video có "gương mặt" riêng ngoài khung bản đồ: Chiến tranh tối viền + tàn lửa + khói; Khám phá lưới hải đồ + la bàn; Cổ đại sắc cát nắng + bụi;
+    // Triều đại khung vàng + cánh hoa; Đế chế sóng lan từ kinh đô; Độc lập từ xám u ám sang rực rỡ + pháo giấy. Vẽ trên lớp bản đồ, dưới giao diện (thanh thời gian, năm, cuộn chữ).
+    const hash01 = (i, k) => { const x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
+    function edgeShade(c, rgb, a) {
+      const g = c.createRadialGradient(width / 2, height * .5, height * .3, width / 2, height * .5, height * 1.0);
+      g.addColorStop(0, `rgba(${rgb},0)`); g.addColorStop(1, `rgba(${rgb},${a})`); c.fillStyle = g; c.fillRect(0, 0, width, height);
+    }
+    function compassRose(c, x, y, R, t) {
+      c.save(); c.translate(x, y); c.rotate(Math.sin(t * .5) * .06); c.lineJoin = 'round';
+      c.fillStyle = 'rgba(241,230,200,.82)'; c.strokeStyle = INK; c.lineWidth = 5; c.beginPath(); c.arc(0, 0, R * .9, 0, TAU); c.fill(); c.stroke();
+      c.lineWidth = 3; c.beginPath(); c.arc(0, 0, R * .72, 0, TAU); c.stroke();
+      for (let k = 0; k < 16; k++) {
+        const a = -Math.PI / 2 + k * TAU / 16, long = k % 4 === 0, mid = k % 2 === 0, rr = long ? R * 1.12 : mid ? R * .78 : R * .5, w = long ? .17 : .12;
+        c.beginPath(); c.moveTo(Math.cos(a - w) * R * .16, Math.sin(a - w) * R * .16); c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); c.lineTo(Math.cos(a + w) * R * .16, Math.sin(a + w) * R * .16); c.closePath();
+        c.fillStyle = long ? (k === 0 ? '#c0392b' : GOLD_DEEP) : mid ? '#b99a5a' : '#d8c590'; c.fill(); if (long) { c.lineWidth = 3; c.stroke(); }
+      }
+      c.fillStyle = INK; c.beginPath(); c.arc(0, 0, R * .1, 0, TAU); c.fill();
+      c.font = `900 ${Math.round(R * .42)}px "MapLabel",sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 6; c.strokeStyle = PAPER; c.fillStyle = INK; c.strokeText('N', 0, -R * 1.42); c.fillText('N', 0, -R * 1.42);
+      c.restore();
+    }
+    function kindLook(c, st, pr, t) {
+      const kind = tl && tl.kind; if (!kind || kind === 'country' || !st.era || st.phase === 'intro') return;
+      const W = width, H = height, local = st.local, idx = st.index || 0, n = Math.max(1, tl.eras.length), p = n > 1 ? idx / (n - 1) : 1, era = st.era;
+      const fight = (era.markers || []).some(m => m.type === 'battle') || era.icon === 'swords';
+      c.save();
+      if (kind === 'war') {
+        edgeShade(c, '35,5,5', fight ? .62 : .42);
+        c.fillStyle = `rgba(120,20,10,${fight ? .09 : .04})`; c.fillRect(0, 0, W, H);
+        c.globalCompositeOperation = 'source-over';
+        for (let i = 0; i < 5; i++) {      // khói trôi dọc đáy khung
+          const x = ((i * 470 + t * (14 + i * 4)) % (W + 600)) - 300, y = H - 150 + Math.sin(t * .4 + i) * 22 - (i % 2) * 70, r = 190 + (i % 3) * 50;
+          const g = c.createRadialGradient(x, y, 10, x, y, r); g.addColorStop(0, `rgba(25,22,22,${fight ? .30 : .18})`); g.addColorStop(1, 'rgba(25,22,22,0)'); c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2);
+        }
+        c.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < (fight ? 54 : 26); i++) {   // tàn lửa bay lên
+          const sp = 55 + hash01(i, 2) * 110, y = H + 20 - ((t * sp + hash01(i, 3) * (H + 80)) % (H + 80)), x = hash01(i, 1) * W + Math.sin(t * .9 + i * 1.7) * 34, r = 1.6 + hash01(i, 4) * 3.4, a = (.25 + .5 * hash01(i, 5)) * clamp(y / H + .15, 0, 1);
+          c.fillStyle = `rgba(255,${130 + Math.floor(hash01(i, 6) * 90)},40,${a})`; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+        }
+      } else if (kind === 'explore') {
+        edgeShade(c, '95,60,20', .30);
+        const cam = pr.cam, step = cam.span > 150 ? 30 : cam.span > 60 ? 10 : cam.span > 28 ? 5 : 2;
+        c.strokeStyle = 'rgba(255,255,255,.26)'; c.lineWidth = 2.5; c.setLineDash([16, 12]);
+        for (let lo = Math.ceil((cam.lon - cam.span * .7) / step) * step; lo <= cam.lon + cam.span * .7; lo += step) { const [x] = pr.P(lo, cam.lat); c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke(); }
+        for (let la = Math.ceil(clamp(cam.lat - cam.span * .6, -80, 80) / step) * step; la <= Math.min(80, cam.lat + cam.span * .6); la += step) { const [, y] = pr.P(cam.lon, la); c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+        c.setLineDash([]);
+        compassRose(c, 150, 770, 62, t);
+      } else if (kind === 'ancient') {
+        c.fillStyle = 'rgba(232,160,60,.26)'; c.fillRect(0, 0, W, H);
+        edgeShade(c, '110,55,15', .55);
+        c.globalCompositeOperation = 'lighter';
+        const g = c.createRadialGradient(W * .9, H * .08, 20, W * .9, H * .08, 620); g.addColorStop(0, 'rgba(255,225,140,.34)'); g.addColorStop(1, 'rgba(255,225,140,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+        for (let i = 0; i < 36; i++) { const x = ((hash01(i, 1) * W + t * (18 + hash01(i, 2) * 30)) % (W + 40)) - 20, y = 140 + hash01(i, 3) * (H - 260) + Math.sin(t * .7 + i) * 14; c.fillStyle = `rgba(255,236,170,${.12 + hash01(i, 4) * .22})`; c.beginPath(); c.arc(x, y, 1.6 + hash01(i, 5) * 2.8, 0, TAU); c.fill(); }
+      } else if (kind === 'dynasty') {
+        edgeShade(c, '90,35,10', .26);
+        c.globalCompositeOperation = 'source-over';
+        for (let i = 0; i < 20; i++) {      // cánh hoa rơi
+          const sp = 38 + hash01(i, 2) * 40, y = ((t * sp + hash01(i, 3) * (H + 100)) % (H + 100)) - 50, x = hash01(i, 1) * W + Math.sin(t * .8 + i * 2.1) * 60;
+          c.save(); c.translate(x, y); c.rotate(t * (.6 + hash01(i, 6)) + i); c.fillStyle = `rgba(255,${170 + Math.floor(hash01(i, 7) * 50)},190,.62)`; c.beginPath(); c.ellipse(0, 0, 9, 5, 0, 0, TAU); c.fill(); c.restore();
+        }
+        c.lineJoin = 'round';
+        c.strokeStyle = GOLD_DEEP; c.lineWidth = 12; c.strokeRect(46, 46, W - 92, H - 92);      // khung lùi vào ~46px vì Ken Burns phóng 3.5% cắt mất mép
+        c.strokeStyle = GOLD; c.lineWidth = 5; c.strokeRect(58, 58, W - 116, H - 116);
+        for (const [x, y] of [[58, 58], [W - 58, 58], [58, H - 58], [W - 58, H - 58]]) { c.save(); c.translate(x, y); c.rotate(Math.PI / 4); c.fillStyle = GOLD; c.strokeStyle = INK; c.lineWidth = 4; c.fillRect(-15, -15, 30, 30); c.strokeRect(-15, -15, 30, 30); c.restore(); }
+      } else if (kind === 'empire') {
+        edgeShade(c, '45,15,70', .34);
+        const cap = (era.markers || []).find(m => m.type === 'capital') || (era.markers || [])[0], k0 = GROW_DELAY + GROW + 1.8;
+        let cx = W / 2, cy = CY; if (cap) [cx, cy] = pr.P(cap.at[0], cap.at[1]);
+        if (local < k0) for (let i = 0; i < 3; i++) {      // sóng uy quyền lan ra từ kinh đô khi bước sang giai đoạn mới
+          const q = clamp((local - i * .35) / (k0 - 1), 0, 1); if (q <= 0 || q >= 1) continue;
+          c.strokeStyle = `rgba(255,215,90,${(1 - q) * .7})`; c.lineWidth = 10 * (1 - q) + 2; c.beginPath(); c.arc(cx, cy, easeOut(q) * W * .42, 0, TAU); c.stroke();
+        }
+      } else if (kind === 'independence') {
+        const dull = 1 - p;      // đầu video xám, u ám (bị đô hộ) → cuối rực rỡ (độc lập)
+        if (dull > .02) {
+          c.globalCompositeOperation = 'saturation'; c.fillStyle = `rgba(128,128,128,${dull * .72})`; c.fillRect(0, 0, W, H);
+          c.globalCompositeOperation = 'source-over'; c.fillStyle = `rgba(35,40,70,${dull * .22})`; c.fillRect(0, 0, W, H); edgeShade(c, '10,12,30', dull * .5);
+        }
+        if (p > .55) {
+          const f = clamp((p - .55) / .45, 0, 1), main = (era.realms || []).find(r => r.face) || (era.realms || [])[0], cols = main && main.colors && main.colors.length ? [...main.colors, '#ffffff', GOLD] : ['#ffd23f', '#ff4d4d', '#ffffff'];
+          c.globalCompositeOperation = 'lighter';
+          const g = c.createRadialGradient(W / 2, -80, 40, W / 2, -80, 900); g.addColorStop(0, `rgba(255,230,150,${.38 * f})`); g.addColorStop(1, 'rgba(255,230,150,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+          c.globalCompositeOperation = 'source-over';
+          for (let i = 0; i < Math.round(46 * f); i++) {      // pháo giấy màu cờ
+            const sp = 90 + hash01(i, 2) * 120, y = ((t * sp + hash01(i, 3) * (H + 80)) % (H + 80)) - 40, x = hash01(i, 1) * W + Math.sin(t * 1.2 + i) * 40;
+            c.save(); c.translate(x, y); c.rotate(t * 2 + i); c.fillStyle = cols[i % cols.length]; c.fillRect(-7, -3.5, 14, 7); c.restore();
+          }
+        }
+      }
+      c.restore();
+    }
+    // Vị trí mặt/tên thế lực: mặc định ở trọng tâm đơn vị lớn nhất (nhích tránh ký hiệu). Nhưng nếu điểm đó nằm NGOÀI lãnh thổ, ngoài khung hình, hoặc đè lên thanh thời gian/năm ở trên và cuộn chữ ở dưới
+    // (camera bám chiến trường nên trọng tâm của nước ở xa có thể ra khỏi màn hình) -> chuyển vào chỗ thoáng nhất của phần lãnh thổ đang nhìn thấy, và thu nhỏ mặt cho vừa lãnh thổ.
+    function faceSpot(c, r, pr, spots, x, y, R) {
+      const vis = [70, 340, width - 70, height - 240], [ax, ay] = eyeSpot(x, y, spots, R);
+      const all = new Path2D(); for (const k of r.units) if (!k.startsWith('B:')) all.addPath(unitPath(k, pr));
+      const fits = ax >= vis[0] + R && ax <= vis[2] - R && ay >= vis[1] + R && ay <= vis[3] - R * 2.2 && c.isPointInPath(all, ax, ay);
+      if (fits) return [ax, ay, R];
+      const keep = pad => spots.flatMap(([sx, sy]) => [{ x: sx, y: sy, r: 52 + pad }, { x: sx, y: sy + 38, r: 46 + pad }]);   // ký hiệu địa danh + tên của nó (nằm ngay dưới) — không để mặt/tên thế lực đè lên
+      const lw = R2 => (r.name || '').length * 7.2 * clamp(R2 * .62, 15, 28) / 22 + 20;
+      const hits = (x, y, R2) => spots.some(([sx, sy]) => (Math.abs(sx - x) < R2 * 2.2 + 26 && Math.abs(sy - y) < R2 * 1.5 + 26) || (Math.abs(sx - x) < lw(R2) && Math.abs(sy - (y + R2 * 2.7)) < 34));
+      let out = null;
+      for (const pad of [0, 50, 110]) {
+        const sp = roomySpot(c, r, pr, vis, keep(pad)); if (!sp || sp.rho < 18) continue;
+        const R2 = clamp(sp.rho / 1.9, Math.min(28, R), R), x2 = clamp(sp.x, vis[0] + R2 * 1.7, vis[2] - R2 * 1.7), y2 = clamp(sp.y, vis[1] + R2, vis[3] + 20 - R2 * 2.7);
+        out = [x2, y2, R2]; if (!hits(x2, y2, R2)) return out;
+      }
+      if (out) return out;
+      const sp = roomySpot(c, r, pr, vis, null);
+      if (!sp) return [clamp(ax, vis[0] + R, vis[2] - R), clamp(ay, vis[1] + R, vis[3] - R * 2.2), R];
+      const R2 = clamp(sp.rho / 1.9, Math.min(28, R), R);
+      return [clamp(sp.x, vis[0] + R2 * 1.7, vis[2] - R2 * 1.7), clamp(sp.y, vis[1] + R2, vis[3] + 20 - R2 * 2.7), R2];
+    }
     function toonRealm(c, r, pr, spots, local, t, opts, idx = 0) {
       if ((opts.pop || opts.pops) && opts.clean) { if (!opts.noFace) popFace(c, r, pr, spots, t, opts); return; }
       if (!r.units.length || opts.clean) return;
@@ -879,13 +992,13 @@
       if (!cl || !b) return;
       const [x, y] = pr.P(cl[0], cl[1]), ub = boxOf([key2], pr) || b, R = clamp(Math.sqrt(ub.w * ub.h * .5 + b.w * b.h * .5) * .19, 14, 74), k = (local - GROW_DELAY - GROW * .45) / .6;
       if (k <= 0) return;
-      const [ax, ay] = eyeSpot(x, y, spots, R), cols = r.colors && r.colors.length ? r.colors : [r.color];
-      if (r.face) Cart.eyes(c, ax, ay, R, { mood: reaction(r, idx), t, seed: seedOf(r.name), k: Cart.easeBack(k), lid: cols[0] });
-      if (r.name && Math.min(b.w, b.h) > 60 && R >= 18 && k > .7) { c.save(); c.globalAlpha *= clamp((k - .7) / .3, 0, 1); Cart.label(c, r.name, ax, ay + R * 2.7, clamp(R * .62, 15, 28)); c.restore(); }
+      const [ax, ay, R2] = faceSpot(c, r, pr, spots, x, y, R), cols = r.colors && r.colors.length ? r.colors : [r.color];
+      if (r.face) Cart.eyes(c, ax, ay, R2, { mood: reaction(r, idx), t, seed: seedOf(r.name), k: Cart.easeBack(k), lid: cols[0] });
+      if (r.name && Math.min(b.w, b.h) > 60 && R2 >= 18 && k > .7) { c.save(); c.globalAlpha *= clamp((k - .7) / .3, 0, 1); Cart.label(c, r.name, ax, ay + R2 * 2.7, clamp(R2 * .62, 15, 28)); c.restore(); }
     }
     // Biển ngả xám xanh ở giai đoạn có trận đánh (chuyển mượt khi sang giai đoạn mới).
     const warOf = e => e && (e.markers || []).some(m => m.type === 'battle') ? .6 : 0;
-    function toonTone(st) { return lerp(st.prev ? warOf(st.prev) : warOf(st.era), warOf(st.era), easeOut(clamp(st.local / 1.2, 0, 1))); }
+    function toonTone(st) { const b = tl && tl.kind === 'war' ? .35 : 0; return Math.max(b, lerp(st.prev ? warOf(st.prev) : warOf(st.era), warOf(st.era), easeOut(clamp(st.local / 1.2, 0, 1)))); }
     function toonHud(c, st, t) {
       const S = Plan.strings(tl.lang), outro = st.phase === 'outro', local = st.local, era = st.era, ms = tl.milestones, n = ms.length;
       const pos = outro ? tl.eras.length : st.index + clamp(local / era.dur, 0, 1), top = outro ? 1 : easeOut(local / .8);
@@ -995,6 +1108,7 @@
           if (r.name && !opts.clean && Math.min(b.w, b.h) > 60 && k > .5) tag(sc, r.name, ax, ay + 24 * fs + (r.face ? 34 * fs + 8 : 0), clamp(easeOut((k - .5) / .5), 0, 1) * clamp(fs + .35, .8, 1.15), clamp(Math.min(b.w, b.h) / 11, 17, 26));
         });
       }
+      if (!opts.clean && !opts.bare && st.era) kindLook(sc, st, pr, t);
       lap('realms+markers', sc);
       // ghép lên khung ra: thu phóng nhẹ (Ken Burns) rồi vẽ giao diện
       ctx.save();
