@@ -9,10 +9,21 @@
   'use strict';
   // Baloo 2 (đi kèm app) vẽ chữ Latinh, tiếng Việt và Devanagari; các chữ khác (Nga, Hy Lạp, Ả Rập, Thái, Nhật, Hàn, Trung) lấy font có sẵn của hệ điều hành.
   const FONT = '"PairRound", "Baloo 2", "Segoe UI", "Leelawadee UI", "Nirmala UI", "Microsoft YaHei UI", "Yu Gothic UI", "Malgun Gothic", "Noto Sans", "Noto Sans CJK SC", "Noto Sans Thai", "Noto Sans Arabic", system-ui, sans-serif';
-  const SIDE = {
+  const SIDE_LIFE = {
     L: { a: '#ffb347', b: '#ff4d6d', glow: 'rgba(255,110,70,.65)', soft: 'rgba(255,120,80,.18)' },
     R: { a: '#37e8cf', b: '#3b8dff', glow: 'rgba(60,200,255,.6)', soft: 'rgba(60,200,255,.16)' }
   };
+  // Chế độ khí tài: cam hổ phách (trái) và xanh thép (phải), nhãn vát góc, phẳng; hợp màu cát / olive của khí tài hơn nhãn «kẹo» của chế độ Cuộc sống.
+  const SIDE_GEAR = {
+    L: { a: '#f2a93b', b: '#c4571a', glow: 'rgba(240,150,50,.5)', soft: 'rgba(240,150,50,.16)' },
+    R: { a: '#62b0ea', b: '#2159b0', glow: 'rgba(80,160,235,.5)', soft: 'rgba(80,160,235,.16)' }
+  };
+  const SIDE = { L: { ...SIDE_LIFE.L }, R: { ...SIDE_LIFE.R } };   // đối tượng này được xuất ra ngoài nên chỉ sửa tại chỗ, không thay mới
+  let gear = false;
+  function setTheme(mode) {
+    gear = mode === 'gear';
+    for (const k of ['L', 'R']) Object.assign(SIDE[k], (gear ? SIDE_GEAR : SIDE_LIFE)[k]);
+  }
   const METER_FPS = 10, METER_HOLD = 4, METER_MOVE = 20;   // 0,4 giây đứng yên rồi 2 giây chạy
   const METER_FRAMES = METER_HOLD + METER_MOVE;
   const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
@@ -49,6 +60,12 @@
   }
   const png = c => c.toDataURL('image/png');
   const rr = (ctx, x, y, w, h, r) => { ctx.beginPath(); ctx.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2)); };
+  // Khối vát hai góc (trên-trái, dưới-phải) cho chế độ khí tài.
+  const chamfer = (ctx, x, y, w, h, c) => {
+    c = Math.min(c, w / 2, h / 2);
+    ctx.beginPath(); ctx.moveTo(x + c, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h - c); ctx.lineTo(x + w - c, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + c); ctx.closePath();
+  };
+  const plate = (ctx, x, y, w, h, r) => { if (gear) chamfer(ctx, x, y, w, h, Math.min(r * .5, 18)); else rr(ctx, x, y, w, h, r); };
   const font = (weight, size) => `${weight} ${Math.round(size)}px ${FONT}`;
   const lerp = (a, b, t) => a + (b - a) * t;
   const ease = t => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
@@ -105,14 +122,15 @@
   const glass = (ctx, x, y, w, h, r, { alpha = .6, edge = .16, blur = 28, drop = 8 } = {}) => {
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = blur; ctx.shadowOffsetY = drop;
-    rr(ctx, x, y, w, h, r);
+    plate(ctx, x, y, w, h, r);
     const g = ctx.createLinearGradient(0, y, 0, y + h);
     g.addColorStop(0, `rgba(22,28,46,${alpha})`); g.addColorStop(1, `rgba(8,11,22,${Math.min(.92, alpha + .14)})`);
     ctx.fillStyle = g; ctx.fill();
     ctx.restore();
     ctx.save();
-    rr(ctx, x + .75, y + .75, w - 1.5, h - 1.5, r);
+    plate(ctx, x + .75, y + .75, w - 1.5, h - 1.5, r);
     ctx.strokeStyle = `rgba(255,255,255,${edge})`; ctx.lineWidth = 1.5; ctx.stroke();
+    if (gear) { ctx.restore(); return; }
     // vệt sáng mảnh ở mép trên cho cảm giác kính
     const shine = ctx.createLinearGradient(x, y, x + w, y);
     shine.addColorStop(0, 'rgba(255,255,255,0)'); shine.addColorStop(.5, 'rgba(255,255,255,.28)'); shine.addColorStop(1, 'rgba(255,255,255,0)');
@@ -126,15 +144,15 @@
     const s = fitSize(ctx, text, weight, size, maxW - 70, 18);
     const w = Math.min(maxW, ctx.measureText(text).width + 70), x = cx - w / 2, y = cy - height / 2, col = SIDE[side];
     ctx.save();
-    ctx.shadowColor = col.glow; ctx.shadowBlur = 26;
-    rr(ctx, x, y, w, height, height / 2);
+    ctx.shadowColor = col.glow; ctx.shadowBlur = gear ? 12 : 26;
+    plate(ctx, x, y, w, height, height / 2);
     const g = ctx.createLinearGradient(x, y, x + w, y + height);
     g.addColorStop(0, col.a); g.addColorStop(1, col.b);
     ctx.fillStyle = g; ctx.fill();
     ctx.restore();
     ctx.save();
-    rr(ctx, x + 1, y + 1, w - 2, height / 2, height / 2);   // phản chiếu nửa trên
-    ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fill();
+    if (gear) { plate(ctx, x + 1, y + 1, w - 2, height - 2, height / 2); ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 2; ctx.stroke(); }
+    else { rr(ctx, x + 1, y + 1, w - 2, height / 2, height / 2); ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fill(); }   // phản chiếu nửa trên
     ctx.font = font(weight, s); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; textShadow(ctx, 8, .45);
     ctx.fillText(text, cx, cy + s * .34);
     ctx.restore();
@@ -212,7 +230,7 @@
     const s = fitSize(ctx, label, 800, 32, w - 120, 18), bw = Math.min(w - 40, Math.max(150, ctx.measureText(label).width + 64));
     ctx.save();
     ctx.shadowColor = 'rgba(255,170,40,.85)'; ctx.shadowBlur = 28;
-    rr(ctx, cx - bw / 2, cy - bh / 2, bw, bh, bh / 2);
+    plate(ctx, cx - bw / 2, cy - bh / 2, bw, bh, bh / 2);
     const g = ctx.createLinearGradient(0, cy - bh / 2, 0, cy + bh / 2);
     g.addColorStop(0, '#ffe08a'); g.addColorStop(1, '#ff9f1c');
     ctx.fillStyle = g; ctx.fill();
@@ -223,7 +241,12 @@
     ctx.restore();
     // đếm mốc nhỏ: dưới huy hiệu (hai cột) hoặc bên phải huy hiệu (hai tầng, dưới huy hiệu là nhãn bên dưới)
     ctx.save();
-    ctx.font = font(700, 22); ctx.fillStyle = 'rgba(255,255,255,.92)'; textShadow(ctx, 8, .8);
+    ctx.font = font(700, 22);
+    if (gear) {   // nền tối cho bộ đếm để vạch chia ở giữa không cắt ngang chữ
+      const counter = `${number}/${spec.total}`, pw = Math.ceil(ctx.measureText(counter).width) + 26;
+      ctx.fillStyle = 'rgba(8,12,20,.88)'; plate(ctx, stack ? cx + bw / 2 + 6 : cx - pw / 2, (stack ? cy + 8 : cy + bh / 2 + 28) - 24, pw, 32, 12); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,.92)'; textShadow(ctx, 8, .8);
     if (stack) { ctx.textAlign = 'left'; ctx.fillText(`${number}/${spec.total}`, cx + bw / 2 + 18, cy + 8); }
     else { ctx.textAlign = 'center'; ctx.fillText(`${number}/${spec.total}`, cx, cy + bh / 2 + 28); }
     ctx.restore();
@@ -244,19 +267,23 @@
     // hai chấm màu hai bên ở mép phụ đề
     for (const [side, x] of [['L', 44], ['R', w - 44]]) {
       ctx.save(); ctx.fillStyle = SIDE[side].a; ctx.shadowColor = SIDE[side].glow; ctx.shadowBlur = 14;
-      ctx.beginPath(); ctx.arc(x, h / 2, 9, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      ctx.beginPath();
+      if (gear) { ctx.moveTo(x, h / 2 - 11); ctx.lineTo(x + 11, h / 2); ctx.lineTo(x, h / 2 + 11); ctx.lineTo(x - 11, h / 2); ctx.closePath(); } else ctx.arc(x, h / 2, 9, 0, Math.PI * 2);
+      ctx.fill(); ctx.restore();
     }
     return png(c);
   }
 
   // ---------- Thanh pin ----------
   const levelColor = v => v >= 60 ? ['#7dffc8', '#18c98a'] : v >= 35 ? ['#ffe27a', '#ffae1a'] : ['#ff8f9b', '#ff3b52'];
-  function drawMeter(side, value, previous) {
+  function drawMeter(side, value, previous, other, target) {
     const W0 = geo.meter[side].w, H0 = geo.meter[side].h, { c, ctx } = canvas(W0, H0), w = W0 - 2 * PAD, h = H0 - 2 * PAD, v = clamp(value, 0, 100), col = SIDE[side];
+    // khí tài: bên điểm cao hơn (theo điểm cuối của mốc, không theo số đang chạy) được tô vàng; không có mũi tên so với mốc trước vì mốc trước là hạng mục khác
+    const lead = gear && Number.isFinite(other) && Math.round(Number.isFinite(target) ? target : v) > Math.round(other);
     ctx.translate(PAD, PAD);
     glass(ctx, 0, 0, w, h, 30, { alpha: .6, blur: 14, drop: 4 });
     // vạch màu của bên ở mép trái panel
-    ctx.save(); rr(ctx, 0, 0, 12, h, 6); const eg = ctx.createLinearGradient(0, 0, 0, h); eg.addColorStop(0, col.a); eg.addColorStop(1, col.b); ctx.fillStyle = eg; ctx.fill(); ctx.restore();
+    ctx.save(); plate(ctx, 0, 0, w, h, 30); if (gear) ctx.clip(); rr(ctx, 0, 0, 12, h, gear ? 0 : 6); const eg = ctx.createLinearGradient(0, 0, 0, h); eg.addColorStop(0, col.a); eg.addColorStop(1, col.b); ctx.fillStyle = eg; ctx.fill(); ctx.restore();
     ctx.save();
     ctx.font = font(700, 25); ctx.fillStyle = 'rgba(255,255,255,.82)'; ctx.textAlign = 'left'; textShadow(ctx, 6, .5);
     const name = spec.meter || '';
@@ -265,19 +292,19 @@
     // pin
     const bx = 40, by = 50, bw = w - 40 - 190, bh = 36;
     ctx.save();
-    rr(ctx, bx, by, bw, bh, 12); ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fill();
+    rr(ctx, bx, by, bw, bh, gear ? 4 : 12); ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 3; ctx.stroke();
     rr(ctx, bx + bw + 4, by + 9, 9, bh - 18, 4); ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fill();
     ctx.restore();
-    const fillW = Math.max(0, (bw - 10) * v / 100), [c1, c2] = levelColor(v);
+    const fillW = Math.max(0, (bw - 10) * v / 100), [c1, c2] = gear ? [col.a, col.b] : levelColor(v);
     if (fillW > 1) {
       ctx.save();
-      rr(ctx, bx + 5, by + 5, bw - 10, bh - 10, 8); ctx.clip();
+      rr(ctx, bx + 5, by + 5, bw - 10, bh - 10, gear ? 3 : 8); ctx.clip();
       ctx.shadowColor = c2; ctx.shadowBlur = 18;
       const g = ctx.createLinearGradient(0, by, 0, by + bh); g.addColorStop(0, c1); g.addColorStop(1, c2);
-      ctx.fillStyle = g; rr(ctx, bx + 5, by + 5, Math.max(8, fillW), bh - 10, 8); ctx.fill();
+      ctx.fillStyle = g; rr(ctx, bx + 5, by + 5, Math.max(8, fillW), bh - 10, gear ? 3 : 8); ctx.fill();
       ctx.shadowBlur = 0;
-      ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(bx + 5, by + 5, Math.max(8, fillW), (bh - 10) * .4);
+      ctx.fillStyle = gear ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.28)'; ctx.fillRect(bx + 5, by + 5, Math.max(8, fillW), (bh - 10) * .4);
       ctx.restore();
     }
     // vạch chia mỗi 10%
@@ -286,13 +313,18 @@
     ctx.restore();
     // số %
     ctx.save();
-    ctx.font = font(800, 62); ctx.textAlign = 'right'; ctx.fillStyle = c2; ctx.shadowColor = c2; ctx.shadowBlur = 16;
+    ctx.font = font(800, 62); ctx.textAlign = 'right'; ctx.fillStyle = gear ? (lead ? '#ffd76a' : '#eef2f8') : c2; ctx.shadowColor = gear ? col.glow : c2; ctx.shadowBlur = 16;
     const label = `${Math.round(v)}%`;
     ctx.fillText(label, w - 28, h - 22);
     const labelW = ctx.measureText(label).width;
     ctx.restore();
+    if (lead) {   // gạch vàng dưới số của bên dẫn điểm
+      ctx.save(); ctx.fillStyle = '#ffd76a'; ctx.shadowColor = 'rgba(255,215,106,.7)'; ctx.shadowBlur = 10;
+      ctx.fillRect(w - 28 - labelW, h - 14, labelW, 5);
+      ctx.restore();
+    }
     // mũi tên chiều thay đổi, nằm ngay trước số %
-    if (Number.isFinite(previous) && Math.round(previous) !== Math.round(v)) {
+    if (!gear && Number.isFinite(previous) && Math.round(previous) !== Math.round(v)) {
       const up = v > previous;
       ctx.save();
       ctx.fillStyle = up ? '#7dffc8' : '#ff6b7d'; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 10;
@@ -305,12 +337,12 @@
     return png(c);
   }
   // Chuỗi khung pin: đứng yên rồi chạy từ `from` đến `to` (làm chậm dần cuối). from == to → một khung.
-  function meterSeq(side, from, to) {
-    if (Math.round(from) === Math.round(to)) return [drawMeter(side, to)];
+  function meterSeq(side, from, to, other) {
+    if (Math.round(from) === Math.round(to)) return [drawMeter(side, to, undefined, other, to)];
     const out = [];
     for (let i = 0; i < METER_FRAMES; i++) {
       const t = i < METER_HOLD ? 0 : (i - METER_HOLD + 1) / METER_MOVE;
-      out.push(drawMeter(side, lerp(from, to, ease(t)), from));
+      out.push(drawMeter(side, lerp(from, to, ease(t)), from, other, to));
     }
     return out;
   }
@@ -407,6 +439,13 @@
       img.src = String(src || '');
     });
   }
+  // Khí tài: ảnh vuông có cả hai khí tài đứng hai bên; mỗi nửa thumbnail chỉ lấy 60% ngang phía bên mình (giống khi dựng video).
+  function focusCrop(img, side) {
+    const cw = Math.round(img.width * .6), c = document.createElement('canvas');
+    c.width = cw; c.height = img.height;
+    c.getContext('2d').drawImage(img, side === 'R' ? img.width - cw : 0, 0, cw, img.height, 0, 0, cw, img.height);
+    return c;
+  }
   // Vẽ ảnh phủ kín ô (cắt giữa); `filter` chỉnh màu (bão hòa / tương phản / sáng) cho nổi trên danh sách video.
   const PUNCH = 'saturate(1.3) contrast(1.1) brightness(1.04)';
   function drawCover(ctx, img, x, y, w, h, filter = PUNCH) {
@@ -496,7 +535,7 @@
   }
   // Số % pin thật to + thanh pin của một bên (kiểu «Điểm cuối»).
   function scoreBlock(ctx, side, cx, score, meterName) {
-    const [c1, c2] = levelColor(score), label = `${Math.round(score)}%`;
+    const [c1, c2] = gear ? [SIDE[side].a, SIDE[side].b] : levelColor(score), label = `${Math.round(score)}%`;
     ctx.save();
     if (meterName) {
       const s = fitSize(ctx, meterName, 800, 54, 760, 28);
@@ -527,7 +566,9 @@
   async function drawThumbnail(opts = {}) {
     const W = THUMB.W, H = THUMB.H, style = ((Math.round(Number(opts.variant)) || 0) % THUMB.STYLES + THUMB.STYLES) % THUMB.STYLES;
     const lang = String(opts.lang || 'en'), left = String(opts.left || ''), right = String(opts.right || '');
-    const [imgL, imgR] = await Promise.all([loadImage(opts.leftImage), loadImage(opts.rightImage)]);
+    setTheme(opts.mode);
+    const [rawL, rawR] = await Promise.all([loadImage(opts.leftImage), loadImage(opts.rightImage)]);
+    const imgL = gear ? focusCrop(rawL, 'L') : rawL, imgR = gear ? focusCrop(rawR, 'R') : rawR;
     const { c, ctx } = canvas(W, H);
     ctx.fillStyle = '#0b0f1a'; ctx.fillRect(0, 0, W, H);
     const title = upper(hookOf(opts.title), lang);
@@ -620,6 +661,7 @@
 
   // ---------- Giao diện gọi từ bộ dựng ----------
   function init(options = {}) {
+    setTheme(options.mode);
     geo = geometry(options.layout);
     spec = { title: String(options.title || ''), left: String(options.left || ''), right: String(options.right || ''), meter: String(options.meter || ''), verdict: options.verdict === 'L' || options.verdict === 'R' ? options.verdict : '', total: Math.max(1, Number(options.total) || 1), lang: String(options.lang || 'en'), tagline: String(options.tagline || 'ONE PERSON · TWO PATHS'), lessonsTitle: String(options.lessonsTitle || 'WHAT TO TAKE AWAY') };
     return { W: geo.W, H: geo.H };

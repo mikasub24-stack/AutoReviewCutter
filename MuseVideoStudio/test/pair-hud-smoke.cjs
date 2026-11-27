@@ -144,6 +144,72 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     assert.equal(Hud.hookOf('Why one calm word beats ten loud ones in every home'), 'Why one calm word beats ten loud ones in every home', 'không có dấu tách: giữ nguyên');
     assert.equal(Hud.hookOf('x'.repeat(60) + ': y'), 'x'.repeat(60) + ': y', 'vế đầu quá dài: giữ nguyên');
     assert.equal(Hud.hookOf(null), '');
+    // ---- Chế độ khí tài: bảng màu riêng, thanh điểm theo màu từng bên, bên dẫn điểm có gạch vàng, KHÔNG có mũi tên so với mốc trước.
+    const census = url => page.evaluate(async url => {
+      const img = new Image(); img.src = url; await img.decode();
+      const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data, n = { gold: 0, arrowGreen: 0, arrowRed: 0, orange: 0, blue: 0, mint: 0 };
+      for (let i = 0; i < d.length; i += 4) {
+        const [r, gg, b, a] = [d[i], d[i + 1], d[i + 2], d[i + 3]]; if (a < 240) continue;
+        if (r > 240 && Math.abs(gg - 215) < 14 && Math.abs(b - 106) < 24) n.gold++;
+        if (Math.abs(r - 125) < 14 && gg > 240 && Math.abs(b - 200) < 18) n.arrowGreen++;
+        if (r > 245 && Math.abs(gg - 107) < 14 && Math.abs(b - 125) < 14) n.arrowRed++;
+        if (r > 200 && gg > 110 && gg < 190 && b < 90) n.orange++;
+        if (b > 150 && r < 120 && gg > 70 && gg < 170) n.blue++;
+        if (gg > 180 && r < 170 && b > 110 && b < 230 && gg > r + 40) n.mint++;
+      }
+      return n;
+    }, url);
+    for (const layout of ['side', 'stack']) {
+      await init({ ...base, layout, mode: 'gear' });
+      const last = async (side, from, to, other) => (await page.evaluate(([s, f, t, o]) => PairHud.meterSeq(s, f, t, o), [side, from, to, other])).at(-1);
+      const L = await census(await last('L', 70, 88, 85)), R = await census(await last('R', 75, 85, 88));
+      assert.ok(L.gold > 120 && R.gold === 0, `${layout}: chỉ bên dẫn điểm (88 > 85) có số vàng và gạch vàng (${L.gold}/${R.gold})`);
+      assert.ok(L.orange > 1500 && L.blue === 0, `${layout}: thanh điểm trái màu cam hổ phách (${L.orange}/${L.blue})`);
+      assert.ok(R.blue > 1500 && R.orange === 0, `${layout}: thanh điểm phải màu xanh thép (${R.blue}/${R.orange})`);
+      assert.equal(L.arrowGreen + L.arrowRed + R.arrowGreen + R.arrowRed, 0, `${layout}: khí tài không có mũi tên so với mốc trước`);
+      assert.equal(L.mint + R.mint, 0, `${layout}: không còn thanh xanh mint chung cho hai bên`);
+      // hòa điểm: không bên nào có gạch vàng; thiếu điểm bên kia: không có gạch vàng
+      assert.equal((await census(await last('L', 60, 80, 80))).gold, 0, `${layout}: hòa điểm không ai dẫn`);
+      assert.equal((await census(await last('L', 60, 80))).gold, 0, `${layout}: không biết điểm bên kia thì không đánh dấu`);
+      // số đang chạy vượt qua điểm bên kia nhưng điểm cuối thấp hơn: không được tô vàng giữa chừng
+      const mid = await page.evaluate(() => PairHud.meterSeq('L', 95, 70, 85));
+      assert.equal((await census(mid[10])).gold, 0, `${layout}: dẫn điểm tính theo điểm cuối của mốc, không theo số đang chạy`);
+      // chế độ Cuộc sống (cùng trang, đổi lại): vẫn thanh mint và mũi tên theo mốc trước
+      await init({ ...base, layout });
+      const lifeBar = await census((await page.evaluate(() => PairHud.meterSeq('L', 60, 88, 70))).at(-1));
+      assert.ok(lifeBar.mint > 1500 && lifeBar.arrowGreen > 40 && lifeBar.gold === 0, `${layout}: chế độ Cuộc sống giữ nguyên (${JSON.stringify(lifeBar)})`);
+      await init({ ...base, layout, mode: 'gear' });
+      // nhãn vát góc: ảnh nhãn khác hẳn chế độ Cuộc sống, cùng kích thước
+      const gearBase = await page.evaluate(() => PairHud.base());
+      await init({ ...base, layout });
+      const lifeBase = await page.evaluate(() => PairHud.base());
+      assert.deepEqual(size(gearBase), size(lifeBase));
+      assert.notEqual(hash(gearBase), hash(lifeBase), `${layout}: lớp nền khí tài khác chế độ Cuộc sống`);
+    }
+    {   // bộ đếm có nền tối: điểm ảnh ngay dưới huy hiệu tối, không còn đường chia sáng cắt qua chữ
+      await init({ ...base, layout: 'side', mode: 'gear', total: 66 });
+      const tag = await page.evaluate(() => PairHud.tag(29, 'URBAN OPS'));
+      const [r, g, b] = await pixel(tag, 160 - 28, 62 + 31 + 28 - 20);
+      assert.ok(r < 60 && g < 70 && b < 80, `nền tối sau bộ đếm: ${r},${g},${b}`);
+    }
+    // thumbnail khí tài: mỗi nửa chỉ lấy 60% ngang phía bên mình
+    {
+      const sideImages = await page.evaluate(() => {
+        const make = (left, right) => { const c = document.createElement('canvas'); c.width = 1000; c.height = 1000; const x = c.getContext('2d'); x.fillStyle = left; x.fillRect(0, 0, 500, 1000); x.fillStyle = right; x.fillRect(500, 0, 500, 1000); return c.toDataURL('image/jpeg', .95); };
+        return { both: make('#e02020', '#2020e0') };
+      });
+      for (const v of [0, 2, 3]) {
+        const gearUrl = await thumb(thumbOpts({ variant: v, mode: 'gear', leftImage: sideImages.both, rightImage: sideImages.both }));
+        const lifeUrl = await thumb(thumbOpts({ variant: v, leftImage: sideImages.both, rightImage: sideImages.both }));
+        assert.notEqual(hash(gearUrl), hash(lifeUrl), `kiểu ${v}: thumbnail khí tài cắt theo bên`);
+        const info = jpegSize(gearUrl);
+        assert.deepEqual([info.w, info.h], [1920, 1080]);
+        const [lr, , lb] = await pixel(gearUrl, 300, 600), [rr_, , rb] = await pixel(gearUrl, 1620, 600);
+        assert.ok(lr > lb, `kiểu ${v}: nửa trái thấy phần đỏ của bên trái (${lr},${lb})`);
+        assert.ok(rb > rr_, `kiểu ${v}: nửa phải thấy phần xanh của bên phải (${rr_},${rb})`);
+      }
+    }
     assert.equal(errors.length, 0, errors.join('\n'));
     console.log('pair hud smoke ok');
   } finally { await browser.close(); server.close(); }

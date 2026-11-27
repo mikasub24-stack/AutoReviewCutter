@@ -4,6 +4,9 @@ const assert = require('node:assert/strict');
 const P = require('../src/pair-plan.js');
 const { createPairWriter } = require('../src/pair-write.cjs');
 const { fakeMuse } = require('./fixtures/pair-fake-muse.cjs');
+const Render = require('../src/pair-render.cjs');
+const Hud = require('../src/pair-hud.js');
+const { spawnSync } = require('node:child_process');
 
 const GEAR_CAST = 'LEFT: a grey single-engine stealth fighter jet with a diamond-shaped intake, low-visibility roundels; RIGHT: a twin-engine light-grey stealth fighter with angled tails and large flaps; one jet each.';
 function gearBible(total = 7, { topic = 'F-35 vs Su-57' } = {}) {
@@ -123,4 +126,58 @@ test('khí tài: trình viết kịch bản thật (createPairWriter) chạy tr�
   const fake = fakeMuse({ total: 7 });
   await createPairWriter({ ask: fake.ask, delay: async () => {} }).write({ options: { topic: 'x', minutes: 1 } });
   assert.ok(fake.log.instructions.every(t => !/KHÍ TÀI ĐỐI ĐẦU/.test(t)));
+});
+
+test('khí tài: lời nhắc bắt hai xe đứng tách hai bên, máy quay đứng yên, mỗi bên một lần, đặc điểm nhận dạng riêng', () => {
+  const cfg = P.options({ mode: 'gear', topic: 'M1 Abrams vs T-90M', minutes: 1 }), script = { cast: GEAR_CAST, beats: [] }, beat = { label: 'RANGE', frame: 'A test track, both tanks parked', left: 'The left tank rolls forward', right: 'The right tank rolls forward' };
+  const anchor = P.anchorPrompt(cfg, script, beat), clipL = P.clipPrompt(cfg, script, beat, 'L'), clipR = P.clipPrompt(cfg, script, beat, 'R');
+  for (const text of [anchor, clipL, clipR]) {
+    assert.match(text, /left 40% of the frame/);
+    assert.match(text, /right 40%/);
+    assert.match(text, /empty gap/);
+    assert.match(text, /ONCE, only on its own side/);
+    assert.match(text, /no machine of the same type as the other one/);
+  }
+  for (const text of [clipL, clipR]) assert.match(text, /camera is locked off: no pan, no zoom/);
+  const bible = P.buildBibleInstruction({ mode: 'gear', topic: 'x', minutes: 1 }, { marker: 'abc' });
+  assert.match(bible, /BỐ CỤC BẮT BUỘC/);
+  assert.match(bible, /40% bên trái khung/);
+  assert.match(bible, /4–5 đặc điểm nhận dạng RIÊNG/);
+  assert.match(P.safeRetryPrompt(P.clipPrompt(cfg, script, beat, 'L'), 2), /camera locked off/);
+  // chế độ Cuộc sống không đổi
+  const life = P.options({ topic: 'x', minutes: 1 });
+  assert.doesNotMatch(P.anchorPrompt(life, { cast: 'c', beats: [] }, beat), /left 40%/);
+});
+
+test('khí tài: bộ lọc dựng cắt mỗi nửa màn hình theo bên mình; chế độ khác vẫn cắt giữa', () => {
+  const geo = Hud.geometry('side'), filter = focus => {
+    const args = Render.beatVideoArgs({ clipL: 'l.mp4', clipR: 'r.mp4', geo: { ...geo, focus }, durL: 5, durR: 5, total: 6, layers: { base: 'b.png', tag: 't.png', caption: 'c.png', meterL: 'ml-%03d.png', meterR: 'mr-%03d.png' }, out: 'o.mp4' });
+    return args[args.indexOf('-filter_complex') + 1];
+  };
+  const gear = filter(true), life = filter(false);
+  assert.match(gear, /\[0:v\]crop=w=iw\*0\.6:h=min\(ih\\,iw\*0\.6\/0\.88889\):x=0:y=\(ih-oh\)\*0\.62,scale=960:1080,setsar=1,/);
+  assert.match(gear, /\[1:v\]crop=w=iw\*0\.6:h=min\(ih\\,iw\*0\.6\/0\.88889\):x=iw\*0\.4:y=\(ih-oh\)\*0\.62,scale=960:1080,setsar=1,/);
+  assert.match(life, /\[0:v\]scale=960:1080:force_original_aspect_ratio=increase,crop=960:1080,setsar=1,/);
+  assert.doesNotMatch(life, /iw\*0\.6/);
+});
+
+const HAS_FFMPEG = (() => { try { return spawnSync('ffmpeg', ['-version']).status === 0; } catch { return false; } })();
+test('khí tài: chạy ffmpeg thật, nửa trái chỉ thấy phần của bên trái, nửa phải chỉ thấy phần của bên phải (hai xe cách nhau 20% ở giữa)', { skip: !HAS_FFMPEG && 'không có ffmpeg' }, () => {
+  for (const layout of ['side', 'stack']) {
+    const geo = { ...Hud.geometry(layout), focus: true }, plain = { ...Hud.geometry(layout), focus: false };
+    const run = (g, side) => {
+      // ảnh vuông: xe trái = đỏ (0–40%), khoảng trống = xám (40–60%), xe phải = xanh (60–100%)
+      const f = `[0:v][1:v][2:v]hstack=inputs=3,format=rgb24,${Render.fit(g, side)},scale=5:5:flags=neighbor,format=rgb24`;
+      const r = spawnSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=0xe02020:s=432x1080:d=1', '-f', 'lavfi', '-i', 'color=c=0x808080:s=216x1080:d=1', '-f', 'lavfi', '-i', 'color=c=0x2020e0:s=432x1080:d=1', '-filter_complex', f, '-frames:v', '1', '-f', 'rawvideo', '-'], { maxBuffer: 1 << 20 });
+      assert.equal(r.status, 0, String(r.stderr));
+      const px = []; for (let i = 0; i < r.stdout.length; i += 3) px.push([r.stdout[i], r.stdout[i + 2]]);
+      return { red: px.filter(([R, B]) => R > 150 && B < 90).length, blue: px.filter(([R, B]) => B > 150 && R < 90).length, total: px.length };
+    };
+    const L = run(geo, 'L'), R = run(geo, 'R');
+    assert.ok(L.red > 0 && L.blue === 0, `${layout}: nửa trái chỉ có phần của bên trái (${JSON.stringify(L)})`);
+    assert.ok(R.blue > 0 && R.red === 0, `${layout}: nửa phải chỉ có phần của bên phải (${JSON.stringify(R)})`);
+    assert.equal(L.total, 25);
+    const mixed = run(plain, 'L');
+    assert.ok(mixed.red > 0 && mixed.blue > 0, `${layout}: cắt giữa thấy cả hai bên (đúng như cũ) ${JSON.stringify(mixed)}`);
+  }
 });

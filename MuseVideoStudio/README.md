@@ -142,6 +142,14 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.15.17
+
+- **«Khí tài đối đầu»: mỗi nửa màn hình chỉ thấy xe của bên mình.** Trước đây ảnh nền (hình vuông có cả hai khí tài) hiện gần trọn ở CẢ HAI nửa nên nửa nào cũng thấy cả hai xe, có mốc nửa phải toàn xe của bên trái. Giờ khi dựng, nửa trái chỉ lấy 60% ngang phía trái của clip, nửa phải lấy 60% phía phải; thumbnail cũng vậy.
+  - **Lời nhắc mới:** khung rộng, máy quay ĐỨNG YÊN (không zoom, không lia); khí tài trái nằm trọn 40% bên trái, khí tài phải 40% bên phải, 20% giữa để trống; mỗi khí tài chỉ xuất hiện một lần, không có xe cùng loại với bên kia ở bên đối diện hay ở nền.
+  - **Đặc điểm nhận dạng:** Muse phải nêu 4–5 đặc điểm RIÊNG của từng khí tài (dáng tháp pháo, giáp, màu sơn…) và điều không được vẽ lẫn từ bên kia, để T-90M không còn giống Abrams sơn xanh. Muse vẫn có thể vẽ sai chi tiết; ảnh tham chiếu riêng cho từng bên chưa có.
+- **HUD riêng cho khí tài** (chế độ Cuộc sống giữ nguyên): nhãn vát góc phẳng, màu cam hổ phách (trái) và xanh thép (phải) thay cho nhãn bóng kiểu kẹo; thanh điểm lấy màu từng bên thay vì xanh mint chung; bên dẫn điểm có số vàng và gạch vàng; bỏ mũi tên ▲▼ (trước đây so với mốc trước là hạng mục khác nên có lúc bên dẫn điểm hiện ▼ đỏ); bộ đếm mốc có nền tối để vạch chia giữa không cắt ngang chữ; phụ đề dùng chấm hình thoi.
+- **Video đã dựng** không tự đổi. Dựng lại từ kịch bản đang có thì áp dụng ngay HUD mới và cách cắt hình, nhưng clip cũ được tạo theo bố cục cũ (xe có thể đứng sát giữa) nên có thể bị cắt lẹm hoặc còn lọt một phần xe bên kia; muốn đúng hẳn thì tạo lại kịch bản và clip.
+
 ## Update 1.15.16
 
 - **«So sánh song song» có thêm chế độ «Khí tài đối đầu».** Màn hình chia đôi: mỗi mốc so sánh MỘT hạng mục (tốc độ, tầm bay, hỏa lực, giáp, tàng hình, giá…) giữa hai khí tài (máy bay, xe tăng, tàu, phòng không, UAV). Chọn ở ô «Chế độ video» đầu tab; chế độ «Cuộc sống» (nhân vật người que, hai con đường) vẫn như cũ.

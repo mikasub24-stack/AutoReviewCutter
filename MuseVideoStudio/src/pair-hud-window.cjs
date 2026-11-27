@@ -35,7 +35,7 @@ function createWindowHud({ BrowserWindow, file = path.join(__dirname, 'pair-hud.
     base: () => call('base', []),
     tag: (number, label) => call('tag', [number, label]),
     caption: text => call('caption', [text]),
-    meterSeq: (side, from, to) => call('meterSeq', [side, from, to]),
+    meterSeq: (side, from, to, other) => call('meterSeq', other === undefined ? [side, from, to] : [side, from, to, other]),
     intro: () => call('intro', []),
     outro: (lessons, closing) => call('outro', [lessons, closing]),
     thumb: options => call('thumb', [options]),

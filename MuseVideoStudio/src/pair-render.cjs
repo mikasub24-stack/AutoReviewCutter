@@ -68,7 +68,15 @@ function cuesFor(beat, prev, total) {
   return cues.filter(c => c.t < total - .1);
 }
 
-const fit = (geo, side) => `scale=${geo.half[side].w}:${geo.half[side].h}:force_original_aspect_ratio=increase,crop=${geo.half[side].w}:${geo.half[side].h},setsar=1`;
+// Chế độ khí tài (geo.focus): ảnh vuông có CẢ HAI khí tài đứng hai bên nên mỗi nửa màn hình chỉ lấy phần của bên mình
+// (trái: 0–60% chiều ngang, phải: 40–100%), nếu không nửa nào cũng thấy cả hai khí tài. Các chế độ khác: cắt giữa như cũ.
+const FOCUS_SHARE = 0.6, FOCUS_LOW = 0.62;
+const fit = (geo, side) => {
+  const h = geo.half[side];
+  if (!geo.focus) return `scale=${h.w}:${h.h}:force_original_aspect_ratio=increase,crop=${h.w}:${h.h},setsar=1`;
+  const aspect = (h.w / h.h).toFixed(5), x = side === 'R' ? `iw*${1 - FOCUS_SHARE}` : '0';
+  return `crop=w=iw*${FOCUS_SHARE}:h=min(ih\\,iw*${FOCUS_SHARE}/${aspect}):x=${x}:y=(ih-oh)*${FOCUS_LOW},scale=${h.w}:${h.h},setsar=1`;
+};
 const stackName = geo => (geo.layout === 'stack' ? 'vstack' : 'hstack');
 // Chuẩn hóa một clip thành `total` giây: giữ khung cuối nếu clip ngắn hơn.
 const clipChain = (index, label, geo, side, duration, total) =>
@@ -196,7 +204,7 @@ async function assemblePair({ script, config = {}, clips, hud, voice = null, dir
   // Âm lượng giọng đọc (thanh kéo): 0.3–1.6 lần mức gốc.
   const voiceVolume = Math.min(1.6, Math.max(0.3, Number(config.voiceVolume) || 1));
   const t = await checkTools(ffmpeg);
-  const geo = Hud.geometry(config.layout === 'stack' ? 'stack' : 'side');
+  const geo = { ...Hud.geometry(config.layout === 'stack' ? 'stack' : 'side'), focus: script.mode === 'gear' };
   await fs.mkdir(dir, { recursive: true });
   const temp = await fs.mkdtemp(path.join(dir, '.pair-'));
   const { workers, threads } = parallelism(cores);
@@ -227,7 +235,7 @@ async function assemblePair({ script, config = {}, clips, hud, voice = null, dir
     const introVoice = await voiceSeconds('intro'), outroVoice = await voiceSeconds('outro');
     // 3. Dựng từng mốc (nhiều mốc cùng lúc): vẽ lớp chữ, ghép hình, trộn tiếng.
     const language = Plan.langOf(config.lang);
-    await hud.init({ layout: geo.layout, title: script.title, left: script.left, right: script.right, meter: script.meter, verdict: Plan.verdictOf(beats, script.mode), total: beats.length, lang: language.id, tagline: Plan.taglineOf(language.id, script.mode), lessonsTitle: Plan.lessonsTitleOf(language.id, script.mode) });
+    await hud.init({ mode: script.mode === 'gear' ? 'gear' : 'life', layout: geo.layout, title: script.title, left: script.left, right: script.right, meter: script.meter, verdict: Plan.verdictOf(beats, script.mode), total: beats.length, lang: language.id, tagline: Plan.taglineOf(language.id, script.mode), lessonsTitle: Plan.lessonsTitleOf(language.id, script.mode) });
     const base = path.join(temp, 'base.png');
     await fs.writeFile(base, decode(await hud.base()));
     const pieces = [];
@@ -241,8 +249,8 @@ async function assemblePair({ script, config = {}, clips, hud, voice = null, dir
       };
       await fs.writeFile(files.tag, decode(await hud.tag(b.number, b.label)));
       await fs.writeFile(files.caption, decode(await hud.caption(b.caption)));
-      for (const [side, from, to] of [['L', prev.left, b.leftScore], ['R', prev.right, b.rightScore]]) {
-        const seq = await hud.meterSeq(side, from, to);
+      for (const [side, from, to, other] of [['L', prev.left, b.leftScore, b.rightScore], ['R', prev.right, b.rightScore, b.leftScore]]) {
+        const seq = await hud.meterSeq(side, from, to, other);
         for (let k = 0; k < seq.length; k++) await fs.writeFile(path.join(temp, `m${side}-${id}-${String(k).padStart(3, '0')}.png`), decode(seq[k]));
       }
       const video = path.join(temp, `v-${id}.mp4`), audio = path.join(temp, `a-${id}.wav`);
@@ -366,7 +374,7 @@ async function makePairThumbnail({ script, config = {}, clips, hud, dir, variant
     const last = script.beats[script.beats.length - 1], shown = k === 1 ? last : beat;
     const jpeg = decodeJpeg(await hud.thumb({
       variant: k, leftImage, rightImage, title: script.title, left: script.left, right: script.right, meter: script.meter,
-      leftScore: shown.leftScore, rightScore: shown.rightScore, verdict: Plan.verdictOf(script.beats, script.mode), lang: Plan.langOf(config.lang).id
+      mode: script.mode === 'gear' ? 'gear' : 'life', leftScore: shown.leftScore, rightScore: shown.rightScore, verdict: Plan.verdictOf(script.beats, script.mode), lang: Plan.langOf(config.lang).id
     }));
     if (jpeg.length > Hud.THUMB.MAX_BYTES + 5e4) throw Error('Ảnh thumbnail quá nặng (hơn 2 MB). Bấm tạo lại để thử kiểu khác.');
     const file = path.join(dir, `thumbnail-${k + 1}.jpg`), part = path.join(temp, 'out.jpg');
@@ -378,4 +386,4 @@ async function makePairThumbnail({ script, config = {}, clips, hud, dir, variant
   }
 }
 
-module.exports = { makePairThumbnail, thumbBeat, LEAD, TAIL, MUSIC_EXT, beatLength, introLength, outroLength, cuesFor, sceneCues, SCENE_SOUNDS, beatVideoArgs, introVideoArgs, outroVideoArgs, audioArgs, finalArgs, assemblePair, decode };
+module.exports = { fit, makePairThumbnail, thumbBeat, LEAD, TAIL, MUSIC_EXT, beatLength, introLength, outroLength, cuesFor, sceneCues, SCENE_SOUNDS, beatVideoArgs, introVideoArgs, outroVideoArgs, audioArgs, finalArgs, assemblePair, decode };
