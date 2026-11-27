@@ -49,6 +49,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
           window.calls.push({ name, data: JSON.parse(JSON.stringify(data ?? null)) });
           if (name === 'pairRemove') {
             delete s.pair.stories[data.storyId]; s.jobs = s.jobs.filter(j => !(j.kind === 'pair' && j.storyId === data.storyId));
+            setTimeout(() => window.push(), 0);   // như tiến trình chính: sau khi đổi dữ liệu luôn notify() để giao diện nhận trạng thái mới (không chỉ kết quả lời gọi)
             return structuredClone(s);
           }
           if (name === 'start') { s.active = true; return structuredClone(s); }
