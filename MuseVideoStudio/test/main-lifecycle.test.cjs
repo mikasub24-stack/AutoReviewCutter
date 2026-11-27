@@ -1430,6 +1430,14 @@ test('tab So sánh song song: Muse tự chọn chủ đề → kịch bản → 
     assert.equal(pubBack.publish.partial, true, 'chưa biết mốc giờ nên chưa có chương');
     assert.equal(typeof (await app.invoke('pairThumb', { storyId: 'SS-phim' })).file, 'string', 'thẻ khôi phục vẫn tạo thumbnail được');
 
+    // Xóa một video (mục «Tác vụ»): bỏ việc + thông tin video của đúng video đó; mặc định giữ file trong thư mục.
+    await assert.rejects(app.invoke('pairRemove', { storyId: 'khong-co' }), /Không thấy video này|This video was not found/);
+    const removedPair = await app.invoke('pairRemove', { storyId: 'SS-phim' });
+    assert.equal(removedPair.pair.stories['SS-phim'], undefined, 'thông tin video đã gỡ');
+    assert.equal(removedPair.jobs.filter(j => j.kind === 'pair' && j.storyId === 'SS-phim').length, 0, 'việc của video đã gỡ');
+    assert.equal(removedPair.removed.trashed, false);
+    assert.ok((await fs.stat(folder)).isDirectory(), 'không tick xóa file thì thư mục vẫn còn');
+
     // Xóa danh sách tab này: việc và video bị gỡ, tab khác không bị đụng.
     await app.invoke('clearList', { kind: 'pair', deleteFiles: false });
     state = await app.invoke('state');

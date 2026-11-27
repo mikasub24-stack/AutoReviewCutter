@@ -83,6 +83,8 @@ jobs:
           if errorlevel 1 (type test.log & exit /b 1)
           call node test/pair-hud-smoke.cjs >> test.log 2>&1
           if errorlevel 1 (type test.log & exit /b 1)
+          call node test/tasks-smoke.cjs >> test.log 2>&1
+          if errorlevel 1 (type test.log & exit /b 1)
           call node test/maphist-tab-smoke.cjs >> test.log 2>&1
           if errorlevel 1 (type test.log & exit /b 1)
           call node test/maphist-parallel-smoke.cjs >> test.log 2>&1

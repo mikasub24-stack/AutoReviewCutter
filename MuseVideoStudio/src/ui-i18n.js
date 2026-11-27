@@ -1066,6 +1066,10 @@ Chờ chạy. Bấm «Chạy» để bắt đầu tạo ảnh nền và clip.|Wa
 Đang tạm dừng. Bấm «Tạo tiếp» để chạy nốt các clip còn lại.|Paused. Click “Continue making” to run the remaining clips.
 Dừng viết|Stop writing
 Tạo tiếp|Continue making
+Tác vụ|Tasks
+Tác vụ đã tạo|Created tasks
+Mọi video đã tạo ở các tab, xong hay còn dở|Every video made in any tab, finished or not
+Danh sách này chỉ đọc từ dữ liệu đã lưu: mở lại app vẫn thấy mọi video đã tạo, dù xong hay còn dở.|This list is read from saved data: reopen the app and every video you made is still here, finished or not.
 Chạy|Run
 Dựng lại video|Rebuild video
 Danh sách clip video so sánh song song|Side-by-side video clip list
@@ -1112,7 +1116,7 @@ Video ghép chưa hợp lệ.|The joined video is not valid.
   function translate(value){
     const raw=String(value??'');if(language==='vi')return raw;
     const key=norm(raw);if(dictionary[key])return raw.replace(key,dictionary[key]);
-    const decorated=key.match(/^([▶■▱▦▧✎⌂☘⇋◍↗⚙✓＋+\s]*)(.*?)([＋▾\s]*)$/u);
+    const decorated=key.match(/^([▶■▱▦▧✎⌂☘⇋◍☰↗⚙✓＋+\s]*)(.*?)([＋▾\s]*)$/u);
     if(decorated&&dictionary[decorated[2]])return decorated[1]+dictionary[decorated[2]]+decorated[3];
     const photoRetry=key.match(/^Chưa lưu được ảnh · giữ đúng kết quả và thử lại: (.+)$/);if(photoRetry)return 'Image not saved yet · Retrying the same result: '+t(photoRetry[1]);
     const retry=key.match(/^Chưa lưu được video · giữ đúng kết quả và thử tải lại: (.+)$/);if(retry)return 'Video not saved yet · Retrying the same result: '+t(retry[1]);

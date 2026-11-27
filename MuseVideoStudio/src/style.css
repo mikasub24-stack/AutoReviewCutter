@@ -503,3 +503,27 @@ dialog::backdrop { background: #03070dcc; backdrop-filter: blur(3px); }
 .publishMore summary { cursor: pointer; font-size: 13px; }
 .publishMore textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; line-height: 1.45; resize: vertical; }
 .publishMore button { justify-self: start; }
+
+/* Mục «Tác vụ» */
+nav #navTasksCount.hasOpen { background: #e8a24a; color: #2b1a05; }
+.tasksBar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.taskFilter { padding: 7px 12px; font-size: 12px; border-radius: 999px; }
+.taskFilter.active { background: var(--accent); color: #082c29; border-color: #81eee1; font-weight: 700; }
+.tasksList { display: grid; gap: 10px; }
+.taskRow { border: 1px solid var(--line); border-left: 4px solid #3b8fd0; border-radius: 10px; padding: 12px 14px; background: #121d2c; }
+.taskRow.done { border-left-color: #3fbf8f; }
+.taskRow.open { border-left-color: #e8a24a; }
+.taskRow.run { border-left-color: var(--accent); }
+.taskRow.ready { border-left-color: #6fa8ff; }
+.taskTop { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.taskTitle { font-size: 14px; overflow-wrap: anywhere; }
+.taskTab { font-size: 11px; color: #9fb2cc; }
+.taskMeta { margin: 4px 0 0; font-size: 12px; color: #b6c5da; }
+.taskFile { margin: 4px 0 0; font-size: 11px; color: #7f93b0; }
+.taskBar { margin-top: 8px; height: 6px; }
+.taskActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.taskActions button { padding: 8px 12px; font-size: 12px; }
+.taskEmpty { padding: 18px 4px; font-size: 13px; color: var(--muted); }
+.taskVideoDialog { width: min(960px, 92vw); border: 1px solid var(--line); border-radius: 12px; background: #0f1826; color: #e9eef7; padding: 14px; }
+.taskVideoDialog video { width: 100%; max-height: 70vh; background: #000; border-radius: 8px; }
+.taskVideoDialog .warn { color: #e0b9ad; }

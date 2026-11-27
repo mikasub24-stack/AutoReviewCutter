@@ -670,7 +670,7 @@ test('nối app: mọi việc tạo video bản đồ đều đòi gói Năm / V
   assert.match(save, /extensions:thumb\?\['jpg','jpeg'\]:\['mp4'\]/);
   assert.match(main, /createMapService\(\{[^}]*ensureAllowed:\(\)=>licenseManager\.requireLongTerm\(\)/);
   assert.match(main, /createMapWriter\(\{[^}]*ensureAllowed:\(\)=>licenseManager\.requireLongTerm\(\)/);
-  assert.match(main, /roots=\[path\.join\(out,'DonNha'\),path\.join\(out,'DongVat'\),path\.join\(out,'BanDo'\)\]/);
+  assert.match(main, /roots=\[path\.join\(out,'DonNha'\),path\.join\(out,'DongVat'\),path\.join\(out,'BanDo'\),path\.join\(out,'SoSanh'\)\]/);
   assert.match(main, /maphist:\{\.\.\.mapState,runs:settings\.mapRuns\|\|\{\},write:mapWriter\?\.status\(\)\|\|\{\},build:mapService\?\.status\(\)\|\|\{\}\}/);
 });
 

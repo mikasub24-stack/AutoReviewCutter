@@ -307,7 +307,7 @@ async function trashStoryFiles({ids=[],files=[]}){
 const savedFilesOf=job=>job.manual?[]:[...new Set([job.output,...(job.outputs||[]),...(job.previousOutputs||[]),job.lastFrame])].filter(f=>typeof f==='string'&&f);
 async function trashSaved({files=[],folders=[]}){
   if(!settings.output||typeof shell.trashItem!=='function')return 0;
-  const out=path.resolve(settings.output),roots=[path.join(out,'DonNha'),path.join(out,'DongVat'),path.join(out,'BanDo')],story=path.join(out,'KeChuyen'),targets=[];
+  const out=path.resolve(settings.output),roots=[path.join(out,'DonNha'),path.join(out,'DongVat'),path.join(out,'BanDo'),path.join(out,'SoSanh')],story=path.join(out,'KeChuyen'),targets=[];
   for(const f of folders){if(typeof f!=='string'||!f)continue;const r=path.resolve(f);if(roots.some(root=>inside(root,r))&&!targets.some(t=>t.path===r))targets.push({path:r,dir:true});}
   for(const f of files){
     if(typeof f!=='string'||!f)continue;
@@ -1960,6 +1960,34 @@ app.whenReady().then(async () => {
       if(meta?.output)shell.showItemInFolder(meta.output);
       else if(settings.output&&meta){await fs.mkdir(pairFolder(settings.output,id),{recursive:true});await shell.openPath(pairFolder(settings.output,id));}
       return true;
+    },
+    pairRemove: async data => {
+      const storyId=String(data?.storyId||'');
+      if(!storyId)throw Error(ui('Không thấy video này.','This video was not found.'));
+      if(stopping||merging||packaging||(pairState.busy&&pairState.storyId===storyId))throw Error(ui('Chờ xử lý hiện tại hoàn tất.','Wait for the current work to finish.'));
+      const own=queue.jobs.filter(j=>j.kind==='pair'&&j.storyId===storyId);
+      if(!own.length&&!settings.pairStories?.[storyId])throw Error(ui('Không thấy video này.','This video was not found.'));
+      if(own.some(j=>j.status==='running'))throw Error(ui('Dừng hàng đợi trước khi xóa video đang được tạo.','Stop the queue before removing a video that is being made.'));
+      for(const job of own){browsers.get(Number(job.account)-1)?.releasePage?.(job.id);if(job.trackerId)void dom(browsers.get(Number(job.account)-1),endTracking,{id:job.trackerId}).catch(()=>{});}
+      await queue.removeStory('pair',storyId);
+      if(settings.pairStories)delete settings.pairStories[storyId];
+      const trashed=data?.deleteFiles===true?(await trashSaved({folders:[pairFolder(settings.output,storyId)]}))>0:false;
+      await save();notify();
+      return {...snapshot(),removed:{storyId,trashed}};
+    },
+    wildRemove: async data => {
+      const storyId=String(data?.storyId||'');
+      if(!storyId)throw Error(ui('Không thấy video này.','This video was not found.'));
+      if(stopping||merging||packaging||(wildState.busy&&wildState.storyId===storyId))throw Error(ui('Chờ xử lý hiện tại hoàn tất.','Wait for the current work to finish.'));
+      const own=queue.jobs.filter(j=>j.kind==='wild'&&j.storyId===storyId);
+      if(!own.length&&!settings.wildStories?.[storyId])throw Error(ui('Không thấy video này.','This video was not found.'));
+      if(own.some(j=>j.status==='running'))throw Error(ui('Dừng hàng đợi trước khi xóa video đang được tạo.','Stop the queue before removing a video that is being made.'));
+      for(const job of own){browsers.get(Number(job.account)-1)?.releasePage?.(job.id);if(job.trackerId)void dom(browsers.get(Number(job.account)-1),endTracking,{id:job.trackerId}).catch(()=>{});}
+      await queue.removeStory('wild',storyId);
+      if(settings.wildStories)delete settings.wildStories[storyId];
+      const trashed=data?.deleteFiles===true?(await trashSaved({folders:[wildFolder(settings.output,storyId)]}))>0:false;
+      await save();notify();
+      return {...snapshot(),removed:{storyId,trashed}};
     },
     restoreReveal: async data => { const out=settings.restoreStories?.[String(data?.storyId||'')]?.output;if(out)shell.showItemInFolder(out);return true; },
     chooseMusic: async () => { const r=await dialog.showOpenDialog(main,{properties:['openFile'],filters:[{name:ui('Nhạc nền','Background music'),extensions:['mp3','wav','m4a','aac','ogg','flac']}]});return r.canceled?'':r.filePaths[0]; },

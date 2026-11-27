@@ -2,7 +2,7 @@
 const pw = (() => { try { return require('playwright-core'); } catch { return require('playwright'); } })();
 const http = require('http'), fs = require('fs/promises'), path = require('path'), assert = require('assert/strict');
 (async () => {
-  const files = { '/assets/muse-studio.svg': 'assets/muse-studio.svg', '/assets/zalo-qr.jpg': 'assets/zalo-qr.jpg', '/': 'index.html', '/style.css': 'style.css', '/renderer.js': 'renderer.js', '/ui-i18n.js': 'ui-i18n.js', '/script-planner.js': 'script-planner.js', '/prompt-import.js': 'prompt-import.js', '/reference-map.js': 'reference-map.js', '/story-plan.js': 'story-plan.js', '/story-ui.js': 'story-ui.js', '/restore-plan.js': 'restore-plan.js', '/restore-ui.js': 'restore-ui.js', '/wild-plan.js': 'wild-plan.js', '/wild-ui.js': 'wild-ui.js', '/pair-plan.js': 'pair-plan.js', '/pair-ui.js': 'pair-ui.js' };
+  const files = { '/assets/muse-studio.svg': 'assets/muse-studio.svg', '/assets/zalo-qr.jpg': 'assets/zalo-qr.jpg', '/': 'index.html', '/style.css': 'style.css', '/renderer.js': 'renderer.js', '/ui-i18n.js': 'ui-i18n.js', '/script-planner.js': 'script-planner.js', '/prompt-import.js': 'prompt-import.js', '/reference-map.js': 'reference-map.js', '/story-plan.js': 'story-plan.js', '/story-ui.js': 'story-ui.js', '/restore-plan.js': 'restore-plan.js', '/restore-ui.js': 'restore-ui.js', '/wild-plan.js': 'wild-plan.js', '/wild-ui.js': 'wild-ui.js', '/pair-plan.js': 'pair-plan.js', '/pair-ui.js': 'pair-ui.js', '/tasks-ui.js': 'tasks-ui.js' };
   const server = http.createServer(async (req, res) => {
     const name = files[req.url];
     if (!name) { res.writeHead(404); return res.end(); }

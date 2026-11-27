@@ -32,6 +32,7 @@ await page.evaluate(()=>{window.s.active=false;window.push();});
 const redo=page.locator('[data-job-id=scene-1] button').filter({hasText:/^Tạo lại$/});assert.equal(await redo.isEnabled(),true);await redo.click();
 assert.equal(await page.evaluate(()=>window.calls.find(c=>c.name==='regenerate').data),'scene-1');
 await page.evaluate(()=>{Object.assign(window.s.jobs[0],{status:'failed',output:'',previousOutput:'C:/Videos/001.mp4'});window.push();});
+await page.locator('[data-job-id=scene-1] video').scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.querySelector('[data-job-id=scene-1] video')?.getAttribute('src'));   // video nạp lười: gắn src khi thẻ vào vùng nhìn thấy (ở đây thẻ nằm ngoài vùng cuộn nên cuộn tới trước)
 assert.equal(await page.locator('[data-job-id=scene-1] video').getAttribute('src'),'file:///C:/Videos/001.mp4');
 assert.equal(await page.locator('[data-job-id=scene-1] .mediaLabel').textContent(),'Video trước');
 assert.equal(await page.locator('[data-job-id=scene-1] button').filter({hasText:/^Tạo lại$/}).isVisible(),true,'cảnh lỗi cũng có nút «Tạo lại»');

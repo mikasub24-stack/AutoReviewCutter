@@ -1,13 +1,14 @@
 const $=id=>document.getElementById(id);
 // Three tabs share one queue, one login and one set of accounts. Each job carries its
 // own kind; a tab only shows and runs jobs of its kind.
-let mode='video';try{const saved=localStorage.getItem('museStudio.mode');if(saved==='image'||saved==='story'||saved==='restore'||saved==='wild'||saved==='pair'||saved==='maphist')mode=saved;}catch{}
+let mode='video';try{const saved=localStorage.getItem('museStudio.mode');if(saved==='image'||saved==='story'||saved==='restore'||saved==='wild'||saved==='pair'||saved==='maphist'||saved==='tasks')mode=saved;}catch{}
 const isImage=()=>mode==='image';
 const isStory=()=>mode==='story';
 const isRestore=()=>mode==='restore';
 const isWild=()=>mode==='wild';
 const isPair=()=>mode==='pair';
 const isMap=()=>mode==='maphist';
+const isTasks=()=>mode==='tasks';
 const kindOfJob=j=>j.kind==='image'?'image':j.kind==='story'?'story':j.kind==='restore'?'restore':j.kind==='wild'?'wild':j.kind==='pair'?'pair':'video';
 // Việc «ảnh» của chế độ Mẹo vặt nằm trong danh sách kể chuyện nhưng hiện như tác vụ ảnh.
 const isPhotoJob=j=>j.kind==='image'||j.phase==='image';
@@ -222,14 +223,14 @@ function updateMedia(row,job){
   const key=output?(photo?'photo:':'video:')+output:image?'image:'+image:'empty';
   text(row.mediaLabel,output?(!job.output&&job.previousOutput?(photo?'Ảnh trước':'Video trước'):(photo?'Ảnh đã lưu':'Video đã tải')):image?'Ảnh tham chiếu':(photo?'Chưa có ảnh':'Chưa có video'));
   if(row.mediaKey===key)return;
-  const previousVideo=row.media.querySelector('video');if(previousVideo)previousVideo.pause();
+  const previousVideo=row.media.querySelector('video');if(previousVideo){previousVideo.pause();lazyVideoObserver?.unobserve(previousVideo);}
   row.media.replaceChildren();row.mediaKey=key;row.preview.classList.toggle('hasVideo',Boolean(output)&&!photo);
   if(output&&photo){
     const img=el('img','resultImage');img.src=output;img.alt=`Ảnh ${job.title||'kết quả'}`;img.loading='lazy';
     const note=el('span','mediaError','Không mở được ảnh này. Dùng “Mở vị trí ảnh” để kiểm tra file.');note.hidden=true;
     img.onerror=()=>{note.hidden=false;};row.media.append(img,note);
   }else if(output){
-    const video=el('video','resultVideo');video.controls=true;video.preload='metadata';video.playsInline=true;video.src=output;video.setAttribute('aria-label',`Video ${job.title||'kết quả'}`);
+    const video=el('video','resultVideo');video.controls=true;video.preload='none';video.playsInline=true;video.dataset.src=output;lazyVideo(video);video.setAttribute('aria-label',`Video ${job.title||'kết quả'}`);
     const note=el('span','mediaError','Không mở được video này. Dùng “Mở vị trí video” để kiểm tra file.');note.hidden=true;
     video.onerror=()=>{note.hidden=false;};row.media.append(video,note);
   }else if(image){
@@ -252,6 +253,15 @@ function updateAccountSelect(row,job){
   for(let i=1;i<=total;i++){if(i===cur)continue;const o=el('option','',(running?'Sang TK ':'Chạy ở TK ')+i+(resting.includes(i)?' (đang nghỉ)':''));o.value=String(i);options.push(o);}
   row.acctSel.replaceChildren(...options);row.acctSel.value=options.some(o=>o.value===before)?before:'';
 }
+// Hàng trăm thẻ cảnh đã xong, mỗi thẻ một trình phát video: nạp hết cùng lúc làm Electron đứng. Chỉ nạp video đang gần vùng nhìn thấy; kéo đi xa thì nhả (trừ video đang phát / đã tua dở).
+const lazyVideoObserver=typeof IntersectionObserver==='function'?new IntersectionObserver(entries=>{
+  for(const e of entries){
+    const v=e.target;
+    if(e.isIntersecting){if(!v.getAttribute('src')&&v.dataset.src){v.preload='metadata';v.src=v.dataset.src;}}
+    else if(v.getAttribute('src')&&v.paused&&!v.seeking&&!(v.currentTime>0)){v.removeAttribute('src');v.load();}
+  }
+},{rootMargin:'500px 0px'}):null;
+function lazyVideo(video){if(lazyVideoObserver)lazyVideoObserver.observe(video);else{video.preload='metadata';video.src=video.dataset.src;}}
 function updateCard(row,job,index){
   row.job=job;row.card.dataset.status=job.status;updateMedia(row,job);updateEditor(row,job);
   const displayNumber=Number.isInteger(job.number)&&job.number>0?job.number:job.order||index+1;
@@ -302,7 +312,7 @@ function updateCard(row,job,index){
 function renderJobs(jobs){
   requestAnimationFrame(fitQueueViewport);
   const ids=new Set(jobs.map(job=>job.id));
-  for(const [id,row]of jobCards)if(!ids.has(id)){row.media.querySelector('video')?.pause();row.card.remove();jobCards.delete(id);}
+  for(const [id,row]of jobCards)if(!ids.has(id)){const gone=row.media.querySelector('video');if(gone){gone.pause();lazyVideoObserver?.unobserve(gone);}row.card.remove();jobCards.delete(id);}
   let cursor=$('jobs').firstElementChild;
   jobs.forEach((job,index)=>{
     let row=jobCards.get(job.id);if(!row){row=makeCard(job.id);jobCards.set(job.id,row);}
@@ -349,12 +359,12 @@ function renderRunning(jobs){
 }
 
 function applyMode(){
-  const image=isImage(),restore=isRestore(),story=isStory(),wild=isWild(),pair=isPair(),map=isMap(),folderTab=story||restore||wild||pair||map;
-  text($('headingText'),map?'Video bản đồ lịch sử':pair?'Danh sách clip video so sánh song song':wild?'Danh sách cảnh phim động vật hoang dã':restore?'Danh sách cảnh dọn nhà · sinh tồn':story?'Danh sách clip kể chuyện':image?'Danh sách tạo ảnh':'Danh sách tạo video');
-  for(const [id,on] of [['navQueue',!image&&!story&&!restore&&!wild&&!pair&&!map],['navImage',image],['navStory',story],['navRestore',restore],['navWild',wild],['navPair',pair],['navMap',map]]){$(id).classList.toggle('selected',on);$(id).setAttribute('aria-pressed',String(on));}
+  const image=isImage(),restore=isRestore(),story=isStory(),wild=isWild(),pair=isPair(),map=isMap(),tasks=isTasks(),folderTab=story||restore||wild||pair||map||tasks;
+  text($('headingText'),tasks?'Tác vụ đã tạo':map?'Video bản đồ lịch sử':pair?'Danh sách clip video so sánh song song':wild?'Danh sách cảnh phim động vật hoang dã':restore?'Danh sách cảnh dọn nhà · sinh tồn':story?'Danh sách clip kể chuyện':image?'Danh sách tạo ảnh':'Danh sách tạo video');
+  for(const [id,on] of [['navTasks',tasks],['navQueue',!image&&!story&&!restore&&!wild&&!pair&&!map&&!tasks],['navImage',image],['navStory',story],['navRestore',restore],['navWild',wild],['navPair',pair],['navMap',map]]){$(id).classList.toggle('selected',on);$(id).setAttribute('aria-pressed',String(on));}
   $('outputTools').hidden=image||folderTab;$('imagePrefixControl').hidden=!image;
-  $('editorPanel').hidden=folderTab;$('toggleEditor').hidden=folderTab;$('storyPanel').hidden=!story;$('storyOutput').hidden=!story;$('restorePanel').hidden=!restore;$('wildPanel').hidden=!wild;$('pairPanel').hidden=!pair;$('mapPanel').hidden=!map;$('queueWorkspace').hidden=map;
-  text($('footNote'),map?'Video lưu trong thư mục «BanDo» theo từng video: kịch bản, lời đọc và file MP4 hoàn chỉnh.':pair?'Ảnh nền và clip lưu trong thư mục «SoSanh» theo từng video; video hoàn chỉnh được lồng tiếng, thêm chữ và âm thanh rồi dựng tự động ở cuối.':wild?'Ảnh và clip lưu trong thư mục «DongVat» theo từng phim; phim hoàn chỉnh được lồng tiếng và dựng tự động ở cuối.':restore?'Cảnh lưu trong thư mục «DonNha» theo từng video; video hoàn chỉnh được dựng tự động ở cuối.':story?'Clip kể chuyện lưu trong thư mục «KeChuyen» theo từng truyện, đánh số cảnh 001, 002, 003…':image?'Ảnh lưu vào thư mục «Anh» theo số prompt: 001, 002, 003…':'Video lưu theo số prompt: 001, 002, 003…');
+  $('editorPanel').hidden=folderTab;$('toggleEditor').hidden=folderTab;$('storyPanel').hidden=!story;$('storyOutput').hidden=!story;$('restorePanel').hidden=!restore;$('wildPanel').hidden=!wild;$('pairPanel').hidden=!pair;$('mapPanel').hidden=!map;$('tasksPanel').hidden=!tasks;$('queueWorkspace').hidden=map||tasks;
+  text($('footNote'),tasks?'Danh sách này chỉ đọc từ dữ liệu đã lưu: mở lại app vẫn thấy mọi video đã tạo, dù xong hay còn dở.':map?'Video lưu trong thư mục «BanDo» theo từng video: kịch bản, lời đọc và file MP4 hoàn chỉnh.':pair?'Ảnh nền và clip lưu trong thư mục «SoSanh» theo từng video; video hoàn chỉnh được lồng tiếng, thêm chữ và âm thanh rồi dựng tự động ở cuối.':wild?'Ảnh và clip lưu trong thư mục «DongVat» theo từng phim; phim hoàn chỉnh được lồng tiếng và dựng tự động ở cuối.':restore?'Cảnh lưu trong thư mục «DonNha» theo từng video; video hoàn chỉnh được dựng tự động ở cuối.':story?'Clip kể chuyện lưu trong thư mục «KeChuyen» theo từng truyện, đánh số cảnh 001, 002, 003…':image?'Ảnh lưu vào thư mục «Anh» theo số prompt: 001, 002, 003…':'Video lưu theo số prompt: 001, 002, 003…');
   text($('emptyTitle'),pair?'Sẵn sàng cho video so sánh song song mới':wild?'Sẵn sàng cho phim động vật hoang dã mới':restore?'Sẵn sàng cho video dọn nhà / sinh tồn mới':story?'Sẵn sàng cho câu chuyện mới':image?'Sẵn sàng cho ảnh mới':'Sẵn sàng cho video mới');
   text($('quickCreate'),image?'▶ Tạo ảnh':'▶ Tạo video');text($('createDrafts'),image?'▶ Tạo ảnh':'▶ Tạo video');
   const script=$('importMode').querySelector('option[value="script"]');script.disabled=image;
@@ -418,7 +428,7 @@ function render(next){
   renderJobs(jobs);renderRunning(jobs);
   // Tab đang xem vẽ ngay mỗi lần; tab đang ẩn (hàng trăm cảnh) chỉ cần cập nhật thưa, tối đa 2 giây một lần. Bấm sang tab khác vẽ ngay (setMode).
   const nowMs=performance.now();let deferred=false;
-  for(const [name,key] of [['story','storyUi'],['restore','restoreUi'],['wild','wildUi'],['pair','pairUi'],['maphist','mapUi']]){
+  for(const [name,key] of [['story','storyUi'],['restore','restoreUi'],['wild','wildUi'],['pair','pairUi'],['maphist','mapUi'],['tasks','tasksUi']]){
     if(mode!==name){if(nowMs-(hiddenRenderedAt[key]??-1e9)<HIDDEN_RENDER_MS){deferred=true;continue;}hiddenRenderedAt[key]=nowMs;}
     try{window[key]?.render(state);}catch(e){console.error(e);}
   }
@@ -458,7 +468,7 @@ $('closeSettings').onclick=()=>$('settingsDialog').close();$('settingsForm').ons
 for(const[id,method,name]of[['chooseBrowser','chooseBrowser','browserPath']])$(id).onclick=async()=>{const file=await call(method);if(file){$('settingsForm').elements.namedItem(name).value=file;if(id==='chooseBrowser')$('settingsForm').elements.namedItem('browserChoice').value='custom';}};
 $('chooseFfmpeg').onclick=async()=>{const result=await call('chooseFfmpeg');if(result){render(result);$('settingsForm').elements.namedItem('ffmpeg').value=result.settings.ffmpeg;}};
 $('mergeNow').onclick=async()=>render(await call('merge'));$('revealMerged').onclick=()=>call('revealMerged');$('packageClips').onclick=async()=>render(await call('packageClips'));$('openPackage').onclick=()=>call('openPackage');
-document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{filter=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===b));render(state);});$('navQueue').onclick=()=>setMode('video');$('navImage').onclick=()=>setMode('image');$('navStory').onclick=()=>setMode('story');$('navRestore').onclick=()=>setMode('restore');$('navWild').onclick=()=>setMode('wild');$('navPair').onclick=()=>setMode('pair');$('navMap').onclick=()=>setMode('maphist');
+document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{filter=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===b));render(state);});$('navQueue').onclick=()=>setMode('video');$('navImage').onclick=()=>setMode('image');$('navStory').onclick=()=>setMode('story');$('navRestore').onclick=()=>setMode('restore');$('navWild').onclick=()=>setMode('wild');$('navPair').onclick=()=>setMode('pair');$('navMap').onclick=()=>setMode('maphist');$('navTasks').onclick=()=>setMode('tasks');
 window.studio.onUpdate(render);call('state').then(render);renderDrafts();mappingInfo();
 
 $('contactButton').onclick=()=>$('contactDialog').showModal();$('closeContact').onclick=()=>$('contactDialog').close();$('contactDialog').onclick=e=>{if(e.target===$('contactDialog'))$('contactDialog').close();};$('licenseButton').onclick=()=>$('licenseDialog').showModal();$('closeLicense').onclick=()=>$('licenseDialog').close();$('copyDevice').onclick=async()=>{try{await navigator.clipboard.writeText($('deviceCode').value);toast('Đã sao chép mã máy.');}catch{$('deviceCode').select();toast('Nhấn Ctrl+C để sao chép mã máy.');}};$('activateKey').onclick=async()=>{const result=await call('activateKey',$('activationKey').value.trim());if(result){render(result);toast('Đã kích hoạt key.');}};
