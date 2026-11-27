@@ -668,6 +668,7 @@ test('nối app: mọi việc tạo video bản đồ đều đòi gói Năm / V
   assert.match(save, /data\?\.thumb/, 'lưu được cả thumbnail');
   assert.match(save, /meta\?\.thumb:meta\?\.output/, 'thumbnail lấy từ ảnh đã tạo, video lấy từ file đã dựng');
   assert.match(save, /extensions:thumb\?\['jpg','jpeg'\]:\['mp4'\]/);
+  assert.match(save, /thumbSaveName\(meta\)/, 'thumbnail lưu mặc định theo tên video, không phải «thumbnail.jpg» chung chung');
   assert.match(main, /createMapService\(\{[^}]*ensureAllowed:\(\)=>licenseManager\.requireLongTerm\(\)/);
   assert.match(main, /createMapWriter\(\{[^}]*ensureAllowed:\(\)=>licenseManager\.requireLongTerm\(\)/);
   assert.match(main, /roots=\[path\.join\(out,'DonNha'\),path\.join\(out,'DongVat'\),path\.join\(out,'BanDo'\),path\.join\(out,'SoSanh'\)\]/);

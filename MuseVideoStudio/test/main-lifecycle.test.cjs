@@ -30,7 +30,7 @@ const safeStorage = {
 };
 
 async function boot(userData, { initialCookies = {}, ownsLock = true, cookieReadGate, externalLauncher, browserResolver, networkProbe, licenseGate, longTerm, wildWriterFactory, pairWriterFactory, pairHudFactory, voiceServiceFactory, domTimeoutMs=20000, logoutResponse=1,closeResponse=1,closeGate } = {}) {
-  const handlers = new Map(), sessions = new Map(), windows = [], errors = [], notices = [], trashed = [];
+  const handlers = new Map(), sessions = new Map(), windows = [], errors = [], notices = [], trashed = [], saveDialogs = [];
   const lifecycle = [],updates=[];
   let loaded, quit;
   const loadedPromise = new Promise(resolve => { loaded = resolve; });
@@ -91,7 +91,7 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
     showErrorBox: (title, message) => { errors.push({ title, message }); loaded(); },
     showMessageBox:async(_parent,options)=>{notices.push(options);if(['Thoát Muse Video Studio?','Exit Muse Video Studio?'].includes(options.title)){if(closeGate)await closeGate;return{response:closeResponse};}return{response:logoutResponse};},
     showMessageBoxSync: options => { notices.push(options); return 1; },
-    showSaveDialog: async () => ({ canceled: false, filePath: path.join(userData, 'export.json') })
+    showSaveDialog: async (_parent, options) => { saveDialogs.push(options); return { canceled: false, filePath: path.join(userData, 'export.json') }; }
   };
   const electron = { app, BrowserWindow, safeStorage, dialog,Menu:{setApplicationMenu:value=>{lifecycle.push(value===null?'menu-removed':'menu-set');}},
     session: { fromPartition: accountSession },
@@ -119,7 +119,7 @@ async function boot(userData, { initialCookies = {}, ownsLock = true, cookieRead
   else await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(errors, []);
 
-  return { app,handlers, sessions, windows, lifecycle, notices, errors,updates,trashed,
+  return { app,handlers, sessions, windows, lifecycle, notices, errors,updates,trashed,saveDialogs,
     invoke: (name, data, sender = windows[0]?.webContents) => {
       return handlers.get(`studio:${name}`)({ sender }, data);
     },
@@ -1332,6 +1332,7 @@ test('tab So sánh song song: Muse tự chọn chủ đề → kịch bản → 
     assert.equal(afterThumb.stories['SS-phim'].thumb, t2.file);
     assert.ok(hudLog.filter(x => x[0] === 'close').length >= 2, 'đóng cửa sổ vẽ sau mỗi thumbnail');
     const savedThumb = await app.invoke('pairSave', { storyId: 'SS-phim', thumb: true });
+    assert.equal(path.basename(app.saveDialogs.at(-1).defaultPath), (afterThumb.stories['SS-phim'].publish?.title || afterThumb.stories['SS-phim'].name).replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) + ' - thumbnail.jpg', 'thumbnail lưu mặc định theo tên video');
     assert.ok(/\.jpg$/.test(savedThumb.file));
     assert.deepEqual(await fs.readFile(savedThumb.file), jpegBytes);
     assert.equal(await app.invoke('pairReveal', { storyId: 'SS-phim', thumb: true }), true);

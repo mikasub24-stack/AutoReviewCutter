@@ -33,6 +33,8 @@ const {assemblePair,makePairThumbnail}=require('./pair-render.cjs');
 const {createWindowHud}=require('./pair-hud-window.cjs');
 // Tab «So sánh song song»: mỗi video một thư mục SoSanh/<mã>.
 const pairFolder=(output,id)=>path.join(output,'SoSanh',String(id||'Phim').replace(/[^\w-]/g,'')||'Phim');
+// Tên file gợi ý khi «Lưu thumbnail…»: đúng tên video (tiêu đề đăng nếu có, nếu không thì tên video) + « - thumbnail.jpg», giống nút «Lưu video…».
+const thumbSaveName=meta=>(String((meta&&(meta.publish?.title||meta.name))||'video').replace(/[\\/:*?"<>|\x00-\x1f]+/g,' ').replace(/\s+/g,' ').trim().slice(0,100)||'video')+' - thumbnail.jpg';
 const isChained=job=>job.kind==='restore'||job.kind==='wild'||job.kind==='pair';
 const chainFolder=job=>job.kind==='wild'?wildFolder(settings.output,job.storyId):job.kind==='pair'?pairFolder(settings.output,job.storyId):restoreFolder(settings.output,job.storyId);
 const {createStoryAnalyzer}=require('./story-analyze.cjs');
@@ -1766,7 +1768,7 @@ app.whenReady().then(async () => {
     mapSave: async data => {
       const meta=mapRuns()[String(data?.runId||'')],thumb=Boolean(data?.thumb),out=thumb?meta?.thumb:meta?.output;
       if(!out||!await fs.stat(out).then(s=>s.isFile(),()=>false))throw Error(thumb?ui('Chưa có thumbnail để lưu. Bấm «Tạo thumbnail 16:9» trước.','There is no thumbnail to save yet. Press “Create 16:9 thumbnail” first.'):ui('Chưa có video hoàn chỉnh để lưu.','There is no finished video to save yet.'));
-      const ext=thumb?'jpg':'mp4',base=thumb?path.basename(out).replace(/^thumbnail-\d+/i,String(meta.name||'video').replace(/[\\/:*?"<>|\x00-\x1f]+/g,' ').trim().slice(0,60)+' - thumbnail'):path.basename(out);
+      const ext=thumb?'jpg':'mp4',base=thumb?thumbSaveName(meta):path.basename(out);
       const picked=await dialog.showSaveDialog(main,{title:thumb?ui('Lưu thumbnail về','Save thumbnail'):ui('Lưu video về','Save video'),defaultPath:path.join(app.getPath('downloads'),!thumb&&meta?.publish?.title?String(meta.publish.title).replace(/[\\/:*?"<>|\x00-\x1f]+/g,' ').replace(/\s+/g,' ').trim().slice(0,100)+'.mp4':base),filters:[{name:thumb?'JPEG':'MP4',extensions:thumb?['jpg','jpeg']:['mp4']}]});
       if(picked.canceled||!picked.filePath)return false;
       const dest=(thumb?/\.jpe?g$/i:/\.mp4$/i).test(picked.filePath)?picked.filePath:picked.filePath+'.'+ext;
@@ -1947,7 +1949,7 @@ app.whenReady().then(async () => {
     pairSave: async data => {
       const meta=settings.pairStories?.[String(data?.storyId||'')],thumb=Boolean(data?.thumb),out=thumb?meta?.thumb:meta?.output;
       if(!out||!await fs.stat(out).then(s=>s.isFile(),()=>false))throw Error(thumb?ui('Chưa có thumbnail để lưu. Bấm «Tạo thumbnail 16:9» trước.','There is no thumbnail to save yet. Press “Create 16:9 thumbnail” first.'):ui('Chưa có video hoàn chỉnh để lưu.','There is no finished video to save yet.'));
-      const base=thumb?(String(meta.name||'video').replace(/[\\/:*?"<>|\x00-\x1f]+/g,' ').trim().slice(0,60)||'video')+' - thumbnail.jpg':path.basename(out);
+      const base=thumb?thumbSaveName(meta):path.basename(out);
       const picked=await dialog.showSaveDialog(main,{title:thumb?ui('Lưu thumbnail về','Save thumbnail'):ui('Lưu video về','Save video'),defaultPath:path.join(app.getPath('downloads'),base),filters:[{name:thumb?'JPEG':'MP4',extensions:thumb?['jpg','jpeg']:['mp4']}]});
       if(picked.canceled||!picked.filePath)return false;
       const dest=(thumb?/\.jpe?g$/i:/\.mp4$/i).test(picked.filePath)?picked.filePath:picked.filePath+(thumb?'.jpg':'.mp4');

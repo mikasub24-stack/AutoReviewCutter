@@ -142,6 +142,12 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.15.13
+
+- **«Lưu thumbnail…» lưu theo tên video.** Ở tab «Bản đồ lịch sử», tên gợi ý khi lưu thumbnail là «thumbnail.jpg» chung chung (chỗ đổi tên chỉ khớp tên kiểu «thumbnail-1», còn file thật tên «thumbnail.jpg»). Giờ cả «Bản đồ lịch sử» và «So sánh song song» gợi ý «<tiêu đề video> - thumbnail.jpg», cùng tiêu đề với nút «Lưu video…» (ưu tiên tiêu đề đăng YouTube nếu có). Tab «Dọn nhà · Sinh tồn» vốn đã đặt tên theo video.
+- Test: `main-lifecycle` kiểm tên gợi ý của hộp «Lưu thumbnail»; `maphist.test` kiểm nút lưu của Bản đồ dùng cùng cách đặt tên.
+- Về đơ khi chạy hai tab nặng cùng lúc (Bản đồ vẽ 16 cửa sổ + hàng đợi Muse): chưa đổi code. Cách giảm đơ: chạy từng tab, và đặt «Số cửa sổ vẽ» về «Tự động».
+
 ## Update 1.15.12
 
 - **Mục «Tác vụ» (đầu thanh bên trái): xem lại mọi video đã tạo, xong hay còn dở.** Mỗi video một dòng, ghi giờ tạo, tab nào, trạng thái («Hoàn thành · video đã dựng», «Đủ clip · chưa dựng video», «Dở · 130/132 clip, có cảnh lỗi», «Dở · kịch bản chưa viết xong»…) và thanh tiến độ. Việc dở xếp lên đầu. Có bộ lọc Tất cả / Chưa xong / Hoàn thành. Số bên cạnh tên mục chuyển màu cam khi còn việc chưa xong. Gom từ So sánh song song, Động vật hoang dã, Dọn nhà · Sinh tồn, Kể chuyện, Bản đồ lịch sử và hai hàng đợi Tạo video / Tạo ảnh. Dữ liệu lấy từ file trạng thái đã lưu nên mở lại app vẫn thấy.
