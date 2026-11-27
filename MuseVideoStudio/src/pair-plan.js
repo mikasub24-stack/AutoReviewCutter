@@ -90,7 +90,7 @@
     const lim = limits(lang);
     const layout = LAYOUTS.includes(input.layout) ? input.layout : 'side';
     const beats = beatsFor(minutes);
-    const avoid = (Array.isArray(input.avoid) ? input.avoid : []).map(x => flat(x).slice(0, 120)).filter(Boolean).slice(0, 20);
+    const avoid = (Array.isArray(input.avoid) ? input.avoid : []).map(x => flat(x).slice(0, 120)).filter(Boolean).slice(-30);   // 30 mục MỚI nhất
     return {
       topic, auto: !topic, avoid, left: flat(input.left).slice(0, lim.label), right: flat(input.right).slice(0, lim.label), minutes, beats, lang, layout, seconds: SECONDS, aspect: '1:1',
       clips: beats * 2, budget: budgetChars(SECONDS, lang)

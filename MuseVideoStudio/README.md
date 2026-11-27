@@ -149,6 +149,8 @@ Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang 
   - **Thumbnail Độc lập** ra kiểu «Trước / Sau» riêng: bên trái xám, ủ rũ, bị đô hộ; bên phải sáng, rực rỡ khi giành độc lập.
   - Các dạng còn lại vẫn là «Trước / Sau» (giai đoạn đầu | giai đoạn cuối) như trước.
   - **Lời dặn kịch bản gửi Muse theo dạng**: Chiến tranh chỉ kể MỘT cuộc chiến (không kể cả trăm năm của cả quốc gia), mỗi phe là một thế lực màu tương phản, ưu tiên cảnh/điểm đánh dấu trận đánh; Độc lập có bên đô hộ và bên đấu tranh; Khám phá xoay quanh các hành trình/tuyến đường. Dạng Nước / Đế chế / Triều đại / Cổ đại giữ nguyên lời dặn cũ.
+- **«So sánh song song»: không tạo video trùng chủ đề khi chạy tự động («🎲 Để Muse tự chọn»).** Trước đây app chỉ nhớ 12 video gần nhất còn trong danh sách và quên ngay khi bạn xóa tác vụ / dọn hàng đợi nên chủ đề cũ có thể lặp lại. Giờ có sổ chủ đề lâu dài (80 mục, không mất khi xóa tác vụ), mỗi lần viết kịch bản gửi Muse 30 chủ đề/tiêu đề MỚI nhất để tránh, và tiêu đề mới được so với cả sổ (trùng thì tự thêm ý riêng hoặc số). Thư mục/file mỗi video vẫn luôn riêng, không ghi đè.
+- Test `tasks-smoke` chờ danh sách vẽ lại sau khi xóa (trước đây có lúc đếm quá sớm nên báo lỗi giả trên CI).
 - Video đã dựng rồi không bị viết lại. Muốn có cấu trúc kể mới thì tạo lại kịch bản; còn thumbnail thì bấm «Tạo thumbnail 16:9» lại là ra kiểu mới.
 - Test: `maphist.test` kiểm đoán dạng, lời dặn theo dạng, dạng đi từ dàn ý → kịch bản → dòng thời gian; `maphist-thumb-smoke` vẽ thumbnail thật cho cả 7 nhóm (JPEG hợp lệ, ≤ 1,9 MB), chiến tranh/độc lập phải khác kiểu «Trước / Sau» thường.
 

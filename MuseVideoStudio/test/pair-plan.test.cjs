@@ -331,3 +331,17 @@ test('tiêu đề đúng từng video: dặn Muse tránh tiêu đề đã dùng 
   assert.ok(Array.from(P.uniqueTitle({ title: 'T'.repeat(100), lessons: [] }, ['T'.repeat(100)])).length <= 100, 'không vượt 100 ký tự của YouTube');
   assert.equal(P.uniqueTitle(null, taken), '');
 });
+
+test('tránh trùng chủ đề: gửi Muse 30 mục MỚI nhất; sổ chủ đề vĩnh viễn nằm ở main.cjs và không mất khi xóa tác vụ', () => {
+  const many = Array.from({ length: 45 }, (_, i) => 'Topic ' + (i + 1));
+  const c = P.options({ topic: '', avoid: many });
+  assert.equal(c.avoid.length, 30);
+  assert.equal(c.avoid[0], 'Topic 16'); assert.equal(c.avoid.at(-1), 'Topic 45', 'giữ mục mới nhất, bỏ mục cũ nhất');
+  assert.match(P.buildBibleInstruction({ topic: '', minutes: 1, lang: 'en', avoid: many }, {}), /Topic 45/);
+  const main = require('node:fs').readFileSync(require('node:path').join(__dirname, '../src/main.cjs'), 'utf8');
+  assert.match(main, /const pairInput=meta=>\(\{[^]*avoid:pairTaken\(meta\)/, 'danh sách tránh lấy từ sổ + video còn trong danh sách');
+  assert.match(main, /uniqueTitle\(result\.script,pairTaken\(meta\)\)/, 'tiêu đề so với cả sổ');
+  assert.match(main, /rememberPair\(meta\.topic,result\.script\.title\)/, 'viết xong ghi vào sổ');
+  const prune = main.match(/function prunePairStories\(\)\{[^]*?\n\}/)[0];
+  assert.doesNotMatch(prune, /pairHistory/, 'dọn video không xóa sổ chủ đề');
+});

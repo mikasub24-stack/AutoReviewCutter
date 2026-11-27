@@ -1050,8 +1050,30 @@ function prunePairStories(){
   const all=settings.pairStories||(settings.pairStories={});
   for(const [id,meta] of Object.entries(all))if(!ids.has(id)&&meta.status!=='writing')delete all[id];
 }
+// Sổ chủ đề đã làm: giữ lâu dài, KHÔNG mất khi xóa tác vụ / dọn hàng đợi (prunePairStories xóa cả meta), để chế độ «Để Muse tự chọn» không lặp lại video cũ.
+const PAIR_HISTORY_MAX=80,PAIR_AVOID_MAX=30;
+const pairSig=t=>String(t||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+function rememberPair(...names){
+  const hist=Array.isArray(settings.pairHistory)?settings.pairHistory:(settings.pairHistory=[]);
+  for(const n of names){
+    const t=String(n||'').replace(/\s+/g,' ').trim().slice(0,120);
+    if(!t)continue;
+    const at=hist.findIndex(x=>pairSig(x)===pairSig(t));
+    if(at>=0)hist.splice(at,1);
+    hist.push(t);
+  }
+  if(hist.length>PAIR_HISTORY_MAX)hist.splice(0,hist.length-PAIR_HISTORY_MAX);
+}
+// Mọi tiêu đề/chủ đề đã dùng (sổ + video còn trong danh sách), cũ → mới, không trùng, trừ chính video đang viết.
+function pairTaken(except){
+  const out=[],seen=new Set();
+  const add=n=>{const t=String(n||'').trim(),k=pairSig(t);if(!k||seen.has(k))return;seen.add(k);out.push(t);};
+  for(const n of settings.pairHistory||[])add(n);
+  for(const m of Object.values(settings.pairStories||{}))if(m!==except){add(m.topic);add(m.name||m.title);}
+  return out;
+}
 const pairInput=meta=>({topic:meta.topic,left:meta.left,right:meta.right,minutes:meta.minutes,lang:meta.lang,layout:meta.layout,
-  avoid:Object.values(settings.pairStories||{}).filter(m=>m!==meta).map(m=>m.name||m.title||m.topic).filter(Boolean).slice(-12)});
+  avoid:pairTaken(meta).filter(n=>pairSig(n)!==pairSig(meta.topic)).slice(-PAIR_AVOID_MAX)});
 async function writePairNotes(storyId,meta,draft){
   if(!draft?.script)return;
   const text=pairPlan.notesText(pairInput(meta),draft.script,{builtAt:new Date().toLocaleString('vi-VN')});
@@ -1148,7 +1170,8 @@ async function runPair(storyId){
     const draft=await readPairDraft(storyId);
     const result=await pairWriter.write({options:pairInput(meta),resume:draft&&!draft.final?draft:null,onDraft:d=>{void savePairDraft(storyId,d);}});
     // Tiêu đề phải đúng từng video: trùng video đã làm thì thêm ý riêng của chính kịch bản này.
-    result.script.title=pairPlan.uniqueTitle(result.script,Object.entries(settings.pairStories||{}).filter(([id])=>id!==storyId).map(([,m])=>m.name||m.title).filter(Boolean))||result.script.title;
+    result.script.title=pairPlan.uniqueTitle(result.script,pairTaken(meta))||result.script.title;
+    rememberPair(meta.topic,result.script.title);
     const jobs=pairPlan.buildJobs(result.config,result.script,{storyId});
     await savePairDraft(storyId,{bible:result.bible,beats:result.script.beats,script:result.script,final:true,config:{lang:result.config.lang,layout:result.config.layout,minutes:result.config.minutes}});
     if(!queue.jobs.some(j=>j.kind==='pair'&&j.storyId===storyId))await queue.add(jobs);

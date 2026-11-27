@@ -106,6 +106,7 @@ const http = require('http'), fs = require('fs/promises'), path = require('path'
     await doneRow.locator('button:has-text("Xóa")').click();
     await page.waitForSelector('#deleteOk'); await page.click('#deleteOk'); await flush();
     assert.deepEqual((await calls('pairRemove')).at(-1).data, { storyId: 'SS-Done', deleteFiles: false });
+    await page.waitForFunction(() => ![...document.querySelectorAll('#tasksList .taskRow')].some(r => r.textContent.includes('Video so sánh đã dựng')), null, { timeout: 15000 });   // danh sách vẽ lại sau lời gọi xóa: chờ, không đếm ngay
     assert.equal(await page.locator('#tasksList .taskRow', { hasText: 'Video so sánh đã dựng' }).count(), 0, 'video đã xóa biến khỏi danh sách');
     await page.locator('#tasksList .taskRow', { hasText: 'Phim cáo' }).locator('button:has-text("Mở tab")').click(); await flush();
     assert.equal(await page.locator('#wildPanel').isVisible(), true);
