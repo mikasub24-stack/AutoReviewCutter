@@ -10,12 +10,18 @@ const isFrameRefusal = text => /Muse từ chối làm clip từ khung hình này
 
 const DETAILS = ['small gestures', 'soft light', 'tiny background details', 'the timing of the movement'];
 const LINE = /^VARIATION \d+:/;
-// The same prompt plus one line that changes with every attempt. Earlier variation lines are replaced, so the prompt never piles them up.
+const INLINE = /\s*VARIATION \d+: [^\n]*$/;
+const ACTION = /^ACTION:/;
+// The same prompt with one note that changes with every attempt. Muse compares the ACTION line, so the note goes at the end of that line when the prompt
+// has one (otherwise on a line of its own). Earlier notes are replaced, so the prompt never piles them up.
 function variantPrompt(prompt, attempt = 1) {
   const n = Math.max(1, Math.trunc(Number(attempt)) || 1);
-  const kept = String(prompt || '').split('\n').filter(l => !LINE.test(l.trim()));
-  while (kept.length && !kept[kept.length - 1].trim()) kept.pop();
+  const lines = String(prompt || '').split('\n').filter(l => !LINE.test(l.trim())).map(l => ACTION.test(l) ? l.replace(INLINE, '') : l);
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
   const detail = DETAILS[(n - 1) % DETAILS.length];
-  return kept.join('\n') + `\nVARIATION ${n}: keep the same scene, camera, characters and action as described above; only ${detail} differ slightly from the previous attempt.`;
+  const note = `VARIATION ${n}: keep the same scene, camera, characters and action as described; only ${detail} may change slightly from the previous attempt.`;
+  const at = lines.findIndex(l => ACTION.test(l));
+  if (at >= 0) { lines[at] = lines[at].replace(/\s+$/, '') + ' ' + note; return lines.join('\n'); }
+  return lines.join('\n') + '\n' + note;
 }
 module.exports = { REPEAT_MESSAGE, isRepeatError, FRAME_MESSAGE, isFrameRefusal, variantPrompt };

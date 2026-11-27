@@ -33,7 +33,7 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
   const CHOICE_CLICK='button,a[href],[role="button"],[tabindex]:not([tabindex="-1"])';
   const nfc=value=>norm(value).normalize('NFC');
   // Muse's text answer when the prompt is one it already made: no clip will ever follow it ("Prompt này vẫn như cũ nên mình chưa tạo được…").
-  const REPEAT_REPLY=/(?:prompt|yêu cầu)\s+(?:này\s+)?(?:vẫn\s+)?(?:như|giống)\s+(?:cũ|trước|hệt|y\s*hệt)|(?:gửi|đưa)\s+(?:lại\s+)?(?:bản|prompt)\s+(?:đã\s+)?(?:chỉnh|sửa|thay\s+đổi)|(?:prompt|request)\s+(?:is\s+)?(?:still\s+)?(?:the\s+same|unchanged|identical)|(?:same|identical)\s+(?:prompt\s+)?as\s+(?:before|last\s+time|the\s+(?:previous|last|earlier)\s+(?:one|prompt|request))|send\s+(?:me\s+)?(?:an?\s+)?(?:edited|changed|modified|updated|revised|adjusted)\s+(?:version|prompt)/i;
+  const REPEAT_REPLY=/(?:prompt|yêu cầu)\s+(?:này\s+)?(?:vẫn\s+)?(?:như|giống)\s+(?:cũ|trước|hệt|y\s*hệt)|(?:gửi|đưa)\s+(?:lại\s+)?(?:bản|prompt)\s+(?:đã\s+)?(?:chỉnh|sửa|thay\s+đổi)|(?:prompt|request)\s+(?:is\s+)?(?:still\s+)?(?:the\s+same|unchanged|identical)|(?:same|identical)\s+(?:prompt\s+)?as\s+(?:before|last\s+time|the\s+(?:previous|last|earlier)\s+(?:one|prompt|request))|send\s+(?:me\s+)?(?:an?\s+)?(?:edited|changed|modified|updated|revised|adjusted)\s+(?:version|prompt)|vẫn\s+là\s+(?:prompt|bản)\s+gốc|không\s+phải\s+bản\s+đã\s+chỉnh|(?:bản|prompt)\s+(?:đã\s+)?chỉnh\s+sẵn|chỉ\s+đổi\s+dòng\s+ACTION|still\s+the\s+original\s+(?:prompt|version)|not\s+the\s+(?:edited|revised|updated|modified)\s+(?:version|prompt)|only\s+(?:change|edit)\s+the\s+ACTION\s+line/i;
   // Muse's text answer when it cannot make the clip from the attached first frame ("…vẫn chưa làm được từ khung hình này. Bạn gửi một khung hình đầu tiên khác…").
   const FRAME_REPLY=/chưa\s+làm\s+được\s+(?:từ|với)\s+khung\s*hình|(?:gửi|đưa|dùng)\s+(?:cho\s+mình\s+)?(?:một\s+)?khung\s*hình\s+(?:đầu\s+tiên\s+)?khác|làm\s+(?:mốc|cảnh|clip)\s+khác\s+trước|(?:can(?:'|’)?t|cannot|could(?:n(?:'|’)?t|\s+not)|unable\s+to)\s+(?:make|create|generate)\s+(?:the|this|that|a)?\s*(?:clip|video)\s+(?:from|with)\s+(?:this|that|the)\s+(?:frame|image)|(?:send|share|give)\s+(?:me\s+)?(?:a|another)\s+different\s+(?:first\s+)?(?:frame|image)|(?:blocked|declined|rejected)\s+by\s+(?:the\s+)?(?:policy|safety)/i;
   const optText=value=>nfc(value).replace(/\s*(?:…|\.{3})\s*$/,'').toLowerCase();
@@ -370,22 +370,28 @@ function beginTracking({ id, prompt, videoSelector = 'video', messageSelector = 
     if(mediaNodes(scope).some(v=>following(card,v)&&!card.contains(v)))return null;
     return {card,again:again[0],fresh:fresh[0],answered:card.hasAttribute('data-muse-studio-choice')};
   }
-  // A short non-user text after this prompt in which Muse says the prompt is unchanged ('repeat') or that it cannot make the clip from this frame
-  // ('blocked'), with no clip after it. Only short texts count, so a copy of a long prompt (or the prompt itself) is never mistaken for Muse's answer.
+  // Short non-user texts after this prompt, with no clip after them: what Muse said instead of making a clip. 'repeat' = Muse says the prompt is unchanged / is
+  // not the edited one, 'blocked' = it cannot make the clip from this frame. Only short texts count, so a copy of a long prompt (or the prompt itself) is
+  // never mistaken for Muse's answer. `reply` is the latest such text (shown to the user as is; never put in diagnostics).
   function findRefusal(scope){
-    if(!scope||!s.echoRoot?.isConnected)return null;
+    if(!scope||!s.echoRoot?.isConnected)return {};
     const textOf=e=>nfc(e.innerText??e.textContent);
-    const hits=[...scope.querySelectorAll('*')].filter(e=>{
+    const texts=new Map();
+    const els=[...scope.querySelectorAll('*')].filter(e=>{
       if(e===s.echoRoot||s.echoRoot.contains(e)||!following(s.echoRoot,e)||!visible(e)||composer(e)||author(e).kind==='user')return false;
-      const text=textOf(e);return text.length>0&&text.length<=400&&(REPEAT_REPLY.test(text)||FRAME_REPLY.test(text));
+      const text=textOf(e);if(text.length<8||text.length>400)return false;texts.set(e,text);return true;
     });
-    const leaves=hits.filter(e=>!hits.some(o=>o!==e&&e.contains(o)));
-    if(!leaves.length||mediaNodes(scope).some(v=>leaves.some(l=>following(l,v)&&!l.contains(v))))return null;
-    return leaves.some(l=>REPEAT_REPLY.test(textOf(l)))?'repeat':'blocked';
+    const leaves=els.filter(e=>!els.some(o=>o!==e&&e.contains(o)));
+    const media=mediaNodes(scope);
+    const open=leaves.filter(l=>!media.some(v=>following(l,v)&&!l.contains(v)));
+    if(!open.length)return {};
+    const hit=open.filter(l=>REPEAT_REPLY.test(texts.get(l))||FRAME_REPLY.test(texts.get(l)));
+    const refused=hit.length?(hit.some(l=>REPEAT_REPLY.test(texts.get(l)))?'repeat':'blocked'):undefined;
+    return {refused,reply:texts.get(open[open.length-1]).slice(0,220)};
   }
   s.poll=()=>{
     const r=s.pollCore();
-    if(!r.ready){try{const scope=chatBound(),c=findChoice(scope);if(c)r.choice={answered:c.answered};else if(r.echoMatched){const refusal=findRefusal(scope);if(refusal)r.refused=refusal;}}catch{}}
+    if(!r.ready){try{const scope=chatBound(),c=findChoice(scope);if(c)r.choice={answered:c.answered};else if(r.echoMatched){const said=findRefusal(scope);if(said.refused)r.refused=said.refused;if(said.reply)r.reply=said.reply;}}catch{}}
     return r;
   };
   // Answers that card: 'resend' = send the clip it already made, 'fresh' = create a new one. One click per card.

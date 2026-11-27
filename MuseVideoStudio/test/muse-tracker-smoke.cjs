@@ -389,6 +389,13 @@ const assert = require('node:assert/strict');
     await refusal('vi-frame','Clip mốc 46 bên trái vẫn chưa làm được từ khung hình này. Bạn gửi một khung hình đầu tiên khác cho mốc này, hoặc mình làm mốc khác trước nhé.','blocked');
     await refusal('en-repeat',"This prompt is the same as before, so I haven't made it. Send me an edited version and I'll start right away.",'repeat');
     await refusal('en-frame',"I still can't make the clip from this frame. Please send me a different first frame for this milestone.",'blocked');
+    await refusal('vi-original','Đây vẫn là prompt gốc, không phải bản đã chỉnh mình vừa gửi. Bạn dùng bản chỉnh sẵn ở tin nhắn ngay trên — chỉ đổi dòng ACTION — rồi gửi lại kèm ảnh này thì mình làm ngay.','repeat');
+    await refusal('en-original',"This is still the original prompt, not the edited version I just sent. Only change the ACTION line and send it again with this image.",'repeat');
+    // what Muse said is handed back as it is (for the scene card), whether or not it is a refusal
+    let said=await refusal('reply-text','Clip mốc 46 bên trái vẫn chưa làm được từ khung hình này. Bạn gửi một khung hình đầu tiên khác cho mốc này, hoặc mình làm mốc khác trước nhé.','blocked');
+    assert.match(said.reply,/^Clip mốc 46 bên trái vẫn chưa làm được/);
+    said=await refusal('reply-normal','Mình đang làm clip này, sẽ xong sau ít phút nhé.',undefined);assert.equal(said.reply,'Mình đang làm clip này, sẽ xong sau ít phút nhé.');
+    said=await refusal('reply-none',null,undefined);assert.equal(said.reply,undefined,'chưa có câu trả lời thì không có gì để hiện');
     await refusal('normal-reply','Done — another take of the same clip, starting exactly from your frame.',undefined);
     await refusal('no-reply',null,undefined);
     // a refusal followed by a clip is not a refusal: the clip is the result

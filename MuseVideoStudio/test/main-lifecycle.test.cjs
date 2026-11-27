@@ -670,7 +670,7 @@ test('Muse từ chối prompt đã làm («vẫn như cũ»): tool gửi lại b
   app=await boot(dir,{browserResolver:()=>'/test/chrome',externalLauncher:async()=>({external:true,isDestroyed:()=>false,isSessionEnabled:()=>true,url:()=> 'https://muse.ai/',openMuse:async()=>{},show:async()=>{},close:async()=>{},evaluate:async(fn,arg)=>{
    if(fn.name==='beginTracking'){last=arg.prompt;prompts.push(arg.prompt);return{};}
    if(fn.name==='submitPrompt')return{clicked:true};
-   if(fn.name==='pollTracking')return /VARIATION 2:/.test(last)?{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null}:{phase:'waiting-response',ready:false,echoMatched:true,responseMatched:false,progress:null,refused:'repeat'};
+   if(fn.name==='pollTracking')return /VARIATION 2:/.test(last)?{phase:'ready',ready:true,echoMatched:true,responseMatched:true,progress:null}:{phase:'waiting-response',ready:false,echoMatched:true,responseMatched:false,progress:null,refused:'repeat',reply:'Prompt này vẫn như cũ nên mình chưa tạo được.'};
    if(fn.name==='downloadAction')return{action:'clicked',clicked:true};return null;
   },captureDownload:async(target,{trigger})=>{await trigger();await fs.writeFile(target,fixtureMp4());}})});
   await app.invoke('settings',{...app.invoke('state').settings,browserChoice:'chrome',finishAction:'keep'});await app.invoke('browser',0);await app.invoke('add',[{prompt:'Line one of the scene\nLine two of the scene'}]);await app.invoke('start');
@@ -681,6 +681,7 @@ test('Muse từ chối prompt đã làm («vẫn như cũ»): tool gửi lại b
   assert.match(prompts[2],/^Line one of the scene\nLine two of the scene\nVARIATION 2: /);assert.equal(prompts[2].match(/VARIATION/g).length,1,'dòng biến thể cũ được thay, không chồng lên nhau');
   assert.equal(app.invoke('state').jobs[0].status,'completed');
   assert.ok(app.updates.some(rows=>rows.some(j=>/giống lần gửi trước/.test(j.stageMessage||'')&&/biến thể/.test(j.stageMessage||''))),'cảnh nói rõ vì sao gửi lại');
+  assert.ok(app.updates.some(rows=>rows.some(j=>/Muse vừa nói: «Prompt này vẫn như cũ nên mình chưa tạo được\.»/.test(j.stageMessage||''))),'thẻ cảnh hiện nguyên văn câu Muse vừa nói');
   await app.stop();
  }finally{if(app&&!app.lifecycle.includes('quit'))await app.stop();await fs.rm(dir,{recursive:true,force:true});}
 });

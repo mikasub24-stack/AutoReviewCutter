@@ -142,6 +142,14 @@ Node22 trở lên: `npm ci`, `npm test`, `npm run test:ui`, `npm run dist:win`. 
 
 Các test đơn vị kiểm tra import60 cảnh, mapping ảnh, hủy job đang chờ, xóa hàng loạt, vòng đời cửa sổ, phiên mã hóa, mở Muse không phụ thuộc IP, trial/key và QR. Test trình duyệt không gọi dịch vụ Muse hoặc ngân hàng. Bản Windows unsigned được build qua GitHub Actions, tải ở Releases.
 
+## Update 1.15.10
+
+- **Nhận ra thêm cách Muse từ chối: «Đây vẫn là prompt gốc, không phải bản đã chỉnh mình vừa gửi… chỉ đổi dòng ACTION… gửi lại kèm ảnh này».** Bản 1.15.9 chưa nhận ra câu này nên cảnh vẫn treo. Giờ nó được xử lý như «prompt vẫn như cũ»: tự gửi lại bản biến thể rồi mới báo lỗi và đổi tài khoản.
+- **Biến thể sửa thẳng dòng ACTION.** Muse so sánh dòng ACTION, nên ghi chú `VARIATION n:` giờ nằm ở cuối chính dòng ACTION (prompt không có dòng ACTION thì vẫn thêm một dòng cuối như trước). Ghi chú cũ được thay, không chồng lên nhau.
+- **Thẻ cảnh hiện nguyên văn câu Muse vừa nói** khi cảnh đang chờ clip («Đã thấy tin nhắn · chờ Muse phản hồi · Muse vừa nói: «…»»), kể cả khi đó không phải câu từ chối. Chỉ lấy câu ngắn nằm sau prompt của cảnh và chưa có clip theo sau. Chỉ hiện trên thẻ cảnh, không ghi vào file «Xuất thông tin lỗi chat».
+- Test mới: thêm hai cách nói (tiếng Việt, tiếng Anh) và câu «Muse vừa nói» vào `muse-tracker-smoke` và `main-lifecycle`; `repeat-prompt.test` kiểm biến thể trên dòng ACTION.
+- **Chưa kiểm được trên Windows, Electron và Muse thật.** Chưa biết Muse có chấp nhận biến thể ở dòng ACTION hay không. Muse còn nhắc «bản chỉnh sẵn ở tin nhắn ngay trên»: tool chưa đọc và dùng lại bản Muse tự viết, chỉ tự đổi dòng ACTION theo cách của nó.
+
 ## Update 1.15.9
 
 - **Sửa lỗi cảnh treo mãi khi Muse từ chối bằng chữ.** Hai kiểu trả lời Muse đưa ra mà không có clip, và tool trước đây coi là «đang chờ video» nên đứng im vô hạn, không thử lại, không đổi tài khoản:

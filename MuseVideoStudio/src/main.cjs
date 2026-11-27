@@ -621,7 +621,7 @@ async function runJobOnce(job,worker,signal,{recover=false}={}) {
         }catch(e){check();stage('downloading',(image?'Chưa lưu được ảnh · giữ đúng kết quả và thử lại: ':'Chưa lưu được video · giữ đúng kết quả và thử tải lại: ')+e.message);await step(delay(5000));continue;}
       }
       if(!warned&&Date.now()>warnAt){warned=true;job.late=true;}
-      stage(!result.echoMatched?'confirming':'waiting',(job.late?'Muse chậm hơn thời gian dự kiến · vẫn giữ cảnh này; bấm «Dừng cảnh này» hoặc «Tạo lại ngay» nếu không muốn chờ nữa. ':'')+(!result.echoMatched?'Chưa thấy đúng prompt trong chat Muse':!result.responseMatched?'Đã thấy tin nhắn · chờ Muse phản hồi'+(result.hint?' ('+result.hint+')':''):holding?'Ảnh đã hiện · chờ Muse tạo xong rồi mới lưu':result.stage||(image?'Chờ đúng ảnh của prompt':'Chờ đúng video của prompt'))+(result.choice&&!result.choice.answered?' · Muse đang hỏi gửi lại hay tạo clip mới: hãy bấm một lựa chọn trong cửa sổ Muse':''));
+      stage(!result.echoMatched?'confirming':'waiting',(job.late?'Muse chậm hơn thời gian dự kiến · vẫn giữ cảnh này; bấm «Dừng cảnh này» hoặc «Tạo lại ngay» nếu không muốn chờ nữa. ':'')+(!result.echoMatched?'Chưa thấy đúng prompt trong chat Muse':!result.responseMatched?'Đã thấy tin nhắn · chờ Muse phản hồi'+(result.hint?' ('+result.hint+')':'')+(result.reply?' · Muse vừa nói: «'+result.reply+'»':''):holding?'Ảnh đã hiện · chờ Muse tạo xong rồi mới lưu':result.stage||(image?'Chờ đúng ảnh của prompt':'Chờ đúng video của prompt'))+(result.choice&&!result.choice.answered?' · Muse đang hỏi gửi lại hay tạo clip mới: hãy bấm một lựa chọn trong cửa sổ Muse':''));
       await step(delay(1500));
     }
   }finally{
